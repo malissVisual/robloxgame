@@ -2,7 +2,9 @@
 -- Bounds and Roads against design/jinocany/plan.json (JinocanyPlan.luau, tests/run_tests.py writes it from the plan),
 -- and their contracts (Config.Moving.Sandbox.Houses) with the economy's numbers (Config.Furniture, shared/HouseLayout.luau):
 --   * the data: the plan's six (`enter`, in its order: the farmstead first, SandboxMap.House) with their ids, boxes,
---     doors, curbs and yaws as the plan has them, their streets and looks the plan's village houses'; the back door only
+--     doors, curbs and yaws as the plan has them (a family house's door its village look's: shared/VillageLooks.luau's
+--     door spot, Config.Village.Front less the door's 0.3 behind the plan's), their streets and looks the plan's village
+--     houses'; the back door only
 --     the farmstead's; each house's walls' box on its box, its lot round it up to its street, clear of every road, plot
 --     and other lot; the world's Bounds and its step-1 roads the plan's (Pražská from Depot Row's far edge, 8.0's)
 --   * every curb on asphalt with the van's back to the door (the Sprinter across the street, its back and nose and its
@@ -20,6 +22,8 @@ local SandboxMap = require("./SandboxMap")
 local SandboxSteps = require("./SandboxSteps")
 local SprinterLooks = require("./SprinterLooks")
 local HouseLayout = require("./HouseLayout")
+local VillageLooks = require("./VillageLooks")
+local VillageScenery = require("./VillageScenery")
 local Plan = require("./JinocanyPlan")
 
 local failures = 0
@@ -73,6 +77,21 @@ end
 
 check("six houses to empty, the plan's (`enter`), in its order; the first the farmstead, SandboxMap.House", #Houses == 6 and #Plan.enter == 6
 	and Houses[1] == SandboxMap.House and Houses[1].id == "sandbox_house" and Houses[1].name == "The Old Farmstead")
+-- (Jinočany: a family house's door is its village look's, VillageLooks.doorSpots': just outside its door's piece, the
+-- body's front wall Config.Village.Front in from the box's face; DOOR_IN behind the plan's door, along its look)
+local DOOR_IN = Config.Village.Front - 0.3
+local spots: { [string]: VillageLooks.DoorSpot } = {}
+for _, placed in VillageScenery.houses(VillageScenery.enter()) do
+	local h = VillageScenery.emptied(placed)
+	if h then
+		local unit = if placed.kind == "row" then placed.opts.richUnit else nil
+		for _, spot in VillageLooks.doorSpots(VillageLooks.house(placed.kind, placed.box, placed.yaw, placed.seed, placed.opts), placed.box, placed.yaw) do
+			if unit == nil or spot.unit == unit then
+				spots[h.id] = spot
+			end
+		end
+	end
+end
 do
 	local bad: string? = nil
 	local names: { [string]: boolean } = {}
@@ -80,10 +99,16 @@ do
 		local p = Plan.enter[index]
 		local v = Plan.village[h.id]
 		local d, c = h.door, h.curb
+		local inset = if index > 1 then DOOR_IN else 0
+		local ox, oz = look(p.door.yaw)
+		local spot = spots[h.id]
 		if h.id ~= p.id or h.kind ~= p.kind or not same(h.box, p.box) then
 			bad = `{h.id}: its id, kind or box`
-		elseif d.x ~= p.door.x or d.z ~= p.door.z or d.yaw ~= p.door.yaw or c.x ~= p.curb.x or c.z ~= p.curb.z or c.yaw ~= p.curb.yaw then
+		elseif math.abs(d.x - (p.door.x - ox * inset)) > EPS or math.abs(d.z - (p.door.z - oz * inset)) > EPS or d.yaw ~= p.door.yaw
+			or c.x ~= p.curb.x or c.z ~= p.curb.z or c.yaw ~= p.curb.yaw then
 			bad = `{h.id}: its door or curb`
+		elseif index > 1 and (spot == nil or math.abs(spot.x - d.x) > 1e-3 or math.abs(spot.z - d.z) > 1e-3 or spot.yaw ~= d.yaw) then
+			bad = `{h.id}: its door not its village look's ({spot and spot.x}, {spot and spot.z})`
 		elseif d.y ~= SandboxMap.GroundTop or c.y ~= SandboxMap.RoadTop or h.yaw ~= d.yaw then
 			bad = `{h.id}: its door's or curb's height, its yaw`
 		elseif index > 1 and (v == nil or v.street ~= h.street or v.kind ~= h.look or not same(v.box, h.box)) then
@@ -95,7 +120,7 @@ do
 		end
 		names[h.name], names[h.id] = true, true
 	end
-	check("…each one's id, kind, box, door and curb the plan's; its street and look the plan's village house's; names each its own", bad == nil, bad)
+	check("…each one's id, kind, box, door (a family house's its village look's, 1.2 in) and curb the plan's; its street and look the plan's village house's; names each its own", bad == nil, bad)
 end
 check("the farmstead: big, on Pražská, its look its own, its back door in its back wall; the family houses: kind house, no back door",
 	(function(): boolean
@@ -199,10 +224,14 @@ do
 end
 do
 	local bad: string? = nil
-	for _, h in Houses do
+	for index, h in Houses do
 		local d, b = h.door, h.box
 		local lx, lz = look(d.yaw)
-		local onFace = (d.yaw == 0 and d.z == b.z0) or (d.yaw == 180 and d.z == b.z1) or (d.yaw == 90 and d.x == b.x0) or (d.yaw == 270 and d.x == b.x1)
+		-- (on its box's face: a family house's DOOR_IN behind it, its village look's)
+		local inset = if index > 1 then DOOR_IN else 0
+		local fx, fz = d.x + lx * inset, d.z + lz * inset
+		local onFace = (d.yaw == 0 and math.abs(fz - b.z0) < EPS) or (d.yaw == 180 and math.abs(fz - b.z1) < EPS) or (d.yaw == 90 and math.abs(fx - b.x0) < EPS)
+			or (d.yaw == 270 and math.abs(fx - b.x1) < EPS)
 		onFace = onFace and inRect(b, d.x, d.z)
 		-- out of the door: the first road it meets is its street (within 30 studs), its curb on that street
 		local met: string? = nil
@@ -233,7 +262,7 @@ do
 			bad = `{h.id}: its door looks at {met}, not {h.street}`
 		end
 	end
-	check("every door on its box's face, looking out to its own street (the farmstead's over the turnaround), its curb in that street", bad == nil, bad)
+	check("every door on its box's face (a family house's 1.2 behind it), looking out to its own street (the farmstead's over the turnaround), its curb in that street", bad == nil, bad)
 end
 -- The roads reachable from Depot Row (rects that meet), by name.
 local function reach(roads: { any }): { [string]: boolean }

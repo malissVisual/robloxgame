@@ -105,7 +105,8 @@ function vanParts(van, spot) {
   return out;
 }
 
-// Renders the parts from straight above: centre (x, z), k px a stud, W × H px; screen right = +Z, screen up = +X.
+// Renders the parts from straight above: centre (x, z), k px a stud, W × H px; screen right = +Z, screen up = +X
+// (8.9 view.northUp: screen right = +X, screen up = north, -Z).
 window.renderTop = (parts, view) => {
   const { W, H, k, cx, cz } = view;
   makeRenderer(W, H);
@@ -113,8 +114,9 @@ window.renderTop = (parts, view) => {
   scene.background = new THREE.Color(0x7fa35a);
   scene.add(new THREE.HemisphereLight(0xeef3ff, 0x606048, 1.15));
   const sun = new THREE.DirectionalLight(0xfff0d8, 2.4);
-  // light from the screen's top left (+X, -Z) and high: the shadows fall to the bottom right
-  sun.position.set(cx + 200, 640, cz - 230);
+  // light from the screen's top left (+X, -Z; north up: -X, -Z) and high: the shadows fall to the bottom right
+  if (view.northUp) sun.position.set(cx - 230, 640, cz - 200);
+  else sun.position.set(cx + 200, 640, cz - 230);
   sun.target.position.set(cx, 0, cz);
   scene.add(sun.target);
   sun.castShadow = true;
@@ -134,7 +136,8 @@ window.renderTop = (parts, view) => {
   const w = W / k, h = H / k;
   const cam = new THREE.OrthographicCamera(-w / 2, w / 2, h / 2, -h / 2, 1, 3000);
   cam.position.set(cx, 1200, cz);
-  cam.up.set(1, 0, 0);
+  if (view.northUp) cam.up.set(0, 0, -1);
+  else cam.up.set(1, 0, 0);
   cam.lookAt(cx, 0, cz);
   renderer.render(scene, cam);
   const out = document.createElement('canvas');

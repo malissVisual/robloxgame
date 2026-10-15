@@ -7,7 +7,7 @@
 > uncommon to legendary), and **four player plots** with a **ZDC warehouse** each. **Jinočany step 1:** six houses to
 > empty (`SandboxMap.Houses`, a contract each in `Config.Moving.Sandbox.Houses`): The Old Farmstead (the big house, The
 > Nováks) and five family houses in the village on Hlavní, Školní, Lidická and Smetanova (a smaller plan, 15 minutes;
-> stand-in looks until the village's art). The kiosk offers one at a time: your card keeps its house and seed (in your
+> the village's own look, a rich one, their front doors walked in as the farmstead's). The kiosk offers one at a time: your card keeps its house and seed (in your
 > save too) until a trip brings something home, then the next free house; two players never get the same one. Every player drives a
 > **walk-in ZDC Sprinter** (`Config.Cars` sprinter, `shared/SprinterLooks.luau`; the owner's Blender look
 > `design/blender-sprinter/` dresses it once imported): open its back or its sliding door, walk up the step and load
@@ -147,6 +147,19 @@
 > (Set price at the stand or 🏷 in STOCK; "🏷 FOR SALE $X" on its tag) and **Buy $X** for everybody else, even while
 > the owner is on a move. The server re-checks everything in one step: the piece goes to the buyer's stock and book,
 > the seller gets the price minus an 8% ZDC fee (PlayerSale, PlayerBuy, TradeFee). The First Deal badge (id 0: off).
+>
+> **8.8** (the owner: "no roles, everyone the same"; the trade review; Jinočany begins): **no move roles in the sandbox**
+> (`MoveRoles.on()` false whenever `Config.Sandbox.On`; the city keeps them behind `Config.MoveRoles.On`): the planning
+> is the crew, READY and LAUNCH; anyone loads and unloads with no wait and anyone calls the van to the door once a move
+> (the move's list, O); nobody carries a piece for two alone at pace. **The trade review's fixes**: a bought piece's
+> book page is `bought` (no milestone, no badge, no "found"), a transfer never counts as brought home
+> (`Collection.onTransferred`), both players saved at once (the buyer first), the offer card armed `CardArm` s (a
+> double click answers one offer), offers and buys need the prompt's ticket, presence and a cooldown
+> (`Config.PlayerTrade`). **First-time hints** for the clipboard and trading, a sell-to-players guide step. **sfx5**
+> (`art/audio/sfx5.ogg`, NAHRAT-SFX5.md): the clipboard's rustle, a piece's tick, an order's chirp, Danny's whistle,
+> the trades' and the auction's sounds (stand-ins until it is uploaded). **Jinočany 1a**: the big house is **The Old
+> Farmstead** on **Pražská**; the soundscape is the village's (fields, the D5's far hum from the east, the chapel's
+> bell, a dog, a tractor; no cowbells), the light at 50° (design/jinocany/NAVRH.md).
 
 The active Roblox game in this repository (Merge Blades is preserved in `../archive/merge-blades`). **You run a delivery company** in a world
 gone wrong: take a job, carry the cargo to your vehicle with your own hands (or lead the horses on a rope), drive it

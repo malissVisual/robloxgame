@@ -20,6 +20,10 @@ every warehouse a Logistics Center (8.3: level 5, the biggest, More stands at it
 move running with the inside and Danny, the server's cap of visitors. The players' own avatars, the
 greeters on the porch and the owner's Blender imports (the Sprinter, the furniture, the chalet) are not in it. 8.3 the
 big move: its inside is counted for every player at once too (4 moves running: a worst case past the one move's).
+8.9 Jinočany: the map is the village's now (server/VillageWorld.luau: world/Village, world/Motorway, world/Far; step 1's
+five family houses to empty among world/Village's houses, rich, with their walk-in doors' leaves, solid pieces and dark
+halls: server/SandboxWorld.luau's villageHouse); then the
+map with 8.8's Auction House (built once Config.Auction.On) against SandboxScenery.Budget: over it, the run fails.
 
     python3 tools/perf/sandbox_count.py <path to the luau binary> [zombie-delivery dir]
 
@@ -97,7 +101,23 @@ def world_rows(luau, game):
         shutil.copy(os.path.join(HERE, "census.luau"), os.path.join(out, "census.luau"))
         for name, text in (("Collection", COLLECTION), ("SandboxPlots", PLOTS), ("Upgrades", UPGRADES)):
             open(os.path.join(out, "server", name + ".luau"), "w", encoding="utf-8").write(text)
+        has = os.path.exists(os.path.join(game, "src", "shared", "AuctionHouseLayout.luau"))
+        open(os.path.join(out, "has-auction.luau"), "w", encoding="utf-8").write(f"return {'true' if has else 'false'}\n")
         return run(luau, out)
+
+
+def map_budget(rows, game):
+    """8.9 Jinočany: the map (SandboxWorld's, the village built) with the Auction House (once Config.Auction.On) against
+    SandboxScenery.Budget; False when over it."""
+    scenery = open(os.path.join(game, "src", "shared", "SandboxScenery.luau"), encoding="utf-8").read()
+    budget = int(re.search(r"^SandboxScenery\.Budget = (\d+)", scenery, re.M).group(1))
+    world = sum(row.get("parts", 0) for label, row in rows.items() if label.startswith("world/"))
+    auction = rows.get("auction", {}).get("parts", 0)
+    total = world + auction
+    print()
+    print(f"INFO budget\tthe map {world:,} parts, with the Auction House (once Config.Auction.On) {total:,}, "
+          f"of SandboxScenery.Budget {budget:,}: {budget - total:,} left" + ("" if total <= budget else " — OVER BUDGET"))
+    return total <= budget
 
 
 def van_rows(luau, game):
@@ -194,6 +214,8 @@ def main():
             print(f"INFO {label}\t{row['parts']} parts, {row['shadows']} cast shadow, {row['lights']} lights")
     for note in notes:
         print(note)
+    if not map_budget(rows, game):
+        sys.exit(1)
 
 
 if __name__ == "__main__":

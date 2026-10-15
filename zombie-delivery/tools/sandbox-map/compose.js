@@ -1,9 +1,11 @@
-// 8.3, tools/sandbox-map: lays out the map sheet (design/sandbox/map.png): the overview from above (north to the left,
-// screen right = +Z, screen up = +X), plot 1 up close (its warehouse's roof off) and the labels, their spots from the
-// export's facts (shared/SandboxMap.luau, SandboxLeadersRules.spot). data = { world: [part], van: [part], facts }
+// 8.3, tools/sandbox-map: lays out the map sheet (design/sandbox/map.png). 8.9 Jinočany: the whole map from above,
+// north up (screen right = +X, screen down = +Z), the village's streets, landmarks and the six houses to empty labelled;
+// a panel on the right with the title, the legend, plot 1 up close (its warehouse's roof off, north up, its parts
+// numbered) and the scale. The labels' spots from the export's facts (shared/SandboxMap.luau, SandboxLeadersRules.spot,
+// VillageScenery's barrier, plan.json's houses to empty). data = { world: [part], van: [part], facts }
 (function () {
   const FONT = "Montserrat, 'DejaVu Sans', sans-serif";
-  const INK = '#1f2328', ORANGE = '#f0842c', WHITE = '#ffffff', CREAM = '#fff6e8';
+  const INK = '#1f2328', ORANGE = '#f0842c', WHITE = '#ffffff', CREAM = '#fff6e8', GREEN = '#38c172';
   const ROOF = /^(Roof|Gable|Barge|Ridge|Gutter|Rib|Downpipe|Beam|Lamp|Parapet|Cornice|Header|DoorPanel|Skylight|Solar|Vault|Truss)/;
 
   let measurer = null;
@@ -23,9 +25,6 @@
   // A pill label. lines: [{ text, size, weight, color }]; at: [x, y] of its anchor corner (align: 'l' | 'c' | 'r',
   // valign: 't' | 'm' | 'b'); to: optional [x, y] the leader line points at (a dot there).
   const F = 1.2; // every label's words this much bigger (the sheet is read scaled down)
-  function pillHeight(lines, padY = 9) {
-    return lines.reduce((h, l) => h + l.size * F * 1.18, 0) + 4 * (lines.length - 1) + 2 * padY;
-  }
   function pill(svg, lines, at, opts = {}) {
     lines = lines.map(l => ({ ...l, size: l.size * F }));
     const padX = opts.padX ?? 14, padY = opts.padY ?? 9, gap = 4;
@@ -56,49 +55,82 @@
     }
     return { x, y, w: bw, h: bh };
   }
-  // Words on the map itself (a road's name): white with a dark edge.
+  // Words on the map itself (a street's name): white with a dark edge.
   function roadText(svg, text, x, y, size, rotate) {
-    const attrs = { x, y, 'font-family': FONT, 'font-size': size * F, 'font-weight': 800, 'text-anchor': 'middle', 'dominant-baseline': 'middle', 'letter-spacing': 3 };
+    const attrs = { x, y, 'font-family': FONT, 'font-size': size * F, 'font-weight': 800, 'text-anchor': 'middle', 'dominant-baseline': 'middle', 'letter-spacing': 2 };
     if (rotate) attrs.transform = `rotate(${rotate} ${x} ${y})`;
-    el(svg, 'text', { ...attrs, fill: 'none', stroke: INK, 'stroke-width': 6, 'stroke-linejoin': 'round', opacity: 0.75 }, text);
+    el(svg, 'text', { ...attrs, fill: 'none', stroke: INK, 'stroke-width': 6, 'stroke-linejoin': 'round', opacity: 0.8 }, text);
     el(svg, 'text', { ...attrs, fill: WHITE }, text);
+  }
+  // A numbered marker (the close-up's parts).
+  function marker(svg, at, n, color) {
+    el(svg, 'circle', { cx: at[0], cy: at[1], r: 17, fill: color || ORANGE, stroke: WHITE, 'stroke-width': 4 });
+    el(svg, 'text', { x: at[0], y: at[1] + 7, 'font-family': FONT, 'font-size': 20, 'font-weight': 800, fill: WHITE, 'text-anchor': 'middle' }, String(n));
+  }
+
+  // A street's longest stretch between its junctions (other streets touching it): where its name goes.
+  function nameSpot(road, roads) {
+    const alongX = road.x1 - road.x0 >= road.z1 - road.z0;
+    const lo = alongX ? road.x0 : road.z0, hi = alongX ? road.x1 : road.z1;
+    let spans = [[lo, hi]];
+    for (const q of roads) {
+      if (q === road) continue;
+      const touch = q.x0 <= road.x1 && q.x1 >= road.x0 && q.z0 <= road.z1 && q.z1 >= road.z0;
+      if (!touch) continue;
+      const a = (alongX ? q.x0 : q.z0) - 6, b = (alongX ? q.x1 : q.z1) + 6;
+      const next = [];
+      for (const [s0, s1] of spans) {
+        if (b <= s0 || a >= s1) next.push([s0, s1]);
+        else {
+          if (a > s0) next.push([s0, a]);
+          if (b < s1) next.push([b, s1]);
+        }
+      }
+      spans = next;
+    }
+    spans.sort((p, q) => (q[1] - q[0]) - (p[1] - p[0]));
+    const [s0, s1] = spans[0] || [lo, hi];
+    const m = (s0 + s1) / 2;
+    return alongX ? { x: m, z: (road.z0 + road.z1) / 2, alongX } : { x: (road.x0 + road.x1) / 2, z: m, alongX };
   }
 
   window.compose = function (data) {
     const { world, van, facts } = data;
     const plots = facts.plots;
+    const B = facts.bounds;
     const base = world.filter(p => !p.group.startsWith('Sandbox/Far') && !p.group.startsWith('Sandbox/Boundary'));
     const vans = [];
     for (const plot of plots) vans.push(...window.vanParts(van, plot.vanSpot));
     const sheet = document.getElementById('sheet');
     sheet.innerHTML = '';
 
-    // ── The overview: z -250 … 620 across, x -285 … 285 up ──
-    const W = 2400, z0 = -250, z1 = 620, x0 = -285, x1 = 285;
-    const k = W / (z1 - z0), H = Math.round((x1 - x0) * k);
-    const cz = (z0 + z1) / 2, cx = (x0 + x1) / 2;
-    const S = (x, z) => [W / 2 + (z - cz) * k, H / 2 - (x - cx) * k];
-    const top = window.renderTop(base.concat(vans), { W, H, k, cx, cz, shadowMap: 8192 });
+    // ── The overview: the Bounds, north up ──
+    const MW = 2400, k = MW / (B.x1 - B.x0), MH = Math.round((B.z1 - B.z0) * k);
+    const PANEL = 800, W = MW + PANEL, H = MH;
+    const cx = (B.x0 + B.x1) / 2, cz = (B.z0 + B.z1) / 2;
+    const S = (x, z) => [MW / 2 + (x - cx) * k, MH / 2 + (z - cz) * k];
+    const top = window.renderTop(base.concat(vans), { W: MW, H: MH, k, cx, cz, shadowMap: 8192, northUp: true });
     sheet.style.width = W + 'px';
     sheet.style.height = H + 'px';
+    sheet.style.background = '#1d2127';
     top.canvas.style.left = '0px';
     top.canvas.style.top = '0px';
     sheet.appendChild(top.canvas);
 
-    // ── The close-up of plot 1 (its warehouse's roof off) ──
+    // ── Plot 1 up close (its warehouse's roof off), north up, in the panel ──
     const p1 = plots.find(p => p.id === 1);
-    const iz0 = -163, iz1 = -88, ix0 = -233, ix1 = -161, ik = 8.4;
-    const IW = Math.round((iz1 - iz0) * ik), IH = Math.round((ix1 - ix0) * ik);
+    const ix0 = -233, ix1 = -161, iz0 = -165, iz1 = -88, ik = 9.6;
+    const IW = Math.round((ix1 - ix0) * ik), IH = Math.round((iz1 - iz0) * ik);
     const icx = (ix0 + ix1) / 2, icz = (iz0 + iz1) / 2;
-    const IL = 650, IT = H - IH - 62; // where it sits on the sheet
-    const IS = (x, z) => [IL + IW / 2 + (z - icz) * ik, IT + IH / 2 - (x - icx) * ik];
+    const IL = MW + Math.round((PANEL - IW) / 2), IT = 470;
+    const IS = (x, z) => [IL + IW / 2 + (x - icx) * ik, IT + IH / 2 + (z - icz) * ik];
     const near = base.filter(p => {
       if (p.group.startsWith('Warehouses/Warehouse1') && !p.group.includes('/Shown') && ROOF.test(p.name)) return false;
       const [x, , z] = p.p;
       const r = Math.max(...p.s);
       return x + r > ix0 - 20 && x - r < ix1 + 20 && z + r > iz0 - 20 && z - r < iz1 + 20;
     });
-    const close = window.renderTop(near.concat(window.vanParts(van, p1.vanSpot)), { W: IW, H: IH, k: ik, cx: icx, cz: icz, shadowMap: 4096 });
+    const close = window.renderTop(near.concat(window.vanParts(van, p1.vanSpot)), { W: IW, H: IH, k: ik, cx: icx, cz: icz, shadowMap: 4096, northUp: true });
     close.canvas.style.left = IL + 'px';
     close.canvas.style.top = IT + 'px';
     close.canvas.style.boxShadow = '0 0 0 5px #ffffff, 0 0 0 9px ' + ORANGE + ', 0 10px 30px rgba(0,0,0,0.5)';
@@ -110,130 +142,135 @@
     svg.setAttribute('height', H);
     sheet.appendChild(svg);
 
-    // the unload circles (not painted in the game: the admin's SHOW ZONES shows them)
+    // ── On the map ──
+    // the unload circles (not painted in the game) and the kiosks
     for (const plot of plots) {
       const [ux, uy] = S(plot.unload.x, plot.unload.z);
-      el(svg, 'circle', { cx: ux, cy: uy, r: plot.unload.r * k, fill: '#3fb6ff', 'fill-opacity': 0.18, stroke: WHITE, 'stroke-width': 3, 'stroke-dasharray': '9 7' });
-    }
-    // the kiosks (small from up here): an orange ring each
-    for (const plot of plots) {
+      el(svg, 'circle', { cx: ux, cy: uy, r: plot.unload.r * k, fill: '#3fb6ff', 'fill-opacity': 0.2, stroke: WHITE, 'stroke-width': 2, 'stroke-dasharray': '5 4' });
       const [kx, ky] = S(plot.board.x, plot.board.z);
-      el(svg, 'circle', { cx: kx, cy: ky, r: 15, fill: 'none', stroke: WHITE, 'stroke-width': 7, opacity: 0.8 });
-      el(svg, 'circle', { cx: kx, cy: ky, r: 15, fill: 'none', stroke: ORANGE, 'stroke-width': 4 });
+      el(svg, 'circle', { cx: kx, cy: ky, r: 9, fill: 'none', stroke: WHITE, 'stroke-width': 5, opacity: 0.8 });
+      el(svg, 'circle', { cx: kx, cy: ky, r: 9, fill: 'none', stroke: ORANGE, 'stroke-width': 3 });
     }
-    // plot 1's frame and its line to the close-up
+    // the six houses to empty: an orange frame each, numbered
+    const enter = facts.enter || [];
+    enter.forEach((h, i) => {
+      const [ax, ay] = S(h.box.x0, h.box.z0), [bx, by] = S(h.box.x1, h.box.z1);
+      el(svg, 'rect', { x: ax - 5, y: ay - 5, width: bx - ax + 10, height: by - ay + 10, fill: 'none', stroke: WHITE, 'stroke-width': 6, rx: 5, opacity: 0.85 });
+      el(svg, 'rect', { x: ax - 5, y: ay - 5, width: bx - ax + 10, height: by - ay + 10, fill: 'none', stroke: ORANGE, 'stroke-width': 4, 'stroke-dasharray': '10 6', rx: 5 });
+      if (i > 0) marker(svg, [(ax + bx) / 2, (ay + by) / 2], i + 1);
+    });
+    // plot 1's frame (it is up close in the panel)
     {
       const r = p1.rect;
-      const [ax, ay] = S(r.x1, r.z0), [bx, by] = S(r.x0, r.z1);
-      el(svg, 'rect', { x: ax, y: ay, width: bx - ax, height: by - ay, fill: 'none', stroke: ORANGE, 'stroke-width': 4, 'stroke-dasharray': '14 9', rx: 6 });
-      el(svg, 'line', { x1: bx, y1: (ay + by) / 2 + 60, x2: IL - 9, y2: IT + 120, stroke: ORANGE, 'stroke-width': 4, 'stroke-dasharray': '14 9' });
+      const [ax, ay] = S(r.x0, r.z0), [bx, by] = S(r.x1, r.z1);
+      el(svg, 'rect', { x: ax, y: ay, width: bx - ax, height: by - ay, fill: 'none', stroke: ORANGE, 'stroke-width': 3, 'stroke-dasharray': '10 7', rx: 4 });
     }
-
+    // the streets' names (Czech, as in the game; Hlavní's on its west stretch, clear of the green's leader line)
+    const NAME_AT = { 'Hlavní': -920 };
+    for (const road of facts.roads) {
+      const at = nameSpot(road, facts.roads);
+      if (NAME_AT[road.name] !== undefined) at.x = NAME_AT[road.name];
+      const [x, y] = S(at.x, at.z);
+      roadText(svg, road.name.toUpperCase(), x, y, road.lane ? 14 : 16, at.alongX ? 0 : -90);
+    }
     // the plots' names
     for (const plot of plots) {
-      const [lx, ly] = S(plot.rect.x1 - 3, plot.rect.z0 + 4);
-      pill(svg, [{ text: `PLOT ${plot.id}`, size: 25, weight: 800 }, { text: `Level ${plot.level} · ${plot.levelName}`, size: 19, weight: 600, color: CREAM }], [lx, ly], { align: 'l', valign: 't', padY: 7 });
+      const [lx, ly] = S(plot.rect.x0 + 3, plot.rect.z0 + 3);
+      pill(svg, [{ text: `PLOT ${plot.id}`, size: 17, weight: 800 }, { text: `Level ${plot.level} · ${plot.levelName}`, size: 13, weight: 600, color: CREAM }], [lx, ly], { align: 'l', valign: 't', padY: 5, padX: 9 });
     }
-    // the roads
-    {
-      const [rx] = S(0, -60);
-      roadText(svg, 'DEPOT ROW', rx, S(212, 0)[1], 27, -90);
-      roadText(svg, 'DEPOT ROW', rx, S(-100, 0)[1], 27, -90);
-      const [, ry] = S(0, 0);
-      roadText(svg, 'PRAŽSKÁ  ▸  TO THE HOUSE', S(0, 230)[0], ry, 27, 0);
-    }
-    // the crossroads' TOP MOVERS board
-    {
-      const at = S(facts.leaders.x, facts.leaders.z);
-      pill(svg, [{ text: 'TOP MOVERS board', size: 25, weight: 800 }, { text: 'the leaderboard at the crossroads', size: 19, weight: 600, color: CREAM }], [at[0] + 80, at[1] - 150], { to: at });
-    }
-    // the turnaround, the house, its curb and front door
+    // the landmarks
+    const mark = id => (facts.landmarks || []).find(l => l.id === id);
+    const mid = r => [(r.x0 + r.x1) / 2, (r.z0 + r.z1) / 2];
+    const labels = [];
+    const green = mark('green'), chapel = mark('chapel'), shop = mark('drugstore'), pond = mark('pond'), d5 = mark('d5');
+    if (chapel) labels.push({ lines: [['THE CHAPEL GREEN', 'Náves: the chapel, the cross, the lindens,', 'the MOVING CONTRACTS noticeboard']], at: S(-1000, 70), to: S(...mid(chapel)), align: 'l' });
+    if (shop) labels.push({ lines: [['CORNER DRUGSTORE', 'a made-up shop: scenery']], at: S(110, 95), to: S(shop.x0 + 30, shop.z0 + 50), align: 'l' });
+    if (pond) labels.push({ lines: [['LITTLE POND', 'Malý rybník']], at: S(108, 300), to: S(...mid(pond)), align: 'c' });
+    if (d5) labels.push({ lines: [['D5 MOTORWAY', 'cars on it (on every screen,', 'scenery only)']], at: S(250, -450), to: S(360, -330), align: 'r' });
+    if (facts.orchard) labels.push({ lines: [['THE ORCHARD', 'ovocný sad']], at: S(-235, 140), to: null, align: 'c', plain: true });
+    if (facts.barrier) labels.push({ lines: [['ROAD CLOSED', "Hornická: the map's west end"]], at: S(-1165, -150), to: S((facts.barrier.x0 + facts.barrier.x1) / 2, -60), align: 'l' });
     {
       const t = facts.turnaround;
-      const at = S(t.x, t.z - t.r * 0.4);
-      pill(svg, [{ text: 'Turnaround', size: 23, weight: 800 }], [at[0] - 160, at[1] - 150], { to: at, align: 'c' });
+      labels.push({ lines: [['Turnaround']], at: S(t.x + 70, t.z - 60), to: S(t.x + t.r * 0.5, t.z - t.r * 0.3), align: 'l' });
       const h = facts.house;
-      const hb = h.house;
-      const hc = S(hb.x + hb.sx * 0.25, hb.z);
-      pill(svg, [{ text: 'THE OLD FARMSTEAD', size: 27, weight: 800 }, { text: "the owner's big European house:", size: 19, weight: 600, color: CREAM }, { text: 'the one house you empty', size: 19, weight: 600, color: CREAM }], [W - 24, hc[1] - 330], { to: hc, align: 'r', valign: 't' });
-      const curb = S(h.curb.x, h.curb.z);
-      const door = S(h.door.x - 6, h.door.z);
-      pill(svg, [{ text: 'Curb: stop the van here', size: 22, weight: 800 }, { text: 'nose to the road, back to the door', size: 18, weight: 600, color: CREAM }], [door[0] - 26, curb[1] + 105], { to: curb, align: 'r', valign: 't' });
-      pill(svg, [{ text: 'Front door', size: 22, weight: 800 }, { text: 'walk in: no key', size: 18, weight: 600, color: CREAM }], [W - 14, curb[1] + 105], { to: door, align: 'r', valign: 't' });
+      labels.push({ lines: [['THE OLD FARMSTEAD', 'Statek: the big house to empty (1)']], at: S(h.lot.x1 + 40, h.house.z + 30), to: S(h.house.x + h.house.sx * 0.3, h.house.z), align: 'l' });
+      labels.push({ lines: [['TOP MOVERS board', 'the leaderboard at the crossroads']], at: S(-40, -8), to: S(facts.leaders.x, facts.leaders.z), align: 'r' });
+    }
+    for (const l of labels) {
+      const [head, ...rest] = l.lines[0];
+      const lines = [{ text: head, size: 19, weight: 800 }, ...rest.map(t => ({ text: t, size: 14, weight: 600, color: CREAM }))];
+      pill(svg, lines, l.at, { to: l.to || undefined, align: l.align, valign: 'm', opacity: l.plain ? 0.8 : 0.92 });
     }
 
-    // ── The close-up's labels: a column right of it, in the order of their targets (no crossing lines) ──
-    pill(svg, [{ text: 'PLOT 1 UP CLOSE', size: 24, weight: 800 }, { text: "the roof is taken off here", size: 17, weight: 600, color: CREAM }], [IL + 10, IT + 10], { align: 'l', valign: 't', fill: ORANGE, opacity: 0.95, padY: 7 });
+    // ── The panel (the sheet's own dark ground, right of the map) ──
+    const PL = MW + 34;
+    {
+      let y = 30;
+      const title = pill(svg, [
+        { text: 'ZOMBIE DELIVERY · THE SANDBOX MAP', size: 25, weight: 800 },
+        { text: 'Jinočany, step 1 · seen from above, north up', size: 17, weight: 600, color: CREAM },
+        { text: `4 plots · ${facts.roads.length} streets · ${facts.villageHouses} village houses · 6 houses to empty`, size: 17, weight: 600, color: CREAM },
+      ], [PL, y], { align: 'l', valign: 't', padX: 18, padY: 14 });
+      y = title.y + title.h + 16;
+      const rows = ['unload circle (not painted in the game)', 'a Sprinter van at its plot', 'kiosk: take a move there (E)', 'a house to empty (their looks come with the moves):'];
+      const names = (facts.enter || []).map((h, i) => `${i + 1} ${i === 0 ? 'The Old Farmstead' : h.name.replace(' house', '')}`);
+      if (names.length) rows.push('   ' + names.slice(0, 3).join(' · '), '   ' + names.slice(3).join(' · '));
+      const lh = 30 * F;
+      const lw = PANEL - 68;
+      el(svg, 'rect', { x: PL, y, width: lw, height: rows.length * lh + 16, rx: 9, fill: INK, 'fill-opacity': 0.92 });
+      rows.forEach((r, i) => {
+        const cyRow = y + 8 + i * lh + lh / 2;
+        el(svg, 'text', { x: PL + 62, y: cyRow + 7, 'font-family': FONT, 'font-size': 16 * F, 'font-weight': 600, fill: WHITE }, r);
+        if (i === 0) el(svg, 'circle', { cx: PL + 30, cy: cyRow, r: 11, fill: '#3fb6ff', 'fill-opacity': 0.35, stroke: WHITE, 'stroke-width': 2.5, 'stroke-dasharray': '5 4' });
+        if (i === 1) el(svg, 'rect', { x: PL + 14, y: cyRow - 7, width: 32, height: 14, rx: 3, fill: '#dfe5ea', stroke: '#8a939c', 'stroke-width': 2 });
+        if (i === 2) {
+          el(svg, 'circle', { cx: PL + 30, cy: cyRow, r: 11, fill: 'none', stroke: ORANGE, 'stroke-width': 4 });
+          el(svg, 'rect', { x: PL + 25, y: cyRow - 2, width: 10, height: 4, fill: WHITE });
+        }
+        if (i === 3) el(svg, 'rect', { x: PL + 15, y: cyRow - 10, width: 30, height: 20, rx: 3, fill: 'none', stroke: ORANGE, 'stroke-width': 3, 'stroke-dasharray': '6 4' });
+      });
+    }
+    // the close-up: its title on it, its parts numbered, their words under it
+    pill(svg, [{ text: 'PLOT 1 UP CLOSE', size: 21, weight: 800 }, { text: 'the roof is taken off here', size: 15, weight: 600, color: CREAM }], [IL + 10, IT + 10], { align: 'l', valign: 't', fill: ORANGE, opacity: 0.95, padY: 7 });
     {
       const [ucx, ucy] = IS(p1.unload.x, p1.unload.z);
       el(svg, 'circle', { cx: ucx, cy: ucy, r: p1.unload.r * ik, fill: '#3fb6ff', 'fill-opacity': 0.14, stroke: WHITE, 'stroke-width': 4, 'stroke-dasharray': '14 10' });
-      // a part of plot 1's warehouse by its name, nudged (studs along x and z), on the sheet
       const at = (name, dx, dz) => {
         const part = base.find(p => p.group === 'Warehouses/Warehouse1' && p.name === name);
-        return IS(part.p[0] + dx, part.p[2] + dz);
+        return part ? IS(part.p[0] + dx, part.p[2] + dz) : IS(p1.door.x, p1.door.z);
       };
-      const spawn = IS(p1.spawn.x, p1.spawn.z);
-      el(svg, 'circle', { cx: spawn[0], cy: spawn[1], r: 14, fill: '#38c172', stroke: WHITE, 'stroke-width': 4 });
-      const labels = [
-        { to: [spawn[0] + 12, spawn[1]], color: '#38c172', lines: [['You appear here', 'by your van, after PLAY']] },
-        { to: at('Stand2', 0, -2), lines: [[`Display stands (${p1.stands} at level ${p1.level})`, 'a piece on show earns $ every minute']] },
-        { to: IS(p1.unload.x + p1.unload.r * 0.7, p1.unload.z + p1.unload.r * 0.71), lines: [['Unload circle', "back the van in: the load goes", 'into your stock (P → SHOW ZONES shows it)']] },
-        { to: IS(p1.vanSpot.x + 1.5, p1.vanSpot.z + 6), lines: [['Your Sprinter van', 'parked back to the warehouse door']] },
-        { to: at('TerminalDesk', 0, -0.6), lines: [['UPGRADES desk', 'warehouse levels 1 – 5, More stands,', "lights, the van's engine, Danny's training"]] },
-        { to: at('Floor', -p1.size[0] * 0.44, p1.size[2] * 0.2), lines: [[`Your warehouse, level ${p1.level}: ${p1.levelName}`, 'it grows bigger with every level']] },
-        { to: IS(p1.board.x, p1.board.z + 0.6), lines: [['Kiosk: take a move here (E)', 'the Moving contracts board']] },
+      const items = [
+        { to: IS(p1.spawn.x, p1.spawn.z), color: GREEN, lines: ['You appear here', 'by your van, after PLAY'] },
+        { to: at('Stand2', 0, 0), lines: [`Display stands (${p1.stands} at level ${p1.level})`, 'a piece on show earns $ every minute'] },
+        { to: IS(p1.unload.x - p1.unload.r * 0.7, p1.unload.z + p1.unload.r * 0.4), lines: ['Unload circle', 'back the van in: the load goes into your stock (P → SHOW ZONES shows it)'] },
+        { to: IS(p1.vanSpot.x, p1.vanSpot.z + 4), lines: ['Your Sprinter van', 'parked back to the warehouse door'] },
+        { to: at('TerminalDesk', 0, 0), lines: ['UPGRADES desk', "warehouse levels 1 – 5, More stands, lights, the van's engine, Danny's training"] },
+        { to: at('Floor', p1.size[0] * 0.3, -p1.size[2] * 0.3), lines: [`Your warehouse, level ${p1.level}: ${p1.levelName}`, 'it grows bigger with every level'] },
+        { to: IS(p1.board.x, p1.board.z), lines: ['Kiosk: take a move here (E)', 'the Moving contracts board: a house to empty'] },
       ];
-      const colX = IL + IW + 34;
-      const rows = l => { const [head, ...rest] = l.lines[0]; return [{ text: head, size: 20, weight: 800 }, ...rest.map(t => ({ text: t, size: 16, weight: 600, color: CREAM }))]; };
-      const total = labels.reduce((a, l) => a + pillHeight(rows(l)), 0);
-      const gap = (IH - total) / (labels.length - 1);
-      let y = IT;
-      for (const l of labels) {
-        const box = pill(svg, rows(l), [colX, y], { to: l.to, align: 'l', valign: 't', lineColor: l.color, padY: 9 });
-        y += box.h + gap;
-      }
-    }
-
-    // ── The title, the legend, the compass and the scale ──
-    {
-      const L = 690, T = 26;
-      const box = pill(svg, [
-        { text: 'ZOMBIE DELIVERY · THE SANDBOX MAP', size: 34, weight: 800 },
-        { text: 'Seen from above. North is to the left. 4 plots, 1 house, 2 roads.', size: 21, weight: 600, color: CREAM },
-        { text: 'Here every plot shows another warehouse level; a new player starts at level 1.', size: 21, weight: 600, color: CREAM },
-      ], [L, T], { align: 'l', valign: 't', padX: 20, padY: 14 });
-      // the legend: an icon, then its words
-      const rows = ['unload circle (not painted in the game)', 'a Sprinter van at its plot', 'kiosk (Moving contracts board) at each door'];
-      const lh = 32 * F, top = box.y + box.h + 14;
-      const lw = Math.max(...rows.map(r => textWidth(r, 19 * F, 600))) + 80;
-      el(svg, 'rect', { x: L, y: top, width: lw, height: rows.length * lh + 16, rx: 9, fill: INK, 'fill-opacity': 0.92 });
-      rows.forEach((r, i) => {
-        const cyRow = top + 8 + i * lh + lh / 2;
-        el(svg, 'text', { x: L + 62, y: cyRow + 8, 'font-family': FONT, 'font-size': 19 * F, 'font-weight': 600, fill: WHITE }, r);
-        if (i === 0) el(svg, 'circle', { cx: L + 30, cy: cyRow, r: 11, fill: '#3fb6ff', 'fill-opacity': 0.35, stroke: WHITE, 'stroke-width': 2.5, 'stroke-dasharray': '5 4' });
-        if (i === 1) el(svg, 'rect', { x: L + 14, y: cyRow - 7, width: 32, height: 14, rx: 3, fill: '#dfe5ea', stroke: '#8a939c', 'stroke-width': 2 });
-        if (i === 2) {
-          el(svg, 'circle', { cx: L + 30, cy: cyRow, r: 12, fill: 'none', stroke: ORANGE, 'stroke-width': 4 });
-          el(svg, 'rect', { x: L + 25, y: cyRow - 2, width: 10, height: 4, fill: WHITE });
-        }
+      let y = IT + IH + 40;
+      items.forEach((it, i) => {
+        marker(svg, it.to, i + 1, it.color);
+        marker(svg, [PL + 18, y + 14], i + 1, it.color);
+        el(svg, 'text', { x: PL + 48, y: y + 21, 'font-family': FONT, 'font-size': 18 * F, 'font-weight': 800, fill: WHITE }, it.lines[0]);
+        el(svg, 'text', { x: PL + 48, y: y + 48, 'font-family': FONT, 'font-size': 13 * F, 'font-weight': 600, fill: CREAM }, it.lines[1]);
+        y += 66;
       });
     }
+    // the compass and the scale (100 studs), the footer
     {
-      // scale: 100 studs, at the bottom right; the compass (an arrow to the left, N) left of it
-      const len = 100 * k, sx = W - 50 - len, sy = H - 92;
-      const cxp = sx - 100, cyp = sy - 6;
-      el(svg, 'circle', { cx: cxp, cy: cyp, r: 50, fill: INK, 'fill-opacity': 0.9, stroke: WHITE, 'stroke-width': 3 });
-      el(svg, 'path', { d: `M ${cxp - 38} ${cyp} L ${cxp + 6} ${cyp - 18} L ${cxp - 2} ${cyp} L ${cxp + 6} ${cyp + 18} Z`, fill: ORANGE });
-      el(svg, 'text', { x: cxp + 22, y: cyp + 10, 'font-family': FONT, 'font-size': 30, 'font-weight': 800, fill: WHITE, 'text-anchor': 'middle' }, 'N');
+      const len = 100 * k, sx = MW + PANEL - 60 - len, sy = H - 110;
+      const cxp = sx - 110, cyp = sy - 6;
+      el(svg, 'circle', { cx: cxp, cy: cyp, r: 46, fill: INK, 'fill-opacity': 0.9, stroke: WHITE, 'stroke-width': 3 });
+      el(svg, 'path', { d: `M ${cxp} ${cyp - 36} L ${cxp + 16} ${cyp + 6} L ${cxp} ${cyp - 2} L ${cxp - 16} ${cyp + 6} Z`, fill: ORANGE });
+      el(svg, 'text', { x: cxp, y: cyp + 32, 'font-family': FONT, 'font-size': 22, 'font-weight': 800, fill: WHITE, 'text-anchor': 'middle' }, 'N');
       el(svg, 'rect', { x: sx - 14, y: sy - 44, width: len + 28, height: 74, rx: 9, fill: INK, 'fill-opacity': 0.9 });
       el(svg, 'line', { x1: sx, y1: sy, x2: sx + len, y2: sy, stroke: WHITE, 'stroke-width': 6 });
       el(svg, 'line', { x1: sx, y1: sy - 10, x2: sx, y2: sy + 10, stroke: WHITE, 'stroke-width': 4 });
       el(svg, 'line', { x1: sx + len, y1: sy - 10, x2: sx + len, y2: sy + 10, stroke: WHITE, 'stroke-width': 4 });
       el(svg, 'text', { x: sx + len / 2, y: sy - 16, 'font-family': FONT, 'font-size': 20, 'font-weight': 700, fill: WHITE, 'text-anchor': 'middle' }, '100 studs');
-    }
-    {
-      el(svg, 'text', { x: W - 24, y: H - 18, 'font-family': FONT, 'font-size': 15, 'font-weight': 600, fill: WHITE, 'text-anchor': 'end', opacity: 0.9 },
-        `Drawn from the game's code (SandboxMap, SandboxWorld, Warehouse, MoveSites, SandboxLeaders) · version ${facts.version} · parts look, no Blender imports`);
+      const foot = ["Drawn from the game's code (SandboxMap, SandboxWorld, VillageWorld,", `Warehouse, MoveSites, SandboxLeaders) · version ${facts.version}`, 'parts look, no Blender imports'];
+      foot.forEach((t, i) => el(svg, 'text', { x: PL, y: H - 250 + i * 22, 'font-family': FONT, 'font-size': 15, 'font-weight': 600, fill: WHITE, opacity: 0.85 }, t));
     }
     return { W, H, parts: top.count, closeParts: close.count };
   };

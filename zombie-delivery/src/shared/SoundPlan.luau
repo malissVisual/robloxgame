@@ -50,8 +50,7 @@
 --                                                 warehouse (amb_warehouse), room (amb_room)
 --   SoundPlan.sandboxPlace(x, y, z, inside, levelOf?)   where you are: "house" (inside: the move's state says you
 --                                                 are in its house; or far off the sandbox's map, where the moves build
---                                                 their interiors; or in a house to empty's own box, the farmstead's or
---                                                 Jinočany's SandboxMap.Houses'), "warehouse" (in a plot's
+--                                                 their interiors; or in the farmstead's own box), "warehouse" (in a plot's
 --                                                 warehouse building) or "outdoors". 8.3: every plot's warehouse is the
 --                                                 building of its level (WarehouseLayout.site: 1 the Garage … 5 the
 --                                                 Logistics Center, up to its roof's top); levelOf(plot id) → its level
@@ -516,11 +515,10 @@ function SoundPlan.sandboxPlace(x: number, y: number, z: number, inside: boolean
 	if x < b.x0 - OFF_MAP or x > b.x1 + OFF_MAP or z < b.z0 - OFF_MAP or z > b.z1 + OFF_MAP then
 		return "house"
 	end
-	for _, house in (SandboxMap :: any).Houses or { SandboxMap.House } do -- (Jinočany: every house to empty's box)
-		local h = if type(house) == "table" then house.house else nil
-		if type(h) == "table" and math.abs(x - h.x) <= h.sx / 2 - INSET and math.abs(z - h.z) <= h.sz / 2 - INSET and y >= h.y - 2 and y <= h.y + h.sy then
-			return "house"
-		end
+	local house: any = SandboxMap.House
+	local h = if type(house) == "table" then house.house else nil
+	if type(h) == "table" and math.abs(x - h.x) <= h.sx / 2 - INSET and math.abs(z - h.z) <= h.sz / 2 - INSET and y >= h.y - 2 and y <= h.y + h.sy then
+		return "house"
 	end
 	local plot = SandboxMap.plotAt(x, z)
 	local w = if plot then hallOf(plot, if levelOf then levelOf(plot.id) else nil) else nil

@@ -1,7 +1,7 @@
 -- 8.3: the sandbox's map for design/sandbox/map.png (tools/sandbox-map/render.py copies this as main.luau next to the
 -- real server modules on tools/perf/world-mock.luau): builds the map, the kiosks, the warehouses (plot n at level n) and
 -- the TOP MOVERS board, then prints every BasePart as a "PART" JSON line (where, its turn, size, colour, material, shape,
--- the folders it is in) and the labels' spots as one "FACTS" line.
+-- the folders it is in) and the labels' spots as one "FACTS" line (8.9: the village's streets, landmarks and barrier too).
 setfenv(1, require("./mock").env)
 local SandboxMap = require("./shared/SandboxMap")
 local SandboxLeadersRules = require("./shared/SandboxLeadersRules")
@@ -76,6 +76,15 @@ end
 
 -- The facts the labels need (SandboxMap's spots, the board's spot, each plot's level and building)
 local facts = { plots = {}, house = SandboxMap.House, roads = SandboxMap.Roads, turnaround = SandboxMap.Turnaround, bounds = SandboxMap.Bounds }
+-- 8.9 Jinočany: the village's landmarks, the orchard, its houses' count and Hornická's barrier (where VillageScenery puts it)
+facts.landmarks = SandboxMap.Landmarks
+facts.orchard = SandboxMap.Orchard
+facts.villageHouses = #SandboxMap.Village
+for _, m in require("./shared/VillageScenery").landmarks() do
+	if m.kind == "barrier" then
+		facts.barrier = m.box
+	end
+end
 for _, plot in SandboxMap.Plots do
 	local level = Warehouse.level(plot.id)
 	local def = WarehouseLayout.level(level) -- (Config.Warehouse.Levels')
