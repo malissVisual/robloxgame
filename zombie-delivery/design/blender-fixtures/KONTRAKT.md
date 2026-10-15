@@ -44,8 +44,9 @@ in front of its box, or into the wall behind (+Z past D/2) by more than 0.05.
 
 - `fixtures.py` builds every kind in its exact box, each at its own place in a row (with a nice preview scene: a
   kitchen corner, the bathroom and the living room's Kachelofen), alpine chalet style to match the house: pine and
-  painted wood, ceramic tiles, white enamel, brushed metal. Keep it light: about 1,500 triangles a kind at most (the
-  Kachelofen 3,000), every piece ("<kind>_<finish>") at most 10,000.
+  painted wood, ceramic tiles, white enamel, brushed metal. Keep it light: at most 3,000 triangles a kind (the
+  Kachelofen 4,000; the lead relaxed the first 1,500 once the model came to about 22,000 in all), every piece
+  ("<kind>_<finish>") at most 10,000.
 - Pieces are named `<kind>_<finish>` (one mesh per kind and finish), as in `design/blender-furniture/furniture.py`'s
   `export_game`. Its markers: `mark_o`, `mark_x`, `mark_y`, `mark_z` (the game's axes: x right = Blender −x, y up =
   Blender z, z back = Blender y; 10 studs each); `mark_<kind>` at each kind's frame origin (the bottom middle);

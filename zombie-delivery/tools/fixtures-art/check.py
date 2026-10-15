@@ -54,7 +54,7 @@ KINDS = {
     "shelves": (5, 7, 1.6), "garage_door": (12, 8.5, 0.3),
 }
 PALETTE = {"tile": ("Stove",), "tile2": ("Upper",), "pine": ("Seat", "StoveBench"), "cushion": ("Cushion",)}
-TRIANGLES = {"kind": 1500, "kachelofen": 3000, "piece": 10000}
+TRIANGLES = {"kind": 3000, "kachelofen": 4000, "piece": 10000}  # (8.7.1: the lead relaxed the contract's 1,500: the whole model about 22,000)
 BASIN_MIRROR = 6.9  # the contract: the basin's mirror up to y 6.9 in its frame
 TOL = 0.05  # the contract's: into the wall behind (and here: into the room in front) at most this
 RUNS = {  # mode → the interiors it builds (kind, seed)
