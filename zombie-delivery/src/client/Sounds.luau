@@ -48,6 +48,12 @@
 -- (through Sounds.play / playAt). Money that went up outside a job plays nothing here in the sandbox (its money is a
 -- sale or the stands' income: SandboxSounds plays those). 8.3: the book's, the tasks' and the bulk actions' feedback are
 -- SandboxSounds' too (shared/SoundPlan.luau feedbackCues: the existing sheets' sounds, one after the other).
+--
+-- 8.9, the newest features' sounds (art/audio/sfx5.ogg, SoundSheet.Sfx5; until Sfx5Id is filled in, their stand-ins:
+-- SoundSheet.Fallback): Danny's clipboard, his orders and his whistle, the trades, the auction, played by name through
+-- client/SandboxSounds.luau event (shared/SoundPlan.luau Events). A Notice's notify waits Config.Soundscape.NoticeWait s:
+-- when a sound of its own answers it (Sounds.answered, SandboxSounds': a piece given to Danny, an order, a trade's
+-- ka-ching) the notify is left out, never both. Sounds.has(name): does a sound play now (its sheet, or a stand-in).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -78,11 +84,15 @@ local player = Players.LocalPlayer
 
 -- Set by client/Main.client.luau: shows a short message (the sound setting after N / SOUND).
 Sounds.notify = nil :: ((text: string) -> ())?
+-- 8.9 set by client/SandboxSounds.luau: is the Notice that came at `at` (os.clock()) answered by a sound of its own?
+-- (asked NoticeWait s after it: true leaves its notify out)
+Sounds.answered = nil :: ((at: number) -> boolean)?
 
 local enabled = SoundSheet.SfxId ~= "" and SoundSheet.MusicId ~= ""
 local sheet2 = SoundSheet.Sfx2Id ~= "" -- 5.7: the world's sounds
 local sheet3 = SoundSheet.Sfx3Id ~= "" -- 6.12: doors, horns, steps by surface, ambience, UI stings
 local sheet4 = SoundSheet.Sfx4Id ~= "" -- 7.1: the moves' sounds and the mountains'
+local sheet5 = SoundSheet.Sfx5Id ~= "" -- 8.9: the newest features' (the clipboard, Danny's orders, trades, the auction)
 -- 5.7: stand-ins from the first sheet while sfx2.ogg is not uploaded yet. 6.12: and from the first two while sfx3.ogg
 -- is not (a stand-in of a stand-in works too: a step plays the 5.7 step once sfx2 is up). 7.1: the list is
 -- SoundSheet.Fallback (make_audio.py), sfx4's too.
@@ -125,6 +135,12 @@ local function find(name: string): (string?, NumberRange?)
 		range = region(SoundSheet.Sfx4, name)
 		if range then
 			return SoundSheet.Sfx4Id, range
+		end
+	end
+	if sheet5 then
+		range = region(SoundSheet.Sfx5, name)
+		if range then
+			return SoundSheet.Sfx5Id, range
 		end
 	end
 	local standIn = FALLBACK[name]
@@ -217,6 +233,11 @@ local function playAt(name: string, position: Vector3, volume: number?, pitch: n
 	sound:Play()
 end
 Sounds.playAt = playAt
+
+-- 8.9: does `name` play now (its sheet uploaded, or a stand-in's; the sounds on, Sounds.start done)?
+function Sounds.has(name: string): boolean
+	return enabled and started and mode ~= 3 and find(name) ~= nil
+end
 
 -- ── Music ─────────────────────────────────────────────────────────────────
 
@@ -456,10 +477,22 @@ local function listenGame()
 	end)
 	local lastNotice = 0
 	Net.get("Notice").OnClientEvent:Connect(function()
-		if os.clock() - lastNotice > 1.2 then
-			lastNotice = os.clock()
-			play("notify", 0.5)
-		end
+		-- 8.9: a sound of its own may answer it (Sounds.answered: a piece given to Danny, an order, a trade's): its
+		-- notify waits NoticeWait s for that and is left out then
+		local at = os.clock()
+		task.delay(Config.Soundscape.NoticeWait, function()
+			local answered = Sounds.answered
+			if answered then
+				local ok, yes = pcall(answered, at)
+				if ok and yes == true then
+					return
+				end
+			end
+			if os.clock() - lastNotice > 1.2 then
+				lastNotice = os.clock()
+				play("notify", 0.5)
+			end
+		end)
 	end)
 	local lastOpen = 0
 	local function opened()
@@ -766,6 +799,8 @@ function Sounds.start()
 		print("[Sounds] 6.12: art/audio/sfx3.ogg is not uploaded yet (SoundSheet.Sfx3Id): stand-ins play (art/audio/NAHRAT-SFX3.md)")
 	elseif not sheet4 then
 		print("[Sounds] 7.1: art/audio/sfx4.ogg is not uploaded yet (SoundSheet.Sfx4Id): stand-ins play (art/audio/NAHRAT-SFX4.md)")
+	elseif not sheet5 then
+		print("[Sounds] 8.9: art/audio/sfx5.ogg is not uploaded yet (SoundSheet.Sfx5Id): stand-ins play (art/audio/NAHRAT-SFX5.md)")
 	end
 	player.CharacterAdded:Connect(function()
 		spawnedAt = os.clock()

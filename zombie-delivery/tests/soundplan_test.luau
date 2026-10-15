@@ -8,7 +8,10 @@
 -- Sprinter's sliding door, step and back doors, no ramp and no Wall's gate on a sandbox move. 8.3, the 8.2 features'
 -- feedback: what the book's, the tasks' and the collection's messages play (the discovery chime, a milestone's fanfare,
 -- a task done and claimed, FILL BEST's few soft clicks, SELL…'s one bigger till), the existing sheets' sounds only, one
--- after the other (the lane: never two stings over each other, a burst is one). In the standalone Luau CLI.
+-- after the other (the lane: never two stings over each other, a burst is one). 8.9, the newest features' own sounds
+-- (sfx5): every event a quiet sound of sfx5, the clipboard's out and away, a piece's tick and cross-off, an order's
+-- chirp, an answer's nope after its Notice, Danny's whistle only when he needs you, the auction's tick, gavel and bell,
+-- the trades' hook; Danny's van door as a player's. In the standalone Luau CLI.
 -- Run: python3 tests/run_tests.py [path to the luau binary]
 
 local Config = require("./Config")
@@ -452,7 +455,11 @@ for _, kind in SoundPlan.FeedbackKinds do
 	end
 	check(`{kind}: its sounds on the existing sheets (or their stand-ins), each plays today`, fine)
 end
-check("no new sheet: still sfx, sfx2, sfx3, sfx4 and the music", SoundSheet.Seconds.sfx5 == nil and (SoundSheet :: any).Sfx5 == nil)
+for _, kind in SoundPlan.FeedbackKinds do
+	for _, cue in SoundPlan.feedbackCues(kind, 5) do
+		check(`8.3 {kind}: {cue.name} is no 8.9 sound (sfx5: the newest features' own)`, SoundSheet.Sfx5[cue.name] == nil, cue.name)
+	end
+end
 local function names2(cues: { SoundPlan.Timed }): string
 	local list = {}
 	for _, cue in cues do
@@ -523,6 +530,125 @@ for key, value in SB do
 end
 for key, value in { "Alpine", "AlpineStandIn", "Warehouse", "WarehouseStandIn", "Room", "Display", "TakeDown", "Sold", "Stored", "Slide", "Step" } do
 	check(`Config.Soundscape.Sandbox.{value} is a volume (0 … 1)`, SB[value] > 0 and SB[value] <= 1, key)
+end
+
+-- ── 8.9: the newest features' sounds (sfx5.ogg) ─────────────────────────────
+-- Every event (the clipboard, Danny's answers, orders and whistle, the trades' hook, the auction) is a sound of sfx5,
+-- quiet UI feedback; the clipboard, the answers, the whistle and the auction's cues from what changed.
+local MoveHelperBrain = require("./MoveHelperBrain")
+local D, TR, AU = S.Danny, S.Trade, S.Auction
+local EVENTS = {
+	"clipboard_out", "clipboard_away", "danny_give", "danny_takeback", "danny_nope", "danny_ack", "danny_whistle",
+	"trade_sold", "trade_offer", "trade_price", "auction_bid", "auction_gavel", "auction_sold", "auction_sold_mine",
+}
+local listedEvents = 0
+for _ in SoundPlan.Events do
+	listedEvents += 1
+end
+check(`8.9 the {#EVENTS} events, no more`, listedEvents == #EVENTS, listedEvents)
+for _, name in EVENTS do
+	local e = SoundPlan.eventOf(name)
+	check(`8.9 {name}: an event`, e ~= nil)
+	if e then
+		check(`8.9 {name}: its sound {e.sound} is on sfx5`, SoundSheet.Sfx5[e.sound] ~= nil, e.sound)
+		check(`8.9 {name}: quiet UI feedback (volume 0 … 0.7, its own pitch)`, e.volume > 0 and e.volume <= 0.7 and e.pitch == 1, e.volume)
+		check(`8.9 {name}: a gap before it plays again (0 … 10 s)`, e.gap >= 0 and e.gap <= 10, e.gap)
+		check(`8.9 {name}: short (at most 2 s)`, SoundSheet.Sfx5[e.sound] ~= nil and SoundSheet.Sfx5[e.sound][2] <= 2)
+		check(`8.9 {name}: {if e.notice then "answers its Notice (a trade's)" else "no Notice of its own"}`, e.notice == (string.sub(name, 1, 6) == "trade_"))
+	end
+end
+check("8.9 an unknown event: none", SoundPlan.eventOf("nope") == nil)
+check("8.9 the trade code's hook: trade_sold, trade_offer, trade_price", #SoundPlan.TradeEvents == 3 and SoundPlan.eventOf("trade_sold") ~= nil
+	and SoundPlan.eventOf("trade_offer") ~= nil and SoundPlan.eventOf("trade_price") ~= nil and table.find(SoundPlan.TradeEvents, "trade_price") ~= nil)
+check("8.9 a sale's ka-ching, an offer's ding, a price's paper", SoundPlan.Events.trade_sold.sound == "coin_kaching" and SoundPlan.Events.trade_offer.sound == "offer_ding"
+	and SoundPlan.Events.trade_price.sound == "price_paper")
+check("8.9 the auction: a bid's tick, the gavel, the \"sold!\" bell (yours louder)", SoundPlan.Events.auction_bid.sound == "bid_tick" and SoundPlan.Events.auction_gavel.sound == "gavel_knock"
+	and SoundPlan.Events.auction_sold.sound == "sold_bell" and SoundPlan.Events.auction_sold_mine.sound == "sold_bell"
+	and SoundPlan.Events.auction_sold_mine.volume > SoundPlan.Events.auction_sold.volume)
+check("8.9 a bid's tick never machine-guns (BidGap), the whistle never nags (WhistleGap)", SoundPlan.Events.auction_bid.gap >= 0.1 and SoundPlan.Events.danny_whistle.gap >= 5)
+-- the clipboard: taken out, put away (your ClipboardHeld before and now)
+check("8.9 the clipboard taken out: its rustle and clip", SoundPlan.clipboardCue(false, true) == "clipboard_out" and SoundPlan.clipboardCue(nil, true) == "clipboard_out")
+check("… put away (the attribute gone)", SoundPlan.clipboardCue(true, false) == "clipboard_away" and SoundPlan.clipboardCue(true, nil) == "clipboard_away")
+check("… no change: nothing", SoundPlan.clipboardCue(true, true) == nil and SoundPlan.clipboardCue(nil, nil) == nil and SoundPlan.clipboardCue(false, nil) == nil)
+-- a piece given or taken back (its DannyQueue before and now)
+check("8.9 a piece onto his list: the pen's tick", SoundPlan.giveOutcome(false, true) == "danny_give")
+check("… off it: crossed off", SoundPlan.giveOutcome(true, false) == "danny_takeback")
+check("… no change (yet): nothing", SoundPlan.giveOutcome(false, false) == nil and SoundPlan.giveOutcome(true, true) == nil)
+-- an order: it applied as it was sent and applies no more (he did it)
+check("8.9 PUT IT DOWN done: his chirp", SoundPlan.orderOutcome("putdown", "putdown", nil) == "danny_ack" and SoundPlan.orderOutcome("putdown", "putdown,getout", "getout") == "danny_ack")
+check("… GET OUT done: his chirp", SoundPlan.orderOutcome("getout", "getout", nil) == "danny_ack" and SoundPlan.orderOutcome("getout", "putdown,getout", "putdown") == "danny_ack")
+check("… still there (not yet, or refused): nothing", SoundPlan.orderOutcome("getout", "getout", "getout") == nil and SoundPlan.orderOutcome("putdown", "putdown,getout", "putdown") == nil)
+check("… an order that did not apply as it was sent: never a chirp (the server refuses it)", SoundPlan.orderOutcome("getout", nil, nil) == nil and SoundPlan.orderOutcome("getout", "putdown", nil) == nil)
+check("… junk: nothing", SoundPlan.orderOutcome("getout", 5, nil) == nil and SoundPlan.orderOutcome("getoutx", "getout", nil) == nil)
+-- an answer awaited (SandboxSounds.await): its event once it shows, the nope Grace s after its Notice, else given up
+local sent = 500
+local function answered(outcome: string?, noticed: number?, now: number): string
+	local name, over = SoundPlan.answer(outcome, sent, noticed, now)
+	return `{name or "-"}:{over}`
+end
+check("8.9 the answer shows: its sound, over", answered("danny_give", nil, sent + 0.1) == "danny_give:true" and answered("danny_ack", sent + 0.1, sent + 0.2) == "danny_ack:true")
+check("… settled quietly (the clipboard out: its rustle is DannyOrders'): no sound, over", answered("", nil, sent + 0.1) == "-:true")
+check("… nothing yet: wait", answered(nil, nil, sent + 0.1) == "-:false")
+check("… its Notice came, nothing changed: wait Grace s, then the nope", answered(nil, sent + 0.2, sent + 0.2 + D.Grace / 2) == "-:false"
+	and answered(nil, sent + 0.2, sent + 0.2 + D.Grace) == "danny_nope:true")
+check("… no word at all: given up quietly after Answer s", answered(nil, nil, sent + D.Answer - 0.01) == "-:false" and answered(nil, nil, sent + D.Answer) == "-:true")
+check("… the grace is short, the wait a couple of seconds, looked at often", D.Grace >= 0.15 and D.Grace <= 0.5 and D.Answer >= 1 and D.Answer <= 4 and D.Poll > 0 and D.Poll <= 0.1)
+check("… a Notice's notify waits a moment only (NoticeWait)", S.NoticeWait > 0 and S.NoticeWait <= 0.15)
+-- his whistle: the bubble's orange because he needs you
+check("8.9 his whistle: the orange turned to \"needs you\"", SoundPlan.whistleCue("", "needs") == "danny_whistle" and SoundPlan.whistleCue("down", "needs") == "danny_whistle")
+check("… not on the first look, not while it stays", SoundPlan.whistleCue(nil, "needs") == nil and SoundPlan.whistleCue("needs", "needs") == nil)
+check("… not for his other alerts (down, running, on three) nor none", SoundPlan.whistleCue("", "down") == nil and SoundPlan.whistleCue("", "flee") == nil
+	and SoundPlan.whistleCue("", "ready") == nil and SoundPlan.whistleCue("needs", "") == nil)
+for kind in D.WhistleFor do
+	local w = MoveHelperBrain.Doing[kind]
+	check(`8.9 the whistle's {kind} is one of his alerts (MoveHelperBrain.Doing: orange)`, w ~= nil and w.alert == true, kind)
+	if w then
+		local same = 0
+		for _, other in MoveHelperBrain.Doing do
+			if other.alert == true and string.sub(other.icon, 1, #w.icon) == w.icon then
+				same += 1
+			end
+		end
+		check(`… its icon {w.icon} tells it from his other alerts (client/DannyBubble.luau reads it)`, same == 1, same)
+	end
+end
+-- the auction: two views in a row
+local function view(lot: any, results: { any }?, index: number?): any
+	return { phase = if lot then "live" else "results", lot = lot, index = index or 1, results = results or {} }
+end
+local function beats(list: { SoundPlan.Beat }): string
+	local out = {}
+	for _, b in list do
+		table.insert(out, `{b.event}@{b.at}`)
+	end
+	return table.concat(out, ",")
+end
+local lot1 = { id = 1, price = 0 }
+local lot1bid = { id = 1, price = 400 }
+check("8.9 the auction's first view: nothing", beats(SoundPlan.auctionCues(nil, view(lot1))) == "")
+check("… a bid (the price up on the same lot): its tick", beats(SoundPlan.auctionCues(view(lot1), view(lot1bid))) == "auction_bid@0")
+check("… the same price again: nothing", beats(SoundPlan.auctionCues(view(lot1bid), view(lot1bid))) == "")
+local sold = { { item = "x", name = "Clock", price = 400, sold = false, won = false } }
+check("… the lot closed, the next on the podium: the gavel, then \"sold!\"", beats(SoundPlan.auctionCues(view(lot1bid), view({ id = 2, price = 0 }, sold, 2))) == `auction_gavel@0,auction_sold@{AU.BellAt}`)
+check("… the round's last lot closed (no lot now): the same", beats(SoundPlan.auctionCues(view(lot1bid), view(nil, sold))) == `auction_gavel@0,auction_sold@{AU.BellAt}`)
+check("… your piece sold, or you bought it: the louder bell", beats(SoundPlan.auctionCues(view(lot1bid), view(nil, { { name = "Clock", price = 400, sold = true } }))) == `auction_gavel@0,auction_sold_mine@{AU.BellAt}`
+	and beats(SoundPlan.auctionCues(view(lot1bid), view(nil, { { name = "Clock", price = 400, won = true } }))) == `auction_gavel@0,auction_sold_mine@{AU.BellAt}`)
+check("… no lot before (the consignments, the results): nothing", beats(SoundPlan.auctionCues(view(nil), view(lot1))) == "" and beats(SoundPlan.auctionCues(view(nil), view(nil))) == "")
+check("… junk: nothing", beats(SoundPlan.auctionCues("x", view(lot1))) == "" and beats(SoundPlan.auctionCues(view({ id = "a" }), view(lot1))) == "")
+check("… the bell a moment after the gavel", AU.BellAt > 0 and AU.BellAt <= 0.6)
+-- 8.5 Danny getting in and out of the van (server/MoveHelper.luau: Vehicles.swingDoor, the door's DoorOpenAt /
+-- DoorCloseAt every client swings, client/CarVisuals.luau onSwing → SoundScape): his door sounds as a player's
+check("8.5 Danny's van door (Vehicles.swingDoor) sounds as a player's: its latch and its thunk", SoundPlan.swingSound("door", "opening", "sprinter") == "car_door_open"
+	and SoundPlan.swingSound("door", "shut", "sprinter") == "car_door_close" and SoundPlan.swingSound("door", "opening", "zdcvan") == "car_door_open")
+for _, group in { D, TR, AU } do
+	for key, value in group do
+		if type(value) == "number" then
+			check(`Config.Soundscape 8.9 {key} is a sane number`, value >= 0 and value <= 10, value)
+		end
+	end
+end
+for key, value in { D.ClipOut, D.ClipAway, D.Give, D.TakeBack, D.Nope, D.Ack, D.Whistle, TR.Sold, TR.Offer, TR.Price, AU.Bid, AU.Gavel, AU.Sold, AU.SoldMine } do
+	check(`8.9 a quiet UI volume ({key})`, value > 0 and value <= 0.7, value)
 end
 Config.Sandbox.On = sandboxOn
 

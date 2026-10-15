@@ -58,6 +58,12 @@
 --     Danny" then: L1); a click that reaches a piece nearer than him is the piece's (onto his list). Both forms are
 --     the one window (Main's: ESC, onOpen, the mouse freed), placed by MoveHelperCard.layout (the menu MENU_W wide),
 --     its buttons at least Ui.MinTouch tall on a touch screen.
+--   * 8.9 the answers' sounds (art/audio/sfx5.ogg, quiet; client/SandboxSounds.luau await: the server decides, the sound
+--     follows what it did): a piece given (a click, a tap, R1) ticked onto his list as its DannyQueue comes (a pen's
+--     tick), taken back crossed off (shared/SoundPlan.luau giveOutcome); an order (PUT IT DOWN, GET OUT: the card's
+--     row, the orders menu; MoveHelperCard.ordered for any other sender) his chirp once it leaves the orders that apply
+--     (he did it: SoundPlan.orderOutcome); the card's 📋 CLIPBOARD asking it out as client/DannyOrders.luau's toggle.
+--     Refused (the server's notice and nothing changed): the soft nope. Each in place of its notice's ping.
 -- Presentation only.
 --   MoveHelperCard.start()                         listens (nothing outside the sandbox)
 --   MoveHelperCard.open(at?, menu?)                opens it beside the screen point `at` (nil: his head's now); 8.6
@@ -78,6 +84,9 @@
 --                                                  (os.clock())
 --   MoveHelperCard.justClosed()                    8.5 it closed a moment ago (the gamepad's B that closed it is not
 --                                                  client/DannyOrders.luau's B too, whichever hears it first)
+--   MoveHelperCard.ordered(kind)                   8.9 an order ("putdown" | "getout") was just sent: his chirp when he
+--                                                  takes it, the nope when refused (the card's buttons call it; the
+--                                                  status line's GET OUT may)
 
 local CollectionService = game:GetService("CollectionService")
 local GuiService = game:GetService("GuiService")
@@ -91,6 +100,7 @@ local Net = require(Shared.Net)
 local Brain = require(Shared.MoveHelperBrain)
 local SandboxPad = require(Shared.SandboxPad) -- (the gamepad's buttons for him: its actions "danny" and "dannygive")
 local ClipboardRules = require(Shared.ClipboardRules) -- 8.5: orders mode's words
+local SoundPlan = require(Shared.SoundPlan) -- 8.9: the answers' sounds
 local PadGlyph = require(script.Parent.PadGlyph) -- 8.5: the device used now (the card's words)
 local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
@@ -452,6 +462,40 @@ function MoveHelperCard.target(origin: Vector3, direction: Vector3): (Model?, bo
 	return piece, false
 end
 
+-- ── 8.9 the answers' sounds ────────────────────────────────────────────────
+
+-- An answer awaited from the server (client/SandboxSounds.luau await; nothing where it is not there).
+local function answer(outcome: () -> string?)
+	pcall(function()
+		(require(script.Parent.SandboxSounds) :: any).await(outcome)
+	end)
+end
+
+-- A piece of your move sent onto his list or off it (the server decides): its tick, its cross-off or the nope.
+local function given(piece: Model)
+	tappedPiece, tappedAt = piece, os.clock()
+	remote:FireServer("helper", "assign", piece)
+	local was = piece:GetAttribute("DannyQueue") ~= nil
+	answer(function(): string?
+		return SoundPlan.giveOutcome(was, piece:GetAttribute("DannyQueue") ~= nil)
+	end)
+end
+
+function MoveHelperCard.ordered(kind: string)
+	local before = player:GetAttribute("MoveHelperOrders")
+	answer(function(): string?
+		return SoundPlan.orderOutcome(kind, before, player:GetAttribute("MoveHelperOrders"))
+	end)
+end
+
+-- The clipboard asked out (the card's 📋 CLIPBOARD): its rustle is client/DannyOrders.luau's; refused, the nope.
+local function askedOut()
+	answer(function(): string?
+		local character = player.Character
+		return if character ~= nil and character:GetAttribute("ClipboardHeld") == true then "" else nil
+	end)
+end
+
 -- ── The card ───────────────────────────────────────────────────────────────
 
 local function send(kind: string)
@@ -459,6 +503,9 @@ local function send(kind: string)
 		return -- (a second tap as it closes: one request)
 	end
 	remote:FireServer("helper", kind)
+	if table.find(ORDER_KINDS, kind) then
+		MoveHelperCard.ordered(kind) -- 8.9 (his chirp when he takes it)
+	end
 	MoveHelperCard.close()
 end
 
@@ -589,7 +636,11 @@ local function build(): Frame?
 		if not opened then
 			return -- (a second tap as it closes: one request)
 		end
-		clipboard:FireServer(not orders())
+		local out = not orders()
+		clipboard:FireServer(out)
+		if out then
+			askedOut() -- 8.9
+		end
 		MoveHelperCard.close()
 	end)
 	parts.clip = clip
@@ -923,8 +974,7 @@ local function clicked(origin: Vector3, direction: Vector3)
 		if him then
 			MoveHelperCard.open(nil, true) -- 8.6
 		elseif target then
-			tappedPiece, tappedAt = target, os.clock()
-			remote:FireServer("helper", "assign", target)
+			given(target) -- (8.9: its tick or the nope)
 		end
 		return
 	end
@@ -1028,8 +1078,7 @@ local function keepGive()
 		fresh.Triggered:Connect(function()
 			local to = giveTo
 			if to and mayAct() and hired() and orders() then
-				tappedPiece, tappedAt = to, os.clock()
-				remote:FireServer("helper", "assign", to)
+				given(to) -- (8.9: its tick or the nope)
 			end
 		end)
 		fresh.Parent = root

@@ -27,6 +27,10 @@
 -- from the same view, once a tick, only where the building stands.
 -- ✕, ESC, the gamepad's B, the Roblox menu or a tap beside the card close it; modal (the mouse free), the gamepad's
 -- selection kept inside; opening it closes the other sandbox windows (client/Main.client.luau: onOpen).
+-- 8.9 its sounds (art/audio/sfx5.ogg, quiet; shared/SoundPlan.luau auctionCues from two views in a row, played by
+-- client/SandboxSounds.luau event): the price up on the lot (a bid: a soft tick, at most every BidGap s), the lot on the
+-- podium closing (the gavel, then the "sold!" bell); while the window is open, and the bell of your own lot (yours sold,
+-- or you bought it: louder) anywhere. The server's step only has to send its views (nothing else to call).
 --   AuctionUi.start()                  listens (once; nothing when Config.Sandbox.On or Config.Auction.On is false)
 --   AuctionUi.open(tab?) / close() / isOpen()
 --   AuctionUi.state()                  the last view (AuctionRules.View; nil: none yet)
@@ -49,6 +53,7 @@ local Net = require(Shared.Net)
 local Rules = require(Shared.AuctionRules)
 local CollectionRules = require(Shared.CollectionRules)
 local HouseLayout = require(Shared.AuctionHouseLayout)
+local SoundPlan = require(Shared.SoundPlan) -- 8.9 (its sounds)
 local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
 local CardKit = require(script.Parent.CardKit)
@@ -834,13 +839,27 @@ function AuctionUi.open(which: string?)
 	end
 end
 
+-- 8.9 what changed between two views, heard (SoundPlan.auctionCues): while the window is open; your own lot's bell
+-- anywhere (client/SandboxSounds.luau event; nothing where it is not there).
+local function heard(was: Rules.View?, now: Rules.View?)
+	for _, beat in SoundPlan.auctionCues(was, now) do
+		if opened or beat.event == "auction_sold_mine" then
+			pcall(function()
+				(require(script.Parent.SandboxSounds) :: any).event(beat.event, beat.at)
+			end)
+		end
+	end
+end
+
 local function onEvent(message: any)
 	if type(message) ~= "table" then
 		return
 	end
 	local kind = message.kind
 	if kind == "state" then
+		local was = current
 		current = Rules.readView(message.view)
+		heard(was, current) -- 8.9
 		waiting = nil
 		if opened then
 			draw(true)
