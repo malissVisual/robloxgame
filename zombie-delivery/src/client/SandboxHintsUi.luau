@@ -4,12 +4,23 @@
 -- other modules:
 --   the "CollectionBook" remote's states   the first piece ever in your book (its state had none): "book"
 --   the "SandboxTasks" remote              a task "done": "tasks" (its states say whether a reward still waits)
---   the "Collection" remote's states       pieces came home and FILL BEST has something to show: "fill"
+--   the "Collection" remote's states       pieces came home and FILL BEST has something to show: "fill"; 8.9:
+--                                          PriceShown pieces of yours on show, none with a FOR SALE sign: "price"
+--   8.9 the "PlayerTrade" remote           another player's offer for your piece ({ kind = "offer", player = true }):
+--                                          "deal" (its offer card covers the screen: the hint comes after it)
+--   8.9, a look every Hints.Look s (only until both are said)   your character's ClipboardHeld (server/Clipboard.luau:
+--                                          your clipboard out, orders mode): "orders"; where you stand: in another
+--                                          player's warehouse (SandboxHints.hallAt at its level, workspace.Warehouses'
+--                                          Level<id>) with a piece of theirs on show (a stand's trade prompt on, tagged
+--                                          Config.PlayerTrade.PromptTag with its owner's UserId): "visit"
+-- (8.9: visit, price and deal only while trading is on, Config.PlayerTrade.On.)
 -- A hint is one toast (SandboxHintsUi.notify: client/SandboxHud.luau's), in this device's words (client/PadGlyph.luau),
 -- once a session, one at a time, never while something covers the screen: a grip check (client/CarryGripUi.luau active),
 -- the move's cards with its result (client/MovingHud.luau isOpen), a sandbox window (the warehouse's, the UPGRADES
--- desk's, the book, the TASKS panel, Danny's command card, 8.3: the PAINT shop's, 8.3 review: a visitor's offer card)
--- or the start screen (the ScreenGui "SandboxHud" off). A hint no longer true when its turn comes (the reward claimed, FILL BEST used) is left out; one
+-- desk's, the book, the TASKS panel, Danny's command card, 8.3: the PAINT shop's, 8.3 review: a visitor's offer card,
+-- 8.9: a player's offer card and the trade's window, client/TradeUi.luau) or the start screen (the ScreenGui
+-- "SandboxHud" off). A hint no longer true when its turn comes (the reward claimed, FILL BEST used; 8.9: the clipboard
+-- put away, the warehouse left, a sign set) is left out; one
 -- whose window the player opened alone while it waited (the book, the TASKS panel) is not needed any more.
 -- client/SandboxHud.luau starts it.
 --   SandboxHintsUi.start()            listens (once; nothing when Config.Sandbox.On is false)
@@ -20,10 +31,13 @@
 --                                     "VanPaintUi", …; nil: none)
 --   SandboxHintsUi.busy()             8.3: a hint waits or has just shown (SandboxHints.busy)
 --   (8.3: client/SandboxGuide.luau asks these three: its soft steps wait as the hints do, and while a hint talks)
+--   SandboxHintsUi.around()           8.9: looks once at your clipboard and where you stand (the look's loop does it
+--                                     every Hints.Look s until both hints are said)
 --   SandboxHintsUi.notify / covered / now   hooks: the toast; what covers the screen (nil: its own look, above); the
 --                                     clock (nil: os.clock)
 -- Presentation only.
 
+local CollectionService = game:GetService("CollectionService") -- 8.9: the stands' trade prompts (a visit)
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -48,6 +62,11 @@ local bookFound: number? = nil -- the pieces in the book's last state (nil: no s
 local stockSeen: number? = nil -- the pieces in the Collection's last state (nil: no state yet)
 local tasksReady = 0 -- rewards waiting to be claimed (the TASKS' last state)
 local fillNow = false -- the Collection's last state: FILL BEST would put something on show
+local priceNow = false -- 8.9: the Collection's last state: PriceShown on show, no FOR SALE sign yet
+local clipboardOut = false -- 8.9: your clipboard out at the last look
+local visitNow = false -- 8.9: in another player's warehouse with a piece of theirs on show at the last look
+local watching = false -- 8.9: the look's loop runs
+local spots: { SandboxHints.Spot } = {} -- 8.9: the trade prompts on (refilled by a look in a warehouse)
 
 local function clock(): number
 	local now = SandboxHintsUi.now
@@ -89,6 +108,9 @@ local LOADERS: { [string]: () -> any } = {
 	OfferCard = function(): any -- (8.3 review)
 		return require(script.Parent.OfferCard)
 	end,
+	TradeUi = function(): any -- (8.9: the trade's window, 8.7)
+		return require(script.Parent.TradeUi)
+	end,
 }
 local modules: { [string]: any } = {}
 local function client(name: string): any
@@ -120,7 +142,7 @@ local function hudHidden(): boolean
 	return hud ~= nil and hud:IsA("ScreenGui") and (hud :: ScreenGui).Enabled == false
 end
 
-local WINDOWS = { "WarehouseUi", "UpgradeUi", "CollectionBookUi", "SandboxTasksUi", "MoveHelperCard", "VanPaintUi", "OfferCard" } -- (8.3: Danny's card, the PAINT shop too; 8.3 review: a visitor's offer)
+local WINDOWS = { "WarehouseUi", "UpgradeUi", "CollectionBookUi", "SandboxTasksUi", "MoveHelperCard", "VanPaintUi", "OfferCard", "TradeUi" } -- (8.3: Danny's card, the PAINT shop too; 8.3 review: a visitor's offer; 8.9: the trade's window)
 
 local function covered(): boolean
 	local hook = SandboxHintsUi.covered
@@ -163,6 +185,12 @@ local function still(id: string): boolean
 		return tasksReady > 0
 	elseif id == "fill" then
 		return fillNow
+	elseif id == "price" then -- (8.9: a sign set meanwhile)
+		return priceNow
+	elseif id == "orders" then -- (8.9: put away meanwhile: said the next time it comes out)
+		return clipboardOut
+	elseif id == "visit" then -- (8.9: out of that warehouse meanwhile)
+		return visitNow
 	end
 	return true
 end
@@ -266,6 +294,96 @@ local function onCollection(message: any)
 		offer("fill") -- (pieces came home: you are at your warehouse)
 	end
 	stockSeen = count
+	-- 8.9: pieces enough on show and no sign yet (a save's too: a player of before 8.7 hears it once)
+	priceNow = SandboxHints.tradeOn() and SandboxHints.priceWorth(message.stock)
+	if priceNow then
+		offer("price")
+	end
+end
+
+-- 8.9: another player's offer for your piece (its card first: the hint waits for it).
+local function onTrade(message: any)
+	if SandboxHints.tradeOn() and SandboxHints.playerOffer(message) then
+		offer("deal")
+	end
+end
+
+-- ── 8.9: your clipboard and where you stand ─────────────────────────────────
+
+local player = Players.LocalPlayer
+
+-- A warehouse's level (server/Warehouse.luau's attribute Level<id> on workspace.Warehouses; nil: not there yet, 4).
+local function levelOf(plotId: number): number?
+	local halls = workspace:FindFirstChild("Warehouses")
+	local level = if halls then halls:GetAttribute(`Level{plotId}`) else nil
+	return if type(level) == "number" then level else nil
+end
+
+-- Do you stand in another player's warehouse with a piece of theirs on show (a stand's trade prompt on)?
+local function visiting(): boolean
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if not root or not root:IsA("BasePart") then
+		return false
+	end
+	local at = (root :: BasePart).Position
+	local plot = SandboxHints.hallAt(at.X, at.Z, levelOf)
+	if plot == nil or plot == player:GetAttribute("Plot") then
+		return false -- (in no warehouse, or in your own: most looks end here)
+	end
+	local trade = Config.PlayerTrade
+	table.clear(spots)
+	for _, prompt in CollectionService:GetTagged(trade.PromptTag) do
+		local seller = prompt:GetAttribute(trade.SellerAttribute)
+		local anchor = prompt.Parent
+		if prompt:IsA("ProximityPrompt") and (prompt :: ProximityPrompt).Enabled and type(seller) == "number" and anchor then
+			local where: Vector3? = if anchor:IsA("Attachment") then (anchor :: Attachment).WorldPosition
+				elseif anchor:IsA("BasePart") then (anchor :: BasePart).Position
+				else nil
+			if where then
+				table.insert(spots, { x = where.X, z = where.Z, seller = seller })
+			end
+		end
+	end
+	return SandboxHints.visiting(at.X, at.Z, player.UserId, spots, levelOf)
+end
+
+function SandboxHintsUi.around()
+	local character = player.Character
+	clipboardOut = character ~= nil and character:GetAttribute("ClipboardHeld") == true
+	if clipboardOut then
+		offer("orders")
+	end
+	if SandboxHints.tradeOn() and not SandboxHints.seen(queue, "visit") then
+		visitNow = visiting()
+		if visitNow then
+			offer("visit")
+		end
+	end
+end
+
+-- The look's loop: every Hints.Look s until the clipboard's hint and a visit's are both said (then it stops).
+local function done(): boolean
+	return SandboxHints.seen(queue, "orders") and (SandboxHints.seen(queue, "visit") or not SandboxHints.tradeOn())
+end
+
+local function watch()
+	if watching then
+		return
+	end
+	watching = true
+	task.spawn(function()
+		local warned = false
+		while not done() do
+			task.wait(H.Look)
+			local ok, why = pcall(SandboxHintsUi.around :: any) -- (an error is said once, the loop goes on)
+			if not ok and not warned then
+				warned = true
+				warn(`[SandboxHintsUi] {why}`)
+			end
+		end
+		watching = false
+	end)
 end
 
 local function sandboxOn(): boolean
@@ -278,7 +396,7 @@ function SandboxHintsUi.start()
 		return
 	end
 	started = true
-	local listeners: { [string]: (any) -> () } = { CollectionBook = onBook, SandboxTasks = onTasks, Collection = onCollection }
+	local listeners: { [string]: (any) -> () } = { CollectionBook = onBook, SandboxTasks = onTasks, Collection = onCollection, PlayerTrade = onTrade } -- (8.9: PlayerTrade)
 	for name, listener in listeners do
 		task.spawn(function()
 			local ok, remote = pcall(Net.get, name)
@@ -289,6 +407,7 @@ function SandboxHintsUi.start()
 			end
 		end)
 	end
+	watch() -- (8.9: your clipboard, where you stand)
 end
 
 return SandboxHintsUi

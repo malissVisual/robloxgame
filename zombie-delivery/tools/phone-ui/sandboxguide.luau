@@ -27,6 +27,10 @@
 -- give it to Danny") until a piece goes on his list; "Heavy piece: press Lift and wait for Danny" with a
 -- two-person piece's Lift near (looked for at most once a second, no more once done) until your Lift calls him; the
 -- line under the move's panel and Danny's strip, clear of the money, the touch buttons and the player list.
+-- 8.9, trading between players' step at 844 × 390, 667 × 375, 1280 × 800 and 1920 × 1080: "🏷 Sell to players: set a
+-- price on a piece on show" once another player is on the server (not alone) with four pieces of yours on show and no
+-- FOR SALE sign, after the other soft steps; the chevron over your nearest piece on show (SET PRICE); the same words
+-- with a gamepad; quiet while the screen is covered; a sign set: done, not again.
 local M = require("./missions_mock")
 
 -- ── The stand-ins (on top of the MISSIONS window's, as movehud.luau) ────────
@@ -981,6 +985,76 @@ for _, name in { "MoveHelper", "MoveHelperQueue", "MoveHelperDoing", "MoveHelper
 end
 tagged.MovePrompt = nil
 tick()
+
+-- ── 8.9: trading between players' step (set a price on a piece on show) ─────
+-- no move; four pieces of yours on show on plot 2, none with a FOR SALE sign; the soft steps before it said already
+local playersHere = { M.player }
+M.services.Players.GetPlayers = function()
+	return playersHere
+end
+local function onShow(signed)
+	return { kind = "state", stands = 4, income = 12, market = market, stock = {
+		{ uid = "s1", item = "sofa", name = "Sofa", stand = 1 },
+		{ uid = "s2", item = "lamp", name = "Lamp", stand = 2, sale = if signed then 1500 else nil },
+		{ uid = "s3", item = "vase", name = "Vase", stand = 3 },
+		{ uid = "s4", item = "clock", name = "Clock", stand = 4 },
+	} }
+end
+local nearStand = standsGiven[3]
+stand(nearStand.x + 2, nearStand.z + 8)
+collection.OnClientEvent:Fire(onShow(false))
+wait(G.SoftGap + 0.02)
+for _ = 1, 3 do
+	tick()
+end
+check("8.9: four pieces on show, no sign, alone on the server: no sell step (nobody there to buy)", SandboxGuide.step() ~= "sell")
+table.insert(playersHere, { UserId = 22, Name = "Ann" })
+wait(1.05) -- (the players counted at most once a second)
+local sellWords = "🏷 Sell to players: set a price on a piece on show"
+for _, size in { { true, 844, 354, "844 x 390" }, { true, 667, 339, "667 x 375" }, { false, 1280, 764, "1280 x 800" }, { false, 1920, 1044, "1920 x 1080" } } do
+	screen(size[1], size[2], size[3])
+	tick()
+	check(`{size[4]}: Ann here too: "{sellWords}" (the last soft step)`, SandboxGuide.step() == "sell" and words.Text == sellWords and shown() and closeButton.Visible, words.Text)
+	local hb, cb2 = hintBox(), closeBox()
+	local ok = inside(hb) and inside(cb2) and math.abs((hb.x0 + hb.x1) / 2 - M.width / 2) < 1 and not overlap(hb, box(money)) and not overlap(cb2, box(money))
+	if M.touch then
+		local here = TouchLayout.cluster(M.width, M.height, M.scale)
+		local controls = TouchLayout.buttons(here)
+		table.insert(controls, here.thumb)
+		table.insert(controls, here.jump)
+		for _, t in controls do
+			ok = ok and not overlap(hb, t) and not overlap(cb2, t)
+		end
+		ok = ok and cb2.x1 - cb2.x0 >= 44 - 0.01 and cb2.y1 - cb2.y0 >= 44 - 0.01
+	else
+		local list = { x0 = M.width - 16 - MoveLayout.PLAYER_LIST_W, y0 = 0, x1 = M.width, y1 = math.min(M.height * 0.45, 52 + 40 * #playersHere) } -- (two rows now)
+		ok = ok and not overlap(hb, list) and not overlap(cb2, list)
+	end
+	check(`… {size[4]}: the line at the top in the middle, on the screen, clear of the money{if M.touch then ", the touch controls (its ✕ a finger's size)" else " and the player list (two players)"}`, ok, show(hb))
+end
+check("… the chevron over your nearest piece on show (its Set price prompt: SET PRICE)", marker.Enabled and at(nearStand.x, nearStand.z)
+	and string.find(tag.Text, "^SET PRICE · %d+ m$") ~= nil, tag.Text)
+M.gamepad = true
+tick()
+check("… with a gamepad the same words (the prompt shows its own button)", words.Text == sellWords, words.Text)
+M.gamepad = false
+coveredNow = true
+tick()
+check("… never while something covers the screen", SandboxGuide.step() ~= "sell" and not hint.Visible)
+coveredNow = false
+wait(G.SoftGap + 0.02)
+tick()
+check("… uncovered: back after SoftGap", SandboxGuide.step() == "sell" and shown())
+collection.OnClientEvent:Fire(onShow(true))
+tick()
+check("a FOR SALE sign set: done, quiet", SandboxGuide.step() ~= "sell" and not hint.Visible)
+collection.OnClientEvent:Fire(onShow(false))
+wait(G.SoftGap + 0.02)
+tick()
+check("… the sign taken off again: not again (once a session)", SandboxGuide.step() ~= "sell" and not hint.Visible)
+M.services.Players.GetPlayers = function()
+	return { M.player }
+end
 SandboxGuide.covered, SandboxGuide.windowOpen = nil, nil
 screen(false)
 check("8.0.1: one arrow: through the whole move the move's HUD set no GPS (no waypoint, no GPS toast), only the guide's chevron and path",

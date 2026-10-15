@@ -59,6 +59,12 @@ end
 M.services.Players.GetPlayers = function()
 	return { M.player }
 end
+-- 8.9: CollectionService's tagged instances (client/SandboxHintsUi.luau: the stands' trade prompts, a visit): a check
+-- puts them in M.tagged[tag]
+M.tagged = {}
+M.services.CollectionService = { GetTagged = function(_, tag)
+	return M.tagged[tag] or {}
+end }
 
 -- A text's width close to Gotham's (px): caps and digits wide, lower case narrower, an emoji a square. The check's
 -- "text fits" and client/CardKit.luau's widths (TextService) both use it.
