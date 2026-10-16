@@ -8533,12 +8533,14 @@ Config.Village = {
 	-- Forest Lodge, the Old Mill, the Orchard Cottage): Porch, the studs the cabin's veranda may reach past its box's
 	-- front edge (into its front yard: everything else of a look is inside its box); Wheel, the studs the mill's water
 	-- wheel and its chute reach past its box's right-hand side at most (seen from outside facing the front door: its
-	-- stream runs there); their colours (Stain: the cabin's dark stained boards, Tar its roof; Logs, Shingles, Shutters,
+	-- stream runs there); WheelAt, the wheel's middle past that side (9.5 review: in the millrace, whose water runs 2 –
+	-- 10 studs past it on the map, the wheel's foot in it; was against the wall, on the bank); their colours (Stain: the cabin's dark stained boards, Tar its roof; Logs, Shingles, Shutters,
 	-- Bone: the lodge's; Stone, Boards: the mill's and the lodge's plinth; Whitewash, Band, Thatch, Terracotta, Doors,
 	-- Flowers: the cottage's; Buoy and Lantern: the cabin's lifebuoy and its lantern by the door)
 	Countryside = {
 		Porch = 2.5,
 		Wheel = 6,
+		WheelAt = 3.6,
 		Stain = { { 84, 62, 46 }, { 72, 56, 44 }, { 96, 70, 50 } } :: { { number } },
 		Tar = { { 58, 62, 60 }, { 70, 66, 62 }, { 56, 72, 62 } } :: { { number } },
 		Logs = { { 120, 84, 54 }, { 108, 76, 50 }, { 134, 96, 62 } } :: { { number } },

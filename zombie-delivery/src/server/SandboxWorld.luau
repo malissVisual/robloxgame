@@ -34,14 +34,14 @@
 --             you in sees a dark hall)
 --   Houses    9.4 the countryside (design/countryside/plan.py): the five other places to empty (SandboxMap.Houses
 --             after the farmstead: the pond cabin, the lone house, the forest lodge, the old mill, the orchard cottage)
---             in their own looks (shared/VillageLooks.luau, rich: VillageScenery.houses; a look VillageLooks does not draw
---             yet: "old"), built here, not by server/VillageWorld.luau, with its model and chunk
---             (SandboxWorld.villageHouse): a Model named after the house (attribute SandboxHouse = its id; VillageHouse,
---             Street) in its Atomic chunk (world.Village's Village_<chunk>), its pieces in "House_<id>" (attribute
---             Home, its walls' part "House", the PrimaryPart), its door "FrontDoor" walked through as the farmstead's
---             (SandboxWorld.walkIn: SandboxDoor, unseen, no collision; its two leaves; the walls less a dark hall
---             behind it; the plinth no longer solid), its name on its mailbox. server/Moving.luau finds each house's
---             FrontDoor by its model's SandboxHouse.
+--             in their own looks (shared/VillageLooks.luau, rich: VillageScenery.houses; 9.5 the cabin, the old family
+--             house, the lodge, the mill, the cottage), built here, not by server/VillageWorld.luau, with its model
+--             and chunk (SandboxWorld.villageHouse): a Model named after the house (attribute SandboxHouse = its id;
+--             VillageHouse, Street) in its Atomic chunk (world.Village's Village_<chunk>), its pieces in "House_<id>"
+--             (attribute Home, its walls' part "House", the PrimaryPart), its door "FrontDoor" walked through as the
+--             farmstead's (SandboxWorld.walkIn: SandboxDoor, unseen, no collision; its two leaves; the walls less a dark
+--             hall behind it; the plinth, where it has one, no longer solid), its name on its mailbox.
+--             server/Moving.luau finds each house's FrontDoor by its model's SandboxHouse.
 --   Scenery   the street lamps along Pražská, the signpost at the crossroads (8.9: white Czech direction boards; the
 --             Alps' spruces, wildflowers and rail fence are gone)
 --   Village   9.4 the countryside (server/VillageWorld.luau): the places' surroundings, the trees, hedges, fences and

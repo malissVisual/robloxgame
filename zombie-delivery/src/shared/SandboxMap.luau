@@ -50,10 +50,12 @@
 --                      name        what the card, the guide and its signs call it (made up, in English words)
 --                      street      the road it stands on, one of Roads (the contract's address, the guide's words)
 --                      number      none (a spot of its own has no house number)
---                      kind        its plan's kind (shared/HouseLayout.luau): "big" the farmstead, "house" the rest
+--                      kind        its inside's plan's kind (shared/HouseLayout.luau; its contract's, Config.Moving
+--                                  .Sandbox.Houses): "big" the farmstead, "house" the lone house, the other four
+--                                  shared/Layouts/Countryside.luau's "cabin", "lodge", "mill" and "cottage"
 --                      look        its outside's kind: "farmstead" (server/SandboxWorld.luau's, the owner's Blender
 --                                  house), else shared/VillageLooks.luau house's ("cabin", "old", "lodge", "mill",
---                                  "cottage"; shared/VillageScenery.luau builds "old" for one it does not know yet)
+--                                  "cottage": shared/VillageScenery.luau builds each in its own)
 --                      box         its footprint (x0, x1, z0, z1): sx along its front × sz deep, turned with its yaw
 --                      lot         its garden: the box, LOT round it, its front up to its yard's edge (10 studs:
 --                                  the front garden; the mill's west side stops at its wall: the millrace runs there)
@@ -228,15 +230,15 @@ SandboxMap.Plots = plots
 
 local TOP = SandboxMap.RoadTop
 
--- A spot of the countryside (plan.json `spots`): its box and yaw as the plan has them, the rest made from them the way
--- the plan makes them (design/countryside/plan.py spots(); tests/sandboxhouses_test.luau holds them together): its door
--- DOOR_IN in from its box's front edge (a look stands its front wall Config.Village.Front, 1.5, in from it, its door 0.3
--- out of that wall: the spot just outside it, VillageLooks.doorSpots), its curb CURB_IN from `edge` (its yard's edge
--- nearest the door: the van's back 2 in, its middle 11 on, its nose away from the door), its walls WALLS high, its lot
--- LOT round its box and its front to `edge`.
+-- A spot of the countryside (plan.json `spots`): its look, kind, box and yaw as the plan has them, the rest made from
+-- them the way the plan makes them (design/countryside/plan.py spots(); tests/sandboxhouses_test.luau holds them
+-- together): its door DOOR_IN in from its box's front edge (a look stands its front wall Config.Village.Front, 1.5, in
+-- from it, its door 0.3 out of that wall: the spot just outside it, VillageLooks.doorSpots), its curb CURB_IN from
+-- `edge` (its yard's edge nearest the door: the van's back 2 in, its middle 11 on, its nose away from the door), its
+-- walls WALLS high, its lot LOT round its box and its front to `edge`.
 local WALLS, LOT, DOOR_IN, CURB_IN = 10, 6, 1.2, 13
 local OUT = { [0] = { 0, -1 }, [90] = { -1, 0 }, [180] = { 0, 1 }, [270] = { 1, 0 } } :: { [number]: { number } } -- (a yaw's look)
-local function spot(id: string, name: string, street: string, look: string, box: Rect, yaw: number, edge: number): House
+local function spot(id: string, name: string, street: string, look: string, kind: string, box: Rect, yaw: number, edge: number): House
 	local out = OUT[yaw]
 	local mx, mz = (box.x0 + box.x1) / 2, (box.z0 + box.z1) / 2
 	-- (the front edge's middle: the box's side the yaw looks out of)
@@ -257,7 +259,7 @@ local function spot(id: string, name: string, street: string, look: string, box:
 		name = name,
 		street = street,
 		number = nil,
-		kind = "house",
+		kind = kind,
 		look = look,
 		box = box,
 		lot = lot,
@@ -270,7 +272,7 @@ end
 
 -- The old mill: the millrace runs past its right-hand side (its west wall, seen facing its door from outside), its lot
 -- stops at that wall.
-local mill = spot("old_mill", "The Old Mill", "Mill Lane", "mill", { x0 = -1072, x1 = -1048, z0 = -26, z1 = 0 }, 0, -36)
+local mill = spot("old_mill", "The Old Mill", "Mill Lane", "mill", "mill", { x0 = -1072, x1 = -1048, z0 = -26, z1 = 0 }, 0, -36)
 mill.lot.x0 = mill.box.x0
 
 SandboxMap.Houses = {
@@ -291,11 +293,11 @@ SandboxMap.Houses = {
 		back = { x = 0, y = 0, z = 523 + 34, yaw = 180 } :: Spot, -- 8.3: outside the back door, looking south into the garden
 	},
 	-- 9.4 the countryside: five spots of their own (plan.json `spots` 2 … 6), each `edge` its yard's edge by its door
-	spot("pond_cabin", "The Pond Cabin", "Pond Lane", "cabin", { x0 = -950, x1 = -932, z0 = 458, z1 = 482 }, 270, -922),
-	spot("lone_house", "The Lone House", "Hill Road", "old", { x0 = -617, x1 = -593, z0 = -451, z1 = -421 }, 270, -583),
-	spot("forest_lodge", "The Forest Lodge", "Wood Lane", "lodge", { x0 = -954, x1 = -926, z0 = -484, z1 = -462 }, 180, -452),
+	spot("pond_cabin", "The Pond Cabin", "Pond Lane", "cabin", "cabin", { x0 = -950, x1 = -932, z0 = 458, z1 = 482 }, 270, -922),
+	spot("lone_house", "The Lone House", "Hill Road", "old", "house", { x0 = -617, x1 = -593, z0 = -451, z1 = -421 }, 270, -583),
+	spot("forest_lodge", "The Forest Lodge", "Wood Lane", "lodge", "lodge", { x0 = -954, x1 = -926, z0 = -484, z1 = -462 }, 180, -452),
 	mill,
-	spot("orchard_cottage", "The Orchard Cottage", "Orchard Lane", "cottage", { x0 = 192, x1 = 212, z0 = -483, z1 = -457 }, 270, 222),
+	spot("orchard_cottage", "The Orchard Cottage", "Orchard Lane", "cottage", "cottage", { x0 = 192, x1 = 212, z0 = -483, z1 = -457 }, 270, 222),
 } :: { House }
 
 -- The one house before the six (The Old Farmstead): what only it has reads it (HouseMesh's import, the menu's drift).

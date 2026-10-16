@@ -15,7 +15,8 @@
 -- 8.0.1: a van finds room on the first try at every vanSpot and at the house's curb (server/Vehicles.luau findRoom's
 -- box query, Config.SpawnSpot.Pass leaving out the ground), and not where a player stands. 9.4 the countryside: the
 -- five other places to empty in their looks (SandboxWorld.villageHouse), each walked in as the farmstead is (its
--- FrontDoor on its door, two leaves, the walls less a dark hall), nothing in its door's way or its walk to its curb.
+-- FrontDoor on its door, two leaves, the walls less a dark hall), nothing in its door's way or its walk to its curb
+-- (9.5: its eaves 8 up at least; the cabin's veranda deck walked up as a doorstep, its roof overhead no obstacle).
 -- Run with tests/run_tests.py.
 local Mock = require("./WorldMock")
 local G = Mock.globals
@@ -31,6 +32,7 @@ local HouseArt = require("./HouseArt")
 local SpawnSpot = require("./SpawnSpot")
 local SprinterLooks = require("./SprinterLooks")
 local WarehouseLayout = require("./WarehouseLayout")
+local VillageLooks = require("./VillageLooks")
 
 local failures = 0
 local function check(name: string, ok: boolean, detail: any?)
@@ -430,8 +432,8 @@ do
 			end
 			continue
 		end
-		if b.y1 <= GROUND + 0.05 or b.y0 >= 14 or (b.name == "Step" and b.y1 <= GROUND + 0.45) then
-			continue -- (a place's doorstep, 0.4 high, walked up)
+		if b.y1 <= GROUND + 0.05 or b.y0 >= 14 or (b.name == "Step" and b.y1 <= GROUND + 0.45) or (b.name == "Deck" and b.y1 <= GROUND + 0.55) then
+			continue -- (a place's doorstep, 0.4 high, walked up; 9.5 the cabin's veranda deck, its plinth's 0.5)
 		end
 		for _, a in areas do
 			local r = a.rect
@@ -817,14 +819,17 @@ do
 end
 
 -- 9.4 the countryside: the five other places to empty in their looks (SandboxWorld.villageHouse: VillageScenery.houses,
--- rich; a look VillageLooks does not draw yet: "old"): each a model of its own
+-- rich; 9.5 each its own look): each a model of its own
 -- (SandboxHouse = its id, VillageHouse its Placed's) in its Atomic chunk (world.Village's Village_<chunk>), its pieces in
--- House_<id> (Home) inside its box (a row's: its group's), its walls (House, a row's Row) the PrimaryPart and no longer
+-- House_<id> (Home) inside its box (a row's: its group's; 9.5 but its look's overhangs, VillageLooks.Overhangs: the
+-- cabin's veranda past its front edge, the mill's wheel past its right-hand side, each its reach at most and no more of
+-- it), its walls (House, a row's Row) the PrimaryPart and no longer
 -- solid, its FrontDoor (SandboxDoor, no collision, unseen; -Z out of the house as the farmstead's) the door's piece, its
 -- outer face on its door (SandboxMap's: VillageLooks.doorSpots'), two leaves (door leaves, out of the house), no back
 -- door; walkable as the farmstead's (4 HouseSolid pieces: the walls less the front door's hall; nothing colliding in the
--- hall or in the door's way but its doorstep; the walls either side, over the doorway and past the hall's end solid),
--- the plinth no longer solid, the hall lined dark (its floor over the plinth), its name on its mailbox.
+-- hall or in the door's way but its doorstep, the cabin's its veranda's deck; the walls either side, over the doorway
+-- and past the hall's end solid), the plinth no longer solid (9.5 the mill has none: its stone walls on the ground), the
+-- hall lined dark (its floor over the plinth, the mill's over the ground), its name on its mailbox.
 do
 	local D = Config.Moving.Doors
 	local placedOf: { [string]: VillageScenery.Placed } = {}
@@ -867,16 +872,31 @@ do
 		local stage = "its model"
 		local ok = models == 1 and placed ~= nil and chunk ~= nil and chunk.ClassName == "Model" and chunk.ModelStreamingMode == Enum.ModelStreamingMode.Atomic
 			and string.sub(chunk.Name, 1, 8) == "Village_" and chunk.Parent == village and model:GetAttribute("VillageHouse") == placed.id
-			and body ~= nil and body:GetAttribute("Home") == h.id and #walls == 1 and #doors == 1 and #west == 1 and #east == 1 and #plinths == 1
-			and #all("BackDoor") == 0 and #all("BackLeaf") == 0 and (h.look ~= "row" or #placed.ids > 1)
+			and body ~= nil and body:GetAttribute("Home") == h.id and #walls == 1 and #doors == 1 and #west == 1 and #east == 1
+			and #plinths == (if h.look == "mill" then 0 else 1) and #all("BackDoor") == 0 and #all("BackLeaf") == 0 and (h.look ~= "row" or #placed.ids > 1)
 		if ok then
 			stage = "its walls"
 			ok = body.PrimaryPart == wall.part and model.PrimaryPart == wall.part and not wall.part.CanCollide and not wall.part.CanQuery
-				and not plinths[1].part.CanCollide and not plinths[1].part.CanQuery
-			for _, b in list do -- (all of it in its box: a row's, its group's)
-				if b.x0 < box.x0 - 0.01 or b.x1 > box.x1 + 0.01 or b.z0 < box.z0 - 0.01 or b.z1 > box.z1 + 0.01 then
+				and (#plinths == 0 or (not plinths[1].part.CanCollide and not plinths[1].part.CanQuery))
+			-- (all of it in its box: a row's, its group's; 9.5 but its look's overhangs, each its reach at most past its side:
+			-- the front, out of the door; the right-hand side seen from outside facing the door, the look's frame's +X)
+			local over = VillageLooks.Overhangs[h.look]
+			local turn = math.rad(VillageLooks.turnOf(h.yaw))
+			local right = over ~= nil and over.side == "right"
+			local sx = if right then math.cos(turn) else -math.sin(math.rad(h.yaw))
+			local sz = if right then -math.sin(turn) else -math.cos(math.rad(h.yaw))
+			local reached = 0
+			for _, b in list do
+				local r = if over and table.find(over.pieces, b.name) then over.reach else 0
+				local x0, x1 = box.x0 - (if sx < -0.5 then r else 0), box.x1 + (if sx > 0.5 then r else 0)
+				local z0, z1 = box.z0 - (if sz < -0.5 then r else 0), box.z1 + (if sz > 0.5 then r else 0)
+				if b.x0 < x0 - 0.01 or b.x1 > x1 + 0.01 or b.z0 < z0 - 0.01 or b.z1 > z1 + 0.01 then
 					ok, stage = false, `its {b.name} out of its box`
 				end
+				reached = math.max(reached, b.x1 - box.x1, box.x0 - b.x0, b.z1 - box.z1, box.z0 - b.z0)
+			end
+			if ok and over and reached <= 0.01 then
+				ok, stage = false, "its overhang inside its box (none past its side)"
 			end
 		end
 		local ox, oz = -math.sin(math.rad(h.door.yaw)), -math.cos(math.rad(h.door.yaw)) -- (out of the door)
@@ -907,7 +927,8 @@ do
 			-- what collides in a box `a0 … a1` along out of the door (from its middle), `c0 … c1` across it, y0 … y1
 			local function solidIn(a0: number, a1: number, c0: number, c1: number, y0: number, y1: number, skipStep: boolean): string?
 				for _, b in boxes do
-					if b.part.CanCollide and not b.far and b.y1 > y0 and b.y0 < y1 and not (skipStep and b.name == "Step" and b.y1 <= GROUND + 0.45) then
+					if b.part.CanCollide and not b.far and b.y1 > y0 and b.y0 < y1
+						and not (skipStep and ((b.name == "Step" and b.y1 <= GROUND + 0.45) or (b.name == "Deck" and b.y1 <= GROUND + 0.55))) then
 						local cx, cz = (b.x0 + b.x1) / 2 - doorX, (b.z0 + b.z1) / 2 - doorZ
 						local hxb, hzb = (b.x1 - b.x0) / 2, (b.z1 - b.z0) / 2
 						local a, aHalf = cx * ox + cz * oz, math.abs(ox) * hxb + math.abs(oz) * hzb
@@ -939,7 +960,7 @@ do
 					floorTop = math.max(floorTop, b.y1)
 				end
 			end
-			local plinthTop = plinths[1].y1
+			local plinthTop = if plinths[1] then plinths[1].y1 else GROUND
 			local texts: { string } = {}
 			for _, d in model:GetDescendants() do
 				if d.ClassName == "TextLabel" and d.Parent and d.Parent.Parent and d.Parent.Parent.Name == "Mailbox" then
@@ -954,9 +975,9 @@ do
 			okAll, why = false, `{h.name}: {stage}`
 		end
 	end
-	check("the five other places in their looks, each its model (SandboxHouse) in its Atomic chunk, its walls the PrimaryPart in its box, its FrontDoor (SandboxDoor, -Z out) on its door, two leaves, no back door",
+	check("the five other places in their looks, each its model (SandboxHouse) in its Atomic chunk, its walls the PrimaryPart in its box (but the cabin's veranda and the mill's wheel, VillageLooks.Overhangs), its FrontDoor (SandboxDoor, -Z out) on its door, two leaves, no back door",
 		okAll and made == 5, why)
-	check("…walkable as the farmstead's (4 HouseSolid pieces: the walls less the front door's hall, nothing solid in the hall or the door's way but the doorstep; the plinth no longer solid), the hall lined dark over the plinth, its name on its mailbox",
+	check("…walkable as the farmstead's (4 HouseSolid pieces: the walls less the front door's hall, nothing solid in the hall or the door's way but the doorstep or the cabin's deck; the plinth no longer solid), the hall lined dark over the plinth (the mill's over the ground), its name on its mailbox",
 		okAll, why)
 	-- (a Placed that holds no place to empty, an old save's village house's id: nothing built)
 	local nowhere: VillageScenery.Placed = { id = "Hlavní_n_5", kind = "old", box = { x0 = 0, x1 = 30, z0 = 0, z1 = 24 }, yaw = 0, seed = 1, opts = { rich = true }, ids = { "Hlavní_n_5" }, street = "Hlavní" }

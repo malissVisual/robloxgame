@@ -282,9 +282,11 @@ end
 
 -- "fishpond": three round waters on their grassy banks (each its own height: no two tops on one plane), reeds in the
 -- shallows, the jetty out from the front shore, the rowing boat by it, a bench, two willows (32 parts). Its rounds are
--- shares of its frame (half: the smaller half side); the jetty JETTY across from the middle.
+-- shares of its frame (half: the smaller half side); the jetty JETTY across from the middle (9.5 review: 0, on the
+-- middle line: the Pond Cabin stands across from it, the jetty out from its own shore behind it; was a third of the way
+-- along the shore), its shore end SHORE in from the front edge on the bank.
 local POND = { { 0, 0.135, 0.889 }, { -0.333, -0.462, 0.556 }, { 0.511, 0, 0.467 } } -- (x / (w / 2), z / (d / 2), r / half)
-local JETTY = -0.333
+local JETTY, SHORE = 0, 6
 local function fishpond(k: Kit, f: Frame, roll: () -> number)
 	local hw, hd = f.w / 2, f.d / 2
 	local half = math.min(hw, hd)
@@ -304,7 +306,7 @@ local function fishpond(k: Kit, f: Frame, roll: () -> number)
 		put(k, "Reeds", { 4.6, 7, 4.6 }, { r[1] + math.cos(a) * (r[3] - 2), 3.5, r[2] + math.sin(a) * (r[3] - 2) }, pick(roll, P.Reeds), "LeafyGrass", { shape = "Ellipsoid" })
 	end
 	-- the jetty from the front shore out over the water, on four posts
-	local jx, z1 = JETTY * hw, hd - 10
+	local jx, z1 = JETTY * hw, hd - SHORE
 	put(k, "Jetty", { 4, 0.35, 28 }, { jx, 0.75, z1 - 14 }, P.Jetty, "WoodPlanks", SOLID)
 	for _, s in { -1, 1 } do
 		for _, z in { z1 - 26, z1 - 14 } do

@@ -13,8 +13,9 @@
 --     corners on it, the back nearer the door: plan.py's check), every door on its box's face looking at its road (its
 --     yard: its curb in it), every place reachable by road from Depot Row (the rects that meet) and the guide's path to
 --     every curb along them (SandboxSteps.route)
---   * the contracts: one per place and no other, a made-up Czech family each, the address on its road, its plan's kind
---     (big the farmstead, the spots' own the rest: HouseLayout's kinds), its clock past the horde's; the economy sane: a house
+--   * the contracts: one per place and no other, a made-up Czech family each, a short place, its plan's kind the
+--     place's own on the map (big the farmstead, house the lone house, the countryside's cabin, lodge, mill and cottage:
+--     HouseLayout's kinds), its clock past the horde's; the economy sane: a house
 --     holds fewer pieces than the big house (Config.Furniture's Spots and collectibles, and the plans themselves:
 --     HouseLayout.plan), gets less time, about the same minutes a piece
 --   * the guide's words and places per house: "Drive to The Pond Cabin on Pond Lane", at the place by its own lot
@@ -143,7 +144,10 @@ do
 	end
 	check("…each one's id, name, road, look, kind, box, lot, door (its look's: 1.2 in from its box's front edge), curb and yaw the plan's; names each its own", bad == nil, bad)
 end
-check("the farmstead: big, on Pražská, its look its own, its back door in its back wall; the other five: kind house, no number, no back door",
+-- (9.5 the countryside: each place's inside its own kind, HouseLayout's: the lone house a family house's, the other
+-- four shared/Layouts/Countryside.luau's)
+local KINDS = { "big", "cabin", "house", "lodge", "mill", "cottage" }
+check("the farmstead: big, on Pražská, its look its own, its back door in its back wall; the other five: their own kinds (the cabin, a family house, the lodge, the mill, the cottage), no number, no back door",
 	(function(): boolean
 		local f = Houses[1]
 		if f.kind ~= "big" or f.street ~= "Pražská" or f.look ~= "farmstead" or f.back == nil or f.back.z ~= f.box.z1 or f.number ~= nil then
@@ -151,7 +155,7 @@ check("the farmstead: big, on Pražská, its look its own, its back door in its 
 		end
 		for index = 2, #Houses do
 			local h = Houses[index]
-			if h.kind ~= "house" or h.back ~= nil or h.number ~= nil then
+			if h.kind ~= KINDS[index] or not table.find(HouseLayout.Kinds, h.kind) or h.back ~= nil or h.number ~= nil then
 				return false
 			end
 		end
@@ -452,29 +456,27 @@ do
 		count += 1
 	end
 	-- 9.5 the countryside: the contracts the six spots' (tests/countryside_test.luau: their families, places, kinds and
-	-- clocks by id), a short place each ("by the Little Pond"), no longer a street's number. A house of the map without
-	-- one (the family houses, until the countryside's map brings the spots) gets the fallback's card (Moving's
-	-- SB.newContract): the map's houses either all with a contract or only the farmstead
+	-- clocks by id), a short place each ("by the Little Pond"), no longer a street's number; every place of the map with
+	-- its own, of the place's kind (SandboxMap's: the big house, a family house, the countryside's four)
 	local bad: string? = nil
-	local mapped = 0
+	local kinds: { [string]: boolean } = {}
 	for _, h in Houses do
 		local c = S.Houses[h.id]
+		kinds[h.kind] = true
 		if not c then
-			continue
-		end
-		mapped += 1
-		if string.sub(c.Client, 1, 4) ~= "The " or string.sub(c.Client, -1) ~= "s" or #c.Client > Config.MoveStory.Limits.Client then
+			bad = `{h.id}: no contract`
+		elseif string.sub(c.Client, 1, 4) ~= "The " or string.sub(c.Client, -1) ~= "s" or #c.Client > Config.MoveStory.Limits.Client then
 			bad = `{h.id}: its family ({c.Client})`
 		elseif #c.Address == 0 or #c.Address > 24 then
 			bad = `{h.id}: its address ({c.Address})`
-		elseif not table.find(HouseLayout.Kinds, c.Kind) or (h == SandboxMap.House and c.Kind ~= h.kind) then
-			bad = `{h.id}: its kind`
+		elseif c.Kind ~= h.kind or not table.find(HouseLayout.Kinds, c.Kind) then
+			bad = `{h.id}: its kind {c.Kind}, the map's {h.kind}`
 		elseif c.Time <= S.HordeAt or #c.Blurb == 0 or #c.Blurb > Config.MoveStory.Limits.Blurb then
 			bad = `{h.id}: its clock or its words`
 		end
 	end
-	check("a contract per place and no other (Config.Moving.Sandbox.Houses): a made-up Czech family, the address on its road, its plan's kind, its clock past the horde's",
-		bad == nil and count == #Houses and mapped == #Houses, bad or `{mapped} of {#Houses} on the map`)
+	check("a contract per place and no other (Config.Moving.Sandbox.Houses): a made-up Czech family, a short place, the place's own kind (the big house, a family house, the cabin, the lodge, the mill, the cottage), its clock past the horde's",
+		bad == nil and count == #Houses and kinds.big and kinds.house and kinds.cabin and kinds.lodge and kinds.mill and kinds.cottage == true, bad)
 	local families: { [string]: boolean } = {}
 	local distinct = true
 	for _, c in S.Houses do

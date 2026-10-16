@@ -6,8 +6,8 @@ The real server code builds the world on tools/perf/world-mock.luau (tools/sandb
 kiosks, the warehouses, the TOP MOVERS board), the ZDC Sprinter's parts model stands at each place's curb
 (tools/vehicle-preview/export_fleet.py), and tools/village/render.mjs draws each view with three.js in headless Chromium
 (tools/village/render.html: a warm afternoon, a perspective camera, soft shadows, a light haze). The parts look only: no
-Blender imports (the farmstead is its stand-in chalet, a place whose look VillageLooks does not draw yet the old family
-house's).
+Blender imports (the farmstead is its stand-in chalet; 9.5 the other five in their own looks, VillageLooks.house's
+cabin, old family house, lodge, mill and cottage).
 
     NODE_PATH=/opt/node22/lib/node_modules python3 zombie-delivery/tools/countryside/views.py <luau> <three.module.min.js> [--out DIR]
 

@@ -462,6 +462,44 @@ do
 		and HouseRoute.gap(g, 14, 15, 14, 15) <= 1 + 1e-6 and HouseRoute.block(g, {}) == before - closed, closed)
 end
 
+-- 9.5 (tests/movehelper_stuck_runtime_test.luau on the countryside's map: The Forest Lodge's walk 1.09 studs off a
+-- doorway's jamb): his way from where he really stands, anywhere on his open cell (not its middle, the way's pulled
+-- legs' start): its first leg keeps the grid's `clear` off everything too (or as far as he is now), else it steps onto
+-- the cell's middle first. Two rooms, a wall between them with a doorway, ways from all over the west room into the
+-- east one.
+do
+	local V = Vector3.new
+	local plan = {
+		min = V(0, 0, 0),
+		max = V(20, 10, 20),
+		faces = { { min = V(9.5, 0, 0), max = V(10.5, 10, 5), header = false }, { min = V(9.5, 0, 9), max = V(10.5, 10, 20), header = false } },
+		rooms = { { min = V(0.5, 0, 0.5), max = V(9.5, 10, 19.5) }, { min = V(10.5, 0, 0.5), max = V(19.5, 10, 19.5) } },
+		doors = { { at = V(10, 0, 7), width = 4, axis = "Z" } },
+		fixtures = {},
+		wall = 1,
+	}
+	local clear = Config.MoveHelper.Walk.Clear
+	local g = HouseRoute.grid(plan, nil, nil, clear) :: HouseRoute.Grid
+	math.randomseed(95)
+	local ways, worst, stepped = 0, math.huge, 0
+	for _ = 1, 600 do
+		local fx, fz = 1 + math.random() * 8, 1 + math.random() * 18
+		local tx, tz = 12 + math.random() * 6, 2 + math.random() * 16
+		if not HouseRoute.open(g, fx, fz) then
+			continue
+		end
+		local points = HouseRoute.path(g, fx, fz, tx, tz)
+		if points and #points > 0 then
+			ways += 1
+			local need = math.min(clear, HouseRoute.gap(g, fx, fz, fx, fz))
+			worst = math.min(worst, HouseRoute.gap(g, fx, fz, points[1].x, points[1].z) - need)
+			stepped += if math.abs(points[1].x - fx) < 0.4 and math.abs(points[1].z - fz) < 0.4 then 1 else 0
+		end
+	end
+	check(`9.5 his way from anywhere on his open cell: its first leg Walk.Clear off everything (or as far as he is), else onto the cell's middle first ({ways} ways, {stepped} stepped onto it)`,
+		ways > 300 and worst >= -1e-3 and stepped > 0, worst)
+end
+
 if failures == 0 then
 	print("ALL CHECKS PASSED")
 else

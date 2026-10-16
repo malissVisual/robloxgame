@@ -8,8 +8,8 @@
 --
 --   The houses     the places to empty but the farmstead (SandboxMap.Houses 2 … 6: server/SandboxWorld.luau builds
 --                  them, their doors walked in; the farmstead its own look), each in its box turned by its yaw, rich,
---                  its dice its id's (VillageLooks.seedOf), in its look: VillageLooks.house's kind (lookOf: "old" for
---                  a look VillageLooks does not draw yet)
+--                  its dice its id's (VillageLooks.seedOf), in its look: VillageLooks.house's kind (9.5 every place's
+--                  own: lookOf)
 --   The landmarks  SandboxMap.Landmarks, each looking its own yaw: CountryLooks' kinds (the spots' surroundings, the
 --                  railway and its halt), else VillageLooks' (the D5); the D5 and the railway are kept on every client
 --                  (far = true: the D5's cars run on it, the railway crosses the whole map)
@@ -26,8 +26,9 @@
 --   VillageScenery.houses(extra?)    { Placed }: the places to empty but the farmstead (rich): kind (the look drawn),
 --                                    box, yaw, seed, opts, ids, street (extra: their PlanHouses, enter()'s; the same)
 --   VillageScenery.enter()           the places to empty but the farmstead as VillageLooks PlanHouses (kind: lookOf)
---   VillageScenery.lookOf(look)      the look VillageLooks.house draws for a place's look: itself once VillageLooks
---                                    knows it, else "old" (so the map builds before a look exists)
+--   VillageScenery.lookOf(look)      the look VillageLooks.house draws for a place's look: itself when VillageLooks
+--                                    lists it (its Houses, 9.5 its Countryside), else "old" (an unknown one still
+--                                    builds)
 --   VillageScenery.emptied(placed)   the place to empty a Placed holds (SandboxMap.Houses'; nil: none)
 --   VillageScenery.landmarks()       { Mark }: id, name, kind, box, yaw, seed, opts, far
 --   VillageScenery.pieces(thing)     a house's or a landmark's pieces on the map (VillageLooks.place)
@@ -71,15 +72,10 @@ end
 
 -- ── The houses and the landmarks ───────────────────────────────────────────
 
-local known: { [string]: boolean } = {}
-
 function VillageScenery.lookOf(look: string): string
-	if known[look] == nil then
-		-- (VillageLooks draws it once it lists it or builds it without an error: the other looks come in their own time)
-		local ok = table.find(VillageLooks.Houses, look) ~= nil or pcall(VillageLooks.house, look, { x0 = -12, x1 = 12, z0 = -10, z1 = 10 }, 0, 1, { rich = true })
-		known[look] = ok
-	end
-	return if known[look] then look else "old"
+	-- (9.5: every look of the map's is VillageLooks' now, the family houses' or the countryside's)
+	local known = table.find(VillageLooks.Houses, look) ~= nil or table.find(VillageLooks.Countryside, look) ~= nil
+	return if known then look else "old"
 end
 
 local enterCache: { VillageLooks.PlanHouse }? = nil

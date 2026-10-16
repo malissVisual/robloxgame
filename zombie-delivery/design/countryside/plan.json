@@ -294,7 +294,7 @@
    "label": "Chata u rybníka",
    "street": "Pond Lane",
    "look": "cabin",
-   "kind": "house",
+   "kind": "cabin",
    "box": {
     "x0": -950,
     "x1": -932,
@@ -358,7 +358,7 @@
    "label": "Hájovna v lese",
    "street": "Wood Lane",
    "look": "lodge",
-   "kind": "house",
+   "kind": "lodge",
    "box": {
     "x0": -954,
     "x1": -926,
@@ -390,7 +390,7 @@
    "label": "Starý mlýn na potoce",
    "street": "Mill Lane",
    "look": "mill",
-   "kind": "house",
+   "kind": "mill",
    "box": {
     "x0": -1072,
     "x1": -1048,
@@ -422,7 +422,7 @@
    "label": "Chalupa v sadu",
    "street": "Orchard Lane",
    "look": "cottage",
-   "kind": "house",
+   "kind": "cottage",
    "box": {
     "x0": 192,
     "x1": 212,

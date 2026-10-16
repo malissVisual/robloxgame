@@ -2,7 +2,7 @@
 -- villages"): the four new places to empty, shared/Layouts/Countryside.luau's plans through shared/HouseLayout.luau's
 -- plan(seed, kind) for "cabin" (The Pond Cabin), "lodge" (The Forest Lodge), "mill" (The Old Mill) and "cottage" (The
 -- Orchard Cottage), in the standalone Luau CLI on the recorder (tools/fixtures/item-mock.luau), and their contracts
--- (Config.Moving.Sandbox.Houses). Built on their own (no SandboxMap entry needed: the map's spots come with the map).
+-- (Config.Moving.Sandbox.Houses). Built on their own; each spot on the map too (SandboxMap.house: its kind and box).
 --   * the contracts: the five family houses gone, the five spots' (and the farmstead's as it was), each its kind
 --     (HouseLayout knows it), a made-up Czech family, a short place for its address, a short blurb, its clock by its
 --     size: 12 – 16 minutes, about the farmstead's minutes a piece
@@ -27,6 +27,7 @@ local HouseLayout = require("./HouseLayout")
 local HouseInterior = require("./HouseInterior")
 local HouseRoute = require("./HouseRoute")
 local Countryside = require("./Countryside")
+local SandboxMap = require("./SandboxMap")
 
 local failures = 0
 local function check(name: string, ok: boolean, detail: any?)
@@ -144,6 +145,17 @@ do
 		bad == nil, bad)
 	check("HouseLayout knows the countryside's kinds", table.find(HouseLayout.Kinds, "cabin") ~= nil and table.find(HouseLayout.Kinds, "lodge") ~= nil
 		and table.find(HouseLayout.Kinds, "mill") ~= nil and table.find(HouseLayout.Kinds, "cottage") ~= nil and table.find(HouseLayout.Kinds, "big") ~= nil)
+	-- (with the countryside's map: each spot on it, of its kind, its box the one its contract's numbers are for)
+	local missing: string? = nil
+	for _, spot in SPOTS do
+		local h = SandboxMap.house(spot.id)
+		local quarter = h ~= nil and (h.yaw == 90 or h.yaw == 270)
+		if not h or h.kind ~= spot.kind or (if quarter then h.box.z1 - h.box.z0 else h.box.x1 - h.box.x0) ~= spot.box[1]
+			or (if quarter then h.box.x1 - h.box.x0 else h.box.z1 - h.box.z0) ~= spot.box[2] then
+			missing = missing or spot.id
+		end
+	end
+	check("…each spot on the map (SandboxMap.house): of its kind, its box the owner's", missing == nil, missing)
 end
 
 -- ── Every plan ─────────────────────────────────────────────────────────────────

@@ -93,15 +93,17 @@ ROADS = [
 
 # ── The six spots ──────────────────────────────────────────────────────────────────────────────────────────────────
 
-# id, name, the owner's words (Czech), street, look, kind, box (its footprint: sx along its front × sz deep, turned
-# with its yaw), yaw (the way its front door looks). The farmstead's door, curb, lot and back door are today's.
+# id, name, the owner's words (Czech), street, look, kind (its inside's plan: shared/HouseLayout.luau's kind, its
+# contract's in Config.Moving.Sandbox.Houses: the farmstead the big house, the lone house a family house, the other
+# four shared/Layouts/Countryside.luau's own), box (its footprint: sx along its front × sz deep, turned with its yaw),
+# yaw (the way its front door looks). The farmstead's door, curb, lot and back door are today's.
 SPOTS = [
     ("sandbox_house", "The Old Farmstead", "Statek (na farmě)", "Pražská", "farmstead", "big", rect(-22, 22, 523, 557), 0),
-    ("pond_cabin", "The Pond Cabin", "Chata u rybníka", "Pond Lane", "cabin", "house", rect(-950, -932, 458, 482), 270),
+    ("pond_cabin", "The Pond Cabin", "Chata u rybníka", "Pond Lane", "cabin", "cabin", rect(-950, -932, 458, 482), 270),
     ("lone_house", "The Lone House", "Samota u cesty", "Hill Road", "old", "house", rect(-617, -593, -451, -421), 270),
-    ("forest_lodge", "The Forest Lodge", "Hájovna v lese", "Wood Lane", "lodge", "house", rect(-954, -926, -484, -462), 180),
-    ("old_mill", "The Old Mill", "Starý mlýn na potoce", "Mill Lane", "mill", "house", rect(-1072, -1048, -26, 0), 0),
-    ("orchard_cottage", "The Orchard Cottage", "Chalupa v sadu", "Orchard Lane", "cottage", "house", rect(192, 212, -483, -457), 270),
+    ("forest_lodge", "The Forest Lodge", "Hájovna v lese", "Wood Lane", "lodge", "lodge", rect(-954, -926, -484, -462), 180),
+    ("old_mill", "The Old Mill", "Starý mlýn na potoce", "Mill Lane", "mill", "mill", rect(-1072, -1048, -26, 0), 0),
+    ("orchard_cottage", "The Orchard Cottage", "Chalupa v sadu", "Orchard Lane", "cottage", "cottage", rect(192, 212, -483, -457), 270),
 ]
 FARMSTEAD = {"lot": rect(-60, 60, 504, 600), "door": {"x": 0, "z": 523, "yaw": 0}, "curb": {"x": 0, "z": 492, "yaw": 0},
              "back": {"x": 0, "z": 557, "yaw": 180}}

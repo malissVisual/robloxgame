@@ -34,7 +34,8 @@
 --   Budget's cabin, lodge, mill and cottage):
 --     "cabin"    the Pond Cabin, a timber fishing cabin: dark stained boards, a low pitched roof with wide eaves, a small
 --                veranda in front of the door (deck, posts, railings, its roof: reaching Countryside.Porch past the box's
---                front edge at most), a stovepipe, a net and a lifebuoy on the wall, a lantern by the door
+--                front edge at most; its roof overhead stops nobody: decoration), a stovepipe, a net and a lifebuoy on
+--                the wall, a lantern by the door
 --     "lodge"    the Forest Lodge, a forester's lodge: log walls on a stone plinth, the corner posts and the beam round
 --                their top, a steep wooden shingle roof, green shutters, antlers over the door, a stone chimney, a
 --                covered woodpile along a side wall
@@ -43,7 +44,11 @@
 --                wall (seen from outside facing the door: the frame's +X), just outside the box (Countryside.Wheel at most)
 --     "cottage"  the Orchard Cottage: whitewash on a painted band, a thatched or a clay tile roof with a round ridge,
 --                flower boxes, a bench by the door, a little porch over it
---   Each has the "House" walls (a block), one door tagged "door" in the middle of its front wall and a Mailbox.
+--   Each has the "House" walls (a block), one door tagged "door" in the middle of its front wall and a Mailbox; its
+--   eaves over the door 8 studs up at least (a mover and whatever goes through the door, 7.2 high, walks under them, as
+--   under a family house's); nothing solid in the door's way but its doorstep (the cabin's: its veranda's deck, its
+--   plinth's height); all of it inside its box but its overhangs (VillageLooks.Overhangs: the cabin's veranda past its
+--   front edge, the mill's wheel past its right-hand side).
 --   The landmarks (VillageLooks.landmark; plan.json landmarks' kinds, each in its rect, Config.Village.Facing):
 --     "chapel"   the green's chapel: a rendered nave (white or Maria Theresa yellow) with a slate gable, a round apse, the
 --                tower at its front with the round-arched door, the bell opening, a green copper or slate spire, the cross
@@ -78,6 +83,10 @@
 --   VillageLooks.doorSpots(pieces, box, yaw)             the front doors on the map: outside each, looking out (a Spot)
 --   VillageLooks.box(piece)                              a piece's axis-aligned box in its frame: x0, x1, y0, y1, z0, z1
 --   VillageLooks.budget(kind, units?, rich?)             the most parts a call may give
+--   VillageLooks.Overhangs                               9.5 per countryside look, what of it may reach out of its box:
+--                                                        side ("front": past its front edge, the frame's +Z; "right":
+--                                                        past its right-hand side seen from outside facing the door,
+--                                                        the frame's +X), reach (studs at most) and the pieces' names
 --   VillageLooks.census(plan, step)                      the parts it gives a step's village of plan.json (by kind)
 --   VillageLooks.seedOf(id), chunkOf(x, z)               a plan entry's dice; a place's chunk
 
@@ -126,6 +135,11 @@ local P = V.Palette
 VillageLooks.Budget = V.Budget
 VillageLooks.Houses = { "old", "row", "modern" }
 VillageLooks.Countryside = { "cabin", "lodge", "mill", "cottage" } -- (9.5 the countryside's spots' houses)
+-- 9.5 (the header) the cabin's veranda (Countryside.Porch), the mill's water wheel and its chute (Countryside.Wheel)
+VillageLooks.Overhangs = {
+	cabin = { side = "front", reach = V.Countryside.Porch, pieces = { "Deck", "Post", "Rail", "VerandaRoof" } },
+	mill = { side = "right", reach = V.Countryside.Wheel, pieces = { "Wheel", "Hub", "Paddle", "Axle", "Chute", "ChutePost" } },
+} :: { [string]: { side: string, reach: number, pieces: { string } } }
 VillageLooks.Landmarks = { "chapel", "green", "pond", "shop", "motorway", "barrier", "hardware" }
 VillageLooks.Trees = { "linden", "oak", "birch", "poplar", "willow", "fruit" }
 VillageLooks.Fields = { "rapeseed", "wheat", "ploughed", "young" }
@@ -580,15 +594,16 @@ local function spotRoof(k: Kit, W: number, D: number, h: number, zc: number, alo
 end
 
 -- "cabin": the Pond Cabin, a timber fishing cabin: dark stained boards on a low plinth, a low pitched roof with wide
--- eaves, a small veranda in front of the door (its deck, posts, railings and its own roof, reaching Porch past the
--- box's front edge at most), the stovepipe through the roof, a net and a lifebuoy on the front wall, a lantern by the
--- door, the mailbox (the jetty is the map's).
+-- eaves (8 studs up at their lowest, inside the box), a small veranda in front of the door (its deck, posts, railings
+-- and its own roof, reaching Porch past the box's front edge at most; the deck its plinth's height, walked up as a
+-- doorstep; its roof overhead decoration: it stops nobody), the stovepipe through the roof, a net and a lifebuoy on
+-- the front wall, a lantern by the door, the mailbox (the jetty is the map's).
 local function cabinHouse(k: Kit, f: Frame, roll: () -> number)
 	local CS = V.Countryside
 	local w, d = f.w, f.d
 	local W = math.min(w - 4, 20)
 	local D = math.min(d - 5, 13)
-	local h = 8.2
+	local h = 8.7 -- (9.5 review: was 8.2, its eaves 7.6 up over the door)
 	local boards = pick(roll, CS.Stain)
 	local tar = pick(roll, CS.Tar)
 	local frame = pick(roll, P.Frames)
@@ -598,7 +613,8 @@ local function cabinHouse(k: Kit, f: Frame, roll: () -> number)
 	local deck = 0.5
 	put(k, "House", { W, h, D }, { 0, h / 2, zc }, boards, "WoodPlanks", SOLID)
 	put(k, "Plinth", { W + 0.3, deck, D + 0.3 }, { 0, deck / 2, zc }, P.Concrete, "Concrete", SOLID)
-	local rise = spotRoof(k, W, D, h, zc, "x", math.rad(24), boards, "WoodPlanks", tar, "Slate", 1.4, 0.8, SLAB, false)
+	-- (its eaves 1.3 out: 9.5 review, was 1.4, their slab's edge 0.08 past the box's front edge)
+	local rise = spotRoof(k, W, D, h, zc, "x", math.rad(24), boards, "WoodPlanks", tar, "Slate", 1.3, 0.8, SLAB, false)
 	put(k, "Door", DOOR, { 0, DOOR[2] / 2, zf + DOOR[3] / 2 }, pick(roll, P.Doors), "Wood", { tag = "door", solid = true })
 	for _, side in { -1, 1 } do
 		window(k, "Window", side * 5.2, 4.6, zf, 3.0, 3.4, frame)
@@ -614,7 +630,7 @@ local function cabinHouse(k: Kit, f: Frame, roll: () -> number)
 		local inner, outer = 2.6, vw / 2 - 0.375
 		put(k, "Rail", { outer - inner, 0.25, 0.2 }, { s * (inner + outer) / 2, deck + 1.2, zf + vd - 0.2 }, posts, "Wood")
 	end
-	put(k, "VerandaRoof", { vw + 0.6, 0.3, vd + 0.6 }, { 0, deck + 6.75, zf + vd / 2 + 0.1 }, tar, "Slate", { turn = { 8, 0, 0 }, solid = true })
+	put(k, "VerandaRoof", { vw + 0.6, 0.3, vd + 0.6 }, { 0, deck + 6.75, zf + vd / 2 + 0.1 }, tar, "Slate", { turn = { 8, 0, 0 } })
 	-- the stovepipe through the back slope and its cap
 	local px, pz = stoveSide * W / 4, zc - D / 4
 	local surface = h + rise - (D / 4) * math.tan(math.rad(24))
@@ -687,7 +703,8 @@ end
 -- "mill": the Old Mill, an old watermill: tall stone walls, a tall tiled roof with its gable to the front (boarded),
 -- its name over the door, a loft door in the gable with the hoist beam over it (a rope, a sack), and its wooden water
 -- wheel on its RIGHT-HAND side wall (seen from outside facing the front door: the frame's +X), the wheel and the chute
--- that feeds it from behind just outside the box (Wheel studs at most): its stream runs there.
+-- that feeds it from behind just outside the box (Wheel studs at most): its stream runs there, the wheel's middle
+-- WheelAt past the box (its foot in the water), its axle into the wall.
 local function millHouse(k: Kit, f: Frame, roll: () -> number)
 	local CS = V.Countryside
 	local w, d = f.w, f.d
@@ -718,7 +735,7 @@ local function millHouse(k: Kit, f: Frame, roll: () -> number)
 	-- the water wheel on the right-hand wall: its rim, its hub, its paddles (three boards across it), the axle into the
 	-- wall; the chute on its posts from behind over the wheel's top
 	local r = 5.2
-	local wx = W / 2 + 0.7 + 0.9
+	local wx = w / 2 + CS.WheelAt
 	local wz = zc - 1
 	local wy = r + 0.1
 	put(k, "Wheel", { 1.8, 2 * r, 2 * r }, { wx, wy, wz }, boards, "WoodPlanks", { shape = "Cylinder", solid = true })
@@ -743,7 +760,7 @@ local function cottageHouse(k: Kit, f: Frame, roll: () -> number)
 	local w, d = f.w, f.d
 	local W = math.min(w - 6, 20)
 	local D = math.min(d - 6, 13)
-	local h = 8.6
+	local h = 9 -- (9.5 review: was 8.6, its clay tile eaves 7.8 up over the door)
 	local wash = pick(roll, CS.Whitewash)
 	local thatch = roll() < 0.5
 	local roof = if thatch then pick(roll, CS.Thatch) else pick(roll, CS.Terracotta)

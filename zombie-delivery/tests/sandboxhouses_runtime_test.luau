@@ -1,18 +1,19 @@
--- 8.9 six houses, 9.4 the countryside (the blocks marked "six houses" in server/Moving.luau): the six houses to
--- empty of shared/SandboxMap.luau (Houses: The Old Farmstead and five family houses in the village) with the real
+-- 8.9 six houses, 9.4 the countryside (the blocks marked "six houses" in server/Moving.luau): the six places to
+-- empty of shared/SandboxMap.luau (Houses: The Old Farmstead and the countryside's five spots) with the real
 -- server/Moving.luau (MoveLobby, MoveGreeters, MoveHelper and MoveSites with it) on tests/runtime/MovingRuntime.luau's
 -- fakes, Config.Sandbox.On (tests/run_tests.py builds them; the fake art's plans record their seeds and kinds):
 --   * a site per house (Move_<id>): a doormat at its front door, its "Enter house" on that house's own map door (the
 --     SandboxDoor part in the model whose SandboxHouse is its id: server/SandboxWorld.luau's stand-ins; the farmstead's
 --     has none: a door of no house's is the farmstead's); a back door (its doormat, "Enter by the back door") only on the
 --     farmstead, which has one
---   * two players never on one house: Ann's first card the farmstead, Bob's the next free one (the Linden House); their
+--   * two players never on one house: Ann's first card the farmstead, Bob's the next free one (The Pond Cabin); their
 --     cards and moves stay apart; Ann's next cards skip the house on Bob's
---   * a whole move on each of the six (Ann five in turn, Bob the Linden House): the card at your kiosk (its family, its
---     place, its clock, its plan's kind: its contract's, 9.5 the countryside's own), START, LAUNCH, the
---     van called to the door (at its curb on its street's asphalt, its back to the door), walked in through its door (no
---     E), a piece carried out through it, loaded, driven home, a trip into your warehouse, FINISH; the next card the next
---     house (round to the farmstead after the last); a death with the van wrecked: out of that house's own door
+--   * a whole move on each of the six (Ann five in turn, Bob The Pond Cabin): the card at your kiosk (its family, its
+--     place, its clock, its plan's kind: its contract's, the place's own on the map, 9.5 the countryside's), START,
+--     LAUNCH, the van called to the door (at its curb on its street's asphalt, its back to the door), walked in through
+--     its door (no E), a piece carried out through it, loaded, driven home, a trip into your warehouse, FINISH; the next
+--     card the next house (round to the farmstead after the last); a death with the van wrecked: out of that house's own
+--     door
 --   * the seed kept across a leave (the save's sandboxHouse and sandboxHouseSeed): back on this server or another, the
 --     same house and the same seed; a save with a house another player here has: the next free one, its seed kept; a
 --     save whose seed a trip spent (none, its house the one emptied last): the next house after it; an 8.4 save (a seed,
@@ -43,12 +44,20 @@ local workspace = M.workspace
 local Houses = SandboxMap.Houses
 local Farm = SandboxMap.House
 local plot1, plot2, plot3 = SandboxMap.Plots[1], SandboxMap.Plots[2], SandboxMap.Plots[3]
--- 9.5 the countryside: a house's card's words, its contract's (Config.Moving.Sandbox.Houses); a house of the map with
--- none (the family houses, until the countryside's map brings the spots) the fallback's (Moving's SB.newContract and
--- SB.site: The Nováks, its street, the map's kind, Config.Moving.Time)
+-- 9.5 the countryside: a place's card's words, its contract's (Config.Moving.Sandbox.Houses: every place of the map
+-- has its own, of the place's kind)
 local function contractOf(h: any): { Client: string, Address: string, Kind: string, Time: number }
-	return S.Houses[h.id] or { Client = "The Nováks", Address = h.street, Kind = h.kind, Time = T.Time }
+	return S.Houses[h.id]
 end
+check("every place of the map with its contract (Config.Moving.Sandbox.Houses), of the place's own kind", (function(): boolean
+	for _, h in Houses do
+		local own = S.Houses[h.id]
+		if not own or own.Kind ~= h.kind then
+			return false
+		end
+	end
+	return #Houses == 6
+end)())
 E.Zombies.findSpot = function(center: any): any
 	return center + V3(60, 0, 0)
 end
@@ -258,7 +267,7 @@ local function moveOn(player: any, plot: any, h: any): string?
 		return `the move's state: {view and view.contract}`
 	end
 	local kind = built[#built].kind
-	if kind ~= own.Kind then -- (9.5: the contract's kind, the countryside's own)
+	if kind ~= own.Kind or kind ~= h.kind then -- (9.5: the contract's kind, the place's own on the map)
 		return `the plan's kind {kind}`
 	end
 	-- the van called to the door: at its curb on the street's asphalt, its nose away from the door, its back to it
@@ -334,8 +343,8 @@ local function moveOn(player: any, plot: any, h: any): string?
 	return nil
 end
 
--- Ann: the farmstead, then the next house each time (Bob's card has the Linden House: she never gets it), round to the
--- farmstead after the last; Bob: the Linden House
+-- Ann: the farmstead, then the next place each time (Bob's card has The Pond Cabin: she never gets it), round to the
+-- farmstead after the last; Bob: The Pond Cabin
 local order = { 1, 3, 4, 5, 6 }
 for _, index in order do
 	local h = Houses[index]

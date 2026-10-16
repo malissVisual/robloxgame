@@ -27,7 +27,8 @@
 --   HouseRoute.path(grid, fx, fz, tx, tz, far?)   his way from (fx, fz) to (tx, tz): its points after the start
 --                                         ({ { x, z } }, the last one the goal's nearest open cell within `far` studs,
 --                                         Route.Snap by default; a start off the open cells steps onto the nearest one
---                                         first); nil: no way
+--                                         first; 9.5 so does one whose first leg from where he stands would come
+--                                         nearer than the grid's `clear` to anything); nil: no way
 --   HouseRoute.reach(grid, fx, fz, piece, stand?, avoid?)   where he stands to take `piece` (its footprint): (x, z,
 --                                         studs on foot) or nil (no such spot he can walk to); `avoid`: rects he never
 --                                         stands in (the doorways, where he would wait in your way)
@@ -689,9 +690,14 @@ function HouseRoute.path(g: Grid, fx: number, fz: number, tx: number, tz: number
 	local points = pulled(g, found)
 	local sx, sz = middle(g, start)
 	local here = cellAt(g, fx, fz)
-	if (sx - fx) * (sx - fx) + (sz - fz) * (sz - fz) > (g.step * 0.75) ^ 2 or #points == 0 or here == 0 or g.open[here] ~= 1 then
+	local clear = g.clear
+	if (sx - fx) * (sx - fx) + (sz - fz) * (sz - fz) > (g.step * 0.75) ^ 2 or #points == 0 or here == 0 or g.open[here] ~= 1
+		or (clear and not HouseRoute.free(g, fx, fz, points[1].x, points[1].z, clear)) then
 		-- (off the open cells: onto the nearest one first; 9.3 even a hair off them: a corner cut by his walk, the first
-		-- leg from there along a wall's end would run into it)
+		-- leg from there along a wall's end would run into it; 9.5 and whenever the first leg from where he really
+		-- stands comes nearer than `clear` to anything: the way was pulled straight from his cell's middle, and he may
+		-- stand up to its half diagonal off it: The Forest Lodge's leg from where the door puts him, pulled past a
+		-- doorway's jamb 1.25 off from the middle, passed it 1.09 off from him)
 		table.insert(points, 1, { x = sx, z = sz })
 	end
 	return points

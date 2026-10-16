@@ -5,7 +5,8 @@
 -- walls). The real server/Moving.luau and server/MoveHelper.luau on tests/runtime/MovingRuntime.luau's fakes
 -- (Config.Sandbox.On) with the real art (shared/FurnitureLooks.luau, shared/HouseLayout.luau, server/HouseInterior.luau
 -- and its shell's real wall parts): a move into each of the six places to empty, The Old Farmstead (the big house, 8.5.2
--- roomy) and the five family houses, each with another layout (the back row's order, mirrored or not). His walk is a
+-- roomy) and 9.5 the countryside's five, each of its own kind (its contract's: the lone house a family house, the cabin,
+-- the lodge, the mill and the cottage shared/Layouts/Countryside.luau's), each with another seed. His walk is a
 -- straight step toward the point he is given (useMover: his way's corners), the rays at the interior's walls the
 -- runtime's (a ray against the parts' boxes).
 --   * his ways on the server's own grid (the move's plan, the real pieces where they stand): from his way in to every
@@ -103,27 +104,20 @@ Moving.parkVan = function(player: any, spot: any, _seat: boolean, carId: string?
 	E.cars[player] = car
 	return nil, car
 end
--- 9.5 the countryside's kinds (shared/Layouts/Countryside.luau: "cabin", "lodge", "mill", "cottage"): a kind no house
--- of the map has yet (the map's spots come with the countryside's map) is a move of its own on one of the map's other
--- houses (not the farmstead, each its own): that house's contract the kind's for this test (Config.Moving.Sandbox.Houses,
--- before Moving.start makes the contracts)
-do
-	local S = Config.Moving.Sandbox
-	local had: { [string]: boolean } = {}
-	for _, house in SandboxMap.Houses do
-		local own = S.Houses[house.id]
-		had[if own then own.Kind else house.kind] = true
-	end
-	local next = 2
-	for _, kind in { "cabin", "lodge", "mill", "cottage" } do
-		local house = SandboxMap.Houses[next]
-		if not had[kind] and house then
-			S.Houses[house.id] = { Client = "The Testers", Address = "the test's own", Blurb = "A move of the test's own.", Kind = kind, Time = 15 * 60 }
-			next += 1
-		end
-	end
-end
 Moving.start()
+-- 9.5 the countryside: the six places of the map, each with its contract (Config.Moving.Sandbox.Houses) of its own kind,
+-- the map's (no stand-in: every kind a place of its own)
+do
+	local kinds: { [string]: boolean } = {}
+	local ok = #SandboxMap.Houses == 6
+	for _, house in SandboxMap.Houses do
+		local own = Config.Moving.Sandbox.Houses[house.id]
+		ok = ok and own ~= nil and own.Kind == house.kind
+		kinds[house.kind] = true
+	end
+	check("the six places of the map, each with its contract of its own kind: the big house, a family house, the cabin, the lodge, the mill, the cottage",
+		ok and kinds.big and kinds.house and kinds.cabin and kinds.lodge and kinds.mill and kinds.cottage == true)
+end
 
 local function promptIn(model: any, action: string): any
 	for _, d in model:GetDescendants() do
@@ -148,7 +142,9 @@ local function pieceRect(s: any): HouseRoute.Rect
 	return { x0 = p.X - ex / 2, z0 = p.Z - ez / 2, x1 = p.X + ex / 2, z1 = p.Z + ez / 2 }
 end
 
--- Every layout of the family house: the first seed of each back-row order, mirrored or not (the five houses take five).
+-- Every layout of the family house: the first seed of each back-row order, mirrored or not (the five places after the
+-- farmstead take five of them as their seeds: the lone house a family house's layout, 9.5 the countryside's kinds the
+-- plan of theirs that seed gives).
 local function variants(kind: string): { number }
 	local found: { [string]: boolean } = {}
 	local list: { number } = {}
@@ -303,7 +299,9 @@ end
 
 -- A piece Danny takes alone (one hand or both, it fits the van) against an inside wall of its room, and a spot across
 -- that wall in the next room, 1.6 studs past it, open on his grid (nobody stands in a piece there) and near enough
--- for the piece's prompt: (spot, x, z in the plan) or nil.
+-- for the piece's prompt: (spot, x, z in the plan) or nil. The spot behind the piece's middle first, else along its
+-- length every half stud, the nearer its middle the sooner (9.5: in the next room a piece may stand right behind its
+-- middle, the cottage's wardrobe behind its sewing machine, with room beside it).
 local function behindWall(plan: any, grid: HouseRoute.Grid, move: any): (any, number?, number?)
 	for _, s in plan.spots do
 		local def = FurnitureLooks.Items[s.item]
@@ -323,15 +321,22 @@ local function behindWall(plan: any, grid: HouseRoute.Grid, move: any): (any, nu
 			local depth = (if alongX then rect.z1 - rect.z0 else rect.x1 - rect.x0) / 2
 			local along = if alongX then p.X else p.Z
 			local a0, a1 = if alongX then f.min.X else f.min.Z, if alongX then f.max.X else f.max.Z
-			if gap < 0 or gap - depth > 0.8 or along < a0 + 0.8 or along > a1 - 0.8 then
+			if gap < 0 or gap - depth > 0.8 then
 				continue
 			end
 			local past = gap + plan.wall + 1.6
-			local qx = if alongX then p.X else p.X - n.X * past
-			local qz = if alongX then p.Z - n.Z * past else p.Z
-			if HouseRoute.inside(grid, qx, qz) and HouseRoute.open(grid, qx, qz) and not HouseRoute.sees(grid, qx, qz, p.X, p.Z)
-				and math.sqrt((qx - p.X) ^ 2 + (qz - p.Z) ^ 2) <= T.Reach.Item + math.max(def.size.X, def.size.Z) / 2 + 2 then
-				return s, qx, qz
+			local half = (if alongX then rect.x1 - rect.x0 else rect.z1 - rect.z0) / 2
+			for k = 0, 2 * math.floor(half / 0.5) do
+				local at = along + (if k % 2 == 1 then 0.5 else -0.5) * math.ceil(k / 2)
+				if at < a0 + 0.8 or at > a1 - 0.8 then
+					continue
+				end
+				local qx = if alongX then at else p.X - n.X * past
+				local qz = if alongX then p.Z - n.Z * past else at
+				if HouseRoute.inside(grid, qx, qz) and HouseRoute.open(grid, qx, qz) and not HouseRoute.sees(grid, qx, qz, p.X, p.Z)
+					and math.sqrt((qx - p.X) ^ 2 + (qz - p.Z) ^ 2) <= T.Reach.Item + math.max(def.size.X, def.size.Z) / 2 + 2 then
+					return s, qx, qz
+				end
 			end
 		end
 	end
@@ -374,15 +379,6 @@ local function give(p: any, model: any)
 end
 
 for index, house in Houses do
-	-- (9.5: the house as its contract has it: its kind, a stand-in's named so)
-	do
-		local own = Config.Moving.Sandbox.Houses[house.id]
-		if own and own.Kind ~= house.kind then
-			house = table.clone(house)
-			house.name = `{house.name} as a {own.Kind}`
-			house.kind = own.Kind
-		end
-	end
 	local seed = if house.kind == "big" then bigSeed else houseSeeds[(index - 2) % #houseSeeds + 1]
 	local p, danny, b = moveInto(index, house, seed)
 	if not danny or not b then

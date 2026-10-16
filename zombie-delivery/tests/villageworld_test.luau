@@ -408,8 +408,8 @@ do
 			ids[id] = (ids[id] or 0) + 1
 		end
 		local place = VillageScenery.emptied(h)
-		if not place or h.opts.rich ~= true or h.kind ~= VillageScenery.lookOf(place.look) then
-			hookBad = `{h.id}: not its place's, rich, in its look`
+		if not place or h.opts.rich ~= true or h.kind ~= place.look or VillageScenery.lookOf(place.look) ~= place.look then
+			hookBad = `{h.id}: not its place's, rich, in its own look`
 		end
 		local made = VillageLooks.house(h.kind, h.box, h.yaw, h.seed, h.opts)
 		if #made > VillageLooks.budget(h.kind, 1, true) and VillageLooks.budget(h.kind, 1, true) > 0 then
@@ -421,9 +421,10 @@ do
 			hookBad = `{h.id} built {ids[h.id] or 0} times`
 		end
 	end
-	check(`the five places but the farmstead each built once, rich, in its look (VillageScenery.lookOf: "old" for one VillageLooks does not draw yet), within its budget`,
+	check(`the five places but the farmstead each built once, rich, in its own look (9.5: VillageLooks draws every one: no stand-in "old"), within its budget`,
 		hookBad == nil and #houses == 5 and VillageScenery.houses() == houses and VillageScenery.houses(VillageScenery.enter()) == houses, hookBad)
-	check("VillageScenery.lookOf: a look VillageLooks draws is itself, one it does not is the old family house", VillageScenery.lookOf("old") == "old"
+	check("VillageScenery.lookOf: a look VillageLooks draws is itself (a family house's, the countryside's), one it does not is the old family house",
+		VillageScenery.lookOf("old") == "old" and VillageScenery.lookOf("cabin") == "cabin" and VillageScenery.lookOf("mill") == "mill"
 		and VillageScenery.lookOf("no such look") == "old")
 	-- the landmarks: each looking its own yaw, the D5 and the railway kept on every client, none on a road or its shoulder
 	local markBad: string? = nil

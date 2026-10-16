@@ -252,11 +252,13 @@ end
 
 -- 9.5 the countryside's spots (VillageLooks.Countryside: the Pond Cabin, the Forest Lodge, the Old Mill, the Orchard
 -- Cottage; their boxes the map's, built here on their own): each within its budget (rich or not), inside its box but
--- the cabin's veranda (Countryside.Porch past its front edge at most) and the mill's water wheel and chute (outside its
--- right-hand side, Countryside.Wheel at most: seen from outside facing the door, the frame's +X); nothing under the
--- ground, nothing floating; one door, the "House" walls a block, the door on their front face in the middle, its spot a
--- family house's (1.2 in from the box's front edge, in its middle, looking out); each its own walls and roof and its
--- own things; the same seed the same look
+-- its overhangs (VillageLooks.Overhangs, only their pieces: the cabin's veranda, Countryside.Porch past its front edge
+-- at most, and the mill's water wheel and chute, outside its right-hand side, Countryside.Wheel at most: seen from
+-- outside facing the door, the frame's +X); nothing under the ground, nothing floating; one door, the "House" walls a
+-- block, the door on their front face in the middle, its spot a family house's (1.2 in from the box's front edge, in its
+-- middle, looking out); its door's way walkable (from the door to 5 past the box's front edge, its width and more:
+-- nothing solid lower than 8 but its doorstep, the cabin's veranda deck; its eaves over it higher); each its own walls
+-- and roof and its own things; the same seed the same look
 do
 	local BOXES: { [string]: { number } } = { cabin = { 24, 18 }, lodge = { 28, 22 }, mill = { 24, 26 }, cottage = { 26, 20 } }
 	local CS = C.Countryside
@@ -267,7 +269,7 @@ do
 		mill = { "Wheel", "Paddle", "Hub", "Axle", "Chute", "ChutePost", "LoftDoor", "HoistBeam", "Rope", "NameBoard", "Mailbox" },
 		cottage = { "PorchRoof", "PorchPost", "FlowerBox", "Flowers", "Bench", "Chimney", "Mailbox" },
 	}
-	local over, out, low, loose, doorBad, own = nil :: string?, nil :: string?, nil :: string?, nil :: string?, nil :: string?, nil :: string?
+	local over, out, low, loose, doorBad, own, way = nil :: string?, nil :: string?, nil :: string?, nil :: string?, nil :: string?, nil :: string?, nil :: string?
 	local most: { [string]: number } = {}
 	local roofs: { [string]: { [string]: boolean } } = {}
 	local reachFront, reachRight = 0, 0
@@ -284,12 +286,25 @@ do
 				if #pieces > V.budget(kind) or V.budget(kind, 1, true) ~= V.budget(kind) then
 					over = over or `{kind} {seed}: {#pieces}`
 				end
+				local hang = V.Overhangs[kind]
+				local doorAt = 0
 				for _, p in pieces do
-					local x0, x1, _, _, z0, z1 = V.box(p)
-					local front = if kind == "cabin" then CS.Porch else 0
-					local right = if kind == "mill" then CS.Wheel else 0
+					if p.tag == "door" then
+						doorAt = p.at[3] + p.size[3] / 2
+					end
+				end
+				for _, p in pieces do
+					local x0, x1, y0, y1, z0, z1 = V.box(p)
+					local reach = if hang and table.find(hang.pieces, p.name) then hang.reach else 0
+					local front = if hang and hang.side == "front" then reach else 0
+					local right = if hang and hang.side == "right" then reach else 0
 					if x0 < -f.w / 2 - EPS or x1 > f.w / 2 + right + EPS or z0 < -f.d / 2 - EPS or z1 > f.d / 2 + front + EPS then
 						out = out or `{kind} {seed} {p.name} ({string.format("%.2f … %.2f, %.2f … %.2f", x0, x1, z0, z1)} in {f.w} × {f.d})`
+					end
+					-- (the door's way: 2.5 either side of it, from its face to 5 past the box's front edge, under 8)
+					local walked = (p.name == "Step" and y1 <= 0.45) or (p.name == "Deck" and y1 <= 0.55)
+					if p.solid and not walked and y1 > 0.05 and y0 < 8 and x0 < 2.5 and x1 > -2.5 and z1 > doorAt + 0.01 and z0 < f.d / 2 + 5 then
+						way = way or `{kind} {seed} yaw {yaw}: {p.name} ({string.format("%.2f … %.2f high", y0, y1)})`
 					end
 					reachFront = math.max(reachFront, z1 - f.d / 2)
 					reachRight = math.max(reachRight, x1 - f.w / 2)
@@ -347,6 +362,9 @@ do
 	check(`…inside their boxes but the cabin's veranda ({string.format("%.2f", reachFront)} past the front edge, at most {CS.Porch}) and the mill's wheel and chute ({string.format("%.2f", reachRight)} past the right-hand side, at most {CS.Wheel})`,
 		out == nil and reachRight > 0 and reachRight <= CS.Wheel, out)
 	check("…nothing under the ground, nothing floating", low == nil and loose == nil, low or loose)
+	check("…their overhangs the cabin's veranda (Countryside.Porch) and the mill's wheel and chute (Countryside.Wheel) only", V.Overhangs.cabin.reach == CS.Porch
+		and V.Overhangs.cabin.side == "front" and V.Overhangs.mill.reach == CS.Wheel and V.Overhangs.mill.side == "right" and V.Overhangs.lodge == nil and V.Overhangs.cottage == nil)
+	check("…the door's way walkable: nothing solid in it lower than 8 (its eaves higher) but its doorstep or the cabin's veranda deck", way == nil, way)
 	check("…one door each, unturned on the House block's front face in its middle; its spot a family house's (1.2 in from the box's front edge, in its middle, looking out)", doorBad == nil, doorBad)
 	check("…each its own: the cabin's boards, the lodge's logs, the mill's stone, the cottage's whitewash; their own things (the veranda, the antlers, the wheel on the mill's right-hand side, the porch)", own == nil, own)
 	check("…their roofs: the cabin's tar, the lodge's wooden shingles, the mill's clay tiles, the cottage's thatch or clay tiles", roofs.cabin.Slate and roofs.lodge.WoodPlanks and roofs.mill.ClayRoofTiles
