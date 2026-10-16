@@ -216,6 +216,61 @@ for kind, seeds in kinds do
 	check(`{kind}: …and his way from there out of every door the same (two layouts)`, outBad == 0, outBad)
 end
 
+-- 9.5 the countryside's spots (shared/Layouts/Countryside.luau: the Pond Cabin, the Forest Lodge, the Old Mill, the
+-- Orchard Cottage; their plans on their own, not the map's), eight seeds of each (mirrored or not, the lodge's and the
+-- cottage's room counts): from the way in every piece a spot beside it, a way there through no wall on open cells, and
+-- from it a way back out of the door, as a house's
+for _, kind in { "cabin", "lodge", "mill", "cottage" } do
+	local pieces, spots, bad, outBad = 0, 0, {} :: { string }, 0
+	local shapes: { [string]: boolean } = {}
+	for seed = 1, 8 do
+		local plan = HouseLayout.plan(seed, kind)
+		shapes[`{#plan.rooms}{plan.mirrored}`] = true
+		local grid = HouseRoute.grid(plan) :: HouseRoute.Grid
+		local rects: { Rect } = {}
+		for _, s in plan.spots do
+			table.insert(rects, pieceRect(s))
+		end
+		HouseRoute.block(grid, rects)
+		local exits = HouseLayout.exitsOf(plan)
+		for index, entryFrame in HouseLayout.entries(plan) do
+			local look = (entryFrame * Vector3.new(0, 0, -1)) - entryFrame.Position
+			local entry = entryFrame.Position + look * 1.5
+			for _, s in plan.spots do
+				pieces += 1
+				local rect = pieceRect(s)
+				local x, z = HouseRoute.reach(grid, entry.X, entry.Z, rect)
+				if not x or not z then
+					table.insert(bad, `{kind} {seed} way {index}: #{s.id} {s.item} no spot`)
+					continue
+				end
+				spots += 1
+				local mx, mz = (rect.x0 + rect.x1) / 2, (rect.z0 + rect.z1) / 2
+				if not HouseRoute.open(grid, x, z) or HouseRoute.toRect(x, z, rect) > R.Stand + 1e-6 or not HouseRoute.sees(grid, x, z, mx, mz) then
+					table.insert(bad, `{kind} {seed}: #{s.id} {s.item} its spot not beside it, or behind a wall`)
+				end
+				local points = HouseRoute.path(grid, entry.X, entry.Z, x, z)
+				local why = if points then walkBad(grid, entry.X, entry.Z, points) else "no way"
+				if why then
+					table.insert(bad, `{kind} {seed} way {index}: #{s.id} {s.item}: {why}`)
+				end
+				for _, exit in exits do
+					local back = HouseRoute.path(grid, x, z, exit.X, exit.Z)
+					if not back or walkBad(grid, x, z, back) then
+						outBad += 1
+					end
+				end
+			end
+		end
+	end
+	local n = 0
+	for _ in shapes do
+		n += 1
+	end
+	check(`9.5 {kind}: from the way in, every piece of {n} layouts has a spot beside it, his way there through no wall on open cells, and back out of the door`,
+		spots == pieces and #bad == 0 and outBad == 0, `{spots}/{pieces} {outBad}: {bad[1]}`)
+end
+
 -- ── A piece boxed in; the doorways; the snap ─────────────────────────────────
 
 do

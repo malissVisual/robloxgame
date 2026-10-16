@@ -23,7 +23,10 @@
 --   piece of FurnitureLooks.Collectibles (a new one joins on its own, at a wall in the room its catalogue entry names,
 --   when the house has that room). HouseLayout.BigRecipes: the big house's rooms' recipes (its own and the house's).
 --   HouseLayout.Kinds              the kinds it lays out (a new kind ("apartment", "farm", "hotel") is a function
---                                  seed's dice → Plan added to KINDS below)
+--                                  seed's dice → Plan added to KINDS below); 9.5 the countryside's spots: "cabin" (The
+--                                  Pond Cabin), "lodge" (The Forest Lodge), "mill" (The Old Mill) and "cottage" (The
+--                                  Orchard Cottage), shared/Layouts/Countryside.luau's plans (one way out, the front door,
+--                                  as a house's; their collectibles from HouseLayout.Collectibles, `found` as a house's)
 --   HouseLayout.Recipes            what each room holds: its pieces, how each is placed, the musts and the ★ ones
 --   HouseLayout.Collectibles       8.0: how each collectible (FurnitureLooks.Collectibles, a piece with a rarity) is
 --                                  placed in its room; a house holds Config.Furniture.Collectibles.Count of them besides
@@ -64,6 +67,7 @@
 local Config = require(script.Parent.Config)
 local FurnitureLooks = require(script.Parent.FurnitureLooks)
 local Farm = require(script.Parent.Layouts.Farm) -- 7.x the farm
+local Countryside = require(script.Parent.Layouts.Countryside) -- 9.5 the countryside's spots
 
 local T = Config.Furniture
 local A = T.Alpine
@@ -1796,6 +1800,13 @@ local KINDS: { [string]: (number, { [string]: any }?) -> Plan } = {
 	end,
 }
 HouseLayout.Kinds = { "house", "farm", "big" }
+-- 9.5 the countryside's spots (shared/Layouts/Countryside.luau)
+for _, kind in Countryside.Kinds do
+	KINDS[kind] = function(seed: number, found: { [string]: any }?): Plan
+		return Countryside.plan(seed, kind, found, POOL) :: any
+	end
+	table.insert(HouseLayout.Kinds, kind)
+end
 
 function HouseLayout.plan(seed: number, kind: string, found: { [string]: any }?): Plan
 	local make = KINDS[kind] or KINDS.house

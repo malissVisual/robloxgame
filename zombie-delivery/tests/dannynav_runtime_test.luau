@@ -103,6 +103,26 @@ Moving.parkVan = function(player: any, spot: any, _seat: boolean, carId: string?
 	E.cars[player] = car
 	return nil, car
 end
+-- 9.5 the countryside's kinds (shared/Layouts/Countryside.luau: "cabin", "lodge", "mill", "cottage"): a kind no house
+-- of the map has yet (the map's spots come with the countryside's map) is a move of its own on one of the map's other
+-- houses (not the farmstead, each its own): that house's contract the kind's for this test (Config.Moving.Sandbox.Houses,
+-- before Moving.start makes the contracts)
+do
+	local S = Config.Moving.Sandbox
+	local had: { [string]: boolean } = {}
+	for _, house in SandboxMap.Houses do
+		local own = S.Houses[house.id]
+		had[if own then own.Kind else house.kind] = true
+	end
+	local next = 2
+	for _, kind in { "cabin", "lodge", "mill", "cottage" } do
+		local house = SandboxMap.Houses[next]
+		if not had[kind] and house then
+			S.Houses[house.id] = { Client = "The Testers", Address = "the test's own", Blurb = "A move of the test's own.", Kind = kind, Time = 15 * 60 }
+			next += 1
+		end
+	end
+end
 Moving.start()
 
 local function promptIn(model: any, action: string): any
@@ -354,6 +374,15 @@ local function give(p: any, model: any)
 end
 
 for index, house in Houses do
+	-- (9.5: the house as its contract has it: its kind, a stand-in's named so)
+	do
+		local own = Config.Moving.Sandbox.Houses[house.id]
+		if own and own.Kind ~= house.kind then
+			house = table.clone(house)
+			house.name = `{house.name} as a {own.Kind}`
+			house.kind = own.Kind
+		end
+	end
 	local seed = if house.kind == "big" then bigSeed else houseSeeds[(index - 2) % #houseSeeds + 1]
 	local p, danny, b = moveInto(index, house, seed)
 	if not danny or not b then
