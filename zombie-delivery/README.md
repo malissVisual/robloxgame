@@ -196,6 +196,11 @@
 > setdown; PUT IT DOWN the same down); a piece nobody can get to is refused at assignment. Players can't pick through
 > walls either (the pieces' prompts need line of sight, `Moving.walled` checks it on the server), and his list's
 > markers no longer show through walls.
+>
+> **8.9.4** (the owner: "on the screen as if driving with pedals, an automatic, a UI like that"): while you drive your
+> own car, the lower right shows an automatic's **pedals and selector** over the speed: the brake and the gas go down
+> as you drive (W / S, the arrows, a gamepad's triggers, a phone's thumbstick), the selector lights P, R or D
+> (`client/DrivePedals.luau`, `shared/PedalRules.luau`, `Config.DrivePedals`). The van drives as before.
 
 The active Roblox game in this repository (Merge Blades is preserved in `../archive/merge-blades`). **You run a delivery company** in a world
 gone wrong: take a job, carry the cargo to your vehicle with your own hands (or lead the horses on a rope), drive it
@@ -1224,7 +1229,7 @@ INVENTORY [I] (I still works), "J FOR THE BOARD" / "Q → GARAGE" and the other 
 | Upper left | 6.5: the NEXT card (above); under it, folded, ■ DELIVERY CONTRACT (type, stars, stop), the destination in caps, the objectives as checkboxes, a rule, the time left (red under 30 s) / EST. pay; the tutorial's strip, the crew strip and the toasts sit under it |
 | Upper right | 6.5: MAP [M] · PHONE [Q] (MENU before Marge's phone: every other action, JOBS, MISSIONS, CAREER, CREW, BAG, CAR, TOP, ESTATE, SOUND, GIVE UP), a red dot for news; under them the small "? KEYS [F1]" |
 | Lower left | money / level and rank (XP on hover), the minimap (thin frame, the job's route in red, the GPS in white, the fog), health |
-| Lower right | 6.5: the speed and the fuel while you drive, the PHONE action over it; a touch screen keeps the weapon line too (its tap opens the weapon wheel) |
+| Lower right | 6.5: the speed and the fuel while you drive, the PHONE action over it; a touch screen keeps the weapon line too (its tap opens the weapon wheel). 8.9.4: the pedals and P R N D while you drive (below) |
 | Bottom centre | 6.0.1, the bottom bar (`client/Hotbar.luau`): 6.1: three hand slots first (✊ fists 1, 🛍 the bag 2 with its fill, 🔫 the gun 3 with its name; the one you hold outlined red) and a divider, then five square item slots (the consumables you own in their order, the count, keys 4-8; a click or a tap uses one, a flash and the cooldown shade), a thin divider and what you carry (a tile a piece with ✋ / 🛍 / 🎒 / 🚲 for where it is, grey for another order, your free room dim, "+N" over 8; a click opens the BAG tab). Touch: the tiles over the slots (48 px or more; 6.1: the hands and two item slots). It hides while a window, the phone or a dialog is open. 6.21: a clean hotbar on a frosted tray, the slot in your hand lifted with a line over the bar, the bag slot's fill ring and "5/6" pill instead of the carried strip (see "Inventory, a clean hotbar (6.21)") |
 | Lower centre | 6.5: the action pill, only while you can press something: a key box, the action, a short instruction and the hold line; the breath bar just over it (both over the bottom bar) |
 | In the world | 6.5: the beam and one pin with the place and the distance ("TONY'S PIZZA · 120 m"); with no job on the depot's job board |
@@ -1990,6 +1995,31 @@ of fixture `shared/HouseLayout.luau` places, each in its exact box: `counter`, `
   - the collisions as before and the part budgets kept;
   - the Neon small and `FixtureMesh.Looks` equal to the model's finishes (`tools/fixtures-art/looks.py --write`
     syncs them).
+
+## The pedals of an automatic (8.9.4)
+
+The owner asked to see the driving on the screen, with pedals, like an automatic. While you drive your own car (not a
+bike), the HUD's lower right shows the dashboard: from the left the **brake** (wide, low on its arm), the **gas** (tall
+and narrow) and the **selector P R N D**. It only shows the driving; the van drives as before.
+- **What it shows** (`shared/PedalRules.luau`, from `Drive.throttle` and `Drive.speed`):
+  - standing with nothing pressed: **P**;
+  - W / up: **D** and the gas, as far down as you press (half a gamepad trigger: half); while backing up it is the
+    brake first, in R;
+  - S / down while rolling forward: the **brake** (red), still D; standing or backing up: **R** and the gas;
+  - rolling with nothing pressed: D (or R backing up), both pedals up. N is never lit: an automatic rolls in D.
+- **How it looks** (`client/DrivePedals.luau`): a pressed pedal goes down by its travel, its face turns green (gas) or
+  red (brake) and its edge lights; it follows your foot smoothly (`Config.DrivePedals.Ease`, about a ninth of a
+  second all the way). The gear's letter is lit: P white, R amber, D green.
+- **Where:** a computer has its own row over the speed and the fuel (the open lower right corner); a touch screen a
+  compact one at the speed row's left, inside the right column (the touch buttons' places as before).
+- `Config.DrivePedals`: `On` (false: the speed and the fuel as before), `Stop` (slower than this the car stands),
+  `Ease`.
+- **The checks:** `tests/pedalrules_test.luau` (every gear and pedal, the easing, junk in) and
+  `tools/phone-ui/drivepedals.luau` (the real DrivePedals on the recorder: its place on a computer and a touch screen,
+  the pedals going down and up, nothing for a bike, on foot or with `On` false, nothing written frame after frame).
+- **Test in Studio:** get in your van: P; W: D and the gas down; S while driving: the brake; stop, S: R and the gas;
+  let go: P. Out of the van, or on a bike: none of it. On a phone (Studio's device emulator): the small pedals left
+  of the fuel.
 
 ## The big move (8.4)
 

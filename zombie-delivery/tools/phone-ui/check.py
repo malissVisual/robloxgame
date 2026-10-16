@@ -52,6 +52,8 @@ offer card with a player's offer (OfferCard's queue) and the STOCK list's 🏷 (
 show and no FOR SALE sign, a player's offer: the real SandboxHintsUi beside SandboxHud, DannyOrders, OfferCard, TradeUi):
 sandboxhints.luau: when each comes, once, held back while a window covers the screen, the device's words, their toasts
 at 844 x 390, 667 x 375, 1280 x 800 and 1920 x 1080 clear of the rest; the guide's sell step in sandboxguide.luau.
+8.9.4 the driving dashboard (the real DrivePedals with PedalRules: drivepedals.luau on missions_mock.luau): a computer's
+row over the speed, a touch screen's in the speed row's room, the gear and the pedals as you drive, nothing for a bike.
 """
 import argparse
 from pathlib import Path
@@ -377,3 +379,24 @@ from keyhintsenv import keyhints_env  # noqa: E402
 with tempfile.TemporaryDirectory() as folder:
     keyhints_env(Path(folder))
     subprocess.run([args.luau, "keyhints.luau"], cwd=folder, check=True)
+# 8.9.4: the driving dashboard (client/DrivePedals.luau, shared/PedalRules.luau, Config.DrivePedals) on missions_mock.luau's
+# recorder, its `os.clock` the check's own: tools/phone-ui/drivepedals.luau in a computer's car panel and a touch
+# screen's speed row (where client/Hud.luau puts it): P R N D and the brake and the gas as you drive, nothing for a bike.
+with tempfile.TemporaryDirectory() as folder:
+    dest = Path(folder)
+    for source in (ROOT / "src/shared").glob("*.luau"):
+        text = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', source.read_text())
+        (dest / source.name).write_text(text)
+    prefix = '''local mock = require("./missions_mock")
+local game, workspace, task = mock.game, mock.workspace, mock.task
+local Enum, Vector2, Vector3, UDim, UDim2 = mock.Enum, mock.Vector2, mock.Vector3, mock.UDim, mock.UDim2
+local Color3, typeof, warn = mock.Color3, mock.typeof, mock.warn
+local os = { clock = function() return mock.clock or 0 end }
+'''
+    text = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', (ROOT / "src/client/DrivePedals.luau").read_text())
+    (dest / "DrivePedals.luau").write_text(prefix + text)
+    for name, field in (("Ui", "MUi"), ("Theme", "MTheme")):
+        (dest / f"{name}.luau").write_text(f'return require("./missions_mock").{field}')
+    for name in ("mock.luau", "missions_mock.luau", "drivepedals.luau"):
+        (dest / name).write_bytes((Path(__file__).parent / name).read_bytes())
+    subprocess.run([args.luau, "drivepedals.luau"], cwd=dest, check=True)

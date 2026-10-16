@@ -2031,15 +2031,20 @@ Ui.make("UIListLayout", {
 v.speed = P.text(v.speedRow, "0", UDim2.fromOffset(0, 30), { AutomaticSize = Enum.AutomaticSize.X, Font = Theme.HeadingFont, TextSize = 28, LayoutOrder = 1 })
 v.unit = P.caps(v.speedRow, "KM/H", UDim2.fromOffset(0, 22), { AutomaticSize = Enum.AutomaticSize.X, LayoutOrder = 2 })
 require(script.Parent.FuelGauge).build(v.speedRow) -- 5.4: the fuel gauge, left of the speed (client/FuelGauge.luau)
+-- 8.9.4: the automatic's pedals and its selector (client/DrivePedals.luau): a computer's row over the speed, a touch
+-- screen's at the speed row's left
+v.pedals = require(script.Parent.DrivePedals)
+v.pedals.build(carPanel, v.speedRow, touchLayout)
 view.vehicle = v
 
 -- Every frame (RenderStepped): your car (nil: none out) and the car you sit in. 6.5: the speed (and the fuel gauge
--- in its row) while you are inside your car, nothing else.
+-- in its row) while you are inside your car, nothing else. 8.9.4: the pedals while you drive it.
 function view.drawVehicle(car: Model?, seatedIn: Model?)
 	local inside = car ~= nil and seatedIn == car
 	if v.speedRow.Visible ~= inside then
 		v.speedRow.Visible = inside
 	end
+	v.pedals.draw(inside and Drive.isDriving(), car, Drive.throttle(), Drive.speed())
 	if car and inside then
 		local chassis = car.PrimaryPart
 		local velocity = if chassis then chassis.AssemblyLinearVelocity else Vector3.zero

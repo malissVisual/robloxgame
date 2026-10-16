@@ -31,6 +31,7 @@ PURE += ("PlayerTradeRules",)  # 8.7 sandbox, trading between players (tests/pla
 PURE += ("VillageLooks",)  # 8.9 sandbox, Jinočany: the village's art kit (tests/villagelooks_test.luau)
 PURE += ("VillageScenery",)  # 8.9 sandbox, Jinočany step 1 on the map: where the village stands (tests/villageworld_test.luau)
 PURE += ("HouseRoute",)  # 9.0 Danny's way inside a house, on its plan's grid (tests/houseroute_test.luau, tests/dannynav_runtime_test.luau)
+PURE += ("PedalRules",)  # 8.9.4 the driving dashboard: the gear and the pedals (tests/pedalrules_test.luau)
 luau = sys.argv[1] if len(sys.argv) > 1 else shutil.which("luau") or "luau"
 
 ok = True
