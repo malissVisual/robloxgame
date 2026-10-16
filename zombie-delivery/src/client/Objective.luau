@@ -220,6 +220,7 @@ function Objective.update(job: any, state: any, distance: number?, hidden: boole
 		result = if result then { success = result.success, total = result.total } else nil,
 		distance = if distance then math.floor(distance) else nil,
 		holding = if type(carrying) == "string" and carrying ~= "" then carrying else nil,
+		pair = character ~= nil and character:GetAttribute("CarryPair") == true, -- 9.0 (the piece's own G prompt)
 		canThrow = typeof(throwTo) == "Vector3" and player:GetAttribute("ThrowFragile") ~= true,
 		touch = Ui.touchLayout(),
 		seat = seatNow(character),

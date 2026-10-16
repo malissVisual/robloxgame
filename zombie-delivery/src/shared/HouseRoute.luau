@@ -33,6 +33,9 @@
 --                                         stands in (the doorways, where he would wait in your way)
 --   HouseRoute.sees(grid, ax, az, bx, bz)   does the line cross no wall slab (the doorways' gaps are open)
 --   HouseRoute.clear(grid, ax, az, bx, bz)  does the line keep to open cells (a leg he can walk)
+--   HouseRoute.slide(grid, fx, fz, tx, tz, clear)   9.0 the far end's holder from (fx, fz) toward (tx, tz), his body
+--                                         `clear` studs off the wall slabs, along them, never through: (x, z, nx, nz),
+--                                         where he gets to and the way out of the last slab that held him (0, 0: none)
 --   HouseRoute.snap(grid, x, z, far?)     the nearest open cell's middle within `far` studs (Route.Snap): (x, z) or nil
 --   HouseRoute.inside(grid, x, z)         is (x, z) in a room or a doorway (not in a wall, not out of the house)
 --   HouseRoute.footprint(cx, cz, sx, sz, yaw)   a box sx × sz turned by `yaw` (radians about Y) at (cx, cz): the
@@ -279,6 +282,93 @@ function HouseRoute.sees(g: Grid, ax: number, az: number, bx: number, bz: number
 		end
 	end
 	return true
+end
+
+-- 9.0 the far end's holder inside the house (server/MoveHelper.luau's hold: Danny walking backwards with your piece, the
+-- owner: "When I want to walk forwards, Danny can't walk backwards"): from (fx, fz) toward (tx, tz) with his body `clear`
+-- studs off every wall slab (each slab grown by it; the doorways' gaps open): the first slab the way meets stops it
+-- there and the rest of the way slides along that slab's face, again for the next one (Slides passes at most). A start
+-- already within `clear` of a slab moves out of it or along it, never deeper in. Returns where he gets to and the face's
+-- way out of the last slab that held him (nx, nz: a unit along X or Z; 0, 0 when none did).
+local SLIDES = 4
+function HouseRoute.slide(g: Grid, fx: number, fz: number, tx: number, tz: number, clear: number): (number, number, number, number)
+	local x, z = fx, fz
+	local mx, mz = tx - fx, tz - fz
+	local nx, nz = 0, 0
+	local pad = math.max(clear, 0)
+	for _ = 1, SLIDES do
+		if mx * mx + mz * mz < 1e-12 then
+			break
+		end
+		-- (a slab he stands within already: nothing of the way deeper into it, through its nearest face)
+		for _, w in g.walls do
+			local x0, x1, z0, z1 = w.x0 - pad, w.x1 + pad, w.z0 - pad, w.z1 + pad
+			if x > x0 and x < x1 and z > z0 and z < z1 then
+				local least = math.min(x - x0, x1 - x, z - z0, z1 - z)
+				local ox, oz = 0, 0
+				if least == x - x0 then
+					ox = -1
+				elseif least == x1 - x then
+					ox = 1
+				elseif least == z - z0 then
+					oz = -1
+				else
+					oz = 1
+				end
+				local into = mx * ox + mz * oz
+				if into < 0 then
+					mx, mz = mx - ox * into, mz - oz * into
+					nx, nz = ox, oz
+				end
+			end
+		end
+		-- (the first slab the way goes into: where, by which face)
+		local first, fox, foz = 1, 0, 0
+		for _, w in g.walls do
+			local x0, x1, z0, z1 = w.x0 - pad, w.x1 + pad, w.z0 - pad, w.z1 + pad
+			if not (x > x0 and x < x1 and z > z0 and z < z1) then
+				local enter, leave, ox, oz = -math.huge, math.huge, 0, 0
+				local blocked = false
+				if math.abs(mx) < 1e-12 then
+					blocked = x <= x0 or x >= x1
+				else
+					local a, b = (x0 - x) / mx, (x1 - x) / mx
+					if a > b then
+						a, b = b, a
+					end
+					if a > enter then
+						enter, ox, oz = a, if mx > 0 then -1 else 1, 0
+					end
+					leave = math.min(leave, b)
+				end
+				if not blocked and math.abs(mz) < 1e-12 then
+					blocked = z <= z0 or z >= z1
+				elseif not blocked then
+					local a, b = (z0 - z) / mz, (z1 - z) / mz
+					if a > b then
+						a, b = b, a
+					end
+					if a > enter then
+						enter, ox, oz = a, 0, if mz > 0 then -1 else 1
+					end
+					leave = math.min(leave, b)
+				end
+				if not blocked and enter >= 0 and enter < leave and enter < first and (ox ~= 0 or oz ~= 0) then
+					first, fox, foz = enter, ox, oz
+				end
+			end
+		end
+		if fox == 0 and foz == 0 then
+			x, z = x + mx, z + mz
+			break
+		end
+		x, z = x + mx * first + fox * 1e-4, z + mz * first + foz * 1e-4 -- (a hair off its face)
+		local restX, restZ = mx * (1 - first), mz * (1 - first)
+		local into = restX * fox + restZ * foz
+		mx, mz = restX - fox * into, restZ - foz * into
+		nx, nz = fox, foz
+	end
+	return x, z, nx, nz
 end
 
 function HouseRoute.clear(g: Grid, ax: number, az: number, bx: number, bz: number): boolean

@@ -42,8 +42,14 @@
 --                                              first that still fits the van; a two-person one too: he waits at it for
 --                                              you): (spot?, pair, full: some left, none fits)
 --   MoveHelperBrain.queueText(count)           8.3 "Nothing to carry" | "1 piece to carry" | "3 pieces to carry"
+--   MoveHelperBrain.idle(text)                 9.0 is he idle by his MoveHelperDoing line or MoveHelperBubble (waiting by
+--                                              the van, the van full, for hire, staying out; nothing)
+--   MoveHelperBrain.title(count, bubble)       9.0 his status line's title words: his list's, or while it is empty and
+--                                              he is busy, his bubble's ("Carrying: Sofa with you": never "Nothing to
+--                                              carry" over a carry in two)
 --   MoveHelperBrain.status(hired, price, count, doing)   8.3 his status in a line: "For hire · $170 this move", or "2
---                                              pieces to carry · Carrying the Lamp to the van"
+--                                              pieces to carry · Carrying the Lamp to the van" (9.0 his list empty and
+--                                              he busy: what he does alone, "Carrying the Sofa with you")
 --   MoveHelperBrain.money(n)                   8.3 "$1,234" (shared/UpgradeRules.luau's: the hire's words)
 --   MoveHelperBrain.markText(index, needs)     8.3 the marker over a piece of his list: "🧑‍🔧 Danny · 2", "🙋 Danny needs you"
 --   MoveHelperBrain.pickSeat(taken)            8.3 the van's passenger seat he takes: the first one nobody sits in (nil:
@@ -121,10 +127,12 @@
 --   MoveHelperBrain.leadTime(ping)             8.3 the seconds Danny is aimed ahead: HoldLead.Base + ping × Ping, 0 … Most
 --   MoveHelperBrain.holdLead(trail, seconds)   8.3 how far ahead (x, z studs): the leader's smoothed velocity × seconds,
 --                                              HoldLead.Far at most (8.6: Danny's hold uses endLead instead)
---   MoveHelperBrain.endLead(trail, x, z, dt, seconds, reset)   8.6 Danny's lead now: one look at his END's place (x,
---                                              z: the piece's turn moves it too), its velocity smoothed over
+--   MoveHelperBrain.endLead(trail, x, z, dt, seconds, reset, ax?, az?)   8.6 Danny's lead now: one look at his END's
+--                                              place (x, z: the piece's turn moves it too), its velocity smoothed over
 --                                              HoldLead.Smooth s × `seconds` (Far at most), reached at HoldLead.Rate
---                                              studs a second at most (never a jump of his aim); reset: none
+--                                              studs a second at most (never a jump of his aim); reset: none. 9.0 (ax,
+--                                              az: his end's way out of the piece) toward the piece's middle HoldLead.In
+--                                              studs at most (his body never in the piece; trail.reach: the rest)
 --   MoveHelperBrain.holdTurn()                 his body's top turn (radians a second: HoldTurn × PairTurn)
 --   MoveHelperBrain.newTrail()                 a holder's record of how long he has been behind
 --   MoveHelperBrain.holdTrack(trail, gap, crossed, speed, dt)   one look: `gap` studs off his place, the piece in the
@@ -326,7 +334,41 @@ function MoveHelperBrain.status(hired: boolean, price: any, count: any, doing: s
 	if type(doing) ~= "string" or doing == "" then
 		return list
 	end
+	local empty = not finite(count) or count < 1
+	if empty and not MoveHelperBrain.idle(doing) then
+		return doing -- (9.0 his list empty, busy with you: never "Nothing to carry" over a carry in two)
+	end
 	return `{list} · {doing}`
+end
+
+-- 9.0 (the owner's screenshot: his status line "DANNY · Nothing to carry" over "Take out your clipboard (Q) to give him
+-- pieces" while his bubble said "🤝 Carrying: Sofa with you"): is he idle by what the crew's attributes say (his
+-- MoveHelperDoing line or his MoveHelperBubble: waiting by the van, the van full, for hire, staying out of the van;
+-- nothing at all)?
+local IDLE = { "wait", "full", "offer", "stay" }
+function MoveHelperBrain.idle(text: any): boolean
+	if type(text) ~= "string" or text == "" then
+		return true
+	end
+	local doing = MoveHelperBrain.Doing :: { [string]: Doing } -- (the words' table, further down)
+	for _, action in IDLE do
+		local w = doing[action]
+		local bubble = `{w.icon} {w.short}`
+		if text == w.line or string.sub(text, 1, #bubble) == bubble then
+			return true
+		end
+	end
+	return false
+end
+
+-- 9.0 his status line's title words while hired: his list ("2 pieces to carry"); his list empty while he is busy (his
+-- bubble, MoveHelperBubble: anything but idle), the bubble's own words without its icon ("Carrying: Sofa with you").
+function MoveHelperBrain.title(count: any, bubble: any): string
+	local empty = not finite(count) or count < 1
+	if not empty or MoveHelperBrain.idle(bubble) then
+		return MoveHelperBrain.queueText(count)
+	end
+	return string.match(bubble :: string, "^%S+%s+(.+)$") or bubble :: string
 end
 
 function MoveHelperBrain.markText(index: number, needs: boolean?): string
@@ -601,7 +643,8 @@ end
 
 -- (8.3: also the height his root follows (nil: none yet) and his legs: walking, backwards; the leader's root at the last
 -- look (fromX, fromZ; nil: none yet), their real speed (pace) and their smoothed velocity (vx, vz); 8.6: his end's place
--- at the last look (endX, endZ; nil: none yet), its smoothed velocity (evx, evz) and his lead now (leadX, leadZ))
+-- at the last look (endX, endZ; nil: none yet), its smoothed velocity (evx, evz) and his lead now (leadX, leadZ); 9.0
+-- the lead toward the piece it did not take (reach: his hands reach on by it))
 export type Trail = {
 	behind: number,
 	ease: number,
@@ -620,11 +663,12 @@ export type Trail = {
 	evz: number,
 	leadX: number,
 	leadZ: number,
+	reach: number,
 }
 
 function MoveHelperBrain.newTrail(): Trail
 	return { behind = 0, ease = 0, easeSpeed = 0, height = nil, walking = false, back = false, fromX = nil, fromZ = nil, pace = 0, vx = 0, vz = 0,
-		endX = nil, endZ = nil, evx = 0, evz = 0, leadX = 0, leadZ = 0 }
+		endX = nil, endZ = nil, evx = 0, evz = 0, leadX = 0, leadZ = 0, reach = 0 }
 end
 
 -- 8.3 keeping up: one look at the leader's root (`x`, `z`), `dt` s after the last: their real speed along the ground
@@ -690,7 +734,14 @@ end
 -- studs at most) at HoldLead.Rate studs a second at most: his aim moves with his end, never faster than Rate on top.
 -- `reset` (a new hold, a door's fade: the other world), no place (NaN), or his end more than HoldPace.Jump studs off
 -- its last look (put there at once): nothing measured, no lead.
-function MoveHelperBrain.endLead(trail: Trail, x: number, z: number, dt: number, seconds: number, reset: boolean): (number, number)
+-- 9.0 (the owner's screenshot: Danny standing inside the Sofa; tests/movehelper_backwards_runtime_test.luau: following
+-- you at the pair's walk with a ping of 0.15 s his lead took his root 2.26 studs toward the piece's middle, his chest 2
+-- studs into the Sofa, where everybody else saw him and where your own screen showed him once you stopped): `ax`, `az`
+-- (his end's way out of the piece's middle, flat, a unit; nil: as before) and the lead toward the middle (against it)
+-- is HoldLead.In studs at most; trail.reach is how much more it wanted (his hands reach on toward the piece by that:
+-- server/MoveHelper.luau's poseHands, Config.MoveHelper.Edge.Reach at most). His lead away from it (he walks
+-- backwards) HoldLead.Back s longer (and his hands reach on by that too), across it as before.
+function MoveHelperBrain.endLead(trail: Trail, x: number, z: number, dt: number, seconds: number, reset: boolean, ax: number?, az: number?): (number, number)
 	local c = cfg()
 	local lead = c.HoldLead
 	local lastX, lastZ = trail.endX, trail.endZ
@@ -702,6 +753,7 @@ function MoveHelperBrain.endLead(trail: Trail, x: number, z: number, dt: number,
 		vx, vz = (x - lastX) / dt, (z - lastZ) / dt
 	end
 	local speed = math.sqrt(vx * vx + vz * vz)
+	trail.reach = 0
 	if reset or not known or lastX == nil or dt ~= dt or dt <= 1e-4 or speed * dt > c.HoldPace.Jump then
 		trail.evx, trail.evz, trail.leadX, trail.leadZ = 0, 0, 0, 0
 		return 0, 0
@@ -714,18 +766,37 @@ function MoveHelperBrain.endLead(trail: Trail, x: number, z: number, dt: number,
 	trail.evz = vz + (trail.evz - vz) * keep
 	local s = if seconds == seconds then math.max(seconds, 0) else 0
 	local wantX, wantZ = trail.evx * s, trail.evz * s
+	-- 9.0 walking backwards himself (his end away from the piece's middle): HoldLead.Back s more of it, along his end's
+	-- way (your screen may show him later than leadTime's guess: clear of the piece all the same, his hands reach on)
+	local axisX, axisZ = ax or 0, az or 0
+	local backing = trail.evx * axisX + trail.evz * axisZ
+	local extra = if backing > 0 and s > 0 then backing * math.max(lead.Back or 0, 0) else 0 -- (no lead: none of it)
+	wantX, wantZ = wantX + axisX * extra, wantZ + axisZ * extra
 	local far = math.sqrt(wantX * wantX + wantZ * wantZ)
 	if far > lead.Far and far > 0 then
 		wantX, wantZ = wantX / far * lead.Far, wantZ / far * lead.Far
+		extra = math.min(extra, lead.Far)
 	end
+	-- 9.0 never into the piece: toward its middle In studs at most (the rest his hands' reach)
+	local inward = math.max(lead.In or 0, 0)
+	local function clampIn(lx: number, lz: number): (number, number, number)
+		local along = lx * axisX + lz * axisZ
+		if along >= -inward then
+			return lx, lz, 0
+		end
+		local over = -inward - along
+		return lx + axisX * over, lz + axisZ * over, over
+	end
+	local wantedIn: number
+	wantX, wantZ, wantedIn = clampIn(wantX, wantZ)
 	local dx, dz = wantX - trail.leadX, wantZ - trail.leadZ
 	local gap = math.sqrt(dx * dx + dz * dz)
 	local most = math.max(lead.Rate, 0) * dt
 	if gap > most and gap > 0 then
 		dx, dz = dx / gap * most, dz / gap * most
 	end
-	trail.leadX += dx
-	trail.leadZ += dz
+	trail.leadX, trail.leadZ = clampIn(trail.leadX + dx, trail.leadZ + dz)
+	trail.reach = wantedIn + extra
 	return trail.leadX, trail.leadZ
 end
 

@@ -179,7 +179,7 @@ local function physics()
 	if not playing or not grip or grip.align.Parent == nil then
 		return
 	end
-	local far = grip.anchor.CFrame * grip.far.CFrame
+	local far = grip.anchor.CFrame * grip.offset -- (9.0 the goal the server sets: the piece's frame × the hold's offset)
 	local lift = grip.lift
 	-- (the lift's Position as PairHold set it: the recorder answers an instance's Position from its default CFrame)
 	local y = if lift then lift.props.Position.Y else far.Position.Y

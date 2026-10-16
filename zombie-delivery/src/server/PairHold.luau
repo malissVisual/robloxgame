@@ -2,8 +2,8 @@
 -- 8.1 carrying in two (the owner: "the way Danny helps me is weird: when I turn around he teleports. When we carry
 -- something heavy and I need help, we must walk, like, backwards and slowly"): the far end's carrier held there by the
 -- server, Danny (server/MoveHelper.luau's mover) and a crew mate who helps lift (server/Moving.luau's watchCarried)
--- alike. An attachment at the piece's far end (turned to its leader), one on the holder's root, an AlignPosition and an
--- AlignOrientation between them: the holder walks there at a top speed that fits the pair's walk (MaxVelocity:
+-- alike. The piece's far end (turned to its leader) the goal of an AlignPosition and an AlignOrientation on the holder's
+-- root (9.0: one attachment each, the holder's; the server sets the goals every Heartbeat): the holder walks there at a top speed that fits the pair's walk (MaxVelocity:
 -- shared/MoveHelperBrain.luau holdSpeed, the leader's CarrySpeed × PairCarry.boost) and turns to the leader at
 -- holdTurn; the server owns the holder's body meanwhile (SetNetworkOwner(nil): the positions are the server's whatever
 -- the lag; a player's body is given back when they let go). The leader's client turns the piece slowly (client/
@@ -26,15 +26,33 @@
 --   decided once as the hold starts and kept in the piece's own frame (MoveHelperBrain.holdEnd): carried in two the
 --   piece lies along the carry (server/Moving.luau's holdOffset), so the two hold the ends of its length; a crew mate's
 --   end as Danny's (it was always the piece's -Z: its long side once the piece lies along the carry).
+--   9.0 (the owner, 8.9.3: "Danny carries better now, but only when I walk backwards. When I want to walk forwards,
+--   Danny can't walk backwards"; then "and he still teleports", his screenshot of Danny in the Sofa, another of his own
+--   body lying across it): the constraints had their Attachment1 on the piece, and the piece is welded to the leader's
+--   root. A constraint between two assemblies makes one mechanism of them, and a mechanism has one network owner: the
+--   holder's body (the server's, SetNetworkOwner(nil)) and the leader's (their own client's) were one thing that the two
+--   machines fought over (tests/movehelper_backwards_runtime_test.luau counts them: both constraints reached into the
+--   leader's assembly). Now each has one attachment, the holder's own (Mode OneAttachment), and the server sets their
+--   goals from the piece where it is now (its frame × the hold's offset: PairHold.aim) every Heartbeat (PairHold.step,
+--   one connection for all the holds): nothing joins the holder's body to the leader's, nothing of the hold pushes or
+--   turns the leader, the server alone moves the holder. The leader's screen shows the holder late (the server's body),
+--   so a crew mate's hold gives the leader's character PairWith (their UserId) and PairFar (their place in the leader's
+--   root's frame) as Danny's does: client/PairSteer.luau never pushes the piece into them on that screen.
 --   PairHold.endOffset(ax, az, reach, rise) -> CFrame   8.6 the far end's place in the piece's frame: `reach` studs out
 --                                            of its middle along its axis (ax, az), `rise` over it, turned back to it
 --   PairHold.make(model, root, anchor, offset, limit, options) -> Hold   the hold made (options: ghost, flat, owner;
 --                                            8.3 lift: the height by the lift, the align along the ground)
 --   PairHold.aim(hold, offset, limit, flat?)   its far end's place in the piece's frame, its top speed, along the
---                                            ground only or not (the lift's height: the far end's now)
+--                                            ground only or not (the lift's height: the far end's now); 9.0 hold.bound
+--                                            (set by its maker): where the holder may go, applied to the goal every
+--                                            Heartbeat (Danny's: along a house's walls)
 --   PairHold.ghost(hold, on)                 the holder's parts in the collision group nothing collides with, or back
 --   PairHold.pause(hold, paused)             the constraints off (a door's trip) or on again
 --   PairHold.snap(hold, goal)                put there at once (a door's fade only)
+--   PairHold.step()                          9.0 every hold's goals from its piece where it is now (each Heartbeat while
+--                                            a hold is live: connected at the first, let go of after the last; a test
+--                                            calls it)
+--   PairHold.goal(hold) -> CFrame            9.0 where the hold puts its holder now (its piece's frame × its offset)
 --   PairHold.alive(hold, anchor) -> boolean  its pieces are all there, on this piece
 --   PairHold.drop(hold)                      let go: the constraints gone, the groups and the body's owner given back
 --   PairHold.walkOf(player, fallback)        a leader's walk now (their CarrySpeed × their boosts), else `fallback`
@@ -47,6 +65,7 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService") -- 9.0 the holds' goals every Heartbeat
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
@@ -64,8 +83,7 @@ local WORLD = 300 -- studs: the far end this far off is in the other world (a ho
 export type Hold = {
 	model: Model,
 	root: BasePart,
-	anchor: BasePart,
-	far: Attachment,
+	anchor: BasePart, -- the piece (9.0: nothing of the hold on it; its frame read for the goals)
 	own: Attachment,
 	align: AlignPosition,
 	orient: AlignOrientation,
@@ -75,11 +93,14 @@ export type Hold = {
 	flat: boolean,
 	offset: CFrame,
 	limit: number,
+	-- 9.0 where the holder may go now (the goal, the holder's root) → the goal kept (Danny's inside a house: along its
+	-- walls, never through: server/MoveHelper.luau's), every Heartbeat; nil: the goal as it is
+	bound: ((goal: Vector3, here: Vector3) -> Vector3)?,
 }
 
 export type Options = { ghost: boolean, flat: boolean, owner: Player?, lift: boolean? }
 
-type Mate = { hold: Hold, trail: Brain.Trail, at: number, ax: number, az: number, reach: number } -- (8.6 their end)
+type Mate = { hold: Hold, trail: Brain.Trail, at: number, ax: number, az: number, reach: number, leader: Model? } -- (8.6 their end; 9.0 the leader's body: PairWith, PairFar)
 
 local mates: { [Player]: Mate } = {}
 
@@ -143,27 +164,65 @@ function PairHold.endOffset(ax: number, az: number, reach: number, rise: number)
 	return CFrame.new(ax * reach, rise, az * reach) * CFrame.Angles(0, math.atan2(ax, az), 0) -- (looking along -axis: in)
 end
 
+-- 9.0 every hold made and not dropped yet (PairHold.step sets their goals every Heartbeat)
+local live: { [Hold]: boolean } = {}
+local stepping: RBXScriptConnection? = nil
+
+function PairHold.goal(hold: Hold): CFrame
+	return hold.anchor.CFrame * hold.offset
+end
+
+-- 9.0 one hold's goals from its piece where it is now: the align's place (along the ground, or in all three axes while
+-- eased), the turn, the lift's height (8.3: up and down only, the floor his end's puts him at).
+local function setGoals(hold: Hold)
+	local goal = hold.anchor.CFrame * hold.offset
+	local bound = hold.bound
+	hold.align.Position = if bound then bound(goal.Position, hold.root.Position) else goal.Position
+	hold.orient.CFrame = goal.Rotation
+	local lift = hold.lift
+	if lift then
+		lift.Position = goal.Position
+	end
+end
+
+-- (no hold left: the Heartbeat let go of until the next one is made)
+local function idle()
+	local connection = stepping
+	if connection and next(live) == nil then
+		stepping = nil
+		connection:Disconnect()
+	end
+end
+
+function PairHold.step()
+	for hold in live do
+		if not hold.align.Parent then
+			live[hold] = nil -- (gone without a drop: its holder's body went)
+		elseif hold.anchor.Parent then
+			setGoals(hold)
+		end
+	end
+	idle()
+end
+
 function PairHold.make(model: Model, root: BasePart, anchor: BasePart, offset: CFrame, limit: number, options: Options): Hold
-	local far = Instance.new("Attachment")
-	far.Name = NAME
-	far.CFrame = offset
-	far.Parent = anchor
 	local own = Instance.new("Attachment")
 	own.Name = NAME
 	own.Parent = root
 	local flat = options.flat or options.lift == true -- (8.3 a lift holds the height: the align along the ground only)
+	-- 9.0 one attachment each, the holder's own: the goals the server's (setGoals), nothing on the piece
 	local align = Instance.new("AlignPosition")
 	align.Name = NAME
+	align.Mode = Enum.PositionAlignmentMode.OneAttachment
 	align.Attachment0 = own
-	align.Attachment1 = far
 	setForce(align, flat)
 	align.MaxVelocity = limit
 	align.Responsiveness = cfg.HoldResponse
 	align.Parent = root
 	local lift: AlignPosition? = nil
 	if options.lift then
-		-- 8.3 his height: one attachment to a point in the world (the far end's, set at each aim), up and down only, at
-		-- HoldClimb studs a second at most
+		-- 8.3 his height: one attachment to a point in the world (the far end's), up and down only, at HoldClimb studs a
+		-- second at most
 		local made = Instance.new("AlignPosition")
 		made.Name = NAME
 		made.Mode = Enum.PositionAlignmentMode.OneAttachment
@@ -173,14 +232,13 @@ function PairHold.make(model: Model, root: BasePart, anchor: BasePart, offset: C
 		made.MaxAxesForce = Vector3.new(0, FORCE, 0)
 		made.MaxVelocity = cfg.HoldClimb
 		made.Responsiveness = cfg.HoldResponse
-		made.Position = (anchor.CFrame * offset).Position
 		made.Parent = root
 		lift = made
 	end
 	local orient = Instance.new("AlignOrientation")
 	orient.Name = NAME
+	orient.Mode = Enum.OrientationAlignmentMode.OneAttachment
 	orient.Attachment0 = own
-	orient.Attachment1 = far
 	orient.MaxTorque = FORCE
 	orient.MaxAngularVelocity = Brain.holdTurn()
 	orient.Responsiveness = cfg.HoldResponse
@@ -188,8 +246,13 @@ function PairHold.make(model: Model, root: BasePart, anchor: BasePart, offset: C
 	pcall(function()
 		root:SetNetworkOwner(nil) -- (the server's positions, whatever the lag)
 	end)
-	local hold: Hold = { model = model, root = root, anchor = anchor, far = far, own = own, align = align, orient = orient, lift = lift, groups = nil,
-		owner = options.owner, flat = flat, offset = offset, limit = limit }
+	local hold: Hold = { model = model, root = root, anchor = anchor, own = own, align = align, orient = orient, lift = lift, groups = nil,
+		owner = options.owner, flat = flat, offset = offset, limit = limit, bound = nil }
+	setGoals(hold)
+	live[hold] = true
+	if not stepping then
+		stepping = RunService.Heartbeat:Connect(PairHold.step)
+	end
 	if options.ghost then
 		PairHold.ghost(hold, true)
 	end
@@ -197,10 +260,7 @@ function PairHold.make(model: Model, root: BasePart, anchor: BasePart, offset: C
 end
 
 function PairHold.aim(hold: Hold, offset: CFrame, limit: number, flat: boolean?)
-	if (hold.offset.Position - offset.Position).Magnitude > 0.05 then
-		hold.offset = offset
-		hold.far.CFrame = offset
-	end
+	hold.offset = offset -- (9.0 the goals from it now and every Heartbeat: setGoals)
 	if math.abs(hold.limit - limit) > 0.01 then
 		hold.limit = limit
 		hold.align.MaxVelocity = limit
@@ -211,9 +271,7 @@ function PairHold.aim(hold: Hold, offset: CFrame, limit: number, flat: boolean?)
 		hold.flat = wantFlat
 		setForce(hold.align, wantFlat)
 	end
-	if lift then
-		lift.Position = (hold.anchor.CFrame * hold.offset).Position -- (8.3 the height his end's floor puts him at now)
-	end
+	setGoals(hold)
 end
 
 function PairHold.pause(hold: Hold, paused: boolean)
@@ -234,12 +292,14 @@ end
 
 function PairHold.alive(hold: Hold, anchor: BasePart?): boolean
 	local lift = hold.lift
-	return (anchor == nil or hold.anchor == anchor) and hold.far.Parent ~= nil and hold.own.Parent ~= nil and hold.align.Parent ~= nil
+	return (anchor == nil or hold.anchor == anchor) and hold.anchor.Parent ~= nil and hold.own.Parent ~= nil and hold.align.Parent ~= nil
 		and hold.orient.Parent ~= nil and hold.root.Parent ~= nil and (lift == nil or lift.Parent ~= nil)
 end
 
 function PairHold.drop(hold: Hold)
-	local made: { Instance } = { hold.align, hold.orient, hold.own, hold.far }
+	live[hold] = nil
+	idle()
+	local made: { Instance } = { hold.align, hold.orient, hold.own }
 	local lift = hold.lift
 	if lift then
 		table.insert(made, lift)
@@ -279,11 +339,32 @@ end
 
 -- ── A crew mate at the far end (server/Moving.luau's tick) ────────────────
 
+-- 9.0 the leader's side of a crew mate's hold (client/PairSteer.luau, shared/PairCarry.luau keep): who holds the far end
+-- (PairWith: their UserId) and their place in the leader's root's frame (PairFar); nil, nil: gone.
+local function leaderSees(leader: Model?, id: number?, far: Vector3?)
+	if not leader then
+		return
+	end
+	if leader:GetAttribute("PairWith") ~= id then
+		leader:SetAttribute("PairWith", id)
+	end
+	local was = leader:GetAttribute("PairFar")
+	if far == nil or typeof(was) ~= "Vector3" or (was - far).Magnitude > 0.05 then
+		if was ~= far then
+			leader:SetAttribute("PairFar", far)
+		end
+	end
+end
+
 function PairHold.free(player: Player)
 	local mate = mates[player]
 	if mate then
 		mates[player] = nil
 		PairHold.drop(mate.hold)
+		local leader = mate.leader
+		if leader and leader:GetAttribute("PairWith") == player.UserId then
+			leaderSees(leader, nil, nil)
+		end
 	end
 end
 
@@ -313,7 +394,7 @@ function PairHold.follow(player: Player, root: BasePart, anchor: BasePart, size:
 		local ax, az, half = Brain.holdEnd(size.X, size.Z, from.X, from.Z)
 		local reach = Brain.farEnd(half * 2)
 		local made = PairHold.make(character, root, anchor, PairHold.endOffset(ax, az, reach, rise), speed, { ghost = false, flat = true, owner = player })
-		mate = { hold = made, trail = Brain.newTrail(), at = clock, ax = ax, az = az, reach = reach }
+		mate = { hold = made, trail = Brain.newTrail(), at = clock, ax = ax, az = az, reach = reach, leader = nil }
 		mates[player] = mate
 	end
 	local m = mate :: Mate
@@ -341,6 +422,13 @@ function PairHold.follow(player: Player, root: BasePart, anchor: BasePart, size:
 	if snap then
 		PairHold.snap(hold, goal)
 	end
+	-- 9.0 the leader's screen shows them late too: the leader never pushes the piece into them there (PairFar, PairWith)
+	local leader = carrierRoot.Parent :: Model?
+	if m.leader and m.leader ~= leader and m.leader:GetAttribute("PairWith") == player.UserId then
+		leaderSees(m.leader, nil, nil)
+	end
+	m.leader = leader
+	leaderSees(leader, player.UserId, carrierRoot.CFrame:PointToObjectSpace(goal.Position))
 	return true
 end
 

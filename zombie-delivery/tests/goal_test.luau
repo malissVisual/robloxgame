@@ -70,6 +70,12 @@ do
 	check("touch: no keys, tap the card", card.key == nil and card.place == "Tap here · or the job board", show(card))
 	card = Goal.now({ deliveries = 2, holding = "crate" })
 	check("cargo in your hands without a job: G puts it down", card.action ~= nil and card.action.key == "G" and card.action.text == "Put it down", show(card))
+	-- 9.0 (the owner's screenshot: "G PUT IT DOWN" over the Sofa's own "G Put down" prompt): a move's piece in two
+	card = Goal.now({ deliveries = 2, holding = "furniture", pair = true })
+	check("9.0 a piece carried in two (CarryPair): no pill (its own G prompt on the piece says it: one put-down on the screen)",
+		card.action == nil, show(card))
+	card = Goal.now({ deliveries = 2, holding = "furniture", pair = false })
+	check("9.0 …carried alone: the pill as ever", card.action ~= nil and card.action.key == "G" and card.action.text == "Put it down", show(card))
 end
 
 -- ── The tutorial ───────────────────────────────────────────────────────────

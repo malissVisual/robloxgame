@@ -35,6 +35,10 @@
 -- in or on his way to it (the server's MoveHelperOrders holds "getout") the button is 🚪 GET OUT, lit: the Moving
 -- remote's ("helper", "getout"), the server decides. A driver reaches nothing else (his card shuts and the clipboard
 -- stays away in a seat); STOP while you wait for him still comes first.
+-- 9.0 (the owner's screenshot: "DANNY · Nothing to carry" over "Take out your clipboard (Q) to give him pieces" while he
+-- carried the Sofa with you, his bubble "Carrying: Sofa with you"): hired, his list empty and he busy (MoveHelperBubble:
+-- anything but idle, MoveHelperBrain.idle), the title says what his bubble says (MoveHelperBrain.title) and the second
+-- line what he does; how to give him pieces only while he is idle.
 --   MoveHelperHud.start(), MoveHelperHud.strip()   the strip (nil before Danny first comes)
 --   MoveHelperHud.useCard(open)                    8.3 HIRE and LIST open his card (open: the card's opener)
 --   MoveHelperHud.cardOpen(open)                   8.4 his card opened or closed (client/MoveHelperCard.luau)
@@ -372,8 +376,11 @@ local function refresh()
 		-- OUT, lit: the one order a driver can reach, the clipboard and his card are for on foot)
 		local count = player:GetAttribute("MoveHelperQueue")
 		local out = getOut()
-		local how = not out and orders ~= nil and not ordersOn and (type(count) ~= "number" or count <= 0)
-		paint(frame, `🧑‍🔧 {name} · {Brain.queueText(count)}`, if how then carriesWords() elseif type(doing) == "string" then doing else "",
+		-- (9.0 the owner's screenshot: "DANNY · Nothing to carry" while his bubble said "Carrying: Sofa with you": his
+		-- list empty and he busy, the title says what the bubble says; the words how to give him pieces only while idle)
+		local bubble = player:GetAttribute("MoveHelperBubble")
+		local how = not out and orders ~= nil and not ordersOn and (type(count) ~= "number" or count <= 0) and Brain.idle(bubble)
+		paint(frame, `🧑‍🔧 {name} · {Brain.title(count, bubble)}`, if how then carriesWords() elseif type(doing) == "string" then doing else "",
 			if out then Brain.orderWords("getout") elseif orders then ClipboardRules.orders(ordersOn) elseif openCard then "LIST" else "CLEAR", false,
 			out or (orders ~= nil and ordersOn))
 	else
@@ -417,7 +424,7 @@ function MoveHelperHud.setOrders(on: boolean)
 end
 
 function MoveHelperHud.start()
-	for _, name in { "MoveHelper", "MoveHelperDoing", "MoveHelperCall", "MoveHelperReady", "MoveHelperPrice", "MoveHelperQueue", "MoveHelperOrders" } do
+	for _, name in { "MoveHelper", "MoveHelperDoing", "MoveHelperCall", "MoveHelperReady", "MoveHelperPrice", "MoveHelperQueue", "MoveHelperOrders", "MoveHelperBubble" } do
 		player:GetAttributeChangedSignal(name):Connect(refresh)
 	end
 	-- 7.0 review: the panel moved, resized, showed or hid (client/TopBlocks.luau), the screen changed size

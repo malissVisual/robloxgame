@@ -116,6 +116,23 @@ check("8.3 his list in words", Brain.queueText(0) == "Nothing to carry" and Brai
 	and Brain.queueText(nil) == "Nothing to carry")
 check("8.3 his status: for hire (the price), hired (his list · what he does)", Brain.status(false, 170, nil, nil) == "For hire · $170 this move"
 	and Brain.status(true, 170, 2, "Carrying the Lamp to the van") == "2 pieces to carry · Carrying the Lamp to the van" and Brain.status(true, 0, 0, "") == "Nothing to carry")
+-- 9.0 (the owner's screenshot: "DANNY · Nothing to carry" over "Take out your clipboard (Q) to give him pieces" while his
+-- bubble said "🤝 Carrying: Sofa with you")
+do
+	local holdLine = Brain.doing("hold", "Sofa")
+	local holdBubble = Brain.bubble("hold", "Sofa")
+	check("9.0 idle: waiting by the van (its line and its bubble), the van full, for hire (with its price), staying out, nothing",
+		Brain.idle(Brain.doing("wait")) and Brain.idle(Brain.bubble("wait")) and Brain.idle(Brain.bubble("wait", nil, true))
+		and Brain.idle(Brain.bubble("offer", nil, false, 170)) and Brain.idle(Brain.doing("stay")) and Brain.idle(nil) and Brain.idle(""))
+	check("…not idle: carrying a piece with you, to the van, going for one", not Brain.idle(holdLine) and not Brain.idle(holdBubble)
+		and not Brain.idle(Brain.bubble("deliver", "Lamp")) and not Brain.idle(Brain.doing("fetch", "Lamp")))
+	check("9.0 his status line's title: his list empty, carrying the Sofa with you: the bubble's words (never \"Nothing to carry\")",
+		Brain.title(0, holdBubble) == "Carrying: Sofa with you" and Brain.title(nil, holdBubble) == "Carrying: Sofa with you", Brain.title(0, holdBubble))
+	check("…his list with pieces: his list; idle: his list as ever", Brain.title(2, holdBubble) == "2 pieces to carry"
+		and Brain.title(0, Brain.bubble("wait")) == "Nothing to carry" and Brain.title(0, nil) == "Nothing to carry")
+	check("…his card's status: his list empty, carrying with you: what he does alone", Brain.status(true, 0, 0, holdLine) == "Carrying the Sofa with you"
+		and Brain.status(true, 0, 0, Brain.doing("wait")) == "Nothing to carry · Waiting at the van", Brain.status(true, 0, 0, holdLine))
+end
 check("8.3 the marker over a piece of his list: its number, or he needs you", Brain.markText(2, false) == "🧑‍🔧 Danny · 2" and Brain.markText(1, true) == "🙋 Danny needs you")
 
 -- 8.3 the van's seat ---------------------------------------------------------------------------------------------------------
@@ -394,6 +411,29 @@ do
 		and select(1, Brain.endLead(trail, x + 51, 0, 0.1, 0.2, true)) == 0)
 	lx, lz = Brain.endLead(trail, 0 / 0, 0, 0.1, 0.2, false)
 	check("…no place (NaN): none, never NaN", lx == 0 and lz == 0)
+	-- 9.0 (the owner's screenshot: Danny inside the Sofa) his end's way out of the piece (+X): never a lead toward its
+	-- middle (HoldLead.In), the rest his hands' reach; away from it (he walks backwards) HoldLead.Back s more of it
+	local function walked(dx: number, seconds: number): (number, number, Brain.Trail)
+		local t = Brain.newTrail()
+		local at, gx, gz = 0, 0, 0
+		Brain.endLead(t, at, 0, 0.1, seconds, false, 1, 0)
+		for _ = 1, 40 do
+			at += dx
+			gx, gz = Brain.endLead(t, at, 0, 0.1, seconds, false, 1, 0)
+		end
+		return gx, gz, t
+	end
+	local inX, inZ, inTrail = walked(-1, 0.2) -- (his end toward the piece's middle at 10 studs/s: he follows you)
+	check("9.0 following you (his end toward the piece's middle): his lead toward it HoldLead.In at most (0: never into the piece)",
+		L.In == 0 and inX >= -L.In - 1e-9 and math.abs(inZ) < 1e-9, inX)
+	check("…his hands reach on by the lead it did not take (10 studs/s × 0.2 s: 2 studs)", near(inTrail.reach, 2, 1e-3), inTrail.reach)
+	local outX, _, outTrail = walked(1, 0.2) -- (his end away from the piece: he walks backwards)
+	check("…walking backwards himself (his end away from it): the lead and HoldLead.Back s more, his hands reaching on by that more",
+		L.Back > 0 and near(outX, 10 * (0.2 + L.Back), 1e-3) and near(outTrail.reach, 10 * L.Back, 1e-3), `{outX} {outTrail.reach}`)
+	local offX, _, offTrail = walked(1, 0)
+	check("…no lead (Base 0, Ping 0: off): none of it either", offX == 0 and offTrail.reach == 0, offX)
+	local crossX, crossZ = Brain.endLead(Brain.newTrail(), 0, 0, 0.1, 0.2, false, 1, 0)
+	check("…a first look: nothing", crossX == 0 and crossZ == 0)
 	-- 8.6 the ease back is HoldCap at most
 	local eased = Brain.newTrail()
 	local top = 0
