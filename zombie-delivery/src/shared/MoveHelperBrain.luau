@@ -140,10 +140,15 @@
 --                                              only when crossed; more than HoldBehind studs off for HoldStuck s, an
 --                                              ease of HoldEase s (the gap / HoldEase a second; 8.6: HoldCap at most,
 --                                              unless `speed` is more); else `speed`
+--   MoveHelperBrain.leadKept(away, off, crossed, dt)   9.2 the server's look at Danny's end driven by the leader's client
+--                                              (server/PairHold.luau lead, client/PairLead.luau): his body `off` studs
+--                                              from his end in the server's own view, `dt` s since the last look (a
+--                                              door's trip, `crossed`, is no fault) → (s he has been more than
+--                                              PairLead.Sane studs off, does the drive stay: false once that is Grace s)
 --   8.3 (the owner: "he just jumps weirdly … make him walk like me, backwards too"):
 --   MoveHelperBrain.holdClimb(trail, height, dt, snap)   his root's height now: toward `height` at HoldClimb studs a
 --                                              second at most (a step stepped, never popped; at once on a new hold or a
---                                              door's fade)
+--                                              door's fade; 9.2 or a change of more than HoldPace.Jump studs: no step's)
 --   MoveHelperBrain.holdLegs(trail, forward, side, dt)   the speed his legs step at (negative: backwards, 0: standing)
 --                                              from his root's own velocity in his frame: his whole speed along the
 --                                              ground, from HoldLegs.From, under HoldLegs.To standing, backwards past
@@ -802,10 +807,11 @@ end
 
 -- 8.3 his root's height now, toward `height` (where the floor under his end puts it) at HoldClimb studs a second at
 -- most: a step or a kerb stepped up or down, never popped. At once on a new hold (none yet) and through a door's fade
--- (`snap`: the piece in the other world).
+-- (`snap`: the piece in the other world). 9.2: also when it changes more than HoldPace.Jump studs at once (no step is
+-- that tall: a door's trip the server did not see, the leader's client having put him there first).
 function MoveHelperBrain.holdClimb(trail: Trail, height: number, dt: number, snap: boolean): number
 	local was = trail.height
-	if snap or was == nil or height ~= height then
+	if snap or was == nil or height ~= height or math.abs(height - was) > cfg().HoldPace.Jump then
 		trail.height = height
 		return height
 	end
@@ -864,6 +870,20 @@ function MoveHelperBrain.holdTrack(trail: Trail, gap: number, crossed: boolean, 
 	trail.ease = c.HoldEase
 	trail.easeSpeed = math.min(gap / math.max(c.HoldEase, 0.05), math.max(speed, c.HoldCap)) -- (8.6: HoldCap at most)
 	return math.max(speed, trail.easeSpeed), false
+end
+
+-- 9.2 (the owner, 8.9.5: "it feels like it's harder to control … fix it so it's playable"): the leader's client drives
+-- Danny's end, so the server only looks: an exploit flinging him away from the piece, a client that stopped driving
+-- (his body left where the piece was) is more than PairLead.Sane studs off his end for PairLead.Grace s, and the server
+-- takes him back (server/MoveHelper.luau actHold). A door's trip moves the piece far at once: no fault (the server puts
+-- him there itself). NaN (no place known): a fault.
+function MoveHelperBrain.leadKept(away: number, off: number, crossed: boolean, dt: number): (number, boolean)
+	local lead = cfg().PairLead
+	if crossed or (off == off and off <= lead.Sane) then
+		return 0, true
+	end
+	local now = (if away == away then math.max(away, 0) else 0) + (if dt == dt then math.max(dt, 0) else 0)
+	return now, now < lead.Grace
 end
 
 -- ── 8.3 your call ──────────────────────────────────────────────────────────

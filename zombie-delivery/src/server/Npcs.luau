@@ -768,6 +768,9 @@ end
 -- up, his first steps after a carry a hop. In the Physics state the gait poses his legs from his real velocity like a
 -- player's (planted feet, backwards, sideways; the stock walk under it for a far body), Jump stays off (the Jumping
 -- state too) and AutoRotate is off; both are given back when he lets go, straight into Running (GettingUp off).
+-- 9.2 (the leader drives his end: server/PairHold.luau lead): the owner of a body runs its humanoid's state machine, so
+-- these are set here while the server owns him (on: before the hold gives his body to the leader's client, which keeps
+-- the Physics state, client/PairLead.luau; off: after the hold's drop took him back), never while a client does.
 function Npcs.carried(npc: Model, on: boolean)
 	local state = states[npc]
 	if not state then

@@ -590,6 +590,26 @@ do
 	check("…and holding on from there: never again", not again)
 end
 
+do
+	-- 9.2 the server's look at his end the leader's client drives (MoveHelperBrain.leadKept)
+	local L = H.PairLead
+	local away, kept = Brain.leadKept(0, L.Sane - 0.1, false, 0.1)
+	check("9.2 leadKept: within PairLead.Sane studs of his end the drive stays (a glide in, a stumble: nothing counted)", away == 0 and kept)
+	local steps = 0
+	repeat
+		away, kept = Brain.leadKept(away, L.Sane + 5, false, 0.1)
+		steps += 1
+	until not kept or steps > 100
+	check("…more than Sane studs off for Grace s (an exploit's fling, a client that stopped driving): the server takes him back",
+		not kept and near(steps * 0.1, L.Grace, 0.1 + 1e-9), steps * 0.1)
+	away, kept = Brain.leadKept(L.Grace - 0.05, 300, true, 0.1)
+	local door = away == 0 and kept
+	away, kept = Brain.leadKept(L.Grace - 0.05, L.Sane - 1, false, 0.1)
+	check("…a door's trip (the piece far off at once) is no fault, and back near his end the count starts again", door and away == 0 and kept)
+	_, kept = Brain.leadKept(L.Grace, 0 / 0, false, 0.1)
+	check("…no place known (NaN) counts as off", not kept)
+end
+
 check("7.x your grip bar while he holds the other end: the box Steadied (1.3) × bigger", near(CarryGrip.profile("pair", 8, false, false, true).zone,
 	CarryGrip.profile("pair", 8, false, false).zone * Config.CarryGrip.Steadied) and Config.CarryGrip.Steadied == 1.3
 	and near(CarryGrip.profile("pair", 8, false, false, false).zone, CarryGrip.profile("pair", 8, false, false).zone))

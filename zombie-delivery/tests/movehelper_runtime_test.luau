@@ -452,12 +452,11 @@ check("…the strip: carrying the Sofa with you", sol:GetAttribute("MoveHelperDo
 -- Sofa's own "Put down")
 do
 	local Goal = require("./Goal")
-	-- the leader's side: who holds the far end and where (her client never pushes the piece into him on her screen)
-	local far = character:GetAttribute("PairFar")
-	local farAt = if M.typeof(far) == "Vector3" then E.rootOf(sol).CFrame * far else nil
-	check("9.0 Sol's client knows who holds the far end (PairWith: his id) and his place (PairFar, in her root's frame); no wall here (PairWall)",
-		character:GetAttribute("PairWith") == danny.id and farAt ~= nil and distance(farAt, farEnd(sofa, SOFA.Z)) < 0.1
-		and character:GetAttribute("PairWall") == nil, far)
+	-- the leader's side: who holds the far end (9.2: her client drives his end, so nothing of him is late on her screen:
+	-- no PairFar to keep the piece off him, no PairWall from the server; tests/movehelper_backwards_runtime_test.luau)
+	check("9.2 Sol leads: her client knows who holds the far end (PairWith: his id) and drives him (no PairFar, no PairWall)",
+		character:GetAttribute("PairWith") == danny.id and character:GetAttribute("PairFar") == nil and character:GetAttribute("PairWall") == nil,
+		character:GetAttribute("PairFar"))
 	-- his status line and his card while he carries it with her (MoveHelperBrain.title / status: the crew's attributes)
 	local bubble = sol:GetAttribute("MoveHelperBubble")
 	local queue = sol:GetAttribute("MoveHelperQueue")
@@ -508,6 +507,36 @@ do
 		hold.align.props.Position)
 	PairHold.drop(hold)
 	check("…let go: its constraints and its attachment gone", hold.align.Parent == nil and hold.orient.Parent == nil and hold.own.Parent == nil)
+	-- 9.2 a hold its leader's client drives (server/PairHold.luau lead): the holder's body theirs, what their client needs
+	-- on the holder's model, the server writing none of the constraints; taken back, the server's again at once
+	local leader = { UserId = 4242, Name = "Leader" }
+	holderRoot.CFrame = M.CFrame.new(0, 3, 0)
+	local driven = PairHold.make(holder, holderRoot, piece, offset, 12, { ghost = false, flat = true, owner = nil, lift = true, driver = leader :: any })
+	local value = holder:FindFirstChild("PairLeadPiece")
+	local at = holder:GetAttribute("PairLeadAt")
+	check("9.2 PairHold driven by its leader: the holder's body theirs (SetNetworkOwner), PairLead their UserId, PairLeadAt its place, PairLeadPiece the piece",
+		holderRoot.NetworkOwner == leader and holder:GetAttribute("PairLead") == 4242 and M.typeof(at) == "CFrame"
+		and (at.Position - V3(offset.X, 0, offset.Z)).Magnitude < 1e-6 and value ~= nil and value.Value == piece and PairHold.drives(driven) == leader
+		and driven.lift ~= nil and driven.lift:GetAttribute("Lift") == true and driven.align.ReactionForceEnabled == false, holderRoot.NetworkOwner)
+	local mark = V3(99, 99, 99)
+	driven.align.Position = mark -- (what the leader's client set)
+	driven.align.MaxVelocity = 400
+	piece.CFrame = M.CFrame.new(-3, 3, -5)
+	E.game:GetService("RunService").Heartbeat:Fire(1 / 60)
+	PairHold.step()
+	PairHold.aim(driven, offset, 30)
+	check("9.2 …meanwhile the server writes none of its constraints (no Heartbeat goals; aim keeps its numbers only)",
+		driven.align.props.Position == mark and driven.align.MaxVelocity == 400 and driven.limit == 30)
+	PairHold.lead(driven, nil)
+	check("9.2 …taken back (lead nil): the server's again at once: its owner, its goals from the piece, its top speed; PairLead* gone",
+		holderRoot.NetworkOwner == false and holder:GetAttribute("PairLead") == nil and holder:GetAttribute("PairLeadAt") == nil
+		and holder:FindFirstChild("PairLeadPiece") == nil and (driven.align.props.Position - (piece.CFrame * offset).Position).Magnitude < 1e-6
+		and driven.align.MaxVelocity == 30)
+	PairHold.lead(driven, leader :: any)
+	PairHold.drop(driven)
+	check("9.2 …a driven hold dropped: PairLead* gone and the holder's body the server's again (before it is stood up)",
+		holder:GetAttribute("PairLead") == nil and holder:FindFirstChild("PairLeadPiece") == nil and holderRoot.NetworkOwner == false
+		and driven.align.Parent == nil)
 	piece:Destroy()
 end
 -- walking and turning together: he moves with it, every step at its far end (8.1 walk-in doors off meanwhile: these
@@ -573,7 +602,8 @@ end)
 check("8.1 spun round at once: no snap, his first step his top speed's (the pair's walk and a margin), at the far end again within a second",
 	caught and firstStep <= Brain.holdSpeed(WALK * T.Speed.Pair) * 0.1 + 1e-6 and firstStep > 1 and jump.over <= 1e-6, `{firstStep} {jump.over}`)
 -- 8.1 stuck far behind (his constraints can't move him: a mover that keeps nothing): HoldStuck s, then eased back over
--- HoldEase s at the gap / HoldEase a second, never put there
+-- HoldEase s at the gap / HoldEase a second, never put there (9.2: more than PairLead.Sane studs off his end for Grace s,
+-- the server also takes his body back from Sol's client for the rest of the carry: its WARN)
 local kept: { any } = {}
 MoveHelper.useMover({ move = walker.move, halt = walker.halt, keep = function(b: any, anchor: any, offset: any, _dt: number, limit: number, snap: boolean)
 	table.insert(kept, { at = E.clock, limit = limit, snap = snap, gap = ((anchor.CFrame * offset).Position - b.root.Position).Magnitude })
