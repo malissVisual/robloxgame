@@ -242,8 +242,14 @@ local pairWorst = walkAt(PAIR, 3, 0.2)
 local leadX, leadZ = lead()
 local ahead = distance(body.root.Position, place())
 check(`8.3 Sol at the pair's walk ({string.format("%.1f", PAIR)}) for 3 s: every step he is where his hold aims him`, pairWorst < 0.05 and holding(), pairWorst)
-check("8.3 …aimed her velocity × leadTime ahead of his place, her way (her screen shows his body that late)",
-	math.abs(ahead - PAIR * Brain.leadTime(0)) < 0.02 and leadZ > 0 and math.abs(leadX) < 1e-6 and H.HoldLead.Base > 0, `{ahead} studs ahead`)
+-- 9.0 (the owner's screenshot: Danny inside the Sofa): following her his lead would take him toward the piece's middle,
+-- into it: his body stays at his place (HoldLead.In 0), his hands reach on by that lead instead (her screen shows his body
+-- that late: there his hands are on its edge; Config.MoveHelper.Edge.Reach at most)
+local carryAt = body.model:GetAttribute("CarryAt")
+local reach = if M.typeof(carryAt) == "Vector3" then -carryAt.Z - (H.Standoff + H.Edge.Depth / 2) else 0
+check("8.3 …her velocity × leadTime his lead (her screen shows his body that late); 9.0 following her, never into the piece: his body at his place, his hands reaching on by it",
+	ahead < 0.02 and math.abs(leadX) + math.abs(leadZ) <= H.HoldLead.In + 1e-6 and H.HoldLead.Base > 0
+	and math.abs(reach - math.min(PAIR * Brain.leadTime(0), H.Edge.Reach)) < 0.06, `{ahead} studs ahead, hands {reach} on`)
 local fasterWorst = walkAt(PAIR * 1.2, 3)
 check("8.3 20% faster (a lag spike, a slope) for 3 s: every step at his aim, from the first", fasterWorst < 0.05 and holding(), fasterWorst)
 local mark = #E.strides

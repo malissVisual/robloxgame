@@ -414,10 +414,15 @@ E.clock += 0.2
 Moving.step()
 local mateHold = PairHold.of(ann)
 local annRoot = E.rootOf(ann)
-check("8.1 the helper held at the sofa's far end by the server: constraints on Ann's root to an attachment on the sofa", mateHold ~= nil
-	and mateHold.align.Parent == annRoot and mateHold.align.Attachment1.Parent == sofaRoot and mateHold.orient.Attachment1 == mateHold.far
+-- (9.0: one attachment each, Ann's own, nothing on the sofa: no constraint joins her body to Bob's; the server sets the
+-- goals, the sofa's far end, from where it is)
+local mateGoal = sofaRoot.CFrame * (mateHold and mateHold.offset or M.CFrame.new())
+check("8.1 the helper held at the sofa's far end by the server: constraints on Ann's root aimed there (9.0 one attachment, hers: nothing on the sofa)",
+	mateHold ~= nil and mateHold.align.Parent == annRoot and mateHold.align.Mode == "OneAttachment" and mateHold.align.Attachment1 == nil
+	and mateHold.orient.Mode == "OneAttachment" and mateHold.orient.Attachment1 == nil and mateHold.align.Attachment0 == mateHold.own
+	and mateHold.own.Parent == annRoot and (mateHold.align.props.Position - mateGoal.Position).Magnitude < 1e-6
 	-- (8.6: the sofa lies along the carry, its +X ahead of Bob: Ann's end the far end of its length, Standoff past it)
-	and math.abs(mateHold.far.CFrame.Position.X - (E.items.sofa.size.X / 2 + H.Standoff)) < 1e-6 and math.abs(mateHold.far.CFrame.Position.Z) < 1e-6)
+	and math.abs(mateHold.offset.Position.X - (E.items.sofa.size.X / 2 + H.Standoff)) < 1e-6 and math.abs(mateHold.offset.Position.Z) < 1e-6)
 check("…at the pair's top speed (never put there), along the ground only (Ann stands on the floor herself)", mateHold ~= nil
 	and math.abs(mateHold.align.MaxVelocity - Brain.holdSpeed(14 * T.Speed.Pair)) < 1e-6 and mateHold.align.MaxAxesForce.Y == 0
 	and mateHold.align.MaxAxesForce.X > 0 and math.abs(mateHold.orient.MaxAngularVelocity - Brain.holdTurn()) < 1e-6)
@@ -434,7 +439,7 @@ local function bobWalks(speed: number, looks: number)
 		local bobRoot = E.rootOf(bob)
 		bobRoot.CFrame = bobRoot.CFrame + V3(0, 0, speed * 0.2)
 		E.welded(sofa) -- (8.6: where the weld keeps it)
-		annRoot.CFrame = sofaRoot.CFrame * mateHold.far.CFrame
+		annRoot.CFrame = sofaRoot.CFrame * mateHold.offset
 		E.clock += 0.2
 		Moving.step()
 	end
@@ -473,7 +478,7 @@ Moving.step()
 check("the pair too far apart: it went down", bobBody:GetAttribute("MoveCarry") == nil and character:GetAttribute("MoveCarry") == nil and sofaRoot.Anchored and string.find(E.lastNotice(bob), "apart", 1, true) ~= nil,
 	E.lastNotice(bob))
 check("8.1 …the hold let go: its constraints gone, Ann's body hers again, Bob's PairTurn gone", PairHold.of(ann) == nil and mateHold ~= nil and mateHold.align.Parent == nil
-	and mateHold.far.Parent == nil and annRoot.NetworkOwner == ann and bobBody:GetAttribute("PairTurn") == nil)
+	and mateHold.own.Parent == nil and annRoot.NetworkOwner == ann and bobBody:GetAttribute("PairTurn") == nil)
 check("8.3 …and both CarryPair gone (their walks theirs again)", bobBody:GetAttribute("CarryPair") == nil and character:GetAttribute("CarryPair") == nil)
 -- picked up again and loaded by two
 E.place(ann, sofaRoot.Position + V3(1, 0, 0))

@@ -447,6 +447,69 @@ said = #E.said
 run(H.ThreeAfter + 0.2)
 check("8.3 …\"On three... lift!\" said once (before the lift, not again after it)", not E.saidSince("On three... lift!", said))
 check("…the strip: carrying the Sofa with you", sol:GetAttribute("MoveHelperDoing") == "Carrying the Sofa with you", sol:GetAttribute("MoveHelperDoing"))
+-- 9.0 (the owner, 8.9.3: "When I want to walk forwards, Danny can't walk backwards"; then "and he still teleports", his
+-- screenshots: Danny inside the Sofa, his status line "Nothing to carry" over a carry in two, "G PUT IT DOWN" over the
+-- Sofa's own "Put down")
+do
+	local Goal = require("./Goal")
+	-- the leader's side: who holds the far end and where (her client never pushes the piece into him on her screen)
+	local far = character:GetAttribute("PairFar")
+	local farAt = if M.typeof(far) == "Vector3" then E.rootOf(sol).CFrame * far else nil
+	check("9.0 Sol's client knows who holds the far end (PairWith: his id) and his place (PairFar, in her root's frame); no wall here (PairWall)",
+		character:GetAttribute("PairWith") == danny.id and farAt ~= nil and distance(farAt, farEnd(sofa, SOFA.Z)) < 0.1
+		and character:GetAttribute("PairWall") == nil, far)
+	-- his status line and his card while he carries it with her (MoveHelperBrain.title / status: the crew's attributes)
+	local bubble = sol:GetAttribute("MoveHelperBubble")
+	local queue = sol:GetAttribute("MoveHelperQueue")
+	check("9.0 his status line says what his bubble says (\"Carrying: Sofa with you\", never \"Nothing to carry\"), no hint how to give him pieces",
+		bubble == "🤝 Carrying: Sofa with you" and Brain.title(queue, bubble) == "Carrying: Sofa with you" and not Brain.idle(bubble)
+		and Brain.status(true, 0, queue, sol:GetAttribute("MoveHelperDoing")) == "Carrying the Sofa with you", `{bubble} / {Brain.title(queue, bubble)}`)
+	-- one put-down on her screen: the Sofa's own G prompt (hers), no pill saying it again
+	local mine = 0
+	for _, d in sofa:GetDescendants() do
+		if d.ClassName == "ProximityPrompt" and d.KeyboardKeyCode == M.Enum.KeyCode.G and d:GetAttribute("MoveOnly") == sol.UserId and not d.destroyed then
+			mine += 1
+		end
+	end
+	local card = Goal.now({ deliveries = 3, holding = character:GetAttribute("Carrying"), pair = character:GetAttribute("CarryPair") == true })
+	check("9.0 one put-down on her screen: the Sofa's own \"Put down\" (G) for her, no \"G PUT IT DOWN\" pill (CarryPair)", mine == 1 and card.action == nil,
+		`{mine} prompts, pill {card.action and card.action.text}`)
+end
+do
+	-- 9.0 server/PairHold.luau's hold: one attachment each (the holder's), nothing on the piece (a constraint between the
+	-- two assemblies made one mechanism of the holder's body and the leader's); its goals the server's, from the piece
+	-- where it is, every Heartbeat; a bound (Danny's in a house: along its walls) on every goal
+	local PairHold = require("./PairHoldServer")
+	local holder = M.Instance.new("Model")
+	local holderRoot = M.Instance.new("Part")
+	holderRoot.Name = "HumanoidRootPart"
+	holderRoot.CFrame = M.CFrame.new(0, 3, 0)
+	holderRoot.Parent = holder
+	local piece = M.Instance.new("Part")
+	piece.CFrame = M.CFrame.new(0, 3, -5)
+	piece.Parent = workspace
+	local offset = M.CFrame.new(0, 0, -4)
+	local hold = PairHold.make(holder, holderRoot, piece, offset, 12, { ghost = false, flat = true, owner = nil, lift = true })
+	local onPiece = #piece:GetDescendants()
+	local function goalIs(at: any): boolean
+		return (hold.align.props.Position - at).Magnitude < 1e-6
+	end
+	check("9.0 PairHold: one attachment each (AlignPosition, AlignOrientation, the lift: the holder's own), nothing on the piece, the goal its far end",
+		hold.align.Mode == "OneAttachment" and hold.align.Attachment1 == nil and hold.align.Attachment0 == hold.own and hold.orient.Mode == "OneAttachment"
+		and hold.orient.Attachment1 == nil and hold.lift ~= nil and hold.lift.Attachment1 == nil and onPiece == 0 and goalIs((piece.CFrame * offset).Position), onPiece)
+	piece.CFrame = M.CFrame.new(3, 3, -5)
+	E.game:GetService("RunService").Heartbeat:Fire(1 / 60)
+	local followed = goalIs((piece.CFrame * offset).Position)
+	hold.bound = function(goal: any, _here: any): any
+		return V3(math.min(goal.X, 1), goal.Y, goal.Z) -- (a wall at X 1)
+	end
+	PairHold.step()
+	check("…the piece moved: its goal follows it at the next Heartbeat; a bound keeps it (Danny's: along a house's walls)", followed and goalIs(V3(1, 3, -9)),
+		hold.align.props.Position)
+	PairHold.drop(hold)
+	check("…let go: its constraints and its attachment gone", hold.align.Parent == nil and hold.orient.Parent == nil and hold.own.Parent == nil)
+	piece:Destroy()
+end
 -- walking and turning together: he moves with it, every step at its far end (8.1 walk-in doors off meanwhile: these
 -- walks turn round by the house's door; it is the Leave prompt's below)
 T.Doors.Walk = false

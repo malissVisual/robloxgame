@@ -68,9 +68,10 @@
 --     starts his walk after the van afresh (rideWalk). His right hand goes to the handle getting in and pushes the door
 --     getting out, as a player's (BoardAt / BoardReach, AlightAt / AlightReach on his body: client/ArmPose.luau).
 --   * Carrying together: he moves WITH the piece: his own walk is off (Npcs.carried), constraints on his root
---     (AlignPosition / AlignOrientation to an attachment at the piece's far end, turned to you) hold him there every
---     physics step, on the floor under that end (stairs, steps: within HoldStep of you), through walls and door frames
---     like the piece itself (a collision group nothing collides with), through the front door's fade with you. Never a
+--     (AlignPosition / AlignOrientation aimed at the piece's far end, turned to you; 9.0 one attachment each, his own,
+--     their goals the server's) hold him there every physics step, on the floor under that end (stairs, steps: within
+--     HoldStep of you), through door frames like the piece itself (a collision group nothing collides with; 9.0 inside
+--     a house along the walls, never through them: HoldWall), through the front door's fade with you. Never a
 --     "too far apart" drop. His arms hold its edge (the Carrying / CarryAt / CarrySize attributes on his body:
 --     client/ArmPose.luau), his legs step with his speed (Npcs.stride, backwards when he walks backwards). Your grip bar
 --     is easier meanwhile (the character attribute GripSteady: Config.CarryGrip.Steadied × the box). He talks on the
@@ -133,12 +134,14 @@
 -- Performance: one helper per move, one loop for all of them, a path at most every Repath s (computed in the background,
 -- one Path object each), his walk ordered again only when its goal moves (Npcs.walkTo), his list's room in the van
 -- worked out only when the load changes (every Think s); carrying together the physics engine moves him (the loop only
--- re-aims the far end's attachment and his top speed, a ray down a step); seated, the van carries him (nothing to do);
+-- re-aims his place at the far end and his top speed, a ray down a step, 9.0 a slide along a few wall slabs; PairHold's
+-- one Heartbeat sets the constraints' goals from it); seated, the van carries him (nothing to do);
 -- 8.5 getting in or out, his pose every frame for that half second only (RunService.Heartbeat, unhooked after).
 --   MoveHelper.sync(s, port)   Moving's tick: the move's crew (he comes or goes; a hirer who left ends the hire) and his
 --                              hands (Moving's helper hooks)
 --   MoveHelper.step(dt)        one step of every helper (his loop's; the runtime test calls it)
 --   MoveHelper.useMover(m)     how he walks (a test's: the Luau CLI has no physics and no pathfinding)
+--   MoveHelper.gameMover       9.0 the game's own mover (a test's walk can borrow its keep and free: the real hold)
 --   MoveHelper.nameOf(id)      his name by his id in a move's rules (nil: not a helper's id)
 --   MoveHelper.find(player)    the helper on this player's move (his state: tests, the admin, server/SandboxTasks.luau)
 --   MoveHelper.call(s, p, spot)    8.3 Moving's Lift on a two-person piece: "wait" (a call: you wait, he comes), "cancel"
@@ -177,6 +180,25 @@
 --     Moving.helperDrop). A piece for two: his end the same bend ("lift") as your lift takes it up, then the 8.6 carry.
 --   * His list's markers (newMark): AlwaysOnTop off, MaxDistance MarkFar: seen in the same room and through an open
 --     doorway, never through a wall.
+-- 9.0 carrying in two, walked forwards (the owner, 8.9.3: "Danny carries better now, but only when I walk backwards.
+-- When I want to walk forwards, Danny can't walk backwards"; then "and he still teleports", his screenshots: Danny
+-- standing inside the Sofa, his own body lying across it; tests/movehelper_backwards_runtime_test.luau measures it):
+--   * His hold's constraints reached into your assembly (their Attachment1 on the piece, welded to your root): one
+--     mechanism of his server-owned body and your own. Now they have one attachment, his (server/PairHold.luau: the
+--     server sets their goals from the piece every Heartbeat); nothing of his hold touches your body.
+--   * His body never in the piece: following you, his lead toward its middle is HoldLead.In at most (it put his chest 2
+--     studs into the Sofa where everybody else saw him, and on your screen once you stopped); his hands reach on by the
+--     rest (poseHands: MoveHelperBrain.endLead's reach, Edge.Reach at most). Walking backwards himself his lead is
+--     HoldLead.Back s longer (your screen may show him later than its guess).
+--   * Your side (client/PairSteer.luau): your character's PairWith (his id) and PairFar (his place in your root's frame,
+--     pairOn) let your client see him as your screen does: your walk's start waits for him and you never push the
+--     piece into him there (Config.MoveHelper.PairStart, PairKeep).
+--   * Inside a house he walks backwards along the walls, never through them (slideAlong: the plan's wall slabs,
+--     HouseRoute.slide, HoldWall.Clear off them; every Heartbeat as his hold's bound), never while he follows you (his
+--     end goes where you went, a corner cut through a doorway's jamb as the piece cuts it); held back by a wall, your
+--     walk into it goes (PairWall: HoldWall.Block's share), slowed as he nears it, stopped against it.
+--   * Nothing else steers him while he holds it: his way (HouseRoute), a stuck nudge, placeAt and the van's outline are
+--     other actions' (actHold alone runs; think only blocks his grid's cells again).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -333,6 +355,9 @@ type Helper = {
 	holdAt: Vector3?, -- 8.1 where his root was a step ago holding it (his legs' speed)
 	holdLimit: number, -- 8.1 his top speed holding it now (the tests read it)
 	steadied: Model?, -- 7.x the carrier's character with GripSteady
+	walled: Model?, -- 9.0 the carrier's character with PairWith / PairFar / PairWall (pairOn)
+	wallWay: Vector3?, -- 9.0 his end against a wall of the house: the way into it × how much of the walk into it goes
+	bound: ((Vector3, Vector3) -> Vector3)?, -- 9.0 his hold's bound along the house's walls (boundOf: made once)
 	lineKey: string?, -- 7.x a line to say at lineAt ("On three... lift!" after "Got the other end!")
 	lineAt: number,
 	vanSaid: number?, -- 7.x the piece "That's going in the van." was said for
@@ -463,9 +488,10 @@ local function gripOff(body: Body)
 	body.speed = -1 -- (Npcs.pace again on his next walk)
 end
 
--- 7.x his root glued to `offset` in the piece's frame: AlignPosition and AlignOrientation between an attachment on his
--- root and one on the piece (the physics engine moves him every step, the server owns him), his own walk off, his parts
--- in the group nothing collides with (8.1 server/PairHold.luau's make: at `limit` studs / s at most).
+-- 7.x his root glued to `offset` in the piece's frame: AlignPosition and AlignOrientation on his root aimed there (the
+-- physics engine moves him every step, the server owns him; 9.0 one attachment each, his own: the server sets their
+-- goals, nothing joins him to the piece), his own walk off, his parts in the group nothing collides with (8.1
+-- server/PairHold.luau's make: at `limit` studs / s at most).
 local function gripOn(body: Body, anchor: BasePart, offset: CFrame, limit: number)
 	gripOff(body)
 	Npcs.carried(body.model, true)
@@ -549,6 +575,7 @@ local mover: Mover = {
 function MoveHelper.useMover(given: Mover)
 	mover = given
 end
+MoveHelper.gameMover = mover -- 9.0 (the game's own: a test plays Roblox's constraints on its keep and free)
 
 -- ── Small helpers ──────────────────────────────────────────────────────────
 
@@ -1109,6 +1136,39 @@ local function steady(h: Helper, character: Model?)
 	end
 end
 
+-- 9.0 the carrier's side of the hold (client/PairSteer.luau, shared/PairCarry.luau keep and wall): their character's
+-- attributes PairWith (his id: their MoveHelperId), PairFar (his place in their root's frame: their screen shows him
+-- there or nearer, never the piece pushed into him) and PairWall (`way`: the way into the wall his end is against × the
+-- share of their walk into it to take away; nil: none); written only when they changed, all gone when he lets go (nil).
+local PAIR_ATTRIBUTES = { "PairWith", "PairFar", "PairWall" }
+local function setPair(character: Model, name: string, value: any)
+	local now = character:GetAttribute(name)
+	if value == nil then
+		if now ~= nil then
+			character:SetAttribute(name, nil)
+		end
+	elseif typeof(value) ~= "Vector3" or typeof(now) ~= "Vector3" or (now - value).Magnitude > 0.05 then
+		if now ~= value then
+			character:SetAttribute(name, value)
+		end
+	end
+end
+local function pairOn(h: Helper, character: Model?, far: Vector3?, way: Vector3?)
+	local was = h.walled
+	if was and was ~= character and was.Parent then
+		for _, name in PAIR_ATTRIBUTES do
+			was:SetAttribute(name, nil)
+		end
+	end
+	h.walled = character
+	if not character then
+		return
+	end
+	setPair(character, "PairWith", if far then h.id else nil)
+	setPair(character, "PairFar", far)
+	setPair(character, "PairWall", way)
+end
+
 -- 7.x the far end let go of: the glue off (he stands again), the carrier's grip as before.
 local function ungrip(h: Helper, body: Body?)
 	local free = mover.free
@@ -1116,6 +1176,8 @@ local function ungrip(h: Helper, body: Body?)
 		free(body)
 	end
 	steady(h, nil)
+	pairOn(h, nil, nil, nil) -- 9.0
+	h.wallWay = nil
 	h.gripped, h.holdOffset, h.lineKey, h.holdAt, h.holdEnd = nil, nil, nil, nil, nil
 end
 
@@ -1152,7 +1214,11 @@ local function poseHands(h: Helper, body: Body, spot: number?, role: string?)
 		-- the grips over its middle), as wide as that end (Config.MoveHelper.Edge)
 		local edge = cfg.Edge
 		local mid, grip = Rules.pairLift(thing.size.Y, 0)
-		at = Vector3.new(0, middle.Y + grip - mid, -(cfg.Standoff + edge.Depth / 2))
+		-- 9.0 following you his body never goes into the piece: the lead it did not take his hands reach on toward its
+		-- edge (MoveHelperBrain.endLead's reach, Edge.Reach at most: on your screen, where he shows late, on the edge)
+		local reach = math.clamp(h.trail.reach or 0, 0, edge.Reach or 0)
+		reach = math.floor(reach * 10 + 0.5) / 10 -- (a tenth of a stud: the attribute written only when it changes)
+		at = Vector3.new(0, middle.Y + grip - mid, -(cfg.Standoff + edge.Depth / 2 + reach))
 		size = Vector3.new(math.min(thing.size.X, thing.size.Z, edge.Width), edge.Height, edge.Depth)
 	else
 		at = body.root.CFrame:PointToObjectSpace(item.root.Position)
@@ -2439,6 +2505,44 @@ local function strideOf(h: Helper, body: Body, dt: number, snap: boolean)
 	Npcs.stride(body.model, Brain.holdLegs(h.trail, vx * look.X + vz * look.Z, vz * look.X - vx * look.Z, dt))
 end
 
+-- 9.0 (the owner: "When I want to walk forwards, Danny can't walk backwards"; walking backwards with your piece he goes
+-- first, into whatever is behind him): inside the house (its plan's grid, h.route) his goal from where he stands keeps
+-- HoldWall.Clear studs off the wall slabs, along them, never through (HouseRoute.slide): (the goal kept, how far the
+-- wall held it back, the way into that wall in the world: nil when none held it).
+local function slideAlong(h: Helper, here: Vector3, goal: Vector3): (Vector3, number, Vector3?)
+	local grid = h.route
+	if not grid or not insideAt(h, here) or not insideAt(h, goal) then
+		return goal, 0, nil
+	end
+	local fx, fz = planAt(h, here)
+	local gx, gz = planAt(h, goal)
+	local x, z, nx, nz = Route.slide(grid, fx, fz, gx, gz, cfg.HoldWall.Clear)
+	local held = math.sqrt((x - gx) * (x - gx) + (z - gz) * (z - gz))
+	if held < 1e-4 then
+		return goal, 0, nil
+	end
+	local into: Vector3? = nil
+	if nx ~= 0 or nz ~= 0 then
+		local way = (h.s.origin :: CFrame).Rotation * Vector3.new(-nx, 0, -nz)
+		into = Vector3.new(way.X, 0, way.Z).Unit
+	end
+	return worldAt(h, x, z, goal.Y), held, into
+end
+
+-- 9.0 his hold's bound (PairHold's hold.bound: every Heartbeat, the goal from the piece where it is now): along the
+-- house's walls from where he stands (slideAlong), made once a helper.
+local function boundOf(h: Helper): (Vector3, Vector3) -> Vector3
+	local made = h.bound
+	if made then
+		return made
+	end
+	local fn = function(goal: Vector3, here: Vector3): Vector3
+		return (slideAlong(h, here, goal))
+	end
+	h.bound = fn
+	return fn
+end
+
 -- 7.x the far end of your piece: he moves with it, glued there; the words.
 local function actHold(h: Helper, body: Body, spot: number, dt: number, clock: number)
 	local s = h.s
@@ -2469,15 +2573,45 @@ local function actHold(h: Helper, body: Body, spot: number, dt: number, clock: n
 	local pace = Brain.holdPace(h.trail, if from then from.X else 0 / 0, if from then from.Z else 0 / 0, dt, crossed or from == nil)
 	local speed = Brain.holdSpeed(PairHold.walkOf(carrier, Rules.carrySpeed(walkSpeed(), "pair", thing.weight)), pace)
 	local endAt = item.root.CFrame * offset.Position
-	local leadX, leadZ = Brain.endLead(h.trail, endAt.X, endAt.Z, dt, Brain.leadTime(PairHold.pingOf(carrier)), crossed or from == nil)
+	-- 9.0 (the owner's screenshot: Danny inside the Sofa): his lead toward the piece's middle HoldLead.In studs at most,
+	-- along his end's way out of it (his body never in the piece: following you, his hands reach on instead)
+	local out = item.root.CFrame.Rotation * (h.holdEnd :: Vector3)
+	local outFlat = Vector3.new(out.X, 0, out.Z)
+	local way = if outFlat.Magnitude > 1e-6 then outFlat.Unit else Vector3.zero
+	local leadX, leadZ = Brain.endLead(h.trail, endAt.X, endAt.Z, dt, Brain.leadTime(PairHold.pingOf(carrier)), crossed or from == nil, way.X, way.Z)
 	local aim = if leadX == 0 and leadZ == 0 then offset
 		else CFrame.new(item.root.CFrame:PointToObjectSpace(item.root.Position + Vector3.new(leadX, 0, leadZ))) * offset
 	local goal = (item.root.CFrame * aim).Position
+	-- 9.0 inside the house along the walls, never through them (slideAlong; following you, his end goes where you went,
+	-- a corner cut through a doorway's jamb as the piece itself cuts it): this step's goal, and every Heartbeat's (the
+	-- hold's bound). How far a wall held it back (his lead looks ahead by the time your screen shows him late) makes
+	-- h.wallWay: the way into that wall × HoldWall.Block's share, the part of your walk into it client/PairSteer.luau
+	-- takes away (slowed as he nears it, stopped against it).
+	local following = h.trail.evx * way.X + h.trail.evz * way.Z < -cfg.HoldLegs.From
+	local walls = not crossed and not following and h.route ~= nil
+	h.wallWay = nil
+	if walls then
+		local along, held, into = slideAlong(h, here, goal)
+		if held > 0 then
+			goal = along
+			aim = CFrame.new(item.root.CFrame:PointToObjectSpace(goal)) * offset.Rotation
+			if into then
+				h.wallWay = into * math.clamp(held / math.max(cfg.HoldWall.Block, 0.01), 0, 1)
+			end
+		end
+	end
 	local limit, snap = Brain.holdTrack(h.trail, (goal - here).Magnitude, crossed, speed, dt)
 	h.holdLimit = limit
 	keepAt(body, item.root, aim, dt, limit, snap)
+	local grip = body.grip
+	if grip then
+		grip.bound = if walls then boundOf(h) else nil -- (9.0 the goal every Heartbeat: along the walls)
+	end
 	strideOf(h, body, dt, snap)
 	steady(h, if carrierRoot then carrierRoot.Parent :: Model? else nil)
+	-- 9.0 your side of it: his place in your root's frame (your screen: never the piece pushed into him), the wall
+	local far = if carrierRoot and not crossed then carrierRoot.CFrame:PointToObjectSpace(endAt) else nil
+	pairOn(h, if carrierRoot then carrierRoot.Parent :: Model? else nil, far, h.wallWay)
 	local at = item.root.Position
 	if insideAt(h, at) and nearDoorway(h, at, cfg.DoorWarn) then
 		say(h, "door", clock)
@@ -3846,6 +3980,9 @@ local function create(s: any, port: Port): Helper
 		holdAt = nil,
 		holdLimit = 0,
 		steadied = nil,
+		walled = nil,
+		wallWay = nil,
+		bound = nil,
 		lineKey = nil,
 		lineAt = 0,
 		vanSaid = nil,

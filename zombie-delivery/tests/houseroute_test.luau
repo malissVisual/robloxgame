@@ -264,6 +264,64 @@ do
 	check("a footprint turned a quarter: its sides swap", math.abs(fp.x1 - 1) < 1e-6 and math.abs(fp.z1 - 2) < 1e-6)
 end
 
+-- ── 9.0 the far end's holder walking backwards with your piece: along the walls, never through ────────────────────────
+-- (the owner, 8.9.3: "When I want to walk forwards, Danny can't walk backwards"; server/MoveHelper.luau's hold slides
+-- him: Config.MoveHelper.HoldWall.Clear off every wall slab)
+
+do
+	local clear = Config.MoveHelper.HoldWall.Clear
+	-- one wall along X (z 10 … 11): straight at it he stops Clear before it; slanting at it he slides along its face
+	local g: any = { walls = { { x0 = -50, z0 = 10, x1 = 50, z1 = 11 } } }
+	local x, z, nx, nz = HouseRoute.slide(g, 0, 0, 0, 20, clear)
+	check("9.0 slide: straight at a wall he stops Clear studs before it, held by its face (its way out: -Z)", math.abs(x) < 1e-6
+		and math.abs(z - (10 - clear)) < 1e-3 and nx == 0 and nz == -1, `{x} {z} {nx} {nz}`)
+	x, z, nx, nz = HouseRoute.slide(g, 0, 0, 6, 20, clear)
+	check("…slanting at it: on along its face (the way along it kept), never through", math.abs(x - 6) < 1e-6 and math.abs(z - (10 - clear)) < 1e-3
+		and nz == -1, `{x} {z}`)
+	x, z, nx, nz = HouseRoute.slide(g, 0, 0, 3, 5, clear)
+	check("…a way short of it: all of it, nothing held", x == 3 and z == 5 and nx == 0 and nz == 0)
+	x, z = HouseRoute.slide(g, 0, 9.5, 2, 15, clear) -- (a start already within Clear of it)
+	check("…from within Clear of it: never deeper in, along it as ever", z <= 9.5 + 1e-6 and math.abs(x - 2) < 1e-6, `{x} {z}`)
+	x, z = HouseRoute.slide(g, 0, 9.5, 0, 0, clear)
+	check("…and out of it freely", x == 0 and z == 0)
+	-- the real plans: a thousand ways from open cells toward anywhere near; where he gets to is Clear off every slab
+	-- and the line there crosses none
+	local worst, crossed, ways = math.huge, 0, 0
+	for _, kind in { "house", "big" } do
+		for _, seed in kinds[kind] do
+			local plan = plans[seed * 10 + (if kind == "big" then 1 else 0)]
+			local grid = HouseRoute.grid(plan) :: HouseRoute.Grid
+			HouseRoute.block(grid, {})
+			math.randomseed(seed)
+			local function between(a: number, b: number): number
+				return a + (b - a) * math.random()
+			end
+			for _ = 1, 150 do
+				local fx = between(plan.min.X, plan.max.X)
+				local fz = between(plan.min.Z, plan.max.Z)
+				if not HouseRoute.open(grid, fx, fz) then
+					continue
+				end
+				local angle = between(0, 2 * math.pi)
+				local reach = between(0.5, 6)
+				local tx, tz = fx + math.cos(angle) * reach, fz + math.sin(angle) * reach
+				local sx, sz = HouseRoute.slide(grid, fx, fz, tx, tz, clear)
+				ways += 1
+				for _, w in grid.walls do
+					local dx = math.max(w.x0 - sx, 0, sx - w.x1)
+					local dz = math.max(w.z0 - sz, 0, sz - w.z1)
+					worst = math.min(worst, math.max(dx, dz))
+				end
+				if not HouseRoute.sees(grid, fx, fz, sx, sz) then
+					crossed += 1
+				end
+			end
+		end
+	end
+	check(`9.0 slide on every layout: {ways} ways, where he gets to Clear ({clear}) studs off every wall slab, never across one`,
+		ways > 500 and worst >= clear - 1e-3 and crossed == 0, `{worst} off at least, {crossed} across`)
+end
+
 if failures == 0 then
 	print("ALL CHECKS PASSED")
 else
