@@ -43,7 +43,8 @@ end
 --                                      the FOR SALE price picker, the buy question; a window too, the STOCK list's 🏷
 --                                      opens its picker and closing that goes back to the list) and 8.8's AuctionUi (the
 --                                      Auction House's window: it starts nothing while Config.Auction.On is false),
---                                      8.9's VillageTraffic (the D5's cars, this screen's only):
+--                                      8.9's VillageTraffic (the D5's cars, this screen's only), 9.1's DrivePedals (GAS
+--                                      and BRAKE while you drive: a touch screen's driving buttons, a computer's feet):
 --                                      each started only when it is there; 8.7's TradePrompts (the trade prompts on
 --                                      your own stands hidden, a big sale's chat line) next to CargoPrompts
 -- 8.5.1: Studio kept old scripts after a sync? This side's stamp (client/BuildStamp.luau) against the shared Config's
@@ -127,7 +128,7 @@ if Config.Sandbox.On then
 	-- The sandbox's own modules (other workers write them at the same time): only when they are there, and one that
 	-- fails to load is skipped with a warning.
 	local own: { { name: string, module: any } } = {}
-	for _, name in { "SandboxHud", "WarehouseUi", "SandboxGuide", "UpgradeUi", "CollectionBookUi", "SandboxTasksUi", "MoveHelperCard", "DannyOrders", "OfferCard", "VanPaintUi", "TradeUi", "AuctionUi", "VillageTraffic" } do -- (8.1: the UPGRADES desk's window; 8.2: the collection book, the TASKS panel; 8.3: Danny's command card, a visitor's offer, the PAINT shop; 8.5: Danny's clipboard, orders mode; 8.7: trading between players; 8.8: the Auction House's window, only while Config.Auction.On; 8.9: the D5's cars, Jinočany)
+	for _, name in { "SandboxHud", "WarehouseUi", "SandboxGuide", "UpgradeUi", "CollectionBookUi", "SandboxTasksUi", "MoveHelperCard", "DannyOrders", "OfferCard", "VanPaintUi", "TradeUi", "AuctionUi", "VillageTraffic", "DrivePedals" } do -- (8.1: the UPGRADES desk's window; 8.2: the collection book, the TASKS panel; 8.3: Danny's command card, a visitor's offer, the PAINT shop; 8.5: Danny's clipboard, orders mode; 8.7: trading between players; 8.8: the Auction House's window, only while Config.Auction.On; 8.9: the D5's cars, Jinočany; 9.1: the drive pedals)
 		local found = Client:FindFirstChild(name)
 		if found and found:IsA("ModuleScript") then
 			local ok, module = pcall(function(): any
@@ -289,6 +290,20 @@ if Config.Sandbox.On then
 	end
 	KeyHints.covered = function(): boolean
 		return CameraRig.mouseNeeded() or Hud.resultOpen()
+	end
+	-- 9.1 the drive pedals step aside while a window, a menu or the result card covers the game; a visitor's offer card
+	-- is no reason (they keep clear of each other: client/OfferCard.luau, client/DrivePedals.luau)
+	local Pedals = ownModule("DrivePedals")
+	if type(Pedals) == "table" then
+		Pedals.covered = function(): boolean
+			for _, module in windows do
+				if module ~= OfferCard and ownOpen(module) then
+					return true
+				end
+			end
+			return Hud.anyWindowOpen() or AdminPanel.isOpen() or CrewPanel.isOpen() or MovingHud.isOpen() or MoveLobbyUi.isOpen()
+				or QuickChat.isOpen() or Hud.resultOpen()
+		end
 	end
 
 	-- The State: the HUD (its old money line is hidden: SandboxHud shows the money), the start screen, the key hints and

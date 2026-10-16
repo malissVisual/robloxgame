@@ -52,6 +52,9 @@ offer card with a player's offer (OfferCard's queue) and the STOCK list's 🏷 (
 show and no FOR SALE sign, a player's offer: the real SandboxHintsUi beside SandboxHud, DannyOrders, OfferCard, TradeUi):
 sandboxhints.luau: when each comes, once, held back while a window covers the screen, the device's words, their toasts
 at 844 x 390, 667 x 375, 1280 x 800 and 1920 x 1080 clear of the rest; the guide's sell step in sandboxguide.luau.
+9.1 the drive pedals (the real DrivePedals beside the HUD's pieces and the real OfferCard: drivepedals.luau) on phones
+held sideways and upright, tablets and computers: shown only in your own driver's seat with the HUD up, clear of the touch
+controls, the speed and the offer card, held to drive on a touch screen, the feet and a gamepad's R2 / L2 on a computer.
 """
 import argparse
 from pathlib import Path
@@ -377,3 +380,14 @@ from keyhintsenv import keyhints_env  # noqa: E402
 with tempfile.TemporaryDirectory() as folder:
     keyhints_env(Path(folder))
     subprocess.run([args.luau, "keyhints.luau"], cwd=folder, check=True)
+# 9.1 the drive pedals (client/DrivePedals.luau with shared/PedalRules.luau: GAS and BRAKE while you drive) beside the
+# HUD's pieces where client/Hud.luau puts them and the real client/OfferCard.luau: tools/phone-ui/drivepedals.luau on
+# phones held sideways and upright, tablets and computers (drivepedalsenv.py builds the folder; drivepedals_preview.py
+# draws the same scenes): when they show, clear of the jump button, the thumbstick, EXIT, the speed and the fuel and a
+# visitor's offer card, a finger's size, held to drive on a touch screen (two touches, sliding), the feet and the mouse
+# on a computer, a gamepad's R2 / L2, the press drawn and eased back, no warnings.
+from drivepedalsenv import drivepedals_env  # noqa: E402
+
+with tempfile.TemporaryDirectory() as folder:
+    drivepedals_env(Path(folder))
+    subprocess.run([args.luau, "drivepedals.luau"], cwd=folder, check=True)
