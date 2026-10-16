@@ -196,6 +196,19 @@
 > setdown; PUT IT DOWN the same down); a piece nobody can get to is refused at assignment. Players can't pick through
 > walls either (the pieces' prompts need line of sight, `Moving.walled` checks it on the server), and his list's
 > markers no longer show through walls.
+>
+> **8.9.4** (the owner: "Danny carries better, but only when I walk backwards … when I walk forwards he can't walk
+> backwards", "and he still teleports", a screenshot of Danny standing in the Sofa and one of the owner lying across
+> it): carrying in two no longer ties Danny's body to yours. The hold's AlignPosition and AlignOrientation have one
+> attachment each, the holder's own, and the server sets their goals from the piece every Heartbeat
+> (`server/PairHold.luau`), so the two machines no longer fight over one mechanism (the side-to-side teleports, your
+> body tipped over the piece). Danny stays at the piece's far end and never stands in it (`MoveHelperBrain.endLead`:
+> no lead into the piece, his hands reach for the edge instead), walks backwards when you walk forwards, and inside a
+> house slides along the walls instead of through them (`HouseRoute.slide`). Your walk eases in and is held back so the
+> piece never runs into him on your screen, also at a wall (`PairCarry`, `client/PairSteer.luau`: PairStart,
+> PairKeep, PairWall). One put-down: while you carry in two only the piece's own G Put down prompt shows (no PUT IT
+> DOWN pill), and Danny's card reads "Carrying: Sofa with you" like his bubble. A crew mate holding the far end gets
+> the same hold.
 
 The active Roblox game in this repository (Merge Blades is preserved in `../archive/merge-blades`). **You run a delivery company** in a world
 gone wrong: take a job, carry the cargo to your vehicle with your own hands (or lead the horses on a rope), drive it
