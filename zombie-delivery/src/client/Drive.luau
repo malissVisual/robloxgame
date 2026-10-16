@@ -22,6 +22,11 @@
 -- carve (its way follows its nose a touch later).
 -- 6.16: Drive.throttle() says the driver's throttle (-1 … 1) for the engine's note (client/Sounds.luau); only read, the
 -- driving is as it was.
+-- 9.1, the drive pedals (client/DrivePedals.luau): Drive.setPedal(value) is the on-screen pedals' input (-1 … 1: BRAKE
+-- brakes, then backs up, as S does; GAS forward; 0 none held). While it is not 0 it wins over the seat's throttle and
+-- the keys; everything after it stays (the open back holds the car, the fuel, a bike's and a scooter's own handling).
+-- Drive.foot() says the driver's foot this step (the pedal, the seat's throttle: W / S, R2 / L2, the thumbstick, or
+-- the keys) before the open back holds the car: the pedals show it.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -39,6 +44,8 @@ local player = Players.LocalPlayer
 local speed = 0 -- signed, along the nose
 local steerInput = 0
 local throttleInput = 0 -- 6.16: the driver's throttle (-1 … 1) this step
+local pedalInput = 0 -- 9.1: the on-screen pedals' (client/DrivePedals.luau), -1 … 1; 0: none held
+local footInput = 0 -- 9.1: the driver's foot this step, before the open back holds the car
 local boostUntil = 0
 local boostMultiplier = 1
 local backToldAt = -math.huge -- the "close the back" toast, at most every few seconds
@@ -182,6 +189,21 @@ function Drive.throttle(): number
 	return throttleInput
 end
 
+-- 9.1: the on-screen pedals held (client/DrivePedals.luau): -1 … 1, 0 when none is (anything else counts as 0).
+function Drive.setPedal(value: number)
+	pedalInput = if type(value) == "number" and value == value then math.clamp(value, -1, 1) else 0
+end
+
+function Drive.pedal(): number
+	return pedalInput
+end
+
+-- 9.1: -1 … 1, the driver's foot this step (the pedal, the seat, the keys) before the open back holds the car; 0 when
+-- nobody drives.
+function Drive.foot(): number
+	return footInput
+end
+
 function Drive.boosting(): boolean
 	return os.clock() < boostUntil
 end
@@ -229,6 +251,7 @@ local function step(dt: number)
 	local car = Drive.myCar()
 	local chassis = car and car.PrimaryPart
 	throttleInput = 0
+	footInput = 0
 	if not car or not chassis then
 		speed = 0
 		return
@@ -243,12 +266,15 @@ local function step(dt: number)
 	local throttle, steer = 0, 0
 	if Drive.isDriving() then
 		throttle, steer = seat.ThrottleFloat, seat.SteerFloat
-		if throttle == 0 then
+		if pedalInput ~= 0 then
+			throttle = pedalInput -- 9.1: an on-screen pedal held wins (the rules below still hold it)
+		elseif throttle == 0 then
 			throttle = keyAxis({ Enum.KeyCode.W, Enum.KeyCode.Up }, { Enum.KeyCode.S, Enum.KeyCode.Down })
 		end
 		if steer == 0 then
 			steer = keyAxis({ Enum.KeyCode.D, Enum.KeyCode.Right }, { Enum.KeyCode.A, Enum.KeyCode.Left })
 		end
+		footInput = throttle
 		-- 3.2: the back is open: the car stays where it is.
 		if throttle ~= 0 and car:GetAttribute("BackOpen") == true then
 			throttle = 0

@@ -15,7 +15,8 @@
 --     stands hidden) right after CargoPrompts, TradeUi (trading between players) a window like the others, the STOCK
 --     list's 🏷 opening its price picker and the picker going back to the list; 9.0: the camera's cursor free unless a
 --     weapon is in the hands (CameraRig.aimOnly, CameraRig.armed: tests/camerarig_test.luau runs the rig itself), the
---     city's never. Run with tests/run_tests.py.
+--     city's never; 9.1: the drive pedals (DrivePedals) start with the own modules and step aside under a window or the
+--     result card, not for a visitor's offer card. Run with tests/run_tests.py.
 
 local Config = require("./Config")
 local ClientMain = require("./ClientMain")
@@ -447,6 +448,25 @@ do -- 8.8 the Auction House's window alone (a window like the others): open, it 
 	check("… opening it closes the PAINT shop's window but not itself", type(onOpen) == "function" and called(run, "VanPaintUi.close") and not called(run, "AuctionUi.close"))
 	run.modules.Hud.onCloseWindows()
 	check("… ESC (the HUD's close) closes it like the others", called(run, "AuctionUi.close"))
+end
+
+do -- 9.1 the drive pedals: started with the sandbox's own modules; they step aside under a window, not for an offer card
+	local run = boot(true, { DrivePedals = "ok", OfferCard = "ok" }, true)
+	check("9.1 the drive pedals start with the sandbox's own modules", called(run, "DrivePedals.start"))
+	local covered = run.modules.DrivePedals.covered
+	check("… with Main's covered check", type(covered) == "function")
+	check("… a visitor's offer card open alone does not hide them (they keep clear of each other)", type(covered) == "function" and covered() == false
+		and run.modules.CameraRig.windowOpen() == true)
+	local withWindow = boot(true, { DrivePedals = "ok", OfferCard = "ok", WarehouseUi = "ok" }, true)
+	local covered2 = withWindow.modules.DrivePedals.covered
+	check("… a sandbox window (the warehouse's picker) open hides them", type(covered2) == "function" and covered2() == true)
+	local plain = boot(true, { DrivePedals = "ok" }, false)
+	local covered3 = plain.modules.DrivePedals.covered
+	check("… nothing open: they show", type(covered3) == "function" and covered3() == false)
+	plain.modules.Hud.resultOpen = function()
+		return true
+	end
+	check("… the result card open: they step aside", covered3() == true)
 end
 
 do -- none of the sandbox's own modules there yet (the other workers' branches not merged)
