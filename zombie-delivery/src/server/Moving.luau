@@ -228,7 +228,8 @@ local Moving = {}
 local remote = Net.get("Moving")
 local notice = Net.get("Notice")
 local TAG = "MovePrompt" -- client/MovingHud.luau shows a tagged prompt only to the players it is for
-local CARRY_ATTRIBUTES = { "Carrying", "CarryCount", "CarryHands", "CarryAt", "CarrySize", "CarrySpeed", "MoveCarry", "CarryGrip", "PairTurn", "CarryPair" } -- (7.0 grip: CarryGrip; 8.1: PairTurn; 8.3: CarryPair)
+local CARRY_ATTRIBUTES = { "Carrying", "CarryCount", "CarryHands", "CarryAt", "CarrySize", "CarrySpeed", "MoveCarry", "CarryGrip", "PairTurn", "CarryPair",
+	"PairWith", "PairFar", "PairWall" } -- (7.0 grip: CarryGrip; 8.1: PairTurn; 8.3: CarryPair; 9.0 the far end's holder: PairWith, PairFar, PairWall)
 
 -- The art (another branch builds it): shared/FurnitureLooks.luau (Items, build), shared/HouseLayout.luau (plan),
 -- server/HouseInterior.luau (build, slot, destroy).

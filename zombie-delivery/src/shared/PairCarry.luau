@@ -9,6 +9,14 @@
 -- behind the facing is walked backwards (facing the piece and the partner, the leader at the front of the movement)
 -- and needs no turn at all; a way ahead is walked forwards (the partner backwards). The walk is slower while the
 -- heading turns (× PairTurnWalk at PairTurnFull degrees off or more, less slow in between).
+-- 9.0 (the owner, 8.9.3: "When I want to walk forwards, Danny can't walk backwards"; tests/movehelper_backwards_runtime_
+-- test.luau): the partner is shown on the leader's screen a moment late (the server holds him; Danny's lead makes that
+-- up once the walk is under way), so a walk at once from standing ran the piece into him before he could step back on
+-- that screen (2.4 studs into his body at a ping of 0.15 s). The walk eases in over PairStart s from standing, and again
+-- when the way turns round (forwards to backwards at once): PairCarry.started; that start waits while the leader's own
+-- screen shows the partner nearer than their place (PairCarry.waits: the server's lead has not caught up yet), and the
+-- piece is never pushed into them as that screen shows them (PairCarry.keep), nor them into a wall of the house
+-- (PairCarry.wall: the server's PairWall).
 -- Angles in radians, Roblox's yaw: CFrame.Angles(0, yaw, 0) looks along (−sin yaw, 0, −cos yaw).
 --   PairCarry.wrap(a)                          a in −π … π
 --   PairCarry.yawOf(x, z)                      the yaw looking along (x, z) (flat)
@@ -19,10 +27,20 @@
 --   PairCarry.goal(want, back)                 where the heading goes: the way, or against it walking backwards
 --   PairCarry.walkFactor(off)                  × the pair's walk with the heading `off` radians from its goal
 --   PairCarry.newSteer(heading)                a leader's steering state (heading, back, off)
---   PairCarry.steer(state, x, z, dt, rate?)    one frame: the wanted way (x, z: Humanoid.MoveDirection; shorter than
+--   PairCarry.steer(state, x, z, dt, rate?, wait?)   one frame: the wanted way (x, z: Humanoid.MoveDirection; shorter than
 --                                              Still: none, the heading stays) turns state.heading (rate: radians a
 --                                              second, else PairTurn's), sets state.back and state.off; returns × the
---                                              pair's walk now
+--                                              pair's walk now (the turn's; 9.0 it keeps state.start too)
+--   PairCarry.started(state)                   9.0 × the pair's walk for the start: s walked since standing (or since
+--                                              the way turned round) / PairStart, 1 from then on
+--   PairCarry.keep(x, z, ox, oz, gap)          9.0 the walk (x, z) with the partner shown `gap` studs past their place
+--                                              (along (ox, oz), the way from the leader to it; < 0: nearer, the piece
+--                                              into them): the part toward them taken away from PairKeep.From studs
+--                                              nearer, all of it at PairKeep.Stop; returns the walk (x, z)
+--   PairCarry.waits(x, z, ox, oz, gap)         9.0 does the start wait (PairCarry.steer's `wait`): walking toward the
+--                                              partner shown more than PairKeep.Wait studs nearer than their place
+--   PairCarry.wall(x, z, wx, wz)               9.0 the walk (x, z) with the far end against a wall (wx, wz: the way into
+--                                              it × the share to take away, the server's PairWall): returns the walk
 --   PairCarry.boost(admin, kit)                × a carrier's walk from their AdminSpeed (1 … 4) and KitSpeed (1 … 2)
 --                                              attributes (anything else: 1)
 
@@ -38,6 +56,9 @@ export type Steer = {
 	heading: number, -- the carry's heading now (the leader's facing)
 	back: boolean, -- walking backwards
 	off: number, -- radians the heading is still off its goal (0: on it)
+	start: number, -- 9.0 s walked since standing or since the way turned round (PairStart at most)
+	wayX: number, -- 9.0 the way wanted at the last walking step (a unit; 0, 0: standing)
+	wayZ: number,
 }
 
 local function cfg(): any
@@ -82,13 +103,26 @@ function PairCarry.walkFactor(off: number): number
 end
 
 function PairCarry.newSteer(heading: number): Steer
-	return { heading = PairCarry.wrap(heading), back = false, off = 0 }
+	return { heading = PairCarry.wrap(heading), back = false, off = 0, start = 0, wayX = 0, wayZ = 0 }
 end
 
-function PairCarry.steer(state: Steer, x: number, z: number, dt: number, rate: number?): number
-	if math.sqrt(x * x + z * z) < STILL then
+function PairCarry.steer(state: Steer, x: number, z: number, dt: number, rate: number?, wait: boolean?): number
+	local length = math.sqrt(x * x + z * z)
+	if length < STILL then
 		state.off = 0
+		state.start, state.wayX, state.wayZ = 0, 0, 0 -- (9.0 standing: the next walk eases in)
 		return 1
+	end
+	-- 9.0 the start: from standing, or the way turned round at once (more than a right angle in one step); `wait`: it
+	-- waits this step (the partner not clear of the piece yet on this screen: PairCarry.waits), once begun (never held
+	-- at a standstill: the first step always goes)
+	local ux, uz = x / length, z / length
+	if ux * state.wayX + uz * state.wayZ < 0 then
+		state.start = 0
+	end
+	state.wayX, state.wayZ = ux, uz
+	if not wait or state.start <= 0 then
+		state.start = math.min(state.start + math.max(dt, 0), math.max(cfg().PairStart or 0, 0))
 	end
 	local want = PairCarry.yawOf(x, z)
 	state.back = PairCarry.backwards(state.heading, want, state.back)
@@ -96,6 +130,44 @@ function PairCarry.steer(state: Steer, x: number, z: number, dt: number, rate: n
 	state.heading = PairCarry.turn(state.heading, goal, rate or math.rad(cfg().PairTurn), dt)
 	state.off = math.abs(PairCarry.wrap(goal - state.heading))
 	return PairCarry.walkFactor(state.off)
+end
+
+function PairCarry.started(state: Steer): number
+	local full = cfg().PairStart or 0
+	if full <= 0 then
+		return 1
+	end
+	return math.clamp(state.start / full, 0, 1)
+end
+
+function PairCarry.keep(x: number, z: number, ox: number, oz: number, gap: number): (number, number)
+	local push = x * ox + z * oz
+	local k = cfg().PairKeep
+	local into = -gap - k.From
+	if gap ~= gap or into <= 0 or push <= 0 then
+		return x, z
+	end
+	local span = k.Stop - k.From
+	local share = if span > 0 then math.clamp(into / span, 0, 1) else 1
+	return x - ox * push * share, z - oz * push * share
+end
+
+function PairCarry.waits(x: number, z: number, ox: number, oz: number, gap: number): boolean
+	return gap == gap and gap < -cfg().PairKeep.Wait and x * ox + z * oz > 0
+end
+
+function PairCarry.wall(x: number, z: number, wx: number, wz: number): (number, number)
+	local size = math.sqrt(wx * wx + wz * wz)
+	if size ~= size or size < 1e-3 then
+		return x, z
+	end
+	local ux, uz = wx / size, wz / size
+	local push = x * ux + z * uz
+	if push <= 0 then
+		return x, z
+	end
+	local share = math.min(size, 1)
+	return x - ux * push * share, z - uz * push * share
 end
 
 function PairCarry.boost(admin: any, kit: any): number

@@ -169,6 +169,59 @@ do
 	check("the same second at 60 or 20 frames: the same turn", near(a.heading, b.heading, 1e-9) and near(a.heading, -RATE, 1e-9), `{a.heading} {b.heading}`)
 end
 
+-- 9.0 the start, the partner as the leader's screen shows them, the wall (the owner, 8.9.3: "When I want to walk forwards,
+-- Danny can't walk backwards"; tests/movehelper_backwards_runtime_test.luau plays them with the real server) -----------------
+
+do
+	local K = H.PairKeep
+	local s = PairCarry.newSteer(0)
+	local x, z = way(0) -- (forwards: toward the partner)
+	PairCarry.steer(s, 0, 0, DT)
+	check("9.0 standing: no start yet", PairCarry.started(s) == 0)
+	local t, last, rising = 0, 0, true
+	while PairCarry.started(s) < 1 and t < 5 do
+		PairCarry.steer(s, x, z, DT)
+		t += DT
+		rising = rising and PairCarry.started(s) >= last
+		last = PairCarry.started(s)
+	end
+	check("9.0 the walk eases in from standing over PairStart s (never at once)", H.PairStart > 0 and near(t, H.PairStart, DT + 1e-9) and rising, t)
+	local rx, rz = way(PI)
+	PairCarry.steer(s, rx, rz, DT)
+	check("…the way turned round at once (forwards to backwards): it eases in again", PairCarry.started(s) < 0.1, PairCarry.started(s))
+	for _ = 1, 30 do
+		PairCarry.steer(s, rx, rz, DT)
+	end
+	local was = PairCarry.started(s)
+	for _ = 1, 30 do
+		PairCarry.steer(s, rx, rz, DT, nil, true)
+	end
+	check("…`wait` (the partner not clear of the piece yet on the leader's screen): the start waits, the walk never slows for it",
+		near(PairCarry.started(s), was) and was > 0)
+	PairCarry.steer(s, 0, 0, DT)
+	check("…standing again: from the start", PairCarry.started(s) == 0)
+	-- the partner shown `gap` studs past their place along (0, -1) (ahead of the leader: the way to them)
+	local ox, oz = 0, -1
+	check("9.0 waits: walking toward the partner shown more than PairKeep.Wait studs nearer than their place",
+		PairCarry.waits(0, -1, ox, oz, -(K.Wait + 0.01)) and not PairCarry.waits(0, -1, ox, oz, -(K.Wait - 0.01))
+		and not PairCarry.waits(0, 1, ox, oz, -1) and not PairCarry.waits(1, 0, ox, oz, -1) and not PairCarry.waits(0, -1, ox, oz, 0 / 0))
+	local kx, kz = PairCarry.keep(0, -1, ox, oz, -(K.From - 0.01))
+	check("9.0 keep: shown nearer than From studs, the walk as it was", kx == 0 and kz == -1)
+	kx, kz = PairCarry.keep(0, -1, ox, oz, -(K.From + K.Stop) / 2)
+	check("…between From and Stop: part of the walk toward them goes", kz > -1 and kz < 0 and kx == 0, kz)
+	kx, kz = PairCarry.keep(0.6, -0.8, ox, oz, -K.Stop - 1)
+	check("…Stop studs in or more: all of the walk toward them goes, the rest stays (sideways)", near(kz, 0) and near(kx, 0.6), `{kx} {kz}`)
+	kx, kz = PairCarry.keep(0, 1, ox, oz, -K.Stop - 1)
+	check("…a walk away from them: never touched", kx == 0 and kz == 1)
+	-- the wall: its way in (+X) × the share to take away
+	local wx, wz = PairCarry.wall(1, 0, 0.5, 0)
+	check("9.0 wall: half the walk into it goes at half a share", near(wx, 0.5) and near(wz, 0), wx)
+	wx, wz = PairCarry.wall(0.6, 0.8, 1, 0)
+	check("…all of it at a full share, along it as ever", near(wx, 0) and near(wz, 0.8), `{wx} {wz}`)
+	wx, wz = PairCarry.wall(-1, 0, 1, 0)
+	check("…away from it, or no wall: as it was", wx == -1 and wz == 0 and select(1, PairCarry.wall(1, 0, 0, 0)) == 1)
+end
+
 -- The far end's holder keeps up -----------------------------------------------------------------------------------------------
 
 do

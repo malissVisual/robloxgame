@@ -39,13 +39,34 @@ humanoid.MoveDirection = V3(0, 0, 0)
 humanoid.SeatPart = nil
 humanoid.Health = 100
 humanoid.Parent = character
+local moved: any = nil -- 9.0 the last Humanoid:Move this module made (this physics step's walk)
+humanoid.Move = function(self: any, direction: any, _relative: boolean)
+	moved = direction
+	self.MoveDirection = direction
+end
 local playerAttributes: { [string]: any } = {}
 local localPlayer = { Character = character, GetAttribute = function(_: any, name: string): any
 	return playerAttributes[name]
 end }
+-- 9.0 the far end's holder: Danny's body in workspace.Npcs (its MoveHelper attribute his id), a crew mate's character
+local npcs = M.Instance.new("Folder")
+npcs.Name = "Npcs"
+local dannyBody = M.Instance.new("Model")
+dannyBody.Name = "Danny"
+dannyBody:SetAttribute("MoveHelper", -7)
+local dannyRoot = M.Instance.new("Part")
+dannyRoot.Name = "HumanoidRootPart"
+dannyRoot.CFrame = M.CFrame.new(0, 3, -9)
+dannyRoot.Parent = dannyBody
+dannyBody.Parent = npcs
+local fakeWorkspace = { FindFirstChild = function(_: any, name: string): any
+	return if name == "Npcs" then npcs else nil
+end }
 local game = { GetService = function(_: any, name: string): any
 	if name == "Players" then
-		return { LocalPlayer = localPlayer }
+		return { LocalPlayer = localPlayer, GetPlayerByUserId = function(_: any, _id: number): any
+			return nil -- (Danny's id is no player's)
+		end }
 	elseif name == "RunService" then
 		return { PreSimulation = { Connect = function() end } }
 	end
@@ -55,7 +76,7 @@ local game = { GetService = function(_: any, name: string): any
 end }
 local PairSteer = require("./PairSteerClient")(game, function(module: any): any
 	return require(`./{module.Name}`)
-end, M.CFrame)
+end, M.CFrame, M.typeof, M.Vector3, fakeWorkspace)
 
 local function heading(): number
 	local look = root.CFrame.LookVector
@@ -156,6 +177,74 @@ for _, name in { "MoveCarry", "CarrySpeed", "CarryPair" } do
 	character:SetAttribute(name, nil)
 end
 PairSteer.step(1 / 60)
+
+-- 9.0 (the owner, 8.9.3: "When I want to walk forwards, Danny can't walk backwards"; his screenshot of Danny inside the
+-- Sofa): your screen shows your partner late (the server holds him), the piece in your hands at once ------------------------
+
+local K = Config.MoveHelper.PairKeep
+character:SetAttribute("PairTurn", Config.MoveHelper.PairTurn)
+root.CFrame = M.CFrame.new(0, 3, 0) -- (facing -Z: Danny ahead of you across the piece)
+humanoid.MoveDirection = V3(0, 0, 0)
+PairSteer.step(1 / 60)
+local eased: { number } = {}
+for _ = 1, 8 do
+	humanoid.MoveDirection = V3(0, 0, -1) -- (forwards, toward him)
+	PairSteer.step(0.1)
+	table.insert(eased, PairSteer.walk())
+end
+check("9.0 standing, then forwards: the walk eases in over PairStart s (never at once from standing)", eased[1] < 0.3 and eased[3] > eased[1]
+	and eased[3] < 1 and eased[8] == 1, table.concat(eased, ", "))
+-- Danny's place in your root's frame (PairFar) and who he is (PairWith: his id, his body in workspace.Npcs)
+character:SetAttribute("PairWith", -7)
+character:SetAttribute("PairFar", V3(0, 0, -9))
+moved = nil
+humanoid.MoveDirection = V3(0, 0, -1)
+PairSteer.step(0.1)
+check("9.0 your screen shows him at his place: your walk toward him as it is", moved == nil and PairSteer.walk() == 1)
+dannyRoot.CFrame = M.CFrame.new(0, 3, -9 + K.Stop + 0.2) -- (shown nearer than his place: the piece into him on your screen)
+humanoid.MoveDirection = V3(0, 0, -1)
+PairSteer.step(0.1)
+check("9.0 …shown PairKeep.Stop studs nearer or more: your walk toward him goes (never the piece pushed into him on your screen)",
+	moved ~= nil and math.abs(moved.Z) < 1e-6, moved and moved.Z)
+moved = nil
+humanoid.MoveDirection = V3(1, 0, 0)
+PairSteer.step(0.1)
+local sideways = moved == nil
+moved = nil
+humanoid.MoveDirection = V3(0, 0, 1)
+PairSteer.step(0.1)
+check("9.0 …sideways or backwards (away from him): your walk as it is", sideways and moved == nil)
+humanoid.MoveDirection = V3(0, 0, 0)
+PairSteer.step(0.1)
+dannyRoot.CFrame = M.CFrame.new(0, 3, -9 + (K.Wait + K.From) / 2) -- (a little nearer: not yet into him)
+local held: { number } = {}
+for _ = 1, 4 do
+	moved = nil
+	humanoid.MoveDirection = V3(0, 0, -1)
+	PairSteer.step(0.1)
+	table.insert(held, PairSteer.walk())
+end
+check("9.0 …shown a little nearer from standing: the start waits for him (the walk held, not slowed), your walk untouched",
+	held[1] > 0 and held[4] == held[1] and moved == nil, table.concat(held, ", "))
+dannyRoot.CFrame = M.CFrame.new(0, 3, -9)
+-- his end against a wall of the house (the server's PairWall: the way into it × the share to take away)
+character:SetAttribute("PairWall", V3(0, 0, -1))
+moved = nil
+humanoid.MoveDirection = V3(0, 0, -1)
+PairSteer.step(0.1)
+local stopped = moved ~= nil and math.abs(moved.Z) < 1e-6
+character:SetAttribute("PairWall", V3(0, 0, -0.5))
+moved = nil
+humanoid.MoveDirection = V3(0.6, 0, -0.8)
+PairSteer.step(0.1)
+check("9.0 his end against a wall (PairWall): your walk into it goes (all of it at a full share, half at half), along it as ever",
+	stopped and moved ~= nil and math.abs(moved.Z + 0.4) < 1e-6 and math.abs(moved.X - 0.6) < 1e-6, moved and `{moved.X} {moved.Z}`)
+for _, name in { "PairTurn", "PairWith", "PairFar", "PairWall" } do
+	character:SetAttribute(name, nil)
+end
+humanoid.MoveDirection = V3(0, 0, 0)
+PairSteer.step(1 / 60)
+check("9.0 let go: your walk yours again", PairSteer.walk() == 1 and not PairSteer.steering())
 
 if failures == 0 then
 	print("ALL CHECKS PASSED")

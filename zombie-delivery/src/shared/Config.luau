@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "8.9.3"
+Config.Version = "8.9.4"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -6817,7 +6817,8 @@ Config.MoveStory = {
 --   PairLift), so that is the far end of its length; its turn, a square-ish piece, a lag never make it another end
 --   Edge               carrying in two, the hands of both (yours and the far end's: client/ArmPose.luau's box, the
 --                      CarryAt / CarrySize attributes) on its end's edge at its grips' height: Width across at most,
---                      Height, Depth (studs)
+--                      Height, Depth (studs); 9.0 Reach: studs his hands reach on toward it at most, following you (his
+--                      body never in the piece: HoldLead.In)
 --   8.1 carrying in two (the owner: "when I turn around he teleports … we must walk, like, backwards and slowly"; shared/
 --   PairCarry.luau the leader's steering, MoveHelperBrain.holdSpeed / holdTrack the far end's holder, server/PairHold.luau
 --   the constraints; Danny and a crew mate who helps lift alike):
@@ -6857,7 +6858,25 @@ Config.MoveStory = {
 --                      and the lead changes Rate studs a second at most (it was your root's velocity, taken at once: a
 --                      step back, a turn's step aside, an uneven look at you threw his aim up to Far × 2 studs across in
 --                      a tenth of a second, and he ran there)
---   RunHint            carrying in two (the character attribute CarryPair on both players, server/Moving.luau setHands)
+--   9.0 (the owner, 8.9.3: "Danny carries better now, but only when I walk backwards. When I want to walk forwards,
+--   Danny can't walk backwards"; then "and he still teleports", a screenshot of Danny standing inside the Sofa):
+--   HoldLead.In        studs his lead may take him toward the piece's middle at most (0: his body never goes into the
+--                      piece, a stop after you walked backwards never leaves him in it; his hands reach on instead,
+--                      Edge.Reach); HoldLead.Back: s more of lead while he walks backwards himself (your screen may show
+--                      him later than the lead's guess: he stays clear of the piece, his hands reach on by it)
+--   PairStart          s the carry in two takes from standing to its full walk (client/PairSteer.luau, shared/PairCarry.
+--                      luau: the walk eases in, again after the way turns round): the far end's holder is shown on your
+--                      screen a moment late, and a start at once ran the piece into him before he could step back
+--   PairKeep           the far end's holder as YOUR screen shows him (the character attributes PairFar: his place in
+--                      your root's frame; PairWith: Danny's MoveHelperId, a crew mate's UserId): shown more than Wait
+--                      studs nearer than his place, your walk's start waits for him (shared/PairCarry.luau waits); From
+--                      studs nearer your walk toward him starts to go, all of it at Stop (keep): you never push the
+--                      piece into him, whatever the lag
+--   HoldWall           inside a house (its plan's wall slabs: shared/HouseRoute.luau slide) his place keeps Clear studs
+--                      off the walls, sliding along them, never through; held back by a wall (his lead looks ahead), the
+--                      leader's walk into that wall loses that many studs' share of Block (the character attribute
+--                      PairWall: client/PairSteer.luau takes it away): slowed as he nears the wall, stopped against it
+--   RunHint           carrying in two (the character attribute CarryPair on both players, server/Moving.luau setHands)
 --                      nobody runs: the walk is held at CarrySpeed (× the admin's and kit's boosts) every step, and the
 --                      run key or button says this once a carry
 --   PathRadius / PathHeight / PathSpacing   his paths (PathfindingService: never a jump, never a climb); PathAgain:
@@ -7026,8 +7045,11 @@ Config.MoveHelper = {
 	HoldLegs = { From = 0.8, To = 0.4, Band = 0.3 },
 	HoldCap = 40, -- 8.3 keeping up
 	HoldPace = { Fall = 0.5, Jump = 12 },
-	HoldLead = { Base = 0.06, Ping = 1, Most = 0.25, Far = 3, Smooth = 0.1, Rate = 5 }, -- (8.6 Rate)
-	Edge = { Width = 2.4, Height = 0.3, Depth = 0.6 }, -- 8.6
+	HoldLead = { Base = 0.06, Ping = 1, Most = 0.25, Far = 3, Smooth = 0.1, Rate = 5, In = 0, Back = 0.05 }, -- (8.6 Rate; 9.0 In, Back)
+	PairStart = 0.6, -- 9.0
+	PairKeep = { Wait = 0.1, From = 0.25, Stop = 0.8 }, -- 9.0
+	HoldWall = { Clear = 0.8, Block = 0.4 }, -- 9.0
+	Edge = { Width = 2.4, Height = 0.3, Depth = 0.6, Reach = 1.2 }, -- 8.6 (9.0 Reach)
 	RunHint = "Too heavy to run with",
 	PathRadius = 1.5,
 	PathHeight = 5,
