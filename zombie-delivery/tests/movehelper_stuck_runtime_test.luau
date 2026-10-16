@@ -354,6 +354,26 @@ Moving.parkVan = function(player: any, spot: any, _seat: boolean, carId: string?
 	E.cars[player] = car
 	return nil, car
 end
+-- 9.5 the countryside's kinds (shared/Layouts/Countryside.luau: "cabin", "lodge", "mill", "cottage"): a kind no house
+-- of the map has yet (the map's spots come with the countryside's map) is a move of its own on one of the map's other
+-- houses (not the farmstead, each its own): that house's contract the kind's for this test (Config.Moving.Sandbox.Houses,
+-- before Moving.start makes the contracts)
+do
+	local S = Config.Moving.Sandbox
+	local had: { [string]: boolean } = {}
+	for _, house in SandboxMap.Houses do
+		local own = S.Houses[house.id]
+		had[if own then own.Kind else house.kind] = true
+	end
+	local next = 2
+	for _, kind in { "cabin", "lodge", "mill", "cottage" } do
+		local house = SandboxMap.Houses[next]
+		if not had[kind] and house then
+			S.Houses[house.id] = { Client = "The Testers", Address = "the test's own", Blurb = "A move of the test's own.", Kind = kind, Time = 15 * 60 }
+			next += 1
+		end
+	end
+end
 Moving.start()
 local lines: { string } = {}
 MoveHelper.diagnose(true, function(line: string)
@@ -406,6 +426,15 @@ local all = { old = newHits(), new = newHits(), oldLegs = newHits(), newLegs = n
 local totals = { pops = 0, trips = 0, faded = 0, stuck = 0, noSpot = 0 }
 
 for index, house in SandboxMap.Houses do
+	-- (9.5: the house as its contract has it: its kind, a stand-in's named so)
+	do
+		local own = Config.Moving.Sandbox.Houses[house.id]
+		if own and own.Kind ~= house.kind then
+			house = table.clone(house)
+			house.name = `{house.name} as a {own.Kind}`
+			house.kind = own.Kind
+		end
+	end
 	local seed = if house.kind == "big" then bigSeed else houseSeeds[(index - 2) % #houseSeeds + 1]
 	local plot = plots[(index - 1) % #plots + 1]
 	local p = E.player(300 + index, `Crew{index}`, V3(plot.spawn.x, 3, plot.spawn.z))
@@ -642,7 +671,7 @@ print(string.format("AUDIT ALL: 9.3's walk %d steps, %d hits, %.2f studs off at 
 	all.new.steps, all.new.body + all.new.step, all.new.least, all.newLegs.body + all.newLegs.step, all.newLegs.least))
 print(string.format("RUN ALL: %d steps, %d hits, %d door trips (%d faded both ways), %d put elsewhere, stuck %.1f s at most",
 	all.runs.steps, all.runs.body + all.runs.step, totals.trips, totals.faded, totals.pops, totals.stuck))
-check("the six houses: 8.9.5's walk measured hitting walls (the cause), 9.3's none", all.old.body > 0 and all.new.body + all.new.step == 0 and totals.noSpot == 0)
+check("the six houses (9.5: every countryside kind among them): 8.9.5's walk measured hitting walls (the cause), 9.3's none", all.old.body > 0 and all.new.body + all.new.step == 0 and totals.noSpot == 0)
 
 if failures == 0 then
 	print("ALL CHECKS PASSED")

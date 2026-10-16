@@ -794,9 +794,12 @@ do
 		ann:GetAttribute("MoveHelper") == "offer" and type(ann:GetAttribute("MoveHelperPrice")) == "number" and #MoveHelper.find(ann).queue == 0, ann:GetAttribute("MoveHelper"))
 	check("…the analytics: FirstContract once, MoveStarted (solo)", H.steps(11).FirstContract == 1 and #H.events("MoveStarted", ann) == 1)
 	local bobCard = H.takeContract(bob, plots[2])
-	check("…Jinočany: Bob's card another house (never Ann's at once): the next free one, The Linden House on Hlavní, a family house",
-		bobCard ~= nil and bobCard.id == SandboxMap.Houses[2].id and bobCard.name == "The Linden House" and bobCard.address == "Hlavní 5"
-		and bobCard.time == Config.Moving.Sandbox.Houses[bobCard.id].Time and bobCard.items < card.items, bobCard and bobCard.id)
+	-- (9.5 the countryside: its contract's place and clock; a house of the map with none, until the countryside's map
+	-- brings the spots, the fallback's: its street, Config.Moving.Time)
+	check(`…Jinočany: Bob's card another house (never Ann's at once): the next free one, {SandboxMap.Houses[2].name}, smaller than the farmstead`,
+		bobCard ~= nil and bobCard.id == SandboxMap.Houses[2].id and bobCard.name == SandboxMap.Houses[2].name
+		and bobCard.address == (Config.Moving.Sandbox.Houses[bobCard.id] or { Address = SandboxMap.Houses[2].street }).Address
+		and bobCard.time == (Config.Moving.Sandbox.Houses[bobCard.id] or { Time = Config.Moving.Time }).Time and bobCard.items < card.items, bobCard and bobCard.id)
 	H.launch(bob)
 	local bobView = H.stateOf(bob)
 	check("…Bob's move too, at the same time: his own, his plot's drop-off, his own Danny", bobCard ~= nil and bobView ~= nil and bobView.id ~= view.id
@@ -1081,7 +1084,7 @@ do
 	S.auto[bob] = true
 	local bobHouse = H.houseOf(bob)
 	H.drive(bob, bobVan, H.toHouse(plots[2], bobHouse))
-	check("Bob: at his own house's curb (Jinočany: The Linden House on Hlavní, its back to its door)", bobHouse == SandboxMap.Houses[2]
+	check("Bob: at his own house's curb (Jinočany: SandboxMap.Houses[2], its back to its door)", bobHouse == SandboxMap.Houses[2]
 		and H.flat(bobVan.chassis.Position, V3(bobHouse.curb.x, 0, bobHouse.curb.z)) < 0.5
 		and H.flat(H.doorOf(bobVan).WorldPosition, V3(bobHouse.door.x, 0, bobHouse.door.z)) < H.flat(bobVan.chassis.Position, V3(bobHouse.door.x, 0, bobHouse.door.z)), bobVan.chassis.Position)
 	check("(Bob's back open)", H.setBack(bob, bobVan, true), E.lastNotice(bob))

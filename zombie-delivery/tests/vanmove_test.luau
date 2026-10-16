@@ -225,14 +225,16 @@ check("the sandbox's house: SandboxMap.House's id and name, 8.3 25 minutes and t
 	SandboxMap.House.id == "sandbox_house" and SandboxMap.House.name == "The Old Farmstead" and farmstead.Time == 25 * 60 and farmstead.Kind == "big"
 	and T.Sandbox.Horde == false and T.Sandbox.Roam == 0 and T.Sandbox.HordeAt > 0 and T.Sandbox.HordeAt < farmstead.Time
 	and #farmstead.Blurb <= Config.MoveStory.Limits.Blurb, `{#farmstead.Blurb} of {Config.MoveStory.Limits.Blurb}`)
+-- (9.5 the countryside: every contract, the six spots' by id; tests/sandboxhouses_test.luau matches them to the map)
 check("Jinočany: every house's contract (its Client and Blurb within the cards' limits, its clock past the horde's)", (function()
-	for _, h in SandboxMap.Houses do
-		local c = T.Sandbox.Houses[h.id]
-		if not c or #c.Blurb > Config.MoveStory.Limits.Blurb or #c.Client > Config.MoveStory.Limits.Client or c.Time <= T.Sandbox.HordeAt then
+	local n = 0
+	for _, c in T.Sandbox.Houses do
+		n += 1
+		if #c.Blurb > Config.MoveStory.Limits.Blurb or #c.Client > Config.MoveStory.Limits.Client or c.Time <= T.Sandbox.HordeAt then
 			return false
 		end
 	end
-	return true
+	return n == #SandboxMap.Houses and T.Sandbox.Houses[SandboxMap.House.id] ~= nil
 end)())
 check("the sandbox's van is the Sprinter, its bed set", Config.Sandbox.Van == "sprinter" and T.Beds[Config.Sandbox.Van] ~= nil)
 check("the house's front door looks out to the road, the van's curb between them (its back to the door)", (function()

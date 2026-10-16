@@ -29,6 +29,21 @@
 --                larch cladding, a window to its garden, a concrete fence and a slatted gate
 --     rich       (opts.rich: one of the six houses to empty; a row's opts.richUnit) a little more: the doorstep, the
 --                door's surround or canopy, a side and a gable window, the garden's fence round the back, the mailbox
+--   9.5 the countryside's spots (VillageLooks.Countryside; the places to empty in open country, Config.Village.Countryside:
+--   their front doors where a family house's is, so SandboxMap's door and curb ways hold; always as rich as they get,
+--   Budget's cabin, lodge, mill and cottage):
+--     "cabin"    the Pond Cabin, a timber fishing cabin: dark stained boards, a low pitched roof with wide eaves, a small
+--                veranda in front of the door (deck, posts, railings, its roof: reaching Countryside.Porch past the box's
+--                front edge at most), a stovepipe, a net and a lifebuoy on the wall, a lantern by the door
+--     "lodge"    the Forest Lodge, a forester's lodge: log walls on a stone plinth, the corner posts and the beam round
+--                their top, a steep wooden shingle roof, green shutters, antlers over the door, a stone chimney, a
+--                covered woodpile along a side wall
+--     "mill"     the Old Mill, a watermill: tall stone walls, a tall tiled roof with its gable to the front, a loft door
+--                and its hoist beam, its name over the door, the wooden water wheel and its chute on the right-hand side
+--                wall (seen from outside facing the door: the frame's +X), just outside the box (Countryside.Wheel at most)
+--     "cottage"  the Orchard Cottage: whitewash on a painted band, a thatched or a clay tile roof with a round ridge,
+--                flower boxes, a bench by the door, a little porch over it
+--   Each has the "House" walls (a block), one door tagged "door" in the middle of its front wall and a Mailbox.
 --   The landmarks (VillageLooks.landmark; plan.json landmarks' kinds, each in its rect, Config.Village.Facing):
 --     "chapel"   the green's chapel: a rendered nave (white or Maria Theresa yellow) with a slate gable, a round apse, the
 --                tower at its front with the round-arched door, the bell opening, a green copper or slate spire, the cross
@@ -110,6 +125,7 @@ local P = V.Palette
 
 VillageLooks.Budget = V.Budget
 VillageLooks.Houses = { "old", "row", "modern" }
+VillageLooks.Countryside = { "cabin", "lodge", "mill", "cottage" } -- (9.5 the countryside's spots' houses)
 VillageLooks.Landmarks = { "chapel", "green", "pond", "shop", "motorway", "barrier", "hardware" }
 VillageLooks.Trees = { "linden", "oak", "birch", "poplar", "willow", "fruit" }
 VillageLooks.Fields = { "rapeseed", "wheat", "ploughed", "young" }
@@ -251,6 +267,9 @@ end
 -- landmark, a tree or a field tile.
 function VillageLooks.budget(kind: string, units: number?, rich: boolean?): number
 	local B = V.Budget
+	if table.find(VillageLooks.Countryside, kind) then
+		return B[kind] -- (9.5 the countryside's spots: always as rich as they get)
+	end
 	local extra = if rich then B.Rich - (B[kind] or B.Rich) else 0
 	if kind == "row" then
 		return B.row * (units or 1) + extra
@@ -516,7 +535,254 @@ local function modernHouse(k: Kit, f: Frame, roll: () -> number, rich: boolean)
 	put(k, "Mailbox", { 1.4, 1.2, 0.6 }, { -gate * (from + 2), 3.2, zf + 0.55 }, P.Anthracite, "Metal")
 end
 
--- A house's pieces in its frame (VillageLooks.frame(box, yaw)). kind: "old" | "row" | "modern"; seed: its dice
+-- ── 9.5 the countryside's spots ─────────────────────────────────────────────
+-- The places to empty in open country (Config.Village.Countryside, its Budget's): their front door where a family
+-- house's is (the body's front wall Config.Village.Front in from the box's front edge, the door in its middle), so
+-- SandboxMap's door and curb ways work for them as for the family houses; always as rich as they get.
+
+-- A gable roof as gableRoof's, its materials, eaves and slabs its own: the attic's two wedges (`gable` in `gableMat`),
+-- the two slabs (`roof` in `roofMat`, `slab` thick, `eave` over the walls, `verge` over the gables) and the ridge (a
+-- round one: a cylinder along it). Returns the rise over the walls.
+local function spotRoof(k: Kit, W: number, D: number, h: number, zc: number, along: string, pitch: number, gable: { number }, gableMat: string, roof: { number }, roofMat: string, eave: number, verge: number, slab: number, round: boolean): number
+	local half = if along == "x" then D / 2 else W / 2
+	local rise = half * math.tan(pitch)
+	local deg = math.deg(pitch)
+	local L = (half + eave) / math.cos(pitch)
+	local y = h + rise - (L / 2) * math.sin(pitch) + (slab / 2) * math.cos(pitch)
+	local out = (L / 2) * math.cos(pitch) + (slab / 2) * math.sin(pitch)
+	local top = h + rise + slab * math.cos(pitch) + 0.2
+	local ridge = shade(roof, -22)
+	if along == "x" then
+		put(k, "Gable", { W, rise, half }, { 0, h + rise / 2, zc + half / 2 }, gable, gableMat, { shape = "Wedge", turn = { 0, 180, 0 }, solid = true })
+		put(k, "Gable", { W, rise, half }, { 0, h + rise / 2, zc - half / 2 }, gable, gableMat, { shape = "Wedge", solid = true })
+		for _, s in { 1, -1 } do
+			put(k, "Roof", { W + 2 * verge, slab, L }, { 0, y, zc + s * out }, roof, roofMat, { turn = { s * deg, 0, 0 }, solid = true })
+		end
+		if round then
+			put(k, "Ridge", { W + 2 * verge + 0.2, 1.1, 1.1 }, { 0, top - 0.2, zc }, ridge, roofMat, { shape = "Cylinder" })
+		else
+			put(k, "Ridge", { W + 2 * verge + 0.2, 0.5, 1 }, { 0, top, zc }, ridge, roofMat)
+		end
+	else
+		for _, s in { 1, -1 } do
+			put(k, "Gable", { D, rise, half }, { s * half / 2, h + rise / 2, zc }, gable, gableMat, { shape = "Wedge", turn = { 0, -s * 90, 0 }, solid = true })
+		end
+		for _, s in { 1, -1 } do
+			put(k, "Roof", { L, slab, D + 2 * verge }, { s * out, y, zc }, roof, roofMat, { turn = { 0, 0, -s * deg }, solid = true })
+		end
+		if round then
+			put(k, "Ridge", { D + 2 * verge + 0.2, 1.1, 1.1 }, { 0, top - 0.2, zc }, ridge, roofMat, { shape = "Cylinder", turn = { 0, 90, 0 } })
+		else
+			put(k, "Ridge", { 1, 0.5, D + 2 * verge + 0.2 }, { 0, top, zc }, ridge, roofMat)
+		end
+	end
+	return rise
+end
+
+-- "cabin": the Pond Cabin, a timber fishing cabin: dark stained boards on a low plinth, a low pitched roof with wide
+-- eaves, a small veranda in front of the door (its deck, posts, railings and its own roof, reaching Porch past the
+-- box's front edge at most), the stovepipe through the roof, a net and a lifebuoy on the front wall, a lantern by the
+-- door, the mailbox (the jetty is the map's).
+local function cabinHouse(k: Kit, f: Frame, roll: () -> number)
+	local CS = V.Countryside
+	local w, d = f.w, f.d
+	local W = math.min(w - 4, 20)
+	local D = math.min(d - 5, 13)
+	local h = 8.2
+	local boards = pick(roll, CS.Stain)
+	local tar = pick(roll, CS.Tar)
+	local frame = pick(roll, P.Frames)
+	local stoveSide = if roll() < 0.5 then -1 else 1
+	local zf = d / 2 - V.Front
+	local zc = zf - D / 2
+	local deck = 0.5
+	put(k, "House", { W, h, D }, { 0, h / 2, zc }, boards, "WoodPlanks", SOLID)
+	put(k, "Plinth", { W + 0.3, deck, D + 0.3 }, { 0, deck / 2, zc }, P.Concrete, "Concrete", SOLID)
+	local rise = spotRoof(k, W, D, h, zc, "x", math.rad(24), boards, "WoodPlanks", tar, "Slate", 1.4, 0.8, SLAB, false)
+	put(k, "Door", DOOR, { 0, DOOR[2] / 2, zf + DOOR[3] / 2 }, pick(roll, P.Doors), "Wood", { tag = "door", solid = true })
+	for _, side in { -1, 1 } do
+		window(k, "Window", side * 5.2, 4.6, zf, 3.0, 3.4, frame)
+	end
+	-- the veranda: its deck, its posts, its railings (an opening at the door) and its lean-to roof
+	local vd = math.min(3.2, V.Front + CS.Porch - 0.5)
+	local vw = 12
+	local posts = shade(boards, -12)
+	put(k, "Deck", { vw, deck, vd }, { 0, deck / 2, zf + vd / 2 }, shade(boards, 20), "WoodPlanks", SOLID)
+	for _, s in { -1, 1 } do
+		put(k, "Post", { 0.35, 6.6, 0.35 }, { s * (vw / 2 - 0.2), deck + 3.3, zf + vd - 0.2 }, posts, "Wood", SOLID)
+		put(k, "Rail", { 0.2, 0.25, vd - 0.35 }, { s * (vw / 2 - 0.2), deck + 1.2, zf + (vd - 0.35) / 2 }, posts, "Wood")
+		local inner, outer = 2.6, vw / 2 - 0.375
+		put(k, "Rail", { outer - inner, 0.25, 0.2 }, { s * (inner + outer) / 2, deck + 1.2, zf + vd - 0.2 }, posts, "Wood")
+	end
+	put(k, "VerandaRoof", { vw + 0.6, 0.3, vd + 0.6 }, { 0, deck + 6.75, zf + vd / 2 + 0.1 }, tar, "Slate", { turn = { 8, 0, 0 }, solid = true })
+	-- the stovepipe through the back slope and its cap
+	local px, pz = stoveSide * W / 4, zc - D / 4
+	local surface = h + rise - (D / 4) * math.tan(math.rad(24))
+	local top = h + rise + 1.6
+	put(k, "Stovepipe", { top - (surface - 0.6), 0.7, 0.7 }, { px, (top + surface - 0.6) / 2, pz }, P.Iron, "Metal", { shape = "Cylinder", turn = { 0, 0, 90 } })
+	put(k, "PipeCap", { 1.0, 0.25, 1.0 }, { px, top + 0.1, pz }, P.Iron, "Metal")
+	-- on the front wall beyond the veranda: the net (one side), the lifebuoy (the other)
+	local edge = W / 2 - 1.3
+	put(k, "Net", { 2.0, 3.0, 0.15 }, { -edge, 4.0, zf + 0.075 }, { 62, 84, 66 }, "SmoothPlastic", { alpha = 0.3 })
+	local turn = { 0, 90, 0 }
+	put(k, "Lifebuoy", { 0.4, 1.9, 1.9 }, { edge, 4.6, zf + 0.2 }, CS.Buoy, "SmoothPlastic", { shape = "Cylinder", turn = turn })
+	put(k, "LifebuoyBand", { 2.0, 0.45, 0.42 }, { edge, 4.6, zf + 0.2 }, P.Trim, "SmoothPlastic")
+	put(k, "LifebuoyBand", { 0.45, 2.0, 0.42 }, { edge, 4.6, zf + 0.2 }, P.Trim, "SmoothPlastic")
+	put(k, "LifebuoyHole", { 0.46, 0.9, 0.9 }, { edge, 4.6, zf + 0.2 }, boards, "WoodPlanks", { shape = "Cylinder", turn = turn })
+	-- the lantern on its bracket by the door, the mailbox on the other side
+	put(k, "Bracket", { 0.15, 0.15, 0.6 }, { 2.9, 6.6, zf + 0.3 }, P.Iron, "Metal")
+	put(k, "Lantern", { 0.55, 0.8, 0.55 }, { 2.9, 6.15, zf + 0.6 }, CS.Lantern, "Neon")
+	put(k, "Mailbox", { 1.2, 1.2, 0.6 }, { -2.9, 4.4, zf + 0.3 }, P.Mailbox, "Metal")
+end
+
+-- "lodge": the Forest Lodge, a forester's lodge: a log body on a stone plinth, its corner posts and the beam round the
+-- top of its walls (the timbering), a steep roof of wooden shingles over plastered gables, green shutters, antlers over
+-- the door, a stone chimney, a covered woodpile along a side wall, the mailbox.
+local function lodgeHouse(k: Kit, f: Frame, roll: () -> number)
+	local CS = V.Countryside
+	local w, d = f.w, f.d
+	local W = math.min(w - 7, 22)
+	local D = math.min(d - 6.5, 16)
+	local h = 10
+	local logs = pick(roll, CS.Logs)
+	local shingles = pick(roll, CS.Shingles)
+	local shutters = pick(roll, CS.Shutters)
+	local stone = pick(roll, CS.Stone)
+	local frame = pick(roll, P.Frames)
+	local pileSide = if roll() < 0.5 then -1 else 1
+	local timber = shade(logs, -36)
+	local zf = d / 2 - V.Front
+	local zc = zf - D / 2
+	put(k, "House", { W, h, D }, { 0, h / 2, zc }, logs, "Wood", SOLID)
+	put(k, "Plinth", { W + 0.6, PLINTH, D + 0.6 }, { 0, PLINTH / 2, zc }, stone, "Granite", SOLID)
+	local rise = spotRoof(k, W, D, h, zc, "x", math.rad(50), pick(roll, P.Render), "Plaster", shingles, "WoodPlanks", 1.0, 0.8, 0.5, false)
+	for _, s in { -1, 1 } do
+		put(k, "Corner", { 0.6, h, 0.6 }, { s * (W / 2 - 0.2), h / 2, zf - 0.2 }, timber, "Wood")
+	end
+	put(k, "Beam", { W + 0.4, 0.5, 0.3 }, { 0, h - 0.25, zf + 0.15 }, timber, "Wood")
+	put(k, "Door", DOOR, { 0, DOOR[2] / 2, zf + DOOR[3] / 2 }, P.DarkWood, "Wood", { tag = "door", solid = true })
+	put(k, "Step", { DOOR[1] + 1.4, 0.4, 1.2 }, { 0, 0.2, zf + 0.6 }, stone, "Granite", SOLID)
+	-- the antlers over the door, on their plaque
+	put(k, "Plaque", { 1.0, 1.2, 0.2 }, { 0, 8.2, zf + 0.1 }, P.DarkWood, "Wood")
+	for _, s in { -1, 1 } do
+		put(k, "Antler", { 0.25, 1.6, 0.25 }, { s * 0.6, 8.9, zf + 0.3 }, CS.Bone, "SmoothPlastic", { turn = { 0, 0, -s * 35 } })
+	end
+	-- the windows and their shutters
+	local xw = math.min(W / 4 + 0.6, W / 2 - 3.2)
+	for _, side in { -1, 1 } do
+		window(k, "Window", side * xw, 5.2, zf, 3.0, 3.8, frame)
+		for _, s in { -1, 1 } do
+			put(k, "Shutter", { 1.4, 3.8, 0.15 }, { side * xw + s * 2.2, 5.2, zf + 0.075 }, shutters, "WoodPlanks")
+		end
+	end
+	-- the chimney through the back slope, on the woodpile's other side
+	local top = h + rise + 1.4
+	put(k, "Chimney", { 1.8, top - (h - 0.5), 1.8 }, { -pileSide * W / 4, (top + h - 0.5) / 2, zc - D / 4 }, stone, "Granite", SOLID)
+	-- the covered woodpile along a side wall
+	put(k, "Woodpile", { 2.2, 4.0, D - 3 }, { pileSide * (W / 2 + 1.1), 2.0, zc }, { 172, 130, 86 }, "Wood", SOLID)
+	put(k, "WoodpileRoof", { 2.9, 0.3, D - 2.2 }, { pileSide * (W / 2 + 1.35), 4.15, zc }, shingles, "WoodPlanks", { turn = { 0, 0, -pileSide * 12 } })
+	put(k, "Mailbox", { 1.0, 1.0, 0.5 }, { -2.8, 2.6, zf + 0.25 }, P.Mailbox, "Metal")
+end
+
+-- "mill": the Old Mill, an old watermill: tall stone walls, a tall tiled roof with its gable to the front (boarded),
+-- its name over the door, a loft door in the gable with the hoist beam over it (a rope, a sack), and its wooden water
+-- wheel on its RIGHT-HAND side wall (seen from outside facing the front door: the frame's +X), the wheel and the chute
+-- that feeds it from behind just outside the box (Wheel studs at most): its stream runs there.
+local function millHouse(k: Kit, f: Frame, roll: () -> number)
+	local CS = V.Countryside
+	local w, d = f.w, f.d
+	local W = math.min(w - 3, 21)
+	local D = math.min(d - 5, 21)
+	local h = 13
+	local stone = pick(roll, CS.Stone)
+	local tiles = pick(roll, P.Tiles)
+	local frame = pick(roll, P.Frames)
+	local boards = CS.Boards
+	local zf = d / 2 - V.Front
+	local zc = zf - D / 2
+	put(k, "House", { W, h, D }, { 0, h / 2, zc }, stone, "Granite", SOLID)
+	spotRoof(k, W, D, h, zc, "z", math.rad(42), boards, "WoodPlanks", tiles, "ClayRoofTiles", 1.0, 0.6, SLAB, false)
+	put(k, "Door", DOOR, { 0, DOOR[2] / 2, zf + DOOR[3] / 2 }, shade(boards, -20), "WoodPlanks", { tag = "door", solid = true })
+	put(k, "Step", { DOOR[1] + 1.2, 0.4, 1.2 }, { 0, 0.2, zf + 0.6 }, P.Concrete, "Concrete", SOLID)
+	put(k, "NameBoard", { 5.2, 1.0, 0.2 }, { 0, 8.4, zf + 0.1 }, P.DarkWood, "Wood", { text = "THE OLD MILL" })
+	for _, side in { -1, 1 } do
+		window(k, "Window", side * 6, 5.0, zf, 2.6, 3.2, frame)
+	end
+	window(k, "UpperWindow", 0, 10.6, zf, 2.4, 2.6, frame)
+	put(k, "Mailbox", { 1.2, 1.2, 0.6 }, { -3.0, 3.8, zf + 0.3 }, P.Mailbox, "Metal")
+	-- the loft door in the gable, the hoist beam over it, its rope and a sack on it
+	put(k, "LoftDoor", { 2.8, 3.4, 0.25 }, { 0, h + 2.3, zf + 0.12 }, shade(boards, -20), "WoodPlanks")
+	put(k, "HoistBeam", { 0.5, 0.5, 1.4 }, { 0, h + 5.6, zf + 0.7 }, P.DarkWood, "Wood")
+	put(k, "Rope", { 0.12, 2.4, 0.12 }, { 0, h + 4.2, zf + 1.0 }, { 196, 176, 130 }, "SmoothPlastic")
+	put(k, "Sack", { 0.9, 1.1, 0.7 }, { 0, h + 2.5, zf + 1.0 }, { 196, 168, 116 }, "SmoothPlastic")
+	-- the water wheel on the right-hand wall: its rim, its hub, its paddles (three boards across it), the axle into the
+	-- wall; the chute on its posts from behind over the wheel's top
+	local r = 5.2
+	local wx = W / 2 + 0.7 + 0.9
+	local wz = zc - 1
+	local wy = r + 0.1
+	put(k, "Wheel", { 1.8, 2 * r, 2 * r }, { wx, wy, wz }, boards, "WoodPlanks", { shape = "Cylinder", solid = true })
+	put(k, "Hub", { 2.2, 1.8, 1.8 }, { wx, wy, wz }, P.DarkWood, "Wood", { shape = "Cylinder" })
+	for n = 0, 2 do
+		put(k, "Paddle", { 2.0, 0.5, 2 * r + 0.2 }, { wx, wy, wz }, shade(boards, -16), "WoodPlanks", { turn = { n * 60, 0, 0 } })
+	end
+	put(k, "Axle", { wx - W / 2 + 0.2, 0.8, 0.8 }, { (W / 2 + wx) / 2 + 0.1, wy, wz }, P.Iron, "Metal", { shape = "Cylinder" })
+	local cy = wy + r + 0.5
+	local z0, z1 = -d / 2 + 0.2, wz + 1.5
+	put(k, "Chute", { 1.6, 0.9, z1 - z0 }, { wx, cy + 0.45, (z0 + z1) / 2 }, shade(boards, -10), "WoodPlanks", SOLID)
+	for _, z in { z0 + 0.6, (z0 + wz - r) / 2 } do
+		put(k, "ChutePost", { 0.4, cy, 0.4 }, { wx, cy / 2, z }, P.DarkWood, "Wood")
+	end
+end
+
+-- "cottage": the Orchard Cottage: a whitewashed cottage on its painted band, a thatched roof or a clay tile one (a
+-- round ridge either way), flower boxes under its windows, a bench by the door, the little porch over the door (its
+-- roof on two posts), a whitewashed chimney, the mailbox.
+local function cottageHouse(k: Kit, f: Frame, roll: () -> number)
+	local CS = V.Countryside
+	local w, d = f.w, f.d
+	local W = math.min(w - 6, 20)
+	local D = math.min(d - 6, 13)
+	local h = 8.6
+	local wash = pick(roll, CS.Whitewash)
+	local thatch = roll() < 0.5
+	local roof = if thatch then pick(roll, CS.Thatch) else pick(roll, CS.Terracotta)
+	local door = pick(roll, CS.Doors)
+	local flowers = pick(roll, CS.Flowers)
+	local frame = pick(roll, P.Frames)
+	local benchSide = if roll() < 0.5 then -1 else 1
+	local zf = d / 2 - V.Front
+	local zc = zf - D / 2
+	put(k, "House", { W, h, D }, { 0, h / 2, zc }, wash, "Plaster", SOLID)
+	put(k, "Plinth", { W + 0.3, 1.0, D + 0.3 }, { 0, 0.5, zc }, pick(roll, CS.Band), "Plaster", SOLID)
+	local rise = spotRoof(k, W, D, h, zc, "x", math.rad(if thatch then 45 else 40), wash, "Plaster", roof, if thatch then "Grass" else "ClayRoofTiles",
+		if thatch then 0.6 else 0.9, if thatch then 0.9 else 0.7, if thatch then 1.0 else SLAB, true)
+	local top = h + rise + 1.4
+	put(k, "Chimney", { 1.6, top - (h - 0.5), 1.6 }, { -benchSide * W / 4, (top + h - 0.5) / 2, zc - D / 6 }, wash, "Plaster", SOLID)
+	put(k, "Door", DOOR, { 0, DOOR[2] / 2, zf + DOOR[3] / 2 }, door, "Wood", { tag = "door", solid = true })
+	put(k, "Step", { DOOR[1] + 1.4, 0.4, 1.2 }, { 0, 0.2, zf + 0.6 }, P.Concrete, "Concrete", SOLID)
+	-- the porch: its little roof on two posts over the door
+	for _, s in { -1, 1 } do
+		put(k, "PorchPost", { 0.3, 7.9, 0.3 }, { s * 3.2, 3.95, zf + 1.15 }, P.DarkWood, "Wood", SOLID)
+	end
+	put(k, "PorchRoof", { 7.2, 0.3, 1.5 }, { 0, 8.05, zf + 0.72 }, roof, if thatch then "Grass" else "ClayRoofTiles", { turn = { 10, 0, 0 } })
+	-- the windows, their flower boxes
+	for _, side in { -1, 1 } do
+		window(k, "Window", side * 5.6, 4.6, zf, 2.8, 3.4, frame)
+		put(k, "FlowerBox", { 3.2, 0.6, 0.8 }, { side * 5.6, 2.6, zf + 0.4 }, P.DarkWood, "Wood")
+		put(k, "Flowers", { 3.0, 0.6, 0.6 }, { side * 5.6, 3.2, zf + 0.4 }, flowers, "SmoothPlastic")
+	end
+	-- the bench under one window, the mailbox on the door's other side
+	local bx = benchSide * 5.6
+	put(k, "Bench", { 3.0, 0.25, 1.0 }, { bx, 1.6, zf + 0.6 }, P.Bench, "Wood")
+	for _, s in { -1, 1 } do
+		put(k, "BenchLeg", { 0.25, 1.48, 0.9 }, { bx + s * 1.2, 0.74, zf + 0.6 }, P.Bench, "Wood")
+	end
+	put(k, "Mailbox", { 1.0, 1.0, 0.5 }, { -benchSide * 2.55, 4.6, zf + 0.25 }, P.Mailbox, "Metal")
+end
+
+-- A house's pieces in its frame (VillageLooks.frame(box, yaw)). kind: "old" | "row" | "modern" (9.5: or one of the
+-- countryside's spots, VillageLooks.Countryside: "cabin" | "lodge" | "mill" | "cottage", always rich); seed: its dice
 -- (VillageLooks.seedOf(id): the same house every time); opts.rich: one of the six houses to empty (a row's richUnit:
 -- which house of it); opts.units: a row's houses (default its width / RowUnit).
 function VillageLooks.house(kind: string, box: Box, yaw: number, seed: number, opts: Options?): { Piece }
@@ -531,6 +797,14 @@ function VillageLooks.house(kind: string, box: Box, yaw: number, seed: number, o
 		rowHouses(k, f, roll, n, if o.rich then o.richUnit or 1 else nil)
 	elseif kind == "modern" then
 		modernHouse(k, f, roll, o.rich == true)
+	elseif kind == "cabin" then
+		cabinHouse(k, f, roll)
+	elseif kind == "lodge" then
+		lodgeHouse(k, f, roll)
+	elseif kind == "mill" then
+		millHouse(k, f, roll)
+	elseif kind == "cottage" then
+		cottageHouse(k, f, roll)
 	else
 		error(`VillageLooks.house: no house kind "{kind}"`)
 	end

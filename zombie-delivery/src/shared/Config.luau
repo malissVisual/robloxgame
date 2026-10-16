@@ -6417,6 +6417,12 @@ Config.CarryGrip = {
 --                     19 – 26 pieces worth $5,700 – 14,000 at 90 % (Config.Collection's tuning), the farmstead Big.Spots
 --                     (34 – 40) and Big.Collectibles.Count (2 – 3), 36 – 43 pieces worth $10,200 – 21,300: about half
 --                     as much, so 15 minutes against the farmstead's 25 (tests/sandboxhouses_test.luau checks it)
+--                     9.5 the countryside (design/countryside/): the five family houses are gone; six spots in open
+--                     country instead, each a contract of its own: The Old Farmstead as ever, The Pond Cabin ("cabin"),
+--                     The Lone House ("house", a family house's plan), The Forest Lodge ("lodge"), The Old Mill ("mill")
+--                     and The Orchard Cottage ("cottage"): Kind its plan's (HouseLayout's; Config.Furniture.Countryside
+--                     the new kinds' pieces), Address a short place, not a street number ("by the Little Pond"), Time
+--                     by its size and its pieces (12 – 16 minutes: about the farmstead's minutes a piece)
 Config.Moving = {
 	Time = 12 * 60,
 	HordeAt = 3 * 60,
@@ -6508,7 +6514,8 @@ Config.Moving = {
 	Pack = { Support = 0.4, Level = 0.35, Contact = 7.5, Flush = 3.6, Waste = 4.2, Base = 0.3, Side = 0.45, Depth = 0.4, Dead = 2.4, High = 2.4, Headroom = 1.1, Probe = 1, Lie = true, Repack = true },
 	Sandbox = {
 		Icon = "🏡",
-		-- Jinočany step 1: a contract per house of SandboxMap.Houses (its id), the families and numbers made up
+		-- Jinočany step 1: a contract per house of SandboxMap.Houses (its id), the families made up (9.5: the countryside's
+		-- six spots)
 		Houses = {
 			sandbox_house = {
 				Client = "The Nováks", -- (The Hubers in the Alps)
@@ -6517,40 +6524,41 @@ Config.Moving = {
 				Kind = "big", -- 8.3: the big house's plan (shared/HouseLayout.luau, Config.Furniture.Big)
 				Time = 25 * 60, -- (8.3: the big house's, was 20 min: it takes several trips)
 			},
-			["Hlavní_n_5"] = {
-				Client = "The Dvořáks",
-				Address = "Hlavní 5",
-				Blurb = "A family house under the old linden. Grandma's things are going to the city: one trip or two home.",
-				Kind = "house",
+			-- 9.5 the countryside's spots (SandboxMap.Houses' ids; the families made up, Czech names, as ever)
+			pond_cabin = {
+				Client = "The Vodičkas",
+				Address = "by the Little Pond",
+				Blurb = "Grandpa's fishing cabin by the pond: rods, nets and an outboard motor. The motor is a two-person job.",
+				Kind = "cabin", -- (shared/Layouts/Countryside.luau: a timber fishing cabin, its bunk room and its store)
+				Time = 12 * 60,
+			},
+			lone_house = {
+				Client = "The Kopeckýs",
+				Address = "on Hill Road",
+				Blurb = "The last house up the hill before the woods. The Kopeckýs are moving to the city at last.",
+				Kind = "house", -- (a family house's plan, HouseLayout's "house")
+				Time = 16 * 60,
+			},
+			forest_lodge = {
+				Client = "The Lesáks",
+				Address = "in the Black Wood",
+				Blurb = "The old forester's lodge: antlers, a stuffed owl and a gun cabinet (empty, thank goodness).",
+				Kind = "lodge",
 				Time = 15 * 60,
 			},
-			["Hlavní_s_11"] = {
-				Client = "The Svobodas",
-				Address = "Hlavní 11",
-				Blurb = "The house with the blue gate, sold at last. Empty it before the new owners come.",
-				Kind = "house",
+			old_mill = {
+				Client = "The Mlynářs",
+				Address = "on the mill stream",
+				Blurb = "The old watermill still smells of flour. The spare millstone weighs a ton: grab a friend or Danny.",
+				Kind = "mill",
 				Time = 15 * 60,
 			},
-			["Školní_e_20"] = {
-				Client = "The Procházkas",
-				Address = "Školní 20",
-				Blurb = "The old schoolmaster's house, full of books and odd old things. Mind the fragile ones.",
-				Kind = "house",
-				Time = 15 * 60,
-			},
-			["Lidická_e_30"] = {
-				Client = "The Kučeras",
-				Address = "Lidická 30",
-				Blurb = "A family house with a rose garden. The Kučeras are moving out: bring everything home to your warehouse.",
-				Kind = "house",
-				Time = 15 * 60,
-			},
-			["Smetanova_w_84"] = {
-				Client = "The Horáks",
-				Address = "Smetanova 84",
-				Blurb = "The end house of the row on Smetanova, packed to the roof. Narrow doors: lift the big pieces with care.",
-				Kind = "house",
-				Time = 15 * 60,
+			orchard_cottage = {
+				Client = "The Sadíleks",
+				Address = "in the old orchard",
+				Blurb = "A whitewashed cottage among the apple trees: jam jars, a beehive box and Grandma's sewing machine.",
+				Kind = "cottage",
+				Time = 13 * 60,
 			},
 		} :: { [string]: { Client: string, Address: string, Blurb: string, Kind: string, Time: number } },
 		HordeAt = 3 * 60,
@@ -6766,6 +6774,64 @@ Config.Furniture = {
 		BarnLight = { Brightness = 1.6, Range = 22, Color = { 255, 246, 226 } :: { number } },
 		Apron = 6,
 	},
+	-- 9.5 the countryside (the owner: "instead of those houses make rather six different spots: by the pond, on the farm,
+	-- one house, somewhere else again ... not any towns, and not villages"): the four new places to empty and their
+	-- insides, shared/Layouts/Countryside.luau's plans (HouseLayout.plan(seed, kind) for the kinds below: the Pond Cabin's
+	-- "cabin", the Forest Lodge's "lodge", the Old Mill's "mill", the Orchard Cottage's "cottage"; the Lone House is a
+	-- family house's "house"); server/HouseInterior.luau builds each in its own style. Per kind:
+	--   Box            the building's footprint on the map (SandboxMap.Houses' box: along its front × deep)
+	--   Ceiling        its rooms' height (the mill's workroom is tall: its millstones' hopper)
+	--   Spots / Stars  its pieces (at least, at most) and its ★ ones (its recipes' star entries first)
+	--   Collectibles   its collector's pieces: Count (at least, at most), Legendary (the chance of one); the house's Odds
+	--                  and Salt; the kind's own themed ones (Countryside.Themes in the layout) tried first in a rarity
+	--   InteriorMaxParts  an interior's parts at most, its furniture included (tests/countryside_test.luau)
+	--   Scale          an inside is its Box × Scale (whole even studs between its outer walls' middles), as a family
+	--                  house's inside is about twice its 30 × 24 box
+	Countryside = {
+		Scale = 1.7,
+		cabin = { Box = { 24, 18 } :: { number }, Ceiling = 11, Spots = { 12, 15 } :: { number }, Stars = 2, Collectibles = { Count = { 2, 4 } :: { number }, Legendary = 0.05 }, InteriorMaxParts = 520 },
+		lodge = { Box = { 28, 22 } :: { number }, Ceiling = 12, Spots = { 18, 22 } :: { number }, Stars = 3, Collectibles = { Count = { 2, 4 } :: { number }, Legendary = 0.05 }, InteriorMaxParts = 640 },
+		mill = { Box = { 24, 26 } :: { number }, Ceiling = 15, Spots = { 16, 20 } :: { number }, Stars = 2, Collectibles = { Count = { 2, 4 } :: { number }, Legendary = 0.05 }, InteriorMaxParts = 600 },
+		cottage = { Box = { 26, 20 } :: { number }, Ceiling = 11, Spots = { 14, 18 } :: { number }, Stars = 3, Collectibles = { Count = { 2, 4 } :: { number }, Legendary = 0.05 }, InteriorMaxParts = 580 },
+	},
+	-- 9.5 the countryside's own pieces (shared/FurnitureLooks.luau draws them and reads its catalogue's numbers here; the
+	-- collection book lists them with the rest): Class ("hand" one hand; "both" both hands; "pair" two people, or one
+	-- dragging it), Weight (1 … 10), Value ($: under every collectible of its class) and Fragile
+	Pieces = {
+		-- the Pond Cabin's: the fishing things in its store, the bunk room's bed
+		tackle_box = { Class = "hand", Weight = 2, Value = 90, Fragile = false },
+		fishing_rods = { Class = "both", Weight = 2, Value = 320, Fragile = true },
+		landing_net = { Class = "hand", Weight = 1, Value = 45, Fragile = false },
+		oars = { Class = "both", Weight = 3, Value = 110, Fragile = false },
+		outboard_motor = { Class = "pair", Weight = 7, Value = 620, Fragile = false },
+		cool_box = { Class = "both", Weight = 3, Value = 70, Fragile = false },
+		folding_chair = { Class = "hand", Weight = 1, Value = 30, Fragile = false },
+		coal_scuttle = { Class = "hand", Weight = 3, Value = 55, Fragile = false },
+		bunk_bed = { Class = "pair", Weight = 7, Value = 380, Fragile = false },
+		-- the Forest Lodge's
+		antler_trophy = { Class = "both", Weight = 2, Value = 380, Fragile = true },
+		gun_cabinet = { Class = "pair", Weight = 9, Value = 420, Fragile = false },
+		log_basket = { Class = "both", Weight = 4, Value = 60, Fragile = false },
+		stuffed_owl = { Class = "hand", Weight = 1, Value = 240, Fragile = true },
+		boot_rack = { Class = "both", Weight = 3, Value = 70, Fragile = false },
+		oak_table = { Class = "pair", Weight = 9, Value = 520, Fragile = false },
+		-- the Old Mill's
+		flour_sacks = { Class = "both", Weight = 4, Value = 40, Fragile = false },
+		grain_scales = { Class = "both", Weight = 5, Value = 240, Fragile = false },
+		grain_crate = { Class = "both", Weight = 4, Value = 50, Fragile = false },
+		millstone = { Class = "pair", Weight = 10, Value = 780, Fragile = false },
+		sack_trolley = { Class = "both", Weight = 3, Value = 80, Fragile = false },
+		joiners_bench = { Class = "pair", Weight = 8, Value = 260, Fragile = false },
+		-- the Orchard Cottage's
+		fruit_crates = { Class = "both", Weight = 3, Value = 50, Fragile = false },
+		jam_shelf = { Class = "both", Weight = 4, Value = 150, Fragile = true },
+		bee_box = { Class = "both", Weight = 4, Value = 180, Fragile = true },
+		rocking_chair = { Class = "both", Weight = 4, Value = 160, Fragile = false },
+		plate_dresser = { Class = "pair", Weight = 8, Value = 420, Fragile = true },
+		sewing_machine = { Class = "both", Weight = 5, Value = 480, Fragile = false },
+		apple_press = { Class = "pair", Weight = 8, Value = 360, Fragile = false },
+		flower_pots = { Class = "hand", Weight = 2, Value = 35, Fragile = true },
+	} :: { [string]: { Class: string, Weight: number, Value: number, Fragile: boolean } },
 }
 
 -- 7.0, the moves' story "The Last Move" (shared/MoveStory.luau: the chapters and their words; client/MoveStoryUi.luau
@@ -8373,6 +8439,7 @@ Config.Auction = {
 --   Front     studs: a house's front wall this far in from its box's front edge (its eaves stay inside the box; the
 --             door's face about 1.2 in from plan.json's door)
 --   RowUnit   studs: one house of a terraced row along the street (plan.py's 18)
+--   Countryside   9.5: the countryside's spots' looks (see there); Budget's cabin, lodge, mill and cottage their parts
 --   Facing    the yaw each of plan.json's landmarks looks (SandboxMap's: 0 north, 90 west, 180 south, 270 east): the
 --             chapel and the green to Hlavní, the pond to Pražská, the drugstore to Depot Row, the D5 to the village,
 --             Sýkorka to its car park; Barrier: the barrier stands on plan.json's road Road, Inset studs in from its
@@ -8442,6 +8509,10 @@ Config.Village = {
 		row = 15,
 		modern = 15,
 		Rich = 25,
+		cabin = 32, -- 9.5 the countryside's spots (Countryside below: always as rich as they get, rich or not)
+		lodge = 32,
+		mill = 34,
+		cottage = 28,
 		tree = 2,
 		chapel = 26,
 		green = 40,
@@ -8458,6 +8529,33 @@ Config.Village = {
 	Chunk = 128,
 	Front = 1.5,
 	RowUnit = 18,
+	-- 9.5 the countryside's spots (VillageLooks.house's "cabin", "lodge", "mill" and "cottage": the Pond Cabin, the
+	-- Forest Lodge, the Old Mill, the Orchard Cottage): Porch, the studs the cabin's veranda may reach past its box's
+	-- front edge (into its front yard: everything else of a look is inside its box); Wheel, the studs the mill's water
+	-- wheel and its chute reach past its box's right-hand side at most (seen from outside facing the front door: its
+	-- stream runs there); their colours (Stain: the cabin's dark stained boards, Tar its roof; Logs, Shingles, Shutters,
+	-- Bone: the lodge's; Stone, Boards: the mill's and the lodge's plinth; Whitewash, Band, Thatch, Terracotta, Doors,
+	-- Flowers: the cottage's; Buoy and Lantern: the cabin's lifebuoy and its lantern by the door)
+	Countryside = {
+		Porch = 2.5,
+		Wheel = 6,
+		Stain = { { 84, 62, 46 }, { 72, 56, 44 }, { 96, 70, 50 } } :: { { number } },
+		Tar = { { 58, 62, 60 }, { 70, 66, 62 }, { 56, 72, 62 } } :: { { number } },
+		Logs = { { 120, 84, 54 }, { 108, 76, 50 }, { 134, 96, 62 } } :: { { number } },
+		Shingles = { { 92, 74, 60 }, { 78, 66, 58 }, { 104, 82, 62 } } :: { { number } },
+		Shutters = { { 58, 104, 70 }, { 46, 90, 62 } } :: { { number } },
+		Bone = { 232, 220, 192 } :: { number },
+		Stone = { { 170, 164, 150 }, { 156, 150, 138 }, { 178, 170, 154 } } :: { { number } },
+		Boards = { 116, 86, 58 } :: { number },
+		Whitewash = { { 244, 242, 234 }, { 238, 236, 226 } } :: { { number } },
+		Band = { { 96, 112, 128 }, { 120, 104, 90 } } :: { { number } },
+		Thatch = { { 182, 156, 98 }, { 168, 142, 88 } } :: { { number } },
+		Terracotta = { { 176, 92, 60 }, { 164, 84, 56 } } :: { { number } },
+		Doors = { { 74, 110, 150 }, { 70, 120, 84 }, { 150, 66, 52 } } :: { { number } },
+		Flowers = { { 214, 54, 60 }, { 232, 120, 160 }, { 236, 178, 60 } } :: { { number } },
+		Buoy = { 214, 50, 40 } :: { number },
+		Lantern = { 255, 214, 150 } :: { number },
+	},
 	Facing = { chapel = 180, green = 180, pond = 90, shop = 0, motorway = 90, hardware = 180 } :: { [string]: number },
 	Barrier = { Road = "Hornická", Inset = 8, Deep = 6, Yaw = 270 },
 	Trees = {

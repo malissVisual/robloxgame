@@ -250,6 +250,115 @@ do
 	check("the doors on the front wall facing +Z, unturned in the house's frame: one for each house", doorBad == nil, doorBad)
 end
 
+-- 9.5 the countryside's spots (VillageLooks.Countryside: the Pond Cabin, the Forest Lodge, the Old Mill, the Orchard
+-- Cottage; their boxes the map's, built here on their own): each within its budget (rich or not), inside its box but
+-- the cabin's veranda (Countryside.Porch past its front edge at most) and the mill's water wheel and chute (outside its
+-- right-hand side, Countryside.Wheel at most: seen from outside facing the door, the frame's +X); nothing under the
+-- ground, nothing floating; one door, the "House" walls a block, the door on their front face in the middle, its spot a
+-- family house's (1.2 in from the box's front edge, in its middle, looking out); each its own walls and roof and its
+-- own things; the same seed the same look
+do
+	local BOXES: { [string]: { number } } = { cabin = { 24, 18 }, lodge = { 28, 22 }, mill = { 24, 26 }, cottage = { 26, 20 } }
+	local CS = C.Countryside
+	local WALLS: { [string]: string } = { cabin = "WoodPlanks", lodge = "Wood", mill = "Granite", cottage = "Plaster" }
+	local OWN: { [string]: { string } } = {
+		cabin = { "Deck", "VerandaRoof", "Post", "Rail", "Stovepipe", "Net", "Lifebuoy", "Lantern", "Mailbox" },
+		lodge = { "Antler", "Plaque", "Shutter", "Woodpile", "WoodpileRoof", "Chimney", "Corner", "Mailbox" },
+		mill = { "Wheel", "Paddle", "Hub", "Axle", "Chute", "ChutePost", "LoftDoor", "HoistBeam", "Rope", "NameBoard", "Mailbox" },
+		cottage = { "PorchRoof", "PorchPost", "FlowerBox", "Flowers", "Bench", "Chimney", "Mailbox" },
+	}
+	local over, out, low, loose, doorBad, own = nil :: string?, nil :: string?, nil :: string?, nil :: string?, nil :: string?, nil :: string?
+	local most: { [string]: number } = {}
+	local roofs: { [string]: { [string]: boolean } } = {}
+	local reachFront, reachRight = 0, 0
+	for _, kind in V.Countryside do
+		roofs[kind] = {}
+		for _, yaw in { 0, 90, 180, 270 } do
+			for seed = 1, 30 do
+				local w, d = BOXES[kind][1], BOXES[kind][2]
+				local box = if yaw == 90 or yaw == 270 then { x0 = 100, x1 = 100 + d, z0 = -50, z1 = -50 + w } else { x0 = 100, x1 = 100 + w, z0 = -50, z1 = -50 + d }
+				local f = V.frame(box, yaw)
+				local pieces = V.house(kind, box, yaw, seed * 13 + yaw, { rich = seed % 2 == 0 })
+				inspect(`{kind} {seed}`, pieces)
+				most[kind] = math.max(most[kind] or 0, #pieces)
+				if #pieces > V.budget(kind) or V.budget(kind, 1, true) ~= V.budget(kind) then
+					over = over or `{kind} {seed}: {#pieces}`
+				end
+				for _, p in pieces do
+					local x0, x1, _, _, z0, z1 = V.box(p)
+					local front = if kind == "cabin" then CS.Porch else 0
+					local right = if kind == "mill" then CS.Wheel else 0
+					if x0 < -f.w / 2 - EPS or x1 > f.w / 2 + right + EPS or z0 < -f.d / 2 - EPS or z1 > f.d / 2 + front + EPS then
+						out = out or `{kind} {seed} {p.name} ({string.format("%.2f … %.2f, %.2f … %.2f", x0, x1, z0, z1)} in {f.w} × {f.d})`
+					end
+					reachFront = math.max(reachFront, z1 - f.d / 2)
+					reachRight = math.max(reachRight, x1 - f.w / 2)
+					if p.name == "Roof" then
+						roofs[kind][p.material] = true
+					end
+				end
+				low = low or underground(pieces)
+				loose = loose or floating(pieces)
+				-- the door: one, on the House's front face in its middle, unturned; its spot a family house's
+				local body = first(pieces, "House")
+				local doors = 0
+				for _, p in pieces do
+					if p.tag == "door" then
+						doors += 1
+						local _, _, _, _, z0, z1 = V.box(p)
+						local _, _, _, _, _, frontFace = V.box(body :: Piece)
+						local turned = p.turn ~= nil and (p.turn[1] ~= 0 or p.turn[2] ~= 0 or p.turn[3] ~= 0)
+						if turned or p.yaw ~= 0 or math.abs(p.at[1]) > EPS or math.abs(z0 - frontFace) > 0.01 or z1 <= frontFace then
+							doorBad = doorBad or `{kind} {seed}: door at x {p.at[1]}, z {z0} … {z1}, the front wall at {frontFace}`
+						end
+					end
+				end
+				local spots = V.doorSpots(pieces, box, yaw)
+				local a = math.rad(f.turn)
+				local lz = f.d / 2 - 1.2
+				local ex, ez = f.x + math.sin(a) * lz, f.z + math.cos(a) * lz
+				local s = spots[1]
+				if doors ~= 1 or body == nil or (body :: Piece).shape ~= "Block" or not (body :: Piece).solid or #spots ~= 1
+					or math.abs(s.x - ex) > 1e-6 or math.abs(s.z - ez) > 1e-6 or s.yaw ~= yaw then
+					doorBad = doorBad or `{kind} {seed} yaw {yaw}: {doors} doors, the spot {s and string.format("%.2f, %.2f", s.x, s.z)} for {ex}, {ez}`
+				end
+				if body and (body :: Piece).material ~= WALLS[kind] then
+					own = own or `{kind}: its walls {(body :: Piece).material}`
+				end
+				for _, name in OWN[kind] do
+					if not first(pieces, name) then
+						own = own or `{kind} {seed}: no {name}`
+					end
+				end
+				if kind == "mill" then
+					local _, houseRight = V.box(body :: Piece)
+					for _, name in { "Wheel", "Chute", "Paddle", "ChutePost" } do
+						local x0 = V.box(first(pieces, name) :: Piece)
+						if x0 < houseRight - EPS or (first(pieces, name) :: Piece).at[1] <= f.w / 2 then
+							own = own or `mill {seed}: its {name} not outside its right-hand wall and box ({x0})`
+						end
+					end
+				end
+			end
+		end
+	end
+	check(`the countryside's spots within their budgets (the cabin {most.cabin} / {C.Budget.cabin}, the lodge {most.lodge} / {C.Budget.lodge}, the mill {most.mill} / {C.Budget.mill}, the cottage {most.cottage} / {C.Budget.cottage}), rich or not`,
+		over == nil and C.Budget.cabin <= 34 and C.Budget.lodge <= 34 and C.Budget.mill <= 36 and C.Budget.cottage <= 34, over)
+	check(`…inside their boxes but the cabin's veranda ({string.format("%.2f", reachFront)} past the front edge, at most {CS.Porch}) and the mill's wheel and chute ({string.format("%.2f", reachRight)} past the right-hand side, at most {CS.Wheel})`,
+		out == nil and reachRight > 0 and reachRight <= CS.Wheel, out)
+	check("…nothing under the ground, nothing floating", low == nil and loose == nil, low or loose)
+	check("…one door each, unturned on the House block's front face in its middle; its spot a family house's (1.2 in from the box's front edge, in its middle, looking out)", doorBad == nil, doorBad)
+	check("…each its own: the cabin's boards, the lodge's logs, the mill's stone, the cottage's whitewash; their own things (the veranda, the antlers, the wheel on the mill's right-hand side, the porch)", own == nil, own)
+	check("…their roofs: the cabin's tar, the lodge's wooden shingles, the mill's clay tiles, the cottage's thatch or clay tiles", roofs.cabin.Slate and roofs.lodge.WoodPlanks and roofs.mill.ClayRoofTiles
+		and roofs.cottage.Grass and roofs.cottage.ClayRoofTiles)
+	local same = true
+	for _, kind in V.Countryside do
+		local box = { x0 = 0, x1 = BOXES[kind][1], z0 = 0, z1 = BOXES[kind][2] }
+		same = same and deepEqual(V.house(kind, box, 180, 77), V.house(kind, box, 180, 77))
+	end
+	check("…the same seed, the same look", same)
+end
+
 -- One terraced house alone (a box RowUnit wide), and the row's doors in the middle of each house
 do
 	local box = { x0 = 0, x1 = C.RowUnit, z0 = 0, z1 = 26 }

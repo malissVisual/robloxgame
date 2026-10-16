@@ -11,8 +11,9 @@
 --     four corners on it, the back nearer the door: plan.py's check), every door on its box's face looking at its street
 --     (its curb in that street), every house reachable by road from Depot Row (the roads that meet, both SandboxMap's and
 --     the plan's) and the guide's path to every curb along them (SandboxSteps.route)
---   * the contracts: one per house and no other, a made-up Czech family each, the address on its street, its plan's
---     kind (big the farmstead, house the rest: HouseLayout's kinds), its clock past the horde's; the economy sane: a family
+--   * the contracts: one per house and no other, a made-up Czech family each, a short place (9.5 the countryside's: "by
+--     the Little Pond"), its plan's kind (big the farmstead; 9.5 the spots' own: HouseLayout's kinds), its clock past the
+--     horde's (9.5: until the countryside's map only the farmstead's on the map, the spots' to come); the economy sane: a family
 --     house holds fewer pieces than the big house (Config.Furniture's Spots and collectibles, and the plans themselves:
 --     HouseLayout.plan), gets less time, about the same minutes a piece
 --   * the guide's words and places per house: "Drive to The Linden House on Hlavní", at the house by its own lot
@@ -350,23 +351,30 @@ do
 	for _ in S.Houses do
 		count += 1
 	end
+	-- 9.5 the countryside: the contracts the six spots' (tests/countryside_test.luau: their families, places, kinds and
+	-- clocks by id), a short place each ("by the Little Pond"), no longer a street's number. A house of the map without
+	-- one (the family houses, until the countryside's map brings the spots) gets the fallback's card (Moving's
+	-- SB.newContract): the map's houses either all with a contract or only the farmstead
 	local bad: string? = nil
+	local mapped = 0
 	for _, h in Houses do
 		local c = S.Houses[h.id]
 		if not c then
-			bad = `{h.id}: no contract`
-		elseif string.sub(c.Client, 1, 4) ~= "The " or string.sub(c.Client, -1) ~= "s" or #c.Client > Config.MoveStory.Limits.Client then
+			continue
+		end
+		mapped += 1
+		if string.sub(c.Client, 1, 4) ~= "The " or string.sub(c.Client, -1) ~= "s" or #c.Client > Config.MoveStory.Limits.Client then
 			bad = `{h.id}: its family ({c.Client})`
-		elseif not string.find(c.Address, h.street, 1, true) or (h.number and not string.find(c.Address, tostring(h.number), 1, true)) then
+		elseif #c.Address == 0 or #c.Address > 24 then
 			bad = `{h.id}: its address ({c.Address})`
-		elseif c.Kind ~= h.kind or not table.find(HouseLayout.Kinds, c.Kind) then
+		elseif not table.find(HouseLayout.Kinds, c.Kind) or (h == SandboxMap.House and c.Kind ~= h.kind) then
 			bad = `{h.id}: its kind`
 		elseif c.Time <= S.HordeAt or #c.Blurb == 0 or #c.Blurb > Config.MoveStory.Limits.Blurb then
 			bad = `{h.id}: its clock or its words`
 		end
 	end
-	check("a contract per house and no other (Config.Moving.Sandbox.Houses): a made-up Czech family, the address on its street, its plan's kind, its clock past the horde's",
-		bad == nil and count == #Houses, bad)
+	check("a contract per house and no other (Config.Moving.Sandbox.Houses; 9.5 until the countryside's map only the farmstead's on it): a made-up Czech family, a short place, its plan's kind, its clock past the horde's",
+		bad == nil and count == #Houses and (mapped == #Houses or (mapped == 1 and S.Houses[SandboxMap.House.id] ~= nil)), bad or `{mapped} of {#Houses} on the map`)
 	local families: { [string]: boolean } = {}
 	local distinct = true
 	for _, c in S.Houses do
@@ -384,15 +392,19 @@ do
 	-- the minutes a piece at the most pieces: a family house no rush beside the farmstead, nor a stroll
 	local farm = S.Houses[SandboxMap.House.id]
 	local farmPace = farm.Time / (big.Spots[2] + big.Collectibles.Count[2])
+	-- (9.5: every other contract by its kind's numbers: a family house's, or the countryside's own)
 	local bad: string? = nil
-	for index = 2, #Houses do
-		local c = S.Houses[Houses[index].id]
-		local pace = c.Time / (house.Spots[2] + house.Collectibles.Count[2])
+	for id, c in S.Houses do
+		if id == SandboxMap.House.id then
+			continue
+		end
+		local own = if c.Kind == "house" then house else F.Countryside[c.Kind]
+		local pace = c.Time / (own.Spots[2] + own.Collectibles.Count[2])
 		if c.Time >= farm.Time or pace < farmPace * 0.9 or pace > farmPace * 1.5 then
-			bad = `{Houses[index].id}: {c.Time / 60} min, {pace} s a piece against {farmPace}`
+			bad = `{id}: {c.Time / 60} min, {pace} s a piece against {farmPace}`
 		end
 	end
-	check("…a family house's clock shorter than the farmstead's, about the same time a piece (0.9 – 1.5 ×)", bad == nil, bad)
+	check("…every other house's clock shorter than the farmstead's, about the same time a piece (0.9 – 1.5 ×)", bad == nil, bad)
 	-- the plans themselves (HouseLayout.plan, the seeds 1 … 12 of each kind): every family house's pieces fewer than any
 	-- big one's
 	local mostHouse, leastBig = 0, math.huge
