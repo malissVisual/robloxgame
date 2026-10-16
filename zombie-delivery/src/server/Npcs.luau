@@ -18,6 +18,10 @@
 -- 7.x: Npcs.carried / Npcs.stride: a person moved by constraints (Danny at the far end of a piece you carry together,
 -- server/MoveHelper.luau): its own walk off, the legs stepping with the speed it moves at. 8.3: carried in the Physics
 -- state (the clients' gait poses its legs like a player's; no jump, no get-up spring after it); walkTo's `jump = false`.
+-- 9.3 (the owner: Danny "takes it completely like a robot … he runs for 2 seconds and then on the spot …"): walkTo's
+-- `legs` (opt-in, Danny's walks): the walk or the run plays only while the body really moves, at the pace it really
+-- moves at, and the idle while it stands (pressed against something, or there with `through`); Npcs.face's `seconds`:
+-- a turn as quick as asked (a tween, never a snap).
 
 -- 6.7: the people wear the couriers' realistic body (server/CharacterArt: Geometry "person", built by its Rig): slim
 -- limbs, hands that hold, a face with eyes that blink (client/BodyLife.luau also gives them the breath, the weight
@@ -75,6 +79,7 @@ type State = {
 }
 
 local states: { [Model]: State } = {}
+local loadTrack: (animator: Animator, id: string) -> AnimationTrack? -- (below: 9.3 a walk's legs load the run too)
 local templates: { [string]: Model } = {}
 local baseRigs: { [boolean]: Model } = {} -- the plain R15 rigs (adult, child) every look is dressed on
 local warmed = false
@@ -550,8 +555,8 @@ local function flatLook(from: Vector3, point: Vector3): CFrame?
 	return CFrame.lookAt(from, from + flat)
 end
 
--- Turn on the spot (anchored root: the whole body follows it).
-local function turnTo(state: State, point: Vector3, setHome: boolean)
+-- Turn on the spot (anchored root: the whole body follows it); 9.3 `seconds`: that long (else by the angle).
+local function turnTo(state: State, point: Vector3, setHome: boolean, seconds: number?)
 	if state.walkToken > 0 and not state.root.Anchored then
 		return -- walking: the Humanoid turns it
 	end
@@ -566,16 +571,17 @@ local function turnTo(state: State, point: Vector3, setHome: boolean)
 		state.turn:Cancel()
 	end
 	local angle = math.acos(math.clamp(state.root.CFrame.LookVector:Dot(target.LookVector), -1, 1))
-	local tween = TweenService:Create(state.root, TweenInfo.new(0.15 + angle * 0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { CFrame = target })
+	local tween = TweenService:Create(state.root, TweenInfo.new(seconds or (0.15 + angle * 0.25), Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { CFrame = target })
 	state.turn = tween
 	tween:Play()
 end
 
--- Turn to face a point (smoothly, on the spot). It keeps facing that way when nobody is around.
-function Npcs.face(npc: Model, point: Vector3)
+-- Turn to face a point (smoothly, on the spot). It keeps facing that way when nobody is around. 9.3 `seconds`: the
+-- turn's time (Danny's: Config.MoveHelper.Walk.Turn); nil: by the angle.
+function Npcs.face(npc: Model, point: Vector3, seconds: number?)
 	local state = states[npc]
 	if state then
-		turnTo(state, point, true)
+		turnTo(state, point, true, seconds)
 	end
 end
 
@@ -634,7 +640,42 @@ end
 --             pushing against a wall until the timeout
 --   near      how close counts as there (default 1.6)
 --   jump      8.3 false: never a jump (its Jumping state off from then on, Jump cleared: Danny's walks)
-export type WalkOptions = { through: boolean?, stuck: number?, near: number?, jump: boolean? }
+--   legs      9.3 true: its legs go by how it really moves (its root's speed along the ground, every LEGS_EVERY s while
+--             the walk lasts, `through` past its arrival too): the walk (the run from RUN_FROM) at that pace while it
+--             moves LEGS_MOVE studs/s or more, the idle once it has stood LEGS_STILL s (pressed against a wall, a
+--             humanoid stopped a hair short: never running on the spot); without it the walk plays from the order on
+export type WalkOptions = { through: boolean?, stuck: number?, near: number?, jump: boolean?, legs: boolean? }
+local LEGS_EVERY, LEGS_MOVE, LEGS_STILL = 0.1, 0.6, 0.15
+
+-- 9.3 one look at a walk's legs (`legs`): the gait for the root's real speed along the ground, or the idle once it has
+-- stood LEGS_STILL s (`still`: since when it stood, nil while it moves). The new `still`. (Roblox: a server-owned
+-- root's AssemblyLinearVelocity is the humanoid's real walk, zero while it presses against a wall.)
+local function legsNow(state: State, still: number?, now: number): number?
+	local v = state.root.AssemblyLinearVelocity
+	local pace = math.sqrt(v.X * v.X + v.Z * v.Z)
+	if pace < LEGS_MOVE then
+		local since = still or now
+		if now - since >= LEGS_STILL and state.moving then
+			play(state, false)
+		end
+		return since
+	end
+	local humanoid = state.humanoid
+	if pace >= RUN_FROM and not state.run and humanoid then
+		local animator = humanoid:FindFirstChildOfClass("Animator")
+		if animator then
+			state.run = loadTrack(animator, RUN)
+		end
+	end
+	local gait = if pace >= RUN_FROM and state.run then state.run else state.walk
+	state.gait = gait
+	state.walkRate = pace / (STRIDE * state.scale)
+	play(state, true)
+	if gait and gait.IsPlaying and math.abs(gait.Speed - state.walkRate) > 0.02 then
+		gait:AdjustSpeed(state.walkRate)
+	end
+	return nil
+end
 
 -- Walk to a point (walk animation), then call `arrived` (false if it could not get there within `timeout` s).
 function Npcs.walkTo(npc: Model, point: Vector3, arrived: ((boolean) -> ())?, timeout: number?, options: WalkOptions?)
@@ -680,7 +721,10 @@ function Npcs.walkTo(npc: Model, point: Vector3, arrived: ((boolean) -> ())?, ti
 			humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
 		end
 	end
-	play(state, true)
+	local legs = options ~= nil and options.legs == true
+	if not legs then
+		play(state, true)
+	end
 	local near = if options and options.near then options.near else 1.6
 	local stuck = if options then options.stuck else nil
 	local through = options ~= nil and options.through == true
@@ -689,7 +733,11 @@ function Npcs.walkTo(npc: Model, point: Vector3, arrived: ((boolean) -> ())?, ti
 		local ordered = -10
 		local ok = false
 		local best, progressAt = distance, startedAt
+		local still: number? = nil
 		while npc.Parent and state.walkToken == token do
+			if legs then
+				still = legsNow(state, still, os.clock()) -- 9.3
+			end
 			local p = root.Position
 			local gap = Vector3.new(point.X - p.X, 0, point.Z - p.Z).Magnitude
 			if gap < near then
@@ -722,6 +770,11 @@ function Npcs.walkTo(npc: Model, point: Vector3, arrived: ((boolean) -> ())?, ti
 		end
 		if arrived then
 			arrived(ok)
+		end
+		-- 9.3 `legs` through its arrival: on until the next walk (or a stop), the idle once it stands
+		while legs and ok and through and npc.Parent and state.walkToken == token do
+			still = legsNow(state, still, os.clock())
+			task.wait(LEGS_EVERY)
 		end
 	end)
 end
@@ -865,7 +918,7 @@ end
 
 -- ── Spawning ───────────────────────────────────────────────────────────────
 
-local function loadTrack(animator: Animator, id: string): AnimationTrack?
+loadTrack = function(animator: Animator, id: string): AnimationTrack?
 	local ok, track = pcall(function()
 		local animation = Instance.new("Animation")
 		animation.AnimationId = id

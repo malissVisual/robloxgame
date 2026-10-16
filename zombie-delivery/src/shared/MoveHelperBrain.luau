@@ -99,9 +99,21 @@
 --   MoveHelperBrain.trained(owner)             8.1 SANDBOX: his walk x this for the move's owner (Danny's training,
 --                                              the level in their player attribute Config.SandboxUpgrades.Danny,
 --                                              shared/UpgradeRules.luau dannySpeed; 1 without one)
---   MoveHelperBrain.stuck(stuckFor, moved, dt, speed)    seconds without progress (under a fifth of his walk)
---   MoveHelperBrain.unstuck(stuckFor)          what a stuck walk does: "walk" | "repath" (StuckRepath s) | "nudge"
---                                              (StuckSnap s: he appears at his way's next point)
+--   9.3 (the owner, 8.9.5: "he runs for 2 seconds and then on the spot he somehow teleports around"):
+--   MoveHelperBrain.newProgress() / progress(p, left, dt, stuckFor)   seconds without progress along his way (`left`:
+--                                              studs of it to his goal; progress: Unstuck.Progress studs nearer than its
+--                                              best of this spell; a walk back or aside is none); rebase(p, left,
+--                                              spell): a new way's own length is its best (within a stuck spell never a
+--                                              longer one)
+--   MoveHelperBrain.unstuck(stuckFor)          what a stuck walk does now and which time round: "walk" (under
+--                                              Unstuck.Repath s), then each Unstuck.Cycle s "repath" (a new way from where
+--                                              he stands), "back" (he walks back off what blocks him), "side" (a sidestep
+--                                              onto open ground); "rescue" from Unstuck.Fade s (the last resort: a fade
+--                                              over, never a pop)
+--   MoveHelperBrain.ease(left)                 × his walk with `left` studs to his goal (slowing over Walk.Ease studs to
+--                                              Walk.EaseMin)
+--   MoveHelperBrain.arrived(gap, near, stuckFor)   at his goal: within `near`, or standing still Walk.Settle s within
+--                                              Walk.Arrive more (the humanoid stops a hair short of it)
 --   MoveHelperBrain.endRise(floorRise, carrierRise)   his root's height at your piece's far end over its middle: the
 --                                              floor's there (stairs, steps) when within HoldStep of the floor under
 --                                              the carrier (8.3: else the carrier's floor: never a roof, never a pop)
@@ -549,23 +561,66 @@ function MoveHelperBrain.routeVia(fromInside: boolean, fx: number, fz: number, t
 	return best, which
 end
 
--- Seconds without progress: `moved` studs in the last dt s at `speed` (under a fifth of it is no progress).
-function MoveHelperBrain.stuck(stuckFor: number, moved: number, dt: number, speed: number): number
-	if moved < speed * dt * 0.2 then
-		return stuckFor + dt
-	end
-	return 0
+-- 9.3 his walk's progress (the owner: "he runs for 2 seconds and then on the spot he somehow teleports around": 8.9's
+-- clock counted only how far he moved, so pressed against a wall's end it ran out and the nudge put him on): seconds
+-- since his way to his goal (`left` studs of it) came Unstuck.Progress studs nearer than its best; a walk back or aside
+-- (his ways out) is no progress.
+export type Progress = { best: number }
+
+function MoveHelperBrain.newProgress(): Progress
+	return { best = math.huge }
 end
 
--- A stuck walk: a new path after StuckRepath s, a nudge to the way's next point after StuckSnap s.
-function MoveHelperBrain.unstuck(stuckFor: number): string
-	local c = cfg()
-	if stuckFor >= c.StuckSnap then
-		return "nudge"
-	elseif stuckFor >= c.StuckRepath then
-		return "repath"
+function MoveHelperBrain.progress(p: Progress, left: number, dt: number, stuckFor: number): number
+	if left < p.best - cfg().Unstuck.Progress then
+		p.best = left
+		return 0
 	end
-	return "walk"
+	return stuckFor + dt
+end
+
+-- (a new way: its own length is the best from now on, the clock as it was; within a stuck spell, `spell`, never a
+-- longer best: walked back or aside, then forward to the same block again is no progress)
+function MoveHelperBrain.rebase(p: Progress, left: number, spell: boolean?)
+	p.best = if spell then math.min(p.best, left) else left
+end
+
+-- 9.3 a stuck walk: "walk" under Unstuck.Repath s; then each Unstuck.Cycle s "repath" (a new way from where he stands),
+-- "back" from Unstuck.Back s into the cycle (he walks back off what blocks him), "side" from Unstuck.Side s (a sidestep
+-- onto open ground, the other side each time round); "rescue" from Unstuck.Fade s on (the last resort: faded over onto
+-- his way, never a pop). Also which time round (0 first).
+function MoveHelperBrain.unstuck(stuckFor: number): (string, number)
+	local u = cfg().Unstuck
+	if stuckFor >= u.Fade then
+		return "rescue", 0
+	elseif stuckFor < u.Repath then
+		return "walk", 0
+	end
+	local t = stuckFor - u.Repath
+	local round = math.floor(t / u.Cycle)
+	local into = t - round * u.Cycle
+	if into < u.Back then
+		return "repath", round
+	elseif into < u.Side then
+		return "back", round
+	end
+	return "side", round
+end
+
+-- 9.3 × his walk with `left` studs to his goal: 1 until Walk.Ease studs, then eased down to Walk.EaseMin at it.
+function MoveHelperBrain.ease(left: number): number
+	local w = cfg().Walk
+	if left >= w.Ease then
+		return 1
+	end
+	local x = math.clamp(left / math.max(w.Ease, 1e-3), 0, 1)
+	return w.EaseMin + (1 - w.EaseMin) * x * x * (3 - 2 * x)
+end
+
+-- 9.3 at his goal: within `near` of it, or no progress Walk.Settle s within Walk.Arrive studs more.
+function MoveHelperBrain.arrived(gap: number, near: number, stuckFor: number): boolean
+	local w = cfg().Walk
+	return gap <= near or (gap <= near + w.Arrive and stuckFor >= w.Settle)
 end
 
 -- A place inside a doorway's zone (along the wall within its half width + Margin, through it within its depth) moved

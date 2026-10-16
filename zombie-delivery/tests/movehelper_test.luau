@@ -1,6 +1,6 @@
 -- 7.0, the depot's helper ("Danny from the depot"): his decisions (shared/MoveHelperBrain.luau, pure). Who has him,
 -- which lift he comes to help with, when he runs from a zombie, what he does now (the priority list), the van's back
--- (he opens it), his speeds (slower than a player, a sprint to your lift), stuck (a new path, a nudge), the far end of
+-- (he opens it), his speeds (slower than a player, a sprint to your lift), stuck (9.3: progress, his ways out), the far end of
 -- your piece (on the floor there), the doorways he keeps out of and his words. tests/movehelper_runtime_test.luau and
 -- tests/movehelper_art_runtime_test.luau run the server side. 8.3 Danny for hire: the price (the house's pieces), the
 -- hire's check (the crew, once, the money), a click on a piece (onto his list, off it, every refusal), his list's next
@@ -354,15 +354,38 @@ check("running from a zombie: Flee × the walk", near(Brain.speed(WALK, "flee", 
 
 -- Stuck ----------------------------------------------------------------------------------------------------------------------
 
-local stuck = Brain.stuck(0, 1, 0.1, 9.8)
-check("walking on: not stuck", stuck == 0)
-stuck = Brain.stuck(0, 0.05, 0.1, 9.8)
-stuck = Brain.stuck(stuck, 0.05, 0.1, 9.8)
-check("no progress: the seconds add up", near(stuck, 0.2))
-check("…and progress again clears them", Brain.stuck(stuck, 1, 0.1, 9.8) == 0)
-check("7.x stuck under StuckRepath s: he walks on", Brain.unstuck(H.StuckRepath - 0.1) == "walk" and H.StuckRepath == 2)
-check("…StuckRepath s: a new path", Brain.unstuck(H.StuckRepath) == "repath" and Brain.unstuck(H.StuckSnap - 0.1) == "repath")
-check("…StuckSnap s: a nudge to his way's next point", Brain.unstuck(H.StuckSnap) == "nudge" and H.StuckSnap == 4)
+-- 9.3 (the owner: "he runs for 2 seconds and then on the spot he somehow teleports around"): the clock is his progress
+-- along his way, not his movement (a walk back or aside is no progress); his ways out walked, the fade only at the end
+do
+	local U = H.Unstuck
+	local p = Brain.newProgress()
+	Brain.rebase(p, 20)
+	local stuck = Brain.progress(p, 19, 0.1, 0)
+	check("9.3 walking on along his way: not stuck", stuck == 0 and p.best == 19)
+	stuck = Brain.progress(p, 18.8, 0.1, stuck)
+	stuck = Brain.progress(p, 19.4, 0.1, stuck)
+	check("…nearer by less than Unstuck.Progress, or farther (a walk back): the seconds add up", near(stuck, 0.2) and U.Progress == 0.5)
+	check("…progress again clears them", Brain.progress(p, 18.4, 0.1, stuck) == 0)
+	Brain.rebase(p, 30)
+	check("…a new way: its own length the best (a longer way round is no stuck spell)", Brain.progress(p, 29.4, 0.1, 0.3) == 0)
+	Brain.rebase(p, 33, true)
+	check("…within a stuck spell never a longer best (back, aside, then forward to the same block: no progress)", p.best == 29.4
+		and Brain.progress(p, 29.2, 0.1, 2) > 2)
+	check("9.3 stuck under Unstuck.Repath s: he walks on", (Brain.unstuck(U.Repath - 0.05)) == "walk")
+	local phase, round = Brain.unstuck(U.Repath)
+	check("…Repath s: a new way from where he stands", phase == "repath" and round == 0)
+	check("…then his ways out, walked: back off what blocks him, then a sidestep", (Brain.unstuck(U.Repath + U.Back)) == "back"
+		and (Brain.unstuck(U.Repath + U.Side)) == "side" and U.Back < U.Side and U.Side < U.Cycle)
+	phase, round = Brain.unstuck(U.Repath + U.Cycle + 0.01)
+	check("…round again (a new way first; the other side next time)", phase == "repath" and round == 1)
+	check("…only Unstuck.Fade s without progress the last resort, a fade over (never 8.9's nudge on the spot after 4 s)",
+		(Brain.unstuck(U.Fade - 0.05)) ~= "rescue" and (Brain.unstuck(U.Fade)) == "rescue" and U.Fade >= 10 and (Brain.unstuck(4)) ~= "rescue")
+	local w = H.Walk
+	check("9.3 into his goal: full speed until Walk.Ease studs, then slowing to Walk.EaseMin", Brain.ease(w.Ease + 1) == 1 and near(Brain.ease(0), w.EaseMin)
+		and Brain.ease(w.Ease / 2) < 1 and Brain.ease(w.Ease / 2) > w.EaseMin)
+	check("…there within `near`, or settled Walk.Settle s within Walk.Arrive more (the humanoid stops a hair short)", Brain.arrived(0.4, 0.5, 0)
+		and not Brain.arrived(0.9, 0.5, 0) and Brain.arrived(0.9, 0.5, w.Settle) and not Brain.arrived(0.5 + w.Arrive + 0.1, 0.5, 5))
+end
 
 -- The far end of your piece (7.x) ------------------------------------------------------------------------------------------
 

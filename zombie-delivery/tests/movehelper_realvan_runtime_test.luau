@@ -277,7 +277,7 @@ local heartbeat = E.services.RunService.Heartbeat
 
 local CURB = CF(House.curb.x, 1.8, House.curb.z) * M.CFrame.Angles(0, math.rad(House.curb.yaw), 0)
 truck.model:PivotTo(CURB) -- (the Driver's call's spot: its nose to the road, its back to the house's door)
-E.place(ann, V3(House.curb.x - 60, 3, House.curb.z - 30))
+E.place(ann, V3(House.curb.x - 200, 3, House.curb.z - 30)) -- (9.3 out of sight: Danny far off is put at the van only unseen, faded in)
 run(6)
 local waiting = rel(body.root.Position)
 check("hired with nothing to carry, he waits by the van's back (behind it: byTruck), clear of it", danny.action == "wait" and waiting.Z > halfZ
@@ -322,7 +322,7 @@ end)
 local inSeat = rel(body.root.Position)
 check("…and in the real passenger seat (Seat:Sit), his hand off the handle (the attributes gone), no fade", seated and danny.seat == seat
 	and seat.Occupant == body.humanoid and math.abs(inSeat.X - seatAt.X) < 0.01 and math.abs(inSeat.Z - seatAt.Z) < 0.01
-	and body.model:GetAttribute("BoardAt") == nil and body.model:GetAttribute("BoardReach") == nil and fades == 0, f(inSeat))
+	and body.model:GetAttribute("BoardAt") == nil and body.model:GetAttribute("BoardReach") == nil and fades == (danny.teleports.far or 0), f(inSeat)) -- (9.3 his far jump to the van at the start: faded in)
 
 -- out again: Ann off the wheel, the van standing
 E.seated[ann] = nil
