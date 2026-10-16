@@ -559,12 +559,12 @@ def moving_box(at, size=(2.0, 2.0, 1.8), rot_z=0.0, parent=None, open_top=False,
             box("Side", (t, sy, sz), (x * (sx / 2 - t / 2), 0, 0), card, origin=(0, 0, -1), parent=root)
         for y in (-1, 1):
             box("Side", (sx, t, sz), (0, y * (sy / 2 - t / 2), 0), card, origin=(0, 0, -1), parent=root)
-        for x, rot in ((-1, -115), (1, 115)):
+        for x in (-1, 1):  # (each flap hinged on its top edge, standing up and leaning out)
             f = box("Flap", (sx / 2, sy * 0.98, t), (x * sx / 2, 0, sz), card, origin=(-x, 0, -1), parent=root)
-            f.rotation_euler.y = math.radians(rot * -x / abs(x) * -1)
-        for y, rot in ((-1, 120), (1, -120)):
+            f.rotation_euler.y = math.radians(-x * 62)
+        for y in (-1, 1):
             f = box("Flap", (sx * 0.98, sy / 2, t), (0, y * sy / 2, sz), card, origin=(0, -y, -1), parent=root)
-            f.rotation_euler.x = math.radians(-rot * -1)
+            f.rotation_euler.x = math.radians(y * 58)
     else:
         box("Carton", (sx, sy, sz), (0, 0, 0), card, bevel=0.04, origin=(0, 0, -1), parent=root)
         box("Tape", (sx * 0.22, sy + 0.02, 0.02), (0, 0, sz), tape, origin=(0, 0, 0), parent=root)

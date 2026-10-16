@@ -1,6 +1,9 @@
-"""The finishing step for the store art: grade, bloom, the titles, the rarity tags, the money chips and the ZDC badge.
+"""The finishing step for the store art: grade, bloom, the titles, the rarity tags, the money chips and the DELIVEROS
+logo (its outline, shadow, glints and tagline ribbon).
 
-python post.py <t1|t2|t3|icon> <raw.png> <out.png>   (the raw render's .json next to it holds the tags' places)
+python post.py <logo|logo-tagline> <logo_raw.png> <out.png>       the logo (make these first: the rest put it on)
+python post.py <t0|t1|t2|t3|icon|icon-box> <raw.png> <out.png>   (the raw render's .json next to it holds the tags'
+                                                                 places; the logo comes from art/store/)
 """
 import json
 import math
@@ -12,6 +15,13 @@ from PIL import Image, ImageChops, ImageDraw, ImageEnhance, ImageFilter, ImageFo
 HERE = os.path.dirname(os.path.abspath(__file__))
 FONT_TITLE = os.path.join(HERE, "fonts", "LuckiestGuy-Regular.ttf")
 FONT_UI = os.path.join(HERE, "fonts", "LilitaOne-Regular.ttf")
+STORE = os.path.abspath(os.path.join(HERE, "..", "..", "art", "store"))
+LOGO = os.environ.get("DELIVEROS_LOGO", os.path.join(STORE, "deliveros-logo.png"))
+LOGO_TAGLINE = os.environ.get("DELIVEROS_LOGO_TAGLINE", os.path.join(STORE, "deliveros-logo-tagline.png"))
+
+
+def logo_image(tagline=False):
+    return Image.open(LOGO_TAGLINE if tagline else LOGO).convert("RGBA")
 INK = (22, 24, 30)
 ZDC_RED = (214, 34, 40)
 WHITE = (255, 255, 255)
@@ -224,31 +234,87 @@ def money_chip(im, at, text, size):
     return base.convert("RGB")
 
 
-def zdc_badge(im, at, size, anchor="ra"):
-    """The ZDC mark: a red rounded square, ZDC in white."""
+# ── the DELIVEROS logo ───────────────────────────────────────────────────────
+
+def dilate(alpha, r):
+    """The alpha grown by about r pixels (a blur, then a threshold: fast at any size), its edge smoothed."""
+    grown = alpha.filter(ImageFilter.GaussianBlur(r * 0.5)).point(lambda v: 255 if v > 6 else 0)
+    return grown.filter(ImageFilter.GaussianBlur(max(1, r * 0.06)))
+
+
+def logo_finish(raw, ribbon=False):
+    """The rendered wordmark (transparent) → the logo: a thick dark outline, a soft drop shadow, a glint; with
+    ribbon, a red MOVE · FIND · GROW ribbon under it. Cropped to itself (a small margin)."""
+    word = raw.convert("RGBA")
+    a = word.getchannel("A").point(lambda v: 255 if v > 40 else int(v * 255 / 40))
+    w, h = word.size
+    r = int(w * 0.016)
+    pad = r * 4
+    canvas = Image.new("RGBA", (w + pad * 2, h + pad * 2 + (int(h * 0.36) if ribbon else 0)), (0, 0, 0, 0))
+    full_a = Image.new("L", canvas.size, 0)
+    full_a.paste(a, (pad, pad))
+    outline = dilate(full_a, r)
+    shadow = outline.filter(ImageFilter.GaussianBlur(r * 0.8)).point(lambda v: int(v * 0.6))
+    canvas.paste(Image.new("RGBA", canvas.size, (0, 0, 0, 255)), (int(r * 0.4), int(r * 1.1)), shadow)
+    canvas.paste(Image.new("RGBA", canvas.size, INK + (255,)), (0, 0), outline)
+    canvas.alpha_composite(word, (pad, pad))
+    if ribbon:
+        d = ImageDraw.Draw(canvas)
+        bb = full_a.getbbox()
+        rh = h * 0.24
+        f = font(FONT_UI, int(rh * 0.56))
+        words = ["MOVE", "FIND", "GROW"]
+        widths = [d.textbbox((0, 0), t, font=f)[2] for t in words]
+        gap = rh * 0.62
+        total = sum(widths) + gap * 2
+        rw = total + rh * 1.5
+        cx = (bb[0] + bb[2]) / 2
+        top = bb[3] - h * 0.04
+        ribbon_poly = [(cx - rw / 2, top), (cx + rw / 2, top), (cx + rw / 2 - rh * 0.25, top + rh), (cx - rw / 2 + rh * 0.25, top + rh)]
+        rib = Image.new("L", canvas.size, 0)
+        ImageDraw.Draw(rib).polygon(ribbon_poly, fill=255)
+        canvas.paste(Image.new("RGBA", canvas.size, INK + (255,)), (0, 0), dilate(rib, r * 0.8))
+        d.polygon(ribbon_poly, fill=ZDC_RED + (255,))
+        x = cx - total / 2
+        tb = d.textbbox((0, 0), "MOVE", font=f)
+        y = top + (rh - (tb[3] - tb[1])) / 2 - tb[1]
+        for i, t in enumerate(words):
+            d.text((x, y), t, font=f, fill=WHITE + (255,))
+            x += widths[i]
+            if i < 2:
+                dot = rh * 0.09
+                d.ellipse((x + gap / 2 - dot, top + rh / 2 - dot, x + gap / 2 + dot, top + rh / 2 + dot), fill=(255, 214, 90, 255))
+                x += gap
+    # a glint on the last letter's top (only there: one over a letter reads as an accent)
+    bb = full_a.getbbox()
+    glints = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
+    gd = ImageDraw.Draw(glints)
+    sparkle(gd, bb[2] - (bb[2] - bb[0]) * 0.07, bb[1] + h * 0.09, w * 0.03, (255, 255, 255, 255))
+    canvas.alpha_composite(glints.filter(ImageFilter.GaussianBlur(w * 0.004)))
+    canvas.alpha_composite(glints)
+    return canvas.crop(canvas.getchannel("A").point(lambda v: 255 if v > 8 else 0).getbbox())
+
+
+def place_logo(im, logo, at, width, anchor="ma"):
+    """The logo, `width` (share of the picture's width) wide, its anchor point at `at` (0…1)."""
     w, h = im.size
-    s = int(size)
-    layer = Image.new("RGBA", (s + 12, s + 12), (0, 0, 0, 0))
-    d = ImageDraw.Draw(layer)
-    d.rounded_rectangle((6, 6, 6 + s, 6 + s), s * 0.18, fill=ZDC_RED + (255,), outline=WHITE + (255,), width=max(3, s // 22))
-    f = font(FONT_UI, int(s * 0.42))
-    tb = d.textbbox((0, 0), "ZDC", font=f)
-    d.text((6 + (s - (tb[2] - tb[0])) / 2 - tb[0], 6 + (s - (tb[3] - tb[1])) / 2 - tb[1]), "ZDC", font=f, fill=WHITE + (255,))
-    sh = Image.new("RGBA", layer.size, (0, 0, 0, 0))
-    ImageDraw.Draw(sh).rounded_rectangle((10, 12, 10 + s, 12 + s), s * 0.18, fill=(0, 0, 0, 130))
-    sh = sh.filter(ImageFilter.GaussianBlur(6))
+    lw = int(w * width)
+    lg = logo.resize((lw, int(logo.height * lw / logo.width)), Image.LANCZOS)
     x, y = at[0] * w, at[1] * h
-    if anchor[0] == "r":
-        x -= layer.width
-    if anchor[1] == "b":
-        y -= layer.height
+    if anchor[0] == "m":
+        x -= lg.width / 2
+    elif anchor[0] == "r":
+        x -= lg.width
+    if anchor[1] == "m":
+        y -= lg.height / 2
+    elif anchor[1] == "b":
+        y -= lg.height
     base = im.convert("RGBA")
-    base.alpha_composite(sh, (int(x), int(y)))
-    base.alpha_composite(layer, (int(x), int(y)))
+    base.alpha_composite(lg, (int(x), int(y)))
     return base.convert("RGB")
 
 
-# ── the four pictures ────────────────────────────────────────────────────────
+# ── the pictures ─────────────────────────────────────────────────────────────
 
 def marks_of(raw):
     p = os.path.splitext(raw)[0] + ".json"
@@ -262,7 +328,7 @@ def t1(im, m):
     im, size = title(im, "MOVE HOUSES", (0.02, 0.025), 168, rot=-3)
     im, _ = title(im, "WITH YOUR CREW!", (0.045, 0.025 + size[1] / 1080 - 0.045), 84, fill=((255, 92, 92), (214, 34, 40)),
                   stroke=WHITE, rot=-3)
-    im = zdc_badge(im, (0.985, 0.03), 150)
+    im = place_logo(im, logo_image(), (0.985, 0.025), 0.27, anchor="ra")
     return im
 
 
@@ -281,7 +347,7 @@ def t2(im, m):
         im = pill(im, (m["gramophone"][0], m["gramophone"][1]), "RARE", RARITY["rare"], 40)
     im, _ = title(im, "FIND RARE", (0.975, 0.02), 150, anchor="ra", rot=3)
     im, _ = title(im, "TREASURES!", (0.975, 0.19), 150, anchor="ra", rot=3, fill=((255, 240, 160), (255, 178, 36)))
-    im = zdc_badge(im, (0.02, 0.03), 130, anchor="la")
+    im = place_logo(im, logo_image(), (0.015, 0.025), 0.25, anchor="la")
     return im
 
 
@@ -300,28 +366,48 @@ def t3(im, m):
     im, _ = title(im, "BUILD YOUR", (0.5, 0.015), 120, anchor="ma", rot=0)
     im, _ = title(im, "WAREHOUSE EMPIRE", (0.5, 0.135), 150, anchor="ma", rot=0, fill=((255, 240, 160), (255, 178, 36)))
     im = pill(im, (0.155, 0.965), "UPGRADE TO LEVEL 5", ZDC_RED, 44, text_color=WHITE, back=(214, 34, 40, 235), pointer=False)
-    im = zdc_badge(im, (0.985, 0.03), 130)
+    im = place_logo(im, logo_image(), (0.985, 0.025), 0.2, anchor="ra")
     return im
 
 
-def icon(im, m):
-    """The icon: a sunburst behind the transparent render, the ZDC badge in a corner."""
-    w, h = im.size
+def t0(im, m):
+    """The title card: the big logo (its tagline) over the key art, the legendary find tagged."""
+    im = grade(im, sat=1.16, contrast=1.07)
+    im = bloom(im, threshold=215, strength=0.45)
+    im = vignette(im, 0.22)
+    if "skull" in m:
+        sx, sy = m["skull"]
+        im = sparkles(im, [(sx - 0.015, sy + 0.075, 0.011), (sx + 0.045, sy + 0.06, 0.008)])
+        im = pill(im, (sx, sy), "LEGENDARY!", RARITY["legendary"], 40)
+    im = place_logo(im, logo_image(tagline=True), (0.5, 0.02), 0.6, anchor="ma")
+    return im
+
+
+def sunburst(w, h, at=(0.5, 0.42)):
     bg = Image.new("RGB", (w, h), (214, 34, 40))
     g = ImageDraw.Draw(bg)
     for i in range(w // 2, 0, -2):
         t = i / (w / 2)
         c = tuple(int(a + (b - a) * t) for a, b in zip((255, 214, 92), (214, 34, 40)))
-        g.ellipse((w * 0.42 - i * 1.5, h * 0.42 - i * 1.5, w * 0.42 + i * 1.5, h * 0.42 + i * 1.5), fill=c)
-    bg = rays(bg, (0.42, 0.42), (255, 244, 200), count=18, length=0.9, alpha=55, spin=0.15)
-    sub = im.convert("RGBA")
-    # the subject as big as the square allows: its bottom on the bottom edge, centred across
+        g.ellipse((w * at[0] - i * 1.5, h * at[1] - i * 1.5, w * at[0] + i * 1.5, h * at[1] + i * 1.5), fill=c)
+    return rays(bg, at, (255, 244, 200), count=18, length=0.9, alpha=55, spin=0.15)
+
+
+def subject(sub, w, h, top, bottom, dx=0.0):
+    """The transparent render's subject as big as fits between `top` and `bottom` (shares of the height), centred."""
     bb = sub.getchannel("A").point(lambda v: 255 if v > 8 else 0).getbbox()
     cut = sub.crop(bb)
-    k = min(h * 0.94 / cut.height, w * 1.0 / cut.width)
+    k = min(h * (bottom - top) / cut.height, w * 0.98 / cut.width)
     cut = cut.resize((int(cut.width * k), int(cut.height * k)), Image.LANCZOS)
-    sub = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    sub.alpha_composite(cut, (int((w - cut.width) / 2 + w * 0.03), h - cut.height))
+    out = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    out.alpha_composite(cut, (int((w - cut.width) / 2 + w * dx), int(h * bottom - cut.height)))
+    return out
+
+
+def icon_from(im, top, bottom, dx, logo_at, logo_anchor, burst_at, glints):
+    w, h = im.size
+    bg = sunburst(w, h, burst_at)
+    sub = subject(im.convert("RGBA"), w, h, top, bottom, dx)
     shadow = Image.new("RGBA", sub.size, (0, 0, 0, 0))
     shadow.putalpha(sub.getchannel("A").filter(ImageFilter.GaussianBlur(w * 0.012)).point(lambda v: v * 0.55))
     out = bg.convert("RGBA")
@@ -330,18 +416,31 @@ def icon(im, m):
     out = out.convert("RGB")
     out = grade(out, sat=1.1, contrast=1.05)
     out = bloom(out, threshold=215, strength=0.45)
-    out = sparkles(out, [(0.62, 0.12, 0.03), (0.86, 0.3, 0.022), (0.2, 0.62, 0.02)])
-    out = zdc_badge(out, (0.06, 0.06), w * 0.22, anchor="la")
-    return out
+    out = sparkles(out, glints)
+    return place_logo(out, logo_image(), logo_at, 0.94, anchor=logo_anchor)
+
+
+def icon(im, m):
+    """Icon A: the courier holds the legendary find up, DELIVEROS across the bottom."""
+    return icon_from(im, 0.02, 0.86, 0.03, (0.5, 0.985), "mb", (0.45, 0.36), [(0.64, 0.1, 0.03), (0.88, 0.28, 0.022), (0.14, 0.3, 0.02)])
+
+
+def icon_box(im, m):
+    """Icon B: the open box glowing, the find rising out of it, DELIVEROS across the top."""
+    return icon_from(im, 0.22, 1.03, 0.0, (0.5, 0.025), "ma", (0.5, 0.55), [(0.2, 0.5, 0.026), (0.82, 0.46, 0.022), (0.7, 0.86, 0.016)])
 
 
 if __name__ == "__main__":
     kind, raw, out = sys.argv[1], sys.argv[2], sys.argv[3]
     im = Image.open(raw)
-    if kind != "icon":
+    if kind in ("logo", "logo-tagline"):
+        logo_finish(im, ribbon=kind == "logo-tagline").save(out, optimize=True)
+        print("saved", out)
+        sys.exit(0)
+    if kind not in ("icon", "icon-box"):
         im = im.convert("RGB")
-    result = {"t1": t1, "t2": t2, "t3": t3, "icon": icon}[kind](im, marks_of(raw))
-    if kind == "icon":
+    result = {"t0": t0, "t1": t1, "t2": t2, "t3": t3, "icon": icon, "icon-box": icon_box}[kind](im, marks_of(raw))
+    if kind.startswith("icon"):
         result = result.resize((512, 512), Image.LANCZOS)
     result.save(out, optimize=True)
     print("saved", out, result.size)
