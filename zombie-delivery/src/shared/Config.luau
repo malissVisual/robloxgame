@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "8.9.4"
+Config.Version = "8.9.5"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -8521,6 +8521,50 @@ Config.Saving = {
 	CloseWait = 25,
 	WarnBytes = 1_000_000,
 	MaxBytes = 4_000_000,
+}
+
+-- 9.1, the drive pedals (the owner: "Add a drive pedal to the game … just visible pedals on PC, and on mobile as driving
+-- buttons"): GAS (tall and narrow) and BRAKE (wider and shorter) at the lower right while you drive your car
+-- (client/DrivePedals.luau, the pure rules shared/PedalRules.luau, the input client/Drive.luau setPedal). On a touch
+-- screen they are held to drive (GAS forward; BRAKE brakes, then backs up, as S does; the thumbstick steers); with a
+-- keyboard or a gamepad they show your feet (W / S, R2 / L2 part way) and a mouse may hold them too.
+--   On             off: no pedals anywhere (the seat, the keys and the thumbstick drive as before)
+--   Gas / Brake    { w, h } px at scale 1 (rubber Ribs across each: how many)
+--   Gap            px between the two at scale 1; Clear: px they keep from everything else (screen px)
+--   Margin         screen px from the screen's edges: Touch at the bottom right of a touch screen, Desk on a computer
+--   Touch          a touch screen's scale: the HUD's (Ui.scaleFor) between Min and Max, then Shrink smaller at a time when
+--                  no place is clear, while every side stays MinSide px (a finger's: Ui.MinTouch) or more
+--   Desk           a computer's: the HUD's scale × Scale (compact), Shrink smaller at a time down to Min
+--   TopShare       their top stays under this share of the screen's height (the lower part); ShrinkCost: px of way from
+--                  their spot a smaller scale counts as, for each share of the biggest it loses; Weight: in the last
+--                  resort (no clear place) covering the touch controls counts this many times a HUD group's px
+--   Caption        px at scale 1 under them for a gamepad's R2 / L2 (the platform's picture, else the word)
+--   Press          the press drawn (shared/PedalRules.luau look / ease): Depth px down at scale 1 (also the shadow's lip
+--                  under the face at rest, which the press closes) and Squash the face's share shorter (it tips away),
+--                  Shade the dark veil over it, Accent the red edge's px (resting, pressed), In / Out how fast it goes
+--                  down and comes back (a share a second: quick, no bounce)
+--   Face           the face's transparency: Rest, Pressed (more solid)
+--   Rolling        studs/s: both held, the brake works while the car still rolls faster than this, then it stands
+--   Check / Place  s between the looks at the seat, the HUD and the device / at where they go (the HUD's groups move)
+Config.DrivePedals = {
+	On = true,
+	Gas = { 64, 120 },
+	Brake = { 92, 88 },
+	Ribs = { Gas = 6, Brake = 4 },
+	Gap = 12,
+	Clear = 8,
+	Margin = { Touch = 10, Desk = 16 },
+	Touch = { Min = 0.78, Max = 0.92, Shrink = 0.04, MinSide = 44 },
+	Desk = { Scale = 0.62, Min = 0.4, Shrink = 0.06 },
+	TopShare = 0.3,
+	ShrinkCost = 600,
+	Weight = 4,
+	Caption = 18,
+	Press = { Depth = 7, Squash = 0.1, Shade = 0.35, Accent = { 2, 5 }, In = 26, Out = 16 },
+	Face = { Rest = 0.35, Pressed = 0.12 },
+	Rolling = 1.5,
+	Check = 0.1,
+	Place = 0.5,
 }
 
 return Config
