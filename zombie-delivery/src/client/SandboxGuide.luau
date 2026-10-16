@@ -11,8 +11,8 @@
 --   * The 3D guide: a soft glowing path on the ground (Beams between Attachments in the Terrain: no parts) along the
 --     roads (SandboxSteps.route: out to the nearest road, along the roads the shortest way, in), a floating orange
 --     chevron over the target and its distance tag ("THE OLD FARMSTEAD · 420 m"). Inside the house only the hint (no
---     target there). Jinočany: the drive steps name the move's house (the Moving state's `contract`, a SandboxMap.Houses
---     id: "Drive to The Linden House on Hlavní"), the chevron over its curb ("THE LINDEN HOUSE") and its door.
+--     target there). The drive steps name the move's place (the Moving state's `contract`, a SandboxMap.Houses
+--     id: "Drive to The Pond Cabin on Pond Lane"), the chevron over its curb ("THE POND CABIN") and its door.
 --   * The steps come from shared/SandboxSteps.luau (pure, tested) on a state read from what the client sees: the player
 --     attribute Plot (server/SandboxPlots.luau); the Moving remote's "state" (as client/MovingHud.luau reads it: a move
 --     runs, `inside` the house, the van's load counts.out, counts.delivered, your piece in your hands: an item `mine` and
@@ -100,14 +100,14 @@ local player = Players.LocalPlayer
 local COLOR = Color3.fromRGB(G.Color[1], G.Color[2], G.Color[3])
 local ABOVE = { "MovePanel", "MoveHelper", "PlanningPill" } -- the top's middle blocks the line goes under (TopBlocks)
 local SIDE_GUIS = { "SandboxHud", "SandboxTasksChip" } -- the HUD at the top's sides the line keeps clear of (client/SandboxHud.luau; 8.2: client/SandboxTasksUi.luau's chip)
-local MAX_POINTS = 8 -- SandboxSteps.route's most points (SandboxSteps.MaxPoints; Jinočany: 8, was 6: a path of seven beams)
+local MAX_POINTS = 8 -- SandboxSteps.route's most points (SandboxSteps.MaxPoints; 8.9: 8, was 6: a path of seven beams)
 local PAD_L, PAD_R, PAD_V = 14, 4, 5 -- the line's padding (at scale 1)
 local LINE_H = G.TextSize + 4 -- one line of words
 local CLOSE_W = 28 -- the ✕'s column (at scale 1; a finger's size on a touch screen)
 local MIN_ROOM = 220 -- px at scale 1: narrower than this beside the sides' HUD, the line goes under it
 local LABELS: { [string]: string } = {
 	board = "CONTRACTS",
-	curb = string.upper(SandboxMap.House.name), -- (Jinočany: the move's house's, HOUSE_LABELS)
+	curb = string.upper(SandboxMap.House.name), -- (the move's place's, HOUSE_LABELS)
 	door = "FRONT DOOR",
 	van = "YOUR VAN",
 	unload = "UNLOAD HERE",
@@ -118,7 +118,7 @@ local LABELS: { [string]: string } = {
 	danny = string.upper(Config.MoveHelper.Name), -- 8.4
 	sale = "SET PRICE", -- 8.9
 }
-local HOUSE_LABELS: { [string]: string } = {} -- Jinočany: a house's id → its chevron's tag (its name, made once)
+local HOUSE_LABELS: { [string]: string } = {} -- a place's id → its chevron's tag (its name, made once)
 for _, h in SandboxMap.Houses do
 	HOUSE_LABELS[h.id] = string.upper(h.name)
 end
@@ -235,7 +235,7 @@ local function readMove(view: any)
 	state.vanLoad = inVan
 	state.delivered = delivered
 	state.heavy = heavy -- 8.4
-	-- Jinočany: the move's house (its contract's id, a SandboxMap.Houses id; another: none, the farmstead's words)
+	-- the move's place (its contract's id, a SandboxMap.Houses id; another: none, the farmstead's words)
 	local house = if move then move.contract else nil
 	state.house = if SandboxMap.house(house) then house else nil
 	readHelper() -- 8.4 (Danny's part: your player attributes)
@@ -548,7 +548,7 @@ local function targetOf(kind: string?, px: number, pz: number): (Vector3?, strin
 	end
 	local plotId = state.plot
 	local plot = if plotId then SandboxMap.Plots[plotId] else nil
-	local house = SandboxMap.house(state.house) or SandboxMap.House -- (Jinočany: the move's house)
+	local house = SandboxMap.house(state.house) or SandboxMap.House -- (the move's place)
 	if kind == "board" then
 		if plot then
 			return Vector3.new(plot.board.x, plot.board.y + 4, plot.board.z), LABELS.board
@@ -1090,7 +1090,7 @@ local function look()
 	end
 	local plot = player:GetAttribute("Plot")
 	state.plot = if type(plot) == "number" then plot else nil
-	state.atHouse = root ~= nil and SandboxSteps.atHouse(px, pz, G.HouseMargin, state.house) -- (Jinočany: the move's house)
+	state.atHouse = root ~= nil and SandboxSteps.atHouse(px, pz, G.HouseMargin, state.house) -- (the move's place)
 	state.seated = seated()
 	state.stock, state.shown, state.freeStands = summary.stock, summary.shown, summary.free
 	if summary.free == nil and summary.stock > 0 then

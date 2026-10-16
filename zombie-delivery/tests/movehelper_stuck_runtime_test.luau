@@ -3,9 +3,10 @@
 -- server/Moving.luau and server/MoveHelper.luau on tests/runtime/MovingRuntime.luau's fakes (Config.Sandbox.On) with the
 -- real art (shared/FurnitureLooks.luau, shared/HouseLayout.luau, server/HouseInterior.luau and its fixtures' parts as
 -- the game builds them, server/FixtureMesh.luau's without the import): a move into each of SandboxMap.Houses (The Old
--- Farmstead and the five family houses of Jinočany). His body is Config.MoveHelper.Body (Roblox's classic R15: a
--- capsule Radius round his root; his collidable parts from Hip to Height over the floor; StepUp the highest rise a
--- Humanoid walks onto with its Jumping state off, an assumption), swept against every collidable part of the built
+-- Farmstead and the five other places to empty, 9.5 each of its own kind: its contract's, the map's). His body is
+-- Config.MoveHelper.Body (Roblox's classic R15: a capsule Radius round his root; his collidable parts from Hip to Height
+-- over the floor; StepUp the highest rise a Humanoid walks onto with its Jumping state off, an assumption), swept
+-- against every collidable part of the built
 -- interior (CanCollide: the shell's walls, the fixtures' solid parts, the pieces' roots): a part in his way above StepUp
 -- is a hit (over Hip his torso's: a collision; under it a step higher than he climbs).
 --   * the sweep, along his ways on the server's grid (HouseRoute.path): from each way in (where the door puts him) to
@@ -25,6 +26,9 @@
 -- 8.9.5 measured with this test before the fix (the same seeds): 1,130 swept steps of the 8.9.5 walk within his body of
 -- a wall (0.35 studs off at the closest; 4 a low piece's step), the grid's own legs 0.95 studs off a garage door's leaf the
 -- plan does not know; in the real runs a 3.9 s stuck spell and a 0.35-stud nudge on the spot, 48 door trips, all popped.
+-- 9.5 measured with this test on the countryside's map: The Forest Lodge's walk 1.09 studs off a doorway's jamb at the
+-- closest, on the first leg of his way from where the door puts him (a quarter stud off his cell's middle: the leg the
+-- way was pulled from began there, not where he stood; HouseRoute.path now steps onto the cell first when it must).
 math.randomseed(93)
 local E = require("./MovingRuntime")
 local Config = require("./Config")
@@ -355,6 +359,19 @@ Moving.parkVan = function(player: any, spot: any, _seat: boolean, carId: string?
 	return nil, car
 end
 Moving.start()
+-- 9.5 the countryside: the six places of the map, each with its contract (Config.Moving.Sandbox.Houses) of its own kind,
+-- the map's (no stand-in: every kind a place of its own)
+do
+	local kinds: { [string]: boolean } = {}
+	local ok = #SandboxMap.Houses == 6
+	for _, house in SandboxMap.Houses do
+		local own = Config.Moving.Sandbox.Houses[house.id]
+		ok = ok and own ~= nil and own.Kind == house.kind
+		kinds[house.kind] = true
+	end
+	check("the six places of the map, each with its contract of its own kind: the big house, a family house, the cabin, the lodge, the mill, the cottage",
+		ok and kinds.big and kinds.house and kinds.cabin and kinds.lodge and kinds.mill and kinds.cottage == true)
+end
 local lines: { string } = {}
 MoveHelper.diagnose(true, function(line: string)
 	table.insert(lines, line)
@@ -429,6 +446,7 @@ for index, house in SandboxMap.Houses do
 		continue
 	end
 	local plan, origin = b.plan, b.origin
+	check(`{house.name}: its move's plan of its own kind ("{house.kind}", its contract's)`, plan.kind == house.kind, plan.kind)
 	local floor = origin.Position.Y
 	local y = floor + 3
 	local solids = solidsOf(b.model, floor)
@@ -642,7 +660,7 @@ print(string.format("AUDIT ALL: 9.3's walk %d steps, %d hits, %.2f studs off at 
 	all.new.steps, all.new.body + all.new.step, all.new.least, all.newLegs.body + all.newLegs.step, all.newLegs.least))
 print(string.format("RUN ALL: %d steps, %d hits, %d door trips (%d faded both ways), %d put elsewhere, stuck %.1f s at most",
 	all.runs.steps, all.runs.body + all.runs.step, totals.trips, totals.faded, totals.pops, totals.stuck))
-check("the six houses: 8.9.5's walk measured hitting walls (the cause), 9.3's none", all.old.body > 0 and all.new.body + all.new.step == 0 and totals.noSpot == 0)
+check("the six houses (9.5: every countryside kind among them): 8.9.5's walk measured hitting walls (the cause), 9.3's none", all.old.body > 0 and all.new.body + all.new.step == 0 and totals.noSpot == 0)
 
 if failures == 0 then
 	print("ALL CHECKS PASSED")

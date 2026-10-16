@@ -128,8 +128,9 @@
 --     house (Moving.respawnAt, SandboxBoot's spawn). The clock and the zombies are Config.Moving.Sandbox's (Time,
 --     HordeAt, Horde, Roam: no horde and no roamers by default, nobody has a gun there; hordeAt 0 is "never"); Danny
 --     comes to a crew of one as ever.
---   * Jinočany step 1 (design/jinocany/NAVRH.md §3; the blocks marked "Jinočany"): six houses to empty in place of the
---     one, shared/SandboxMap.luau's Houses (The Old Farmstead, the big one, then five family houses in the village),
+--   * 8.9 six houses (the blocks marked "six houses"; 9.4 the countryside, design/countryside/plan.py): six places to
+--     empty in place of the one, shared/SandboxMap.luau's Houses (The Old Farmstead, the big one, then five places of
+--     their own: the pond cabin, the lone house, the forest lodge, the old mill, the orchard cottage),
 --     a contract each (SB.contracts, Config.Moving.Sandbox.Houses: its family, address, plan's kind and clock) and a
 --     site each (SB.site: its front door's "Enter house" on that house's map door, the part with the attribute
 --     SandboxDoor in the model whose SandboxHouse is its id, SB.frontDoor; "Call the van to the door" to its curb; its
@@ -182,7 +183,7 @@
 --   Moving.busy(player)       why `player` can't take a job, a mission or a rental now (on a move), or nil
 --   Moving.respawnAt(player)  8.0 SANDBOX: where a new body of a player on a move stands (by the move's van, else
 --                             outside the house), or nil (off a move, the city)
---   Moving.houseOf(player)    Jinočany: the SandboxMap house of the move `player` is on, else of their card (nil: none
+--   Moving.houseOf(player)    six houses: the SandboxMap house of the move `player` is on, else of their card (nil: none
 --                             yet, the city)
 --   Moving.parkVan            8.0 SANDBOX: the hook server/SandboxBoot.luau sets (its parkVan: START's van, repaired)
 --   Moving.admin(player, arg) the admin panel's MOVES buttons: "card" | "start" | "house" | "horde" | "time" | "deliver"
@@ -346,7 +347,7 @@ local jobs: any = nil -- server/Jobs.luau (required in start: Jobs.active; 8.0 S
 -- 8.0 SANDBOX (design/sandbox/KONTRAKT.md): the mode, its state and its helpers in one table (this chunk's registers
 -- are few: the -O0 limit). Its functions come where what they use is (the blocks marked "8.0 SANDBOX").
 --   on        Config.Sandbox.On when Moving.start ran (false: the city's game, as it was)
---   contracts Jinočany: house id → its contract (SandboxMap.Houses, Config.Moving.Sandbox.Houses: SB.newContract); a
+--   contracts six houses: house id → its contract (SandboxMap.Houses, Config.Moving.Sandbox.Houses: SB.newContract); a
 --             move's is a copy with its seed (SB.contractFor); all: the same in SandboxMap.Houses' order
 --   boards    every plot's Moving contracts corkboard (server/MoveSites.luau plotBoard)
 --   seeds     user id → the seed of the house their card shows, kept until a move of theirs brings something home
@@ -354,10 +355,10 @@ local jobs: any = nil -- server/Jobs.luau (required in start: Jobs.active; 8.0 S
 --             keeps it, so starting, peeking and calling off never rerolls the house; the admin's REFILL forgets it.
 --             8.4: kept in their save too (PlayerData's sandboxHouseSeed: SB.keep sets and drops both), and their
 --             save's is the one while it is loaded (SB.cardOf): leaving and joining another server shows the same house
---   houses    Jinočany: user id → the house of their card (with its seed in seeds; the seed spent, the house they emptied
+--   houses    six houses: user id → the house of their card (with its seed in seeds; the seed spent, the house they emptied
 --             last: their next card takes the next one, SB.pick), in their save too (PlayerData's sandboxHouse)
 --   last      the last seed handed out (never twice in a row)
---   doors     Jinočany: house id → its map front door (the part with the attribute SandboxDoor), once found
+--   doors     six houses: house id → its map front door (the part with the attribute SandboxDoor), once found
 --   how       the result card's words for an end (HOW_TEXT's)
 local SB = {
 	on = false,
@@ -414,7 +415,7 @@ function SB.why(code: string?): string
 	return if SB.on then (string.gsub(text, "the Wall", "your warehouse")) else text
 end
 
--- The board's contracts: the city's (Config.Moving.Contracts), or the sandbox's houses (Jinočany: all six, the order
+-- The board's contracts: the city's (Config.Moving.Contracts), or the sandbox's houses (six houses: all six, the order
 -- of SandboxMap.Houses; a card shows only the player's own, contractList).
 function SB.list(): { Contract }
 	return if SB.on then SB.all else T.Contracts
@@ -426,7 +427,7 @@ function SB.plotOf(player: Player): SandboxMap.Plot?
 end
 
 -- 8.4: `player`'s card seed set (a number) or dropped (nil), here and in their profile (their next save keeps it).
--- Jinočany: with its house (`house`: a SandboxMap.Houses id; the seed dropped, the house they emptied last).
+-- six houses: with its house (`house`: a SandboxMap.Houses id; the seed dropped, the house they emptied last).
 function SB.keep(player: Player, house: string?, seed: number?)
 	local id = player.UserId
 	if house then
@@ -458,7 +459,7 @@ function SB.cardOf(player: Player): (string?, number?)
 	return SB.houses[player.UserId], SB.seeds[player.UserId]
 end
 
--- Jinočany: is the house `id` somebody else's now? Another owner's move on it, or the card of another player here (its
+-- six houses: is the house `id` somebody else's now? Another owner's move on it, or the card of another player here (its
 -- seed not spent): two players are never on one house at once.
 function SB.taken(id: string, player: Player): boolean
 	for owner, s in sessions do
@@ -477,7 +478,7 @@ function SB.taken(id: string, player: Player): boolean
 	return false
 end
 
--- Jinočany: the next house free for `player` after the house `after` (SandboxMap.Houses' order, round; nil: from the
+-- six houses: the next house free for `player` after the house `after` (SandboxMap.Houses' order, round; nil: from the
 -- first one, the farmstead), nil when every house is somebody else's.
 function SB.pick(player: Player, after: string?): string?
 	local list = SandboxMap.Houses
@@ -498,7 +499,7 @@ end
 
 -- The contract of `player`'s next move: their card's house with its seed, else (none yet, or spent) the next free
 -- house with a new seed (never the last one handed out): every move refills a house; its clock (its Config.Moving
--- .Sandbox.Houses' Time) and horde Config.Moving.Sandbox's as they are now (Horde false: hordeAt 0, never). Jinočany:
+-- .Sandbox.Houses' Time) and horde Config.Moving.Sandbox's as they are now (Horde false: hordeAt 0, never). six houses:
 -- their card's house taken meanwhile by another player (SB.taken), the next free one with the same seed. nil before
 -- Moving.start made them, and why: "loading" (8.4: their save still loads: no house before it says which one they
 -- have) or "taken" (every house somebody else's).
@@ -538,7 +539,7 @@ function SB.contractFor(player: Player): (Contract?, string?)
 end
 
 -- `player`'s card seed is spent (8.3 economy: a move of theirs brought something home, SB.store; the admin's REFILL; a
--- plan that failed): their next card shows a new house (Jinočany: the next one, SB.pick after this one, which their
+-- plan that failed): their next card shows a new house (six houses: the next one, SB.pick after this one, which their
 -- card keeps as the last); that house's plan facts go (factsOf keeps one per seed in the sandbox). `keep` (they left):
 -- only the facts go, the seed stays theirs (by user id) for when they come back (8.4: and in their save, written as
 -- they leave, for another server).
@@ -552,7 +553,7 @@ function SB.forget(player: Player, keep: boolean?)
 	end
 end
 
--- Jinočany: the SandboxMap house of the move `player` is on (theirs or their crew's), else of their card (its seed
+-- six houses: the SandboxMap house of the move `player` is on (theirs or their crew's), else of their card (its seed
 -- not spent), nil without one (and in the city).
 function Moving.houseOf(player: Player): SandboxMap.House?
 	if not SB.on then
@@ -1150,7 +1151,7 @@ local function yawLook(yaw: number): Vector3
 	return Vector3.new(-math.sin(r), 0, -math.cos(r))
 end
 
--- Jinočany: every house's site, the contract's house's (SandboxMap.house(contract.id)): its front door, its curb, its
+-- six houses: every house's site, the contract's house's (SandboxMap.house(contract.id)): its front door, its curb, its
 -- street and address (Config.Moving.Sandbox.Houses'); its back door only where it has one.
 function SB.site(contract: Contract, parent: Instance): Site
 	local h = SandboxMap.house(contract.id) or SandboxMap.House
@@ -1183,7 +1184,7 @@ function SB.site(contract: Contract, parent: Instance): Site
 	local front: SiteDoor = { exit = 1, name = "front door", door = door, facing = facing, outside = outside, park = park, heading = yawLook(h.curb.yaw), width = 4, part = enter }
 	local doors = { front }
 	-- 8.3 the big move: its back door (House.back, the plan's exits[2]), a second way in and out; the van's spot the curb
-	-- (Jinočany: only where the house has one, the farmstead)
+	-- (six houses: only where the house has one, the farmstead)
 	local back = h.back
 	if back then
 		local backFacing = yawLook(back.yaw)
@@ -1204,7 +1205,7 @@ function SB.site(contract: Contract, parent: Instance): Site
 	return { contract = contract, home = home, door = door, facing = facing, outside = outside, model = model, doors = doors }
 end
 
--- The house a map door belongs to (Jinočany): its own attribute SandboxHouse, else its nearest model's that has one;
+-- The house a map door belongs to (six houses): its own attribute SandboxHouse, else its nearest model's that has one;
 -- none: the farmstead (a door of 8.0 – 8.9's map, a test's).
 function SB.doorHouse(d: Instance): string
 	local at: Instance? = d
@@ -1237,7 +1238,7 @@ function SB.frontDoor(id: string): BasePart?
 	return nil
 end
 
--- A house's contract (its seed, clock and horde set per move: SB.contractFor): Jinočany, its own words in
+-- A house's contract (its seed, clock and horde set per move: SB.contractFor): six houses, its own words in
 -- Config.Moving.Sandbox.Houses (its family, its plan's kind: 8.3 the farmstead the big house's, HouseLayout's "big";
 -- the family houses "house"), the cards' icon Config.Moving.Sandbox's.
 function SB.newContract(h: SandboxMap.House): Contract
@@ -3190,7 +3191,7 @@ end
 -- 7.x farm move: one at every door of the site (a farm's: "Enter house" at the farmhouse, "Enter barn" at the barn
 -- doors), each to its own way in (onEnter's index); the front door's is team.enter, the others team.doors.
 local function enterPrompt(s: Session)
-	local front = if SB.on then SB.frontDoor(s.contract.id) else nil -- 8.0 SANDBOX: on the map's front door once it has one (Jinočany: its house's)
+	local front = if SB.on then SB.frontDoor(s.contract.id) else nil -- 8.0 SANDBOX: on the map's front door once it has one (six houses: its house's)
 	if front then
 		s.site.doors[1].part = front
 	end
@@ -4093,7 +4094,7 @@ local function nextContract(player: Player): Contract?
 end
 
 -- The card's list of contracts (open, or 🔒 and why; the admin's all open).
--- (Jinočany: the sandbox's card lists only its own house, `only`: one house at a time)
+-- (six houses: the sandbox's card lists only its own house, `only`: one house at a time)
 local function contractList(player: Player, admin: boolean, only: Contract?): { { [string]: any } }
 	local list = {}
 	local offered: { Contract } = if SB.on and only then { only } else SB.list()
@@ -4130,7 +4131,7 @@ end
 -- 7.x farm move: `contractId` nil: the board's next contract for the player; the card lists every contract (open or
 -- 🔒) and a locked one's START waits (busy: why).
 function Moving.openCard(player: Player, contractId: string?, admin: boolean)
-	-- (8.0 SANDBOX: the one house, with the seed of the player's next move: a new house every move; Jinočany: the house
+	-- (8.0 SANDBOX: the one house, with the seed of the player's next move: a new house every move; six houses: the house
 	-- of their card, one of six)
 	local contract: Contract?, why: string? = nil, nil
 	if SB.on then
@@ -4140,7 +4141,7 @@ function Moving.openCard(player: Player, contractId: string?, admin: boolean)
 	end
 	local a = artNow()
 	if not contract or not a then
-		say(player, if SB.on and a and why == "taken" then "Every house in Jinočany is being emptied right now: try the board again in a minute."
+		say(player, if SB.on and a and why == "taken" then "Every place is being emptied right now: try the board again in a minute."
 			elseif SB.on and a then "Your save is still loading: try the board again in a moment." -- (8.4: SB.contractFor)
 			else "Moving is not ready in this place yet (the house art is missing).")
 		return
@@ -4170,7 +4171,7 @@ function Moving.openCard(player: Player, contractId: string?, admin: boolean)
 		truck = vanName(player), -- (7.x van moves: your own van)
 		crew = #Crew.members(player),
 		busy = cantStart(player) or (if admin then nil else lockedFor(player, contract)),
-		contracts = contractList(player, admin, contract), -- 7.x farm move: the board's contracts (Jinočany: this one)
+		contracts = contractList(player, admin, contract), -- 7.x farm move: the board's contracts (six houses: this one)
 	}
 	if SB.on then -- 8.0 SANDBOX: no story (client/MovingHud.luau: no intro, no CHAPTERS), no pay per piece (the note)
 		card.story = false
@@ -4708,13 +4709,13 @@ end
 function Moving.admin(player: Player, arg: any): string
 	local s = sessions[player]
 	-- (7.x farm move: "farm…" is Walt's Farm's: farmcard, farm (start), farmgo; the rest Marge's House; 8.0 SANDBOX: the
-	-- one house's, every one; Jinočany: your move's house, else your card's)
+	-- one house's, every one; six houses: your move's house, else your card's)
 	local contract = if type(arg) == "string" and string.sub(arg, 1, 4) == "farm" then contractById("walt") or T.Contracts[1] else T.Contracts[1]
 	if SB.on then
 		local house = if s and not s.ended then s.contract else (SB.contractFor(player))
 		contract = house or SB.all[1] or contract
 	end
-	if SB.on and arg == "refill" then -- 8.0 SANDBOX: a new house for your next move (its card shows it; Jinočany: the next house)
+	if SB.on and arg == "refill" then -- 8.0 SANDBOX: a new house for your next move (its card shows it; six houses: the next house)
 		if s then
 			return "ADMIN: the house is refilled for your next move (FINISH or end this one first)."
 		end
@@ -5278,7 +5279,7 @@ function Moving.onResult(fn: (Player, Rules.Move, Rules.Result, { Player }) -> (
 -- 8.0 SANDBOX (server/SandboxBoot.luau: every spawn): where a new body of a player on a move (its owner or its crew)
 -- stands, never stranded at home while the van is out: by the move's van when it is out and not wrecked (beside its
 -- back, its side's way, on the ground, looking at the back doors), else 6 studs out of the house's front door
--- (Jinočany: the move's house's SandboxMap door, looking out); nil off a move (and in the city).
+-- (six houses: the move's house's SandboxMap door, looking out); nil off a move (and in the city).
 function Moving.respawnAt(player: Player): CFrame?
 	local s = sessionOf(player)
 	if not SB.on or not s then
@@ -5294,7 +5295,7 @@ function Moving.respawnAt(player: Player): CFrame?
 		local look = frame * Vector3.new(0, 0, backZ)
 		return CFrame.lookAt(at, Vector3.new(look.X, at.Y, look.Z))
 	end
-	local spot = (SandboxMap.house(s.contract.id) or SandboxMap.House).door -- (Jinočany: the move's house's)
+	local spot = (SandboxMap.house(s.contract.id) or SandboxMap.House).door -- (six houses: the move's house's)
 	return CFrame.new(spot.x, spot.y + 3, spot.z) * CFrame.Angles(0, math.rad(spot.yaw), 0) * CFrame.new(0, 0, -6)
 end
 
@@ -5417,7 +5418,7 @@ function Moving.start()
 	made.Parent = workspace
 	folder = made
 	if SB.on then
-		-- 8.0 SANDBOX: the houses (no Marge, no Walt; Jinočany: six, a contract and a site each), a board on every plot,
+		-- 8.0 SANDBOX: the houses (no Marge, no Walt; six houses: six, a contract and a site each), a board on every plot,
 		-- no Wall, no dressing, no soldier
 		for _, h in SandboxMap.Houses do
 			local house = SB.newContract(h)

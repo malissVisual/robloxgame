@@ -21,7 +21,7 @@
 --   * 8.4: the house the moving card shows (sandboxHouseSeed): written with its flag, read back on another server's
 --     join (the same house), dropped once a trip spent it; only a whole number in Config.Moving.Sandbox.Seeds' range,
 --     only from a real save written with its flag (junk, an older save, a lock-only record, a new player: none).
---     Jinočany: which house it is (sandboxHouse) the same way, only an id shared/SandboxMap.luau knows; a real 8.4 save
+--     8.9: which house it is (sandboxHouse) the same way, only an id shared/SandboxMap.luau knows; a real 8.4 save
 --     with a seed and no house's flag: the farmstead's (its seed was rolled for the one house there was).
 --   * Size: the biggest realistic sandbox save, measured.
 --   * The shutdown (BindToClose): every player saved at once, in parallel, waited for (a failed try too); a store that
@@ -644,7 +644,7 @@ do
 	check("… a new player's save: the flag, no seed", E.saves.Player_221.sandboxHouseSeedKept == true and E.saves.Player_221.sandboxHouseSeed == nil)
 end
 
--- ── Jinočany: which house it is (sandboxHouse) ────────────────────────────
+-- ── 8.9: which house it is (sandboxHouse) ────────────────────────────
 -- (server/Moving.luau keeps it with the seed in SB.houses: tests/sandboxhouses_runtime_test.luau)
 do
 	local SandboxMap = require("./SandboxMap")
@@ -655,7 +655,7 @@ do
 	E.saves.Player_232 = houseSave
 	local H1 = E.join(232, "Hana")
 	local p1 = PlayerData.get(H1) :: any
-	check("Jinočany: a save with its house and the flag: read into the profile with its seed", p1.sandboxHouse == linden and p1.sandboxHouseSeed == 424242)
+	check("8.9: a save with its house and the flag: read into the profile with its seed", p1.sandboxHouse == linden and p1.sandboxHouseSeed == 424242)
 	E.leave(H1)
 	check("… the leave save writes it back with its flag", E.saves.Player_232.sandboxHouse == linden and E.saves.Player_232.sandboxHouseKept == true)
 	local H2 = E.join(232, "Hana")
@@ -670,7 +670,7 @@ do
 	E.leave(H3)
 	-- only an id SandboxMap knows, only from a real save written with its flag
 	local kept = {}
-	for index, value in { "nowhere", "", 5, true, { linden }, string.upper(linden) } :: { any } do
+	for index, value in { "nowhere", "", 5, true, { linden }, string.upper(linden), "Hlavní_n_5", "Školní_e_20" } :: { any } do
 		local junkSave = save83(100)
 		junkSave.sandboxHouseSeed, junkSave.sandboxHouseSeedKept = 424242, true
 		junkSave.sandboxHouse, junkSave.sandboxHouseKept = value, true
@@ -682,8 +682,19 @@ do
 		end
 		E.leave(J)
 	end
-	check("Jinočany: a house that is no SandboxMap.Houses id (unknown, empty, a number, a boolean, a table, another spelling): none, loaded and not kicked",
+	check("8.9: a house that is no SandboxMap.Houses id (unknown, empty, a number, a boolean, a table, another spelling, 9.4: an old village house's): none, loaded and not kicked",
 		#kept == 0, table.concat(kept, "; "))
+	-- 9.4: an 8.9 save of a village house (gone with the countryside): no house, its seed kept (the next card takes the
+	-- next free place from the farmstead on: server/Moving.luau's SB.pick)
+	local village = save83(100)
+	village.sandboxHouseSeed, village.sandboxHouseSeedKept = 4343, true
+	village.sandboxHouse, village.sandboxHouseKept = "Hlavní_n_5", true
+	E.saves.Player_233 = village
+	local JV = E.join(233, "Jan")
+	local pv = PlayerData.get(JV) :: any
+	check("9.4: an 8.9 save of a village house (Hlavní_n_5, gone): no house, its seed kept, loaded and not kicked", pv ~= nil and pv.sandboxHouse == nil
+		and pv.sandboxHouseSeed == 4343)
+	E.leave(JV)
 	-- the migration: a real 8.4 save (a seed with its flag, no house's flag): the farmstead's, the one house there was
 	local old = save83(100)
 	old.sandboxHouseSeed, old.sandboxHouseSeedKept = 4242, true
@@ -691,7 +702,7 @@ do
 	E.saves.Player_233 = old
 	local J2 = E.join(233, "Jan")
 	local pj2 = PlayerData.get(J2) :: any
-	check("Jinočany: an 8.4 save (a seed, no house's flag): the farmstead with that seed (its seed was rolled for it)", pj2.sandboxHouse == SandboxMap.House.id
+	check("8.9: an 8.4 save (a seed, no house's flag): the farmstead with that seed (its seed was rolled for it)", pj2.sandboxHouse == SandboxMap.House.id
 		and pj2.sandboxHouseSeed == 4242)
 	E.leave(J2)
 	local older = save83(100) -- (no seed either: none)

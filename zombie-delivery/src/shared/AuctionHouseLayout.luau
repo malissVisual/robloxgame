@@ -3,8 +3,8 @@
 -- level; tests/auctionhouse_test.luau); server/SandboxWorld.luau builds it from these parts, only while
 -- Config.Auction.On (8.8 is the groundwork: the round itself comes with the server's step). Its numbers are
 -- Config.Auction.House's; its place is House.Spot alone (the middle of its front wall on the ground, looking out), so it
--- moves with one line when the Jinočany village is built (design/jinocany/plan.json: the Corner Drugstore keeps
--- x 40 – 120 at the crossroads; this stands east of it on Depot Row, across from plots 3 and 4).
+-- moves with one line (it stands on Depot Row east of the crossroads, across from plots 3 and 4; 9.4 the countryside's
+-- plan, design/countryside/plan.py, keeps its site clear).
 --
 -- A small Central European town hall of auctions, not alpine: a cream rendered hall on a granite plinth, white
 -- pilasters and cornice, a red tile gable roof with its ridge along the front, tall white-framed windows, a doorway with

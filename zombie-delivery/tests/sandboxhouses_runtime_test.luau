@@ -1,18 +1,19 @@
--- Jinočany step 1 (design/jinocany/NAVRH.md §3; the blocks marked "Jinočany" in server/Moving.luau): the six houses to
--- empty of shared/SandboxMap.luau (Houses: The Old Farmstead and five family houses in the village) with the real
+-- 8.9 six houses, 9.4 the countryside (the blocks marked "six houses" in server/Moving.luau): the six places to
+-- empty of shared/SandboxMap.luau (Houses: The Old Farmstead and the countryside's five spots) with the real
 -- server/Moving.luau (MoveLobby, MoveGreeters, MoveHelper and MoveSites with it) on tests/runtime/MovingRuntime.luau's
 -- fakes, Config.Sandbox.On (tests/run_tests.py builds them; the fake art's plans record their seeds and kinds):
 --   * a site per house (Move_<id>): a doormat at its front door, its "Enter house" on that house's own map door (the
 --     SandboxDoor part in the model whose SandboxHouse is its id: server/SandboxWorld.luau's stand-ins; the farmstead's
 --     has none: a door of no house's is the farmstead's); a back door (its doormat, "Enter by the back door") only on the
 --     farmstead, which has one
---   * two players never on one house: Ann's first card the farmstead, Bob's the next free one (the Linden House); their
+--   * two players never on one house: Ann's first card the farmstead, Bob's the next free one (The Pond Cabin); their
 --     cards and moves stay apart; Ann's next cards skip the house on Bob's
---   * a whole move on each of the six (Ann five in turn, Bob the Linden House): the card at your kiosk (its family, its
---     address on its street, its clock, its plan's kind: big for the farmstead, house for the rest), START, LAUNCH, the
---     van called to the door (at its curb on its street's asphalt, its back to the door), walked in through its door (no
---     E), a piece carried out through it, loaded, driven home, a trip into your warehouse, FINISH; the next card the next
---     house (round to the farmstead after the last); a death with the van wrecked: out of that house's own door
+--   * a whole move on each of the six (Ann five in turn, Bob The Pond Cabin): the card at your kiosk (its family, its
+--     place, its clock, its plan's kind: its contract's, the place's own on the map, 9.5 the countryside's), START,
+--     LAUNCH, the van called to the door (at its curb on its street's asphalt, its back to the door), walked in through
+--     its door (no E), a piece carried out through it, loaded, driven home, a trip into your warehouse, FINISH; the next
+--     card the next house (round to the farmstead after the last); a death with the van wrecked: out of that house's own
+--     door
 --   * the seed kept across a leave (the save's sandboxHouse and sandboxHouseSeed): back on this server or another, the
 --     same house and the same seed; a save with a house another player here has: the next free one, its seed kept; a
 --     save whose seed a trip spent (none, its house the one emptied last): the next house after it; an 8.4 save (a seed,
@@ -43,6 +44,20 @@ local workspace = M.workspace
 local Houses = SandboxMap.Houses
 local Farm = SandboxMap.House
 local plot1, plot2, plot3 = SandboxMap.Plots[1], SandboxMap.Plots[2], SandboxMap.Plots[3]
+-- 9.5 the countryside: a place's card's words, its contract's (Config.Moving.Sandbox.Houses: every place of the map
+-- has its own, of the place's kind)
+local function contractOf(h: any): { Client: string, Address: string, Kind: string, Time: number }
+	return S.Houses[h.id]
+end
+check("every place of the map with its contract (Config.Moving.Sandbox.Houses), of the place's own kind", (function(): boolean
+	for _, h in Houses do
+		local own = S.Houses[h.id]
+		if not own or own.Kind ~= h.kind then
+			return false
+		end
+	end
+	return #Houses == 6
+end)())
 E.Zombies.findSpot = function(center: any): any
 	return center + V3(60, 0, 0)
 end
@@ -191,7 +206,7 @@ do
 			ok, why = false, `{h.name}: {mats} mats, back {back ~= nil}`
 		end
 	end
-	check("Jinočany: a site per house (Move_<id>), a doormat at each of its doors; a back door only on the farmstead (its own mat)", ok and #Houses == 6, why)
+	check("six houses: a site per house (Move_<id>), a doormat at each of its doors; a back door only on the farmstead (its own mat)", ok and #Houses == 6, why)
 end
 
 -- Two players, two houses ------------------------------------------------------------------------------------------------
@@ -211,9 +226,9 @@ local bobCard = cardAt(bob, plot2)
 check("Ann's first card: the farmstead (the first house), The Nováks at the end of Pražská, its big plan, 25 minutes", annCard ~= nil and annCard.id == Farm.id
 	and annCard.client == "The Nováks" and annCard.address == "the end of Pražská" and annCard.time == 25 * 60 and plans[#plans - 1].kind == "big" and annCard.busy == nil,
 	annCard and annCard.id)
-check("Bob's: never Ann's house, the next free one, The Linden House (The Dvořáks, Hlavní 5), a family house's plan, 15 minutes", bobCard ~= nil
-	and bobCard.id == Houses[2].id and bobCard.name == "The Linden House" and bobCard.client == "The Dvořáks" and bobCard.address == "Hlavní 5"
-	and bobCard.time == 15 * 60 and plans[#plans].kind == "house" and #bobCard.contracts == 1 and bobCard.contracts[1].id == bobCard.id, bobCard and bobCard.id)
+check(`Bob's: never Ann's house, the next free one, {Houses[2].name} ({contractOf(Houses[2]).Client}, {contractOf(Houses[2]).Address}), its contract's plan and clock`, bobCard ~= nil
+	and bobCard.id == Houses[2].id and bobCard.name == Houses[2].name and bobCard.client == contractOf(Houses[2]).Client and bobCard.address == contractOf(Houses[2]).Address
+	and bobCard.time == contractOf(Houses[2]).Time and plans[#plans].kind == contractOf(Houses[2]).Kind and #bobCard.contracts == 1 and bobCard.contracts[1].id == bobCard.id, bobCard and bobCard.id)
 check("…each card lists only its own house (one at a time)", #annCard.contracts == 1 and annCard.contracts[1].id == Farm.id)
 check("…their saves keep each card's house and seed", E.profiles[ann].sandboxHouse == Farm.id and E.profiles[bob].sandboxHouse == Houses[2].id
 	and E.profiles[ann].sandboxHouseSeed == plans[#plans - 1].seed and E.profiles[bob].sandboxHouseSeed == plans[#plans].seed)
@@ -235,7 +250,7 @@ end
 -- `player` (at their plot `plot`) moves house `h` out: their card, START, LAUNCH, the van called to its door, walked in,
 -- a piece carried out and loaded, home, a trip, FINISH. Says what went wrong (nil: all of it went right).
 local function moveOn(player: any, plot: any, h: any): string?
-	local own = S.Houses[h.id]
+	local own = contractOf(h)
 	local card = cardAt(player, plot)
 	if not card or card.id ~= h.id then
 		return `the card: {card and card.id}`
@@ -252,7 +267,7 @@ local function moveOn(player: any, plot: any, h: any): string?
 		return `the move's state: {view and view.contract}`
 	end
 	local kind = built[#built].kind
-	if kind ~= own.Kind or kind ~= h.kind then
+	if kind ~= own.Kind or kind ~= h.kind then -- (9.5: the contract's kind, the place's own on the map)
 		return `the plan's kind {kind}`
 	end
 	-- the van called to the door: at its curb on the street's asphalt, its nose away from the door, its back to it
@@ -328,13 +343,13 @@ local function moveOn(player: any, plot: any, h: any): string?
 	return nil
 end
 
--- Ann: the farmstead, then the next house each time (Bob's card has the Linden House: she never gets it), round to the
--- farmstead after the last; Bob: the Linden House
+-- Ann: the farmstead, then the next place each time (Bob's card has The Pond Cabin: she never gets it), round to the
+-- farmstead after the last; Bob: The Pond Cabin
 local order = { 1, 3, 4, 5, 6 }
 for _, index in order do
 	local h = Houses[index]
 	local why = moveOn(ann, plot1, h)
-	check(`a move on {h.name} ({h.street}, its plan {h.kind}): its card, LAUNCH, the van at its curb (on asphalt, its back to the door), walked in and out, a piece home, FINISH`,
+	check(`a move on {h.name} ({h.street}, its plan {contractOf(h).Kind}): its card, LAUNCH, the van at its curb (on asphalt, its back to the door), walked in and out, a piece home, FINISH`,
 		why == nil, why)
 	check(`…her save: {h.name} spent (no seed), the house she emptied last`, E.profiles[ann].sandboxHouse == h.id and E.profiles[ann].sandboxHouseSeed == nil)
 end
@@ -344,7 +359,7 @@ local again = cardAt(ann, plot1)
 check("Ann's card after the last house: round to the farmstead again (a new seed)", again ~= nil and again.id == Farm.id and plans[#plans].kind == "big"
 	and plans[#plans].seed == E.profiles[ann].sandboxHouseSeed)
 local bobNext = cardAt(bob, plot2)
-check("Bob's after the Linden House: the next free one after it (the Blue Gate House)", bobNext ~= nil and bobNext.id == Houses[3].id, bobNext and bobNext.id)
+check(`Bob's after {Houses[2].name}: the next free one after it ({Houses[3].name})`, bobNext ~= nil and bobNext.id == Houses[3].id, bobNext and bobNext.id)
 
 -- Two moves at once, never on one house; the back door; a death -------------------------------------------------------------
 
@@ -375,7 +390,7 @@ do
 	local card = cardAt(cy, plot3)
 	check("a save with a house another player is on (Bob's move): the next free one, its seed kept (never two on one house)", card ~= nil
 		and card.id == Houses[4].id and E.profiles[cy].sandboxHouse == Houses[4].id and E.profiles[cy].sandboxHouseSeed == 777 and plans[#plans].seed == 777
-		and plans[#plans].kind == "house", card and card.id)
+		and plans[#plans].kind == contractOf(Houses[4]).Kind, card and card.id)
 	Moving.admin(ann, "end")
 	Moving.admin(bob, "end")
 	E.leave(cy)
@@ -468,8 +483,8 @@ do
 	E.profiles[last] = { money = 5000 }
 	local planned = #plans
 	local card = cardAt(last, plot3)
-	check("…a seventh: no card, no house rolled; the board says every house is being emptied", card == nil and #plans == planned
-		and string.find(E.lastNotice(last), "Every house", 1, true) ~= nil and Moving.houseOf(last) == nil, E.lastNotice(last))
+	check("…a seventh: no card, no house rolled; the board says every place is being emptied", card == nil and #plans == planned
+		and string.find(E.lastNotice(last), "Every place", 1, true) ~= nil and Moving.houseOf(last) == nil, E.lastNotice(last))
 	E.leave(players[1])
 	card = cardAt(last, plot3)
 	check("…one leaves: theirs is free again, the seventh gets it", card ~= nil and Moving.houseOf(last) ~= nil, card and card.id)

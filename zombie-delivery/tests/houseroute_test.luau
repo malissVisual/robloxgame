@@ -1,7 +1,7 @@
 -- 9.0 Danny's way inside a house (shared/HouseRoute.luau; the owner, 8.9: "Danny can't walk around things logically. He
 -- goes to take things through the wall: he can't get to the thing, he got stuck on the wall"), on the REAL plans
 -- (shared/HouseLayout.luau on the recorder, tests/run_tests.py): the big house (The Old Farmstead, kind "big", 8.5.2
--- roomy) and the family house (the five houses of Jinočany, kind "house"), every layout of each (the back row's four
+-- roomy) and the family house (the five other places to empty, kind "house"), every layout of each (the back row's four
 -- orders, mirrored or not: a seed for each).
 --   * the cause, measured: 8.9's aim (server/MoveHelper.luau besidePiece: straight out of the piece toward where he came
 --     in, half its size and 1.5 studs) put a fifth of the pieces' spots behind a wall (in the next room, in the wall,
@@ -216,6 +216,61 @@ for kind, seeds in kinds do
 	check(`{kind}: …and his way from there out of every door the same (two layouts)`, outBad == 0, outBad)
 end
 
+-- 9.5 the countryside's spots (shared/Layouts/Countryside.luau: the Pond Cabin, the Forest Lodge, the Old Mill, the
+-- Orchard Cottage; their plans on their own, not the map's), eight seeds of each (mirrored or not, the lodge's and the
+-- cottage's room counts): from the way in every piece a spot beside it, a way there through no wall on open cells, and
+-- from it a way back out of the door, as a house's
+for _, kind in { "cabin", "lodge", "mill", "cottage" } do
+	local pieces, spots, bad, outBad = 0, 0, {} :: { string }, 0
+	local shapes: { [string]: boolean } = {}
+	for seed = 1, 8 do
+		local plan = HouseLayout.plan(seed, kind)
+		shapes[`{#plan.rooms}{plan.mirrored}`] = true
+		local grid = HouseRoute.grid(plan) :: HouseRoute.Grid
+		local rects: { Rect } = {}
+		for _, s in plan.spots do
+			table.insert(rects, pieceRect(s))
+		end
+		HouseRoute.block(grid, rects)
+		local exits = HouseLayout.exitsOf(plan)
+		for index, entryFrame in HouseLayout.entries(plan) do
+			local look = (entryFrame * Vector3.new(0, 0, -1)) - entryFrame.Position
+			local entry = entryFrame.Position + look * 1.5
+			for _, s in plan.spots do
+				pieces += 1
+				local rect = pieceRect(s)
+				local x, z = HouseRoute.reach(grid, entry.X, entry.Z, rect)
+				if not x or not z then
+					table.insert(bad, `{kind} {seed} way {index}: #{s.id} {s.item} no spot`)
+					continue
+				end
+				spots += 1
+				local mx, mz = (rect.x0 + rect.x1) / 2, (rect.z0 + rect.z1) / 2
+				if not HouseRoute.open(grid, x, z) or HouseRoute.toRect(x, z, rect) > R.Stand + 1e-6 or not HouseRoute.sees(grid, x, z, mx, mz) then
+					table.insert(bad, `{kind} {seed}: #{s.id} {s.item} its spot not beside it, or behind a wall`)
+				end
+				local points = HouseRoute.path(grid, entry.X, entry.Z, x, z)
+				local why = if points then walkBad(grid, entry.X, entry.Z, points) else "no way"
+				if why then
+					table.insert(bad, `{kind} {seed} way {index}: #{s.id} {s.item}: {why}`)
+				end
+				for _, exit in exits do
+					local back = HouseRoute.path(grid, x, z, exit.X, exit.Z)
+					if not back or walkBad(grid, x, z, back) then
+						outBad += 1
+					end
+				end
+			end
+		end
+	end
+	local n = 0
+	for _ in shapes do
+		n += 1
+	end
+	check(`9.5 {kind}: from the way in, every piece of {n} layouts has a spot beside it, his way there through no wall on open cells, and back out of the door`,
+		spots == pieces and #bad == 0 and outBad == 0, `{spots}/{pieces} {outBad}: {bad[1]}`)
+end
+
 -- ── A piece boxed in; the doorways; the snap ─────────────────────────────────
 
 do
@@ -405,6 +460,44 @@ do
 	local closed = HouseRoute.solid(g, { { x0 = 15, z0 = 14, x1 = 16, z1 = 16 } })
 	check("9.3 HouseRoute.solid: a built part's cells closed for good, counted by the exact clearance", closed > 0 and not HouseRoute.open(g, 15.5, 15)
 		and HouseRoute.gap(g, 14, 15, 14, 15) <= 1 + 1e-6 and HouseRoute.block(g, {}) == before - closed, closed)
+end
+
+-- 9.5 (tests/movehelper_stuck_runtime_test.luau on the countryside's map: The Forest Lodge's walk 1.09 studs off a
+-- doorway's jamb): his way from where he really stands, anywhere on his open cell (not its middle, the way's pulled
+-- legs' start): its first leg keeps the grid's `clear` off everything too (or as far as he is now), else it steps onto
+-- the cell's middle first. Two rooms, a wall between them with a doorway, ways from all over the west room into the
+-- east one.
+do
+	local V = Vector3.new
+	local plan = {
+		min = V(0, 0, 0),
+		max = V(20, 10, 20),
+		faces = { { min = V(9.5, 0, 0), max = V(10.5, 10, 5), header = false }, { min = V(9.5, 0, 9), max = V(10.5, 10, 20), header = false } },
+		rooms = { { min = V(0.5, 0, 0.5), max = V(9.5, 10, 19.5) }, { min = V(10.5, 0, 0.5), max = V(19.5, 10, 19.5) } },
+		doors = { { at = V(10, 0, 7), width = 4, axis = "Z" } },
+		fixtures = {},
+		wall = 1,
+	}
+	local clear = Config.MoveHelper.Walk.Clear
+	local g = HouseRoute.grid(plan, nil, nil, clear) :: HouseRoute.Grid
+	math.randomseed(95)
+	local ways, worst, stepped = 0, math.huge, 0
+	for _ = 1, 600 do
+		local fx, fz = 1 + math.random() * 8, 1 + math.random() * 18
+		local tx, tz = 12 + math.random() * 6, 2 + math.random() * 16
+		if not HouseRoute.open(g, fx, fz) then
+			continue
+		end
+		local points = HouseRoute.path(g, fx, fz, tx, tz)
+		if points and #points > 0 then
+			ways += 1
+			local need = math.min(clear, HouseRoute.gap(g, fx, fz, fx, fz))
+			worst = math.min(worst, HouseRoute.gap(g, fx, fz, points[1].x, points[1].z) - need)
+			stepped += if math.abs(points[1].x - fx) < 0.4 and math.abs(points[1].z - fz) < 0.4 then 1 else 0
+		end
+	end
+	check(`9.5 his way from anywhere on his open cell: its first leg Walk.Clear off everything (or as far as he is), else onto the cell's middle first ({ways} ways, {stepped} stepped onto it)`,
+		ways > 300 and worst >= -1e-3 and stepped > 0, worst)
 end
 
 if failures == 0 then

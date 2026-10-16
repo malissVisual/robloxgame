@@ -1,13 +1,13 @@
 # Zombie Delivery
 
 > **8.0 SANDBOX (the game the owner tests now).** With `Config.Sandbox.On = true` (the default) the server builds a
-> test world instead of the city (`shared/SandboxMap.luau`, `server/SandboxWorld.luau`): since 8.9 the owner's village
-> **Jinočany** (8.0 – 8.8: an alpine meadow with one road), at first **one house to empty** (The Old Farmstead on Pražská, called The Old Chalet on Main Street before the Jinočany
-> plan, `design/jinocany/NAVRH.md`; refilled with a new random layout every move, with 2 – 4 **collectibles** from
-> uncommon to legendary), and **four player plots** with a **ZDC warehouse** each. **Jinočany step 1:** six houses to
-> empty (`SandboxMap.Houses`, a contract each in `Config.Moving.Sandbox.Houses`): The Old Farmstead (the big house, The
-> Nováks) and five family houses in the village on Hlavní, Školní, Lidická and Smetanova (a smaller plan, 15 minutes;
-> the village's own look, a rich one, their front doors walked in as the farmstead's). The kiosk offers one at a time: your card keeps its house and seed (in your
+> test world instead of the city (`shared/SandboxMap.luau`, `server/SandboxWorld.luau`): since 9.0 **open countryside**
+> (`design/countryside/`; 8.9: the village of Jinočany, 8.0 – 8.8: an alpine meadow with one road) with **six places to
+> empty**, each on its own country lane (`SandboxMap.Houses`, a contract each in `Config.Moving.Sandbox.Houses`; every
+> move a new random layout with 2 – 4 **collectibles** from uncommon to legendary): **The Old Farmstead** (the big
+> house on Pražská, The Nováks, now a farm with a barn, a tractor and bales), **The Pond Cabin**, **The Lone House**,
+> **The Forest Lodge**, **The Old Mill** and **The Orchard Cottage** (their own looks, interiors and pieces:
+> `shared/Layouts/Countryside.luau`), and **four player plots** with a **ZDC warehouse** each. The kiosk offers one at a time: your card keeps its house and seed (in your
 > save too) until a trip brings something home, then the next free house; two players never get the same one. Every player drives a
 > **walk-in ZDC Sprinter** (`Config.Cars` sprinter, `shared/SprinterLooks.luau`; the owner's Blender look
 > `design/blender-sprinter/` dresses it once imported): open its back or its sliding door, walk up the step and load
@@ -242,6 +242,28 @@
 > turning his end into a wall stops, sliding along it still works. The server only checks (`MoveHelperBrain.leadKept`):
 > his body more than 8 studs off his end for 1.5 s and it takes him back for that carry, never a teleport. A crew mate
 > at the far end is unchanged.
+>
+> **9.0** (the owner: "make all the family houses go, and instead of the houses rather six different spots: by the
+> pond, on the farm, one house, somewhere else … but no towns, no villages"): **the countryside in place of the
+> village.** The village is gone (its 102 houses and streets, the chapel green, the school, the pitch, the shops, the
+> hardware store, the building site and the station); the sandbox is open fields, tree lines, a forest, a pond and a
+> stream, with six places to empty, each at the end of its own country lane (22 wide) in a yard where the van turns
+> round (`design/countryside/plan.py` → `plan.json`, `plan.png`; `tools/countryside/sandboxmap.py` writes SandboxMap's
+> section; `shared/CountryLooks.luau` the surroundings). **The Old Farmstead** stays where it was, now a farm (a barn, a
+> red tractor and trailer, round bales and a haystack, a paddock, a muck heap and a woodpile). **The Pond Cabin** (the
+> Vodičkas): a timber fishing cabin with a veranda on the pond's shore, its jetty, reeds and a rowing boat; inside a
+> bunk room and a store of rods, nets, oars and an outboard motor (two people). **The Lone House** (the Kopeckýs): one
+> family house alone among the fields on Hill Road. **The Forest Lodge** (the Lesáks): a log lodge on a stone plinth in
+> a clearing of a dense forest, antlers over the door; inside a hall straight through, a kitchen, a gun room (its
+> cabinet empty), a stuffed owl. **The Old Mill** (the Mlynářs): a stone watermill whose wheel turns in its millrace on
+> the right-hand side, a weir and a footbridge; inside the millstones in the workroom, flour sacks and a spare
+> millstone (two people). **The Orchard Cottage** (the Sadíleks): whitewashed under thatch or clay tiles among 54 fruit
+> trees and beehives; jam jars, a beehive box, an apple press and Grandma's sewing machine. Each place plans a fresh
+> layout every visit (`shared/Layouts/Countryside.luau`, HouseLayout's kinds cabin, lodge, mill and cottage; its own
+> walls and floors, `server/HouseInterior.luau`), 29 new pieces join the Collection book (97 in all), the clocks run
+> 12 – 16 minutes by size. Danny walks all six (his way's first leg checked off the walls too: `HouseRoute.path`; the
+> stuck audit over every place on the real map). A woodpecker drums in the forest where the chapel bell rang. The map is
+> lighter: 1,909 parts (was 2,253). A save with a village house loads with none and the next card gives a free place.
 
 The active Roblox game in this repository (Merge Blades is preserved in `../archive/merge-blades`). **You run a delivery company** in a world
 gone wrong: take a job, carry the cargo to your vehicle with your own hands (or lead the horses on a rope), drive it

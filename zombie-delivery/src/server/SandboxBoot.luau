@@ -34,7 +34,7 @@
 --     day is off (no Tutorial: the van never waits for it). A respawn leaves the van where it is (a new one only when
 --     it is gone, and never on a move: there the move's CAR brings it back);
 --   * CAR (the SpawnCar remote → Vehicles.callCar) parks your van at the sandbox's spot nearest you: your vanSpot, or
---     the house's curb when you are nearer the house (Jinočany: your move's house, else your card's, server/Moving.luau
+--     the house's curb when you are nearer the house (your move's place, else your card's, server/Moving.luau
 --     houseOf; else the nearest of SandboxMap.Houses). No chauffeur (server/CarCall.luau drives
 --     the city's roads, which are not here) and no repair bay: every van parked here comes repaired. A forced spawn
 --     (an admin's: Vehicles.homeGarage) and Vehicles.placeNear (you in the driver's seat) park it the same way;
@@ -120,7 +120,7 @@ local function homeWords(player: Player): string
 end
 
 -- The sandbox's parking spot nearest the player: their vanSpot, or the house's curb when they are nearer the house.
--- Also what the notice says about it. Jinočany: the house of their move, else of their card (Moving.houseOf), else
+-- Also what the notice says about it. The place of their move, else of their card (Moving.houseOf), else
 -- the house to empty nearest them (SandboxMap.Houses').
 local function parkingNear(player: Player): (SandboxMap.Spot, string)
 	local home = SandboxBoot.vanSpot(player)

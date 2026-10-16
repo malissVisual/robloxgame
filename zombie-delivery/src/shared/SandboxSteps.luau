@@ -10,7 +10,7 @@
 --   vanLoad       the pieces in the van now (the state's counts.out)
 --   delivered     the pieces unloaded at home on this move (the state's counts.delivered: a trip or more done)
 --   atHouse       you stand (or drive) at the house (SandboxSteps.atHouse: the move's)
---   house         Jinočany: the move's house (the Moving state's `contract`: a SandboxMap.Houses id; nil: the farmstead)
+--   house         the move's place (the Moving state's `contract`: a SandboxMap.Houses id; nil: the farmstead)
 --   seated        you sit in a vehicle
 --   planning      the move's planning lobby is open (the MoveLobby remote's "lobby"); planningMine: yours (LAUNCH)
 --   stock         your pieces in the stock, not on show (the Collection remote's "state")
@@ -43,9 +43,9 @@
 --   carrying, outside                   load      "Load it into the van: walk in or E at the back"        the van's back
 --   the van has things, the move is on  home      "Drive home to your warehouse to unload (or keep loading)" unload
 --   a move, at the house, outside       door      "Walk in through the front door"                        its door
---   a move, not at the house            drive     "Drive to The Linden House on Hlavní"                   its curb
---     (after a trip home)               back      "Drive back to The Linden House on Hlavní for more, or FINISH"
---   (Jinočany: the move's house and its street, SandboxSteps.words with the state's `house`; the step's own hint the
+--   a move, not at the house            drive     "Drive to The Pond Cabin on Pond Lane"                  its curb
+--     (after a trip home)               back      "Drive back to The Pond Cabin on Pond Lane for more, or FINISH"
+--   (the move's place and its road, SandboxSteps.words with the state's `house`; the step's own hint the
 --   farmstead's, "Drive to The Old Farmstead on Pražská")
 --   no move, the planning open          plan      "Press LAUNCH to start the move" / the crew waits       (no target)
 --   no move, pieces in the stock        show      "Put your pieces on show: E at an empty stand"          a free stand
@@ -62,12 +62,12 @@
 --                                                      shown: nil = not known yet, then only taken, nothing marked)
 --   SandboxSteps.visible(step, done, seated) -> (hint, guide)   show the hint line? the 3D guide?
 --   SandboxSteps.text(step, touch) -> string           the hint's words ("E" is "tap" on a touch screen)
---   SandboxSteps.atHouse(x, z, margin, house?) -> boolean   in the house's lot or within `margin` studs of it (Jinočany:
+--   SandboxSteps.atHouse(x, z, margin, house?) -> boolean   in the house's lot or within `margin` studs of it (
 --                                                      `house` a SandboxMap.Houses id, the move's; nil: the farmstead)
 --   SandboxSteps.route(fx, fz, tx, tz, out, direct) -> n   the path on the ground, along the roads: n points written
 --                                                      into `out` as x1, z1, x2, z2 … (no table made: the guide calls
 --                                                      it five times a second); straight when within `direct` studs.
---                                                      Jinočany: along every road of SandboxMap.Roads (the shortest
+--                                                      along every road of SandboxMap.Roads (the shortest
 --                                                      way along their middle lines, from the road nearest the start to
 --                                                      the one nearest the target), MaxPoints points at most
 --   SandboxSteps.collection(msg, total?) -> Summary    the Collection remote's "state": stock, shown, free, taken (8.3:
@@ -180,7 +180,7 @@ export type State = {
 	-- 8.9, trading between players (all optional: a state without them has no sell step)
 	players: number?,
 	signs: number?,
-	-- Jinočany: the move's house (a SandboxMap.Houses id; nil: the farmstead)
+	-- the move's place (a SandboxMap.Houses id; nil: the farmstead)
 	house: string?,
 }
 
@@ -566,12 +566,12 @@ function SandboxSteps.detail(step: Step, s: State): (string?, number?)
 	elseif step.id == "give" and s.clipboard == true then
 		return "clipboard", nil -- (8.5: its words change once the clipboard is out)
 	elseif step.id == "drive" or step.id == "back" then
-		return s.house, nil -- (Jinočany: the move's house)
+		return s.house, nil -- (the move's place)
 	end
 	return nil, nil
 end
 
--- Jinočany: "The Linden House on Hlavní", the house's name on its street (nil or an unknown id: the farmstead's).
+-- "The Pond Cabin on Pond Lane", the place's name on its road (nil or an unknown id: the farmstead's).
 function SandboxSteps.houseWords(id: string?): string
 	local h = SandboxMap.house(id)
 	return if h then `{h.name} on {h.street}` else HOUSE
@@ -593,7 +593,7 @@ function SandboxSteps.words(step: Step, s: State): string
 		return `🔥 Your {s.hot} is hot today: sell it or show it`
 	elseif step.id == "give" and s.clipboard == true then
 		return `Pick a piece to give it to {DANNY}` -- (8.5: the clipboard out, orders mode)
-	elseif step.id == "drive" and s.house ~= nil then -- (Jinočany: the move's house and its street)
+	elseif step.id == "drive" and s.house ~= nil then -- (the move's place and its road)
 		return `Drive to {SandboxSteps.houseWords(s.house)}`
 	elseif step.id == "back" and s.house ~= nil then
 		return `Drive back to {SandboxSteps.houseWords(s.house)} for more, or FINISH`
@@ -608,7 +608,7 @@ end
 
 -- ── The path along the roads ───────────────────────────────────────────────
 -- Along the roads' middle lines (SandboxMap.Roads: Depot Row, the plots' road; Pražská down to the farmstead;
--- Jinočany: the village's streets too, each one east-west when it is longer along X). The path goes out from the start
+-- 9.4: the country lanes and their yards too, each one east-west when it is longer along X). The path goes out from the start
 -- to the middle line of the road nearest it, along the roads the shortest way to the middle line of the road nearest
 -- the target (through the junctions where two roads meet: the crossing of their middle lines; Dijkstra on those few
 -- points), then in. A point on the line it already runs along replaces the last one (no bend), MaxPoints at most (the

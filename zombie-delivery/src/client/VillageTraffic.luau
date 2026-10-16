@@ -1,5 +1,5 @@
 --!strict
--- 8.9 SANDBOX, Jinočany: the D5's cars (design/jinocany/NAVRH.md §4: "a few cars that move only on the clients"). This
+-- 8.9 SANDBOX: the D5's cars at the map's east edge ("a few cars that move only on the clients"; 9.4 the countryside). This
 -- screen's own (made here, never sent anywhere): Config.VillageWorld.Cars' cars on the D5's four lanes
 -- (shared/VillageScenery.luau lanes: the carriageways of server/VillageWorld.luau's Motorway, a Persistent model every
 -- client has, run on past the Bounds onto the far view's D5, where they go round again unseen). Northbound on the

@@ -73,7 +73,7 @@ local V3 = M.Vector3.new
 local CF = M.CFrame.new
 local workspace = M.workspace
 local House = SandboxMap.House
-local F = S.Houses[House.id] -- (Jinočany: the farmstead's contract, one of six)
+local F = S.Houses[House.id] -- (six houses: the farmstead's contract, one of six)
 local plot1, plot2 = SandboxMap.Plots[1], SandboxMap.Plots[2]
 E.Zombies.findSpot = function(center: any): any
 	return center + V3(60, 0, 0)
@@ -190,7 +190,7 @@ frontDoor:SetAttribute("DoorLeaf", 1) -- (8.3: a leaf swinging into the house, a
 frontDoor:SetAttribute("DoorSwing", 1)
 frontDoor:SetAttribute("DoorDark", true)
 frontDoor.Parent = workspace
--- Jinočany: the village's houses to empty have theirs too (SandboxWorld's stand-ins: a door in a model whose SandboxHouse
+-- six houses: the other places to empty have theirs too (SandboxWorld's stand-ins: a door in a model whose SandboxHouse
 -- is the house's id), each in front of its own house's door (the farmstead's above has none: a door of no house's is
 -- the farmstead's). A move rotates to the next house once something came home: every later move is on one of them.
 local doorOf: { [string]: any } = { [House.id] = frontDoor }
@@ -289,8 +289,8 @@ local function anyText(list: { string }, word: string): boolean
 	return false
 end
 local corkWords = textsOf(kiosk1)
-check("8.0.1: the plot kiosk's corkboard is the sandbox's: Jinočany's houses to empty, bring it home to your warehouse", anyText(corkWords, "JINOČANY")
-	and anyText(corkWords, "HOUSES TO EMPTY")
+check("8.0.1: the plot kiosk's corkboard is the sandbox's: the countryside's places to empty, bring it home to your warehouse", anyText(corkWords, "THE COUNTRYSIDE")
+	and anyText(corkWords, "PLACES TO EMPTY")
 	and anyText(corkWords, "Bring it home to your warehouse") and anyText(corkWords, "MOVING CONTRACTS"), table.concat(corkWords, " | "))
 check("…no Marge, no Walt, no Wall, no evacuation on it", not anyText(corkWords, "Marge") and not anyText(corkWords, "Walt") and not anyText(corkWords, "Wall")
 	and not anyText(corkWords, "evacuat"), table.concat(corkWords, " | "))
@@ -604,14 +604,14 @@ E.place(ann, cork1.Position + V3(0, 0, 4))
 local planned = #seeds
 trigger(board1, ann)
 check("the next card: a new seed (the house refilled: 8.3 economy, the move brought pieces home)", #seeds == planned + 1 and seeds[#seeds] ~= firstSeed)
--- (Jinočany: and the next house, the first free one after the farmstead: Cid's card holds the Linden House)
-check("Jinočany: …on the next house free after the farmstead (the Blue Gate House: Cid's card has the Linden House)",
+-- (and the next place, the first free one after the farmstead: Cid's card holds the Pond Cabin)
+check("six houses: …on the next place free after the farmstead (the Lone House: Cid's card has the Pond Cabin)",
 	E.last(ann, "Moving", "contract").a.id == SandboxMap.Houses[3].id and E.last(cid, "Moving", "contract").a.id == SandboxMap.Houses[2].id
 	and kinds[#kinds] == "house", E.last(ann, "Moving", "contract").a.id)
 check("admin: start picks the sandbox house (the card's new seed)", string.find(Moving.admin(ann, "start"), "started", 1, true) ~= nil and E.built == 2 and #seeds == planned + 1
 	and built[2] == seeds[#seeds] and Moving.busy(ann) ~= nil)
 step()
-check("Jinočany: …her move on that house (the state's contract), its plan a family house's", houseNow(ann) == SandboxMap.Houses[3], houseNow(ann).id)
+check("six houses: …her move on that place (the state's contract), its plan a house's", houseNow(ann) == SandboxMap.Houses[3], houseNow(ann).id)
 -- The van at the house of the player's move now, at its curb (its nose the curb's way).
 local function parkAt(van: any, player: any)
 	local h = houseNow(player)
@@ -655,7 +655,7 @@ check("admin: time leaves one minute", string.find(Moving.admin(ann, "time"), "m
 	and E.last(ann, "Moving", "state") ~= nil)
 step()
 check("…its clock", math.abs(E.last(ann, "Moving", "state").a.endsAt - (E.now + 60)) < 1e-6)
-check("Jinočany: …the next house in turn (the Schoolmaster's House on Školní)", houseNow(ann) == SandboxMap.Houses[4], houseNow(ann).id)
+check("six houses: …the next place in turn (the Forest Lodge on Wood Lane)", houseNow(ann) == SandboxMap.Houses[4], houseNow(ann).id)
 local marched = E.marched
 check("admin: horde (the house without one keeps its clock)", string.find(Moving.admin(ann, "horde"), "horde", 1, true) ~= nil
 	and math.abs(E.last(ann, "Moving", "state").a.endsAt - (E.now + 60)) < 1e-6)
@@ -667,8 +667,8 @@ check("8.2: …onFinish: cancelled, nothing home, \"admin\"", (lastTold("finish"
 	and howOf((lastTold("finish"))) == "admin", howOf((lastTold("finish"))))
 trigger(board1, ann)
 local cardSeed = seeds[#seeds]
-check("Jinočany: called off with nothing home, her card keeps its house (Moving.houseOf: her card's)", Moving.houseOf(ann) == SandboxMap.Houses[4])
-check("admin: refill: a new house for the next move, its card (Jinočany: the next one, the Rose Garden House)", string.find(Moving.admin(ann, "refill"), "refilled", 1, true) ~= nil
+check("six houses: called off with nothing home, her card keeps its place (Moving.houseOf: her card's)", Moving.houseOf(ann) == SandboxMap.Houses[4])
+check("admin: refill: a new house for the next move, its card (the next one, the Old Mill)", string.find(Moving.admin(ann, "refill"), "refilled", 1, true) ~= nil
 	and seeds[#seeds] ~= cardSeed and E.last(ann, "Moving", "contract").a.id == SandboxMap.Houses[5].id, E.last(ann, "Moving", "contract").a.id)
 
 -- No van out: it comes to the plot; a refusing collection; the horde and roamers switched on --------------------------------------
@@ -689,7 +689,7 @@ check("8.0.1: …the sandbox's way (SandboxBoot.parkVan, the hook Moving.parkVan
 check("…never a bare spawnAt / placeAt / placeNear (they would skip the repair)", (E.vehicleCalls or 0) == callsBefore, E.vehicleCalls)
 step()
 check("…its clock 25 minutes, the horde switched on at HordeAt", E.last(bob, "Moving", "state").a.hordeAt == E.last(bob, "Moving", "state").a.endsAt - S.HordeAt)
-check("Jinočany: Bob's first card: the farmstead (free again: Ann's card has moved on)", houseNow(bob) == House, houseNow(bob).id)
+check("six houses: Bob's first card: the farmstead (free again: Ann's card has moved on)", houseNow(bob) == House, houseNow(bob).id)
 local zombies = #E.zombies
 E.place(bob, outside)
 step(T.Roam.Every + 0.1)

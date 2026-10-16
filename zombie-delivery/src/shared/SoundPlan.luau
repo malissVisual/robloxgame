@@ -45,7 +45,7 @@
 -- the Wall's gate (no Wall there: the trip home has its fanfare). 8.3: and the house's door creak (its leaves creak at
 -- the door as they swing open, Config.Moving.Doors Swing: client/WalkDoors.luau).
 --   SoundPlan.SandboxLoops                        the sandbox's loops by their part of the mix (each a wanted sound:
---                                                 sandboxSound plays it or its stand-in): fields (amb_fields, Jinočany's
+--                                                 sandboxSound plays it or its stand-in): fields (amb_fields, the countryside's
 --                                                 fields: birds and larks, a breeze; never the city's traffic, amb_day),
 --                                                 warehouse (amb_warehouse), room (amb_room)
 --   SoundPlan.sandboxPlace(x, y, z, inside, levelOf?)   where you are: "house" (inside: the move's state says you
@@ -60,11 +60,11 @@
 --                                                 (sheet4: is sfx4.ogg up; else the stand-ins' own volumes and no room
 --                                                 tone); the D5's hum (motorway) outdoors, faint in a warehouse
 --   SoundPlan.reverb(place)                       SoundService.AmbientReverb's name there ("NoReverb" outdoors)
---   JINOČANY (design/jinocany/NAVRH.md §5): the village's sounds in place of the Alps' (no cowbell, no alpine meadow);
+--   8.9 in place of the Alps' (no cowbell, no alpine meadow); 9.4 the countryside's (design/countryside/plan.py: no chapel);
 --   each one wanted on the next sheet, a stand-in from the sheets up now (sfx … sfx4) until then.
 --   SoundPlan.SandboxFar                          the far sounds outdoors by their part: motorway (amb_motorway, the
---                                                 D5's far hum: a 3D loop from the east), bell (chapel_bell: one stroke
---                                                 of the chapel's bell), dog (dog_far: a dog barking far off), tractor
+--                                                 D5's far hum: a 3D loop from the east), woodpecker (woodpecker_far:
+--                                                 one drum of a woodpecker in the forest), dog (dog_far: a dog barking far off), tractor
 --                                                 (tractor_far: a tractor's diesel, a 3D loop that drives past)
 --   SoundPlan.SandboxStandIns                     a wanted sound → what stands in for it until a sheet has it, in
 --                                                 order, each at its pitch (PlaybackSpeed) and gain (× its volume)
@@ -72,9 +72,9 @@
 --                                                 sheet has it, else its first stand-in that plays (has: the client's
 --                                                 api.has, a stand-in's own SoundSheet.Fallback counted); nil: silence
 --   SoundPlan.motorwaySpot(z) -> (x, z)           where the D5's hum comes from: the motorway's point nearest z
---   SoundPlan.farGap(kind, r)                     seconds to a far sound's next time ("bell", "dog", "tractor"; r: a
+--   SoundPlan.farGap(kind, r)                     seconds to a far sound's next time ("woodpecker", "dog", "tractor"; r: a
 --                                                 random 0 … 1)
---   SoundPlan.farSpot(kind, x, z, r1, r2)         where it sounds: the bell at the chapel's tower; a dog or a tractor a
+--   SoundPlan.farSpot(kind, x, z, r1, r2)         where it sounds: the woodpecker in the forest; a dog or a tractor a
 --                                                 random way round (x, z), its Far studs off (r1 the way, r2 how far)
 --   SoundPlan.tractorPath(x, z, r1, r2)           the tractor's pass: where it starts and its velocity (studs a second),
 --                                                 across the way from (x, z), at farSpot halfway through
@@ -440,14 +440,14 @@ function SoundPlan.resultCue(result: any): Cue?
 	return nil
 end
 
--- ── 8.1 SANDBOX: the village, the warehouse, the farmstead, the collection, the Sprinter ───────────────────────────
+-- ── 8.1 SANDBOX: the countryside, the warehouse, the farmstead, the collection, the Sprinter ───────────────────────
 
--- (Jinočany: the fields in place of the Alps' meadow; amb_alpine, its birds and lark over a breeze, stands in for them)
+-- (8.9: the fields in place of the Alps' meadow; amb_alpine, its birds and lark over a breeze, stands in for them)
 SoundPlan.SandboxLoops = { fields = "amb_fields", warehouse = "amb_warehouse", room = "amb_room" }
 
--- Jinočany's far sounds outdoors (Config.Soundscape.Sandbox Motorway, Bell, Dog, Tractor), each a sound wanted on the
+-- The countryside's far sounds outdoors (Config.Soundscape.Sandbox Motorway, Woodpecker, Dog, Tractor), each a sound wanted on the
 -- next sheet.
-SoundPlan.SandboxFar = { motorway = "amb_motorway", bell = "chapel_bell", dog = "dog_far", tractor = "tractor_far" }
+SoundPlan.SandboxFar = { motorway = "amb_motorway", woodpecker = "woodpecker_far", dog = "dog_far", tractor = "tractor_far" }
 
 -- What stands in for a wanted sound until a sheet has it: sounds of the sheets up now (sfx … sfx4), in order, each at
 -- its pitch (PlaybackSpeed, 1 if none) and gain (× its volume, 1 if none). A loop's stand-ins are loops.
@@ -458,8 +458,8 @@ SoundPlan.SandboxStandIns = {
 	amb_fields = { { name = "amb_alpine" } },
 	-- sfx2's far hum (a low rumble and a far band swelling), a little lower: a motorway's roar far off
 	amb_motorway = { { name = "ambience", pitch = 0.85 } },
-	-- sfx's bright bell (two partials a third apart) lower and longer: a small chapel bell's stroke
-	chapel_bell = { { name = "ding", pitch = 0.6 } },
+	-- sfx2's three knocks, high, quick and quiet: a woodpecker's drum far off in the forest
+	woodpecker_far = { { name = "knock", pitch = 1.5, gain = 0.5 } },
 	-- sfx2's three knocks, low and quiet: dull barks far off (a poor stand-in: a bark is wanted first)
 	dog_far = { { name = "knock", pitch = 0.65, gain = 0.6 } },
 	-- sfx's engine loop (55 Hz, chugging 8 times a second), slower: a diesel tractor's
@@ -557,13 +557,13 @@ end
 
 function SoundPlan.farGap(kind: string, r: number): number
 	local B = S.Sandbox
-	return between(if kind == "bell" then B.Bell.Gap elseif kind == "dog" then B.Dog.Gap else B.Tractor.Gap, r)
+	return between(if kind == "woodpecker" then B.Woodpecker.Gap elseif kind == "dog" then B.Dog.Gap else B.Tractor.Gap, r)
 end
 
 function SoundPlan.farSpot(kind: string, x: number, z: number, r1: number, r2: number): (number, number)
 	local B = S.Sandbox
-	if kind == "bell" then
-		return B.Bell.X, B.Bell.Z
+	if kind == "woodpecker" then
+		return B.Woodpecker.X, B.Woodpecker.Z
 	end
 	local angle = math.clamp(r1, 0, 1) * 2 * math.pi
 	local distance = between(if kind == "dog" then B.Dog.Far else B.Tractor.Far, r2)

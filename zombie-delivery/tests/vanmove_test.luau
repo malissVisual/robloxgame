@@ -220,19 +220,25 @@ check("a new seed is a new house (the sandbox refills it every move)", (function
 	end
 	return not same
 end)())
-local farmstead = T.Sandbox.Houses[SandboxMap.House.id] -- (Jinočany: its contract among the six)
+local farmstead = T.Sandbox.Houses[SandboxMap.House.id] -- (six houses: its contract among the six)
 check("the sandbox's house: SandboxMap.House's id and name, 8.3 25 minutes and the big plan (several trips), no horde and no roamers by default (no guns), switches kept",
 	SandboxMap.House.id == "sandbox_house" and SandboxMap.House.name == "The Old Farmstead" and farmstead.Time == 25 * 60 and farmstead.Kind == "big"
 	and T.Sandbox.Horde == false and T.Sandbox.Roam == 0 and T.Sandbox.HordeAt > 0 and T.Sandbox.HordeAt < farmstead.Time
 	and #farmstead.Blurb <= Config.MoveStory.Limits.Blurb, `{#farmstead.Blurb} of {Config.MoveStory.Limits.Blurb}`)
-check("Jinočany: every house's contract (its Client and Blurb within the cards' limits, its clock past the horde's)", (function()
+-- (9.5 the countryside: every place of the map its contract, by id, of the place's kind; tests/sandboxhouses_test.luau
+-- matches the rest of them to the map)
+check("six places: every place's contract, of its kind (its Client and Blurb within the cards' limits, its clock past the horde's)", (function()
+	local n = 0
+	for _ in T.Sandbox.Houses do
+		n += 1
+	end
 	for _, h in SandboxMap.Houses do
 		local c = T.Sandbox.Houses[h.id]
-		if not c or #c.Blurb > Config.MoveStory.Limits.Blurb or #c.Client > Config.MoveStory.Limits.Client or c.Time <= T.Sandbox.HordeAt then
+		if not c or c.Kind ~= h.kind or #c.Blurb > Config.MoveStory.Limits.Blurb or #c.Client > Config.MoveStory.Limits.Client or c.Time <= T.Sandbox.HordeAt then
 			return false
 		end
 	end
-	return true
+	return n == #SandboxMap.Houses
 end)())
 check("the sandbox's van is the Sprinter, its bed set", Config.Sandbox.Van == "sprinter" and T.Beds[Config.Sandbox.Van] ~= nil)
 check("the house's front door looks out to the road, the van's curb between them (its back to the door)", (function()
