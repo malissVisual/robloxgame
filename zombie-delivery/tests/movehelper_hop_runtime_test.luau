@@ -18,6 +18,10 @@
 --     diagonal: each step the direction and the rate the module picks (8.1's: still legs sideways, a diagonal's legs
 --     at its share along his facing only)
 -- (Run on 8.1's MoveHelper / PairHold / MoveHelperBrain, the porch, the jump, the eave and the legs checks fail.)
+-- 9.2 (you drive Danny's end): his body is Ann's (she leads), her client sets his hold's goals (the real client/
+-- PairLead.luau, E.leadClient: its own rays down under his end, the same rules: from a step over the floor under her
+-- down to a step under it, the house's Shell inside, never the pieces, his body or hers outside), and the constraints
+-- are played on what it set: the lift at its MaxVelocity (HoldClimb) up and down, as Roblox's AlignPosition does.
 local E = require("./MovingRuntime")
 local Moving = require("./MovingServer")
 local MoveHelper = require("./MoveHelperServer")
@@ -73,6 +77,7 @@ Moving.useArt({
 -- with CanCollide false (RespectCanCollide). Every ray is kept (its start, reach and filter).
 local rays: { any } = {}
 local stepping = false -- (a ray cast in one of his steps: MoveHelper's own)
+local clientRays = false -- (9.2 a ray cast by Ann's client/PairLead.luau)
 local function within(part: any, list: { any }): boolean
 	for _, top in list do
 		if part == top or part:IsDescendantOf(top) then
@@ -84,7 +89,7 @@ end
 workspace.Raycast = function(_, origin: any, direction: any, params: any): any
 	local include = params ~= nil and params.FilterType == "Include"
 	local list = (params and params.FilterDescendantsInstances) or {}
-	table.insert(rays, { origin = origin, direction = direction, include = include, list = list, his = stepping })
+	table.insert(rays, { origin = origin, direction = direction, include = include, list = list, his = stepping, client = clientRays })
 	local best: number? = nil
 	for _, root in (if include then list else { workspace }) do
 		for _, part in root:GetDescendants() do
@@ -171,19 +176,33 @@ local function hold()
 		carried.PrimaryPart.CFrame = E.rootOf(ann).CFrame * M.CFrame.new(0, C.CarryLow + size.Y / 2, -(C.CarryFront + size.Z / 2))
 	end
 end
--- The constraints (Roblox's physics): his root where his hold pulls it, after each of his steps.
+-- The constraints (Roblox's physics): his root where his hold pulls it, after each of his steps. 9.2: Ann's client sets
+-- the goals first while she drives him (client/PairLead.luau: its rays marked `client`), the lift climbs at its
+-- MaxVelocity at most.
 local playing = true
+local lead: any = nil
 local function physics()
 	local body = danny and danny.body
 	local grip = body and body.grip
 	if not playing or not grip or grip.align.Parent == nil then
 		return
 	end
-	local far = grip.anchor.CFrame * grip.offset -- (9.0 the goal the server sets: the piece's frame × the hold's offset)
+	local drive = if lead then lead.of(body.model) else nil
+	if drive then
+		clientRays = true
+		lead.step(drive, 0.1, E.rootOf(ann), ann.Character:FindFirstChildOfClass("Humanoid"))
+		clientRays = false
+	end
+	-- (the goals as they were set: the recorder answers an instance's Position from its default CFrame)
+	local goal = grip.align.props.Position
 	local lift = grip.lift
-	-- (the lift's Position as PairHold set it: the recorder answers an instance's Position from its default CFrame)
-	local y = if lift then lift.props.Position.Y else far.Position.Y
-	body.root.CFrame = M.CFrame.new(far.Position.X, y, far.Position.Z) * far.Rotation
+	local y = goal.Y
+	if lift then
+		local was = body.root.Position.Y
+		local most = lift.MaxVelocity * 0.1
+		y = was + math.clamp(lift.props.Position.Y - was, -most, most)
+	end
+	body.root.CFrame = M.CFrame.new(goal.X, y, goal.Z) * grip.orient.CFrame.Rotation
 end
 -- Steps of 0.1 s (his loop's), the move's tick every other one; a path he asked for worked out at once (the runtime
 -- keeps a spawned function: his path's).
@@ -257,6 +276,7 @@ local started = Moving.admin(ann, "start")
 check("a solo move into Marge's real house starts", string.find(started, "started", 1, true) ~= nil and #built == 1, started)
 Moving.step()
 danny = MoveHelper.find(ann)
+lead = E.leadClient(ann) -- 9.2 Ann's client/PairLead.luau
 check("Danny comes with the van", danny ~= nil and danny.body ~= nil)
 do -- (his body in workspace.Npcs, as server/Npcs.luau's people are, and the van in workspace.Cars, as server/
 	-- Vehicles.luau's are: the runtime's stand-ins put them in the workspace)
@@ -346,7 +366,8 @@ check("8.3 his hold: the align along the ground only, his height the lift's (a s
 	grip ~= nil and grip.align.MaxAxesForce.Y == 0 and grip.align.MaxAxesForce.X > 0 and grip.lift ~= nil and grip.lift.Parent == body.root
 	and grip.lift.Mode == "OneAttachment" and grip.lift.Attachment0 == grip.own and grip.lift.MaxAxesForce.X == 0 and grip.lift.MaxAxesForce.Z == 0
 	and grip.lift.MaxAxesForce.Y > 0 and grip.lift.MaxVelocity == H.HoldClimb, grip and grip.lift)
-check("…the server owns his body meanwhile", body.root.NetworkOwner == false)
+check("9.2 …his body Ann's meanwhile (she leads: her client drives his end)", body.root.NetworkOwner == ann and body.model:GetAttribute("PairLead") == ann.UserId
+	and lead.of(body.model) ~= nil)
 
 -- Out toward the front door, Ann forwards, Danny ahead of her backwards: his end out on the porch, under its roof ----------------
 
@@ -429,6 +450,28 @@ end
 local cleanInside, insideRays = clean(0)
 check("8.3 inside, the rays under his end and under Ann: the interior's Shell only (never the table, his body or Ann's)", cleanInside and insideRays > 40
 	and carried:IsDescendantOf(moves) and body.model:IsDescendantOf(npcs), insideRays)
+-- 9.2 her client's rays down (under her, under his end): inside the Shell first (its floors), else never the pieces,
+-- his body or hers
+local function cleanClient(from: number): (boolean, number)
+	local ok, count = true, 0
+	for index = from + 1, #rays do
+		local r = rays[index]
+		if not r.client or math.abs(r.direction.X) + math.abs(r.direction.Z) > 1e-6 then
+			continue
+		end
+		count += 1
+		if r.include then
+			for _, top in r.list do
+				ok = ok and top.Name == "Shell"
+			end
+		else
+			ok = ok and within(carried, r.list) and within(body.model, r.list) and within(ann.Character, r.list)
+		end
+	end
+	return ok, count
+end
+local cleanMine, mine = cleanClient(0)
+check("9.2 inside, Ann's client's rays down: the interior's Shell first (never the table, his body or hers)", cleanMine and mine > 40, mine)
 
 -- Outside: a kerb under his end (he steps up onto it), an eave over it (never found) ------------------------------------------------
 
@@ -473,6 +516,8 @@ check("8.3 outside, a kerb (1 stud) under his end: he steps up onto it, HoldClim
 check("8.3 …the eave over it (its top 10.5 over the street) never found: never higher than the kerb", highest < 1 + 0.06, highest)
 local cleanOut, _, outRays = clean(rayMark)
 check("8.3 outside, the rays: never the pieces (Moves), his body (Npcs) or Ann's", cleanOut and outRays > 10, outRays)
+local cleanMineOut, mineOut = cleanClient(rayMark)
+check("9.2 outside, Ann's client's rays down: never the pieces, his body or hers", cleanMineOut and mineOut > 10, mineOut)
 kerb:Destroy()
 eave:Destroy()
 

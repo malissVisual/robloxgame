@@ -221,6 +221,27 @@
 > them); a mouse can hold them too. Pressed, a pedal tips down, darkens and its red line lights; let go, it springs
 > back. Only in your own driver's seat, with the HUD up and no window open (`tests/drivepedals_test.luau`,
 > `tools/phone-ui/drivepedals.luau`).
+>
+> **8.9.6** (the owner, 8.9.5: "Danny still annoys me. He takes it completely like a robot … he runs for 2 seconds and
+> then on the spot he somehow teleports around … the carrying is better, but it feels harder to control … fix it so
+> it's playable"). **His walk:** the cause, measured on the six houses as built (`tests/movehelper_stuck_runtime_test.luau`):
+> he turned to his way's next corner a stud early, cut it into the wall's end (his body 0.35 studs off it, 1,130 swept
+> steps in the walls), got pressed there, and 4 s later the stuck nudge popped him on. Now he aims a few studs ahead
+> along his way at a point whose straight line stays clear of every wall, fixture and piece (`HouseRoute.ahead`,
+> `Config.MoveHelper.Walk`); his grid knows the built parts the plan doesn't (the garage door); he slows into his goal,
+> turns to it in a quarter second, and his legs walk only while he really moves (`Npcs.walkTo`'s `legs`). Stuck, he
+> tries a new way, steps back and aside; only after 10 s does he fade over (`Config.MoveHelper.Unstuck`). Through the
+> front door he walks into the doorway fading out (the piece in his hands with him) and comes out the other side fading
+> in; the long jump to the van happens only where nobody can see it. In Studio the Output reports every jump and every
+> stuck spell (`[Danny] teleport …`, `[Danny] stuck … blocked by …`). **Carrying in two:** while Danny holds the far end
+> of a piece you lead, your own client drives his end: the server hands his body's physics to you (`SetNetworkOwner`;
+> his model's `PairLead`, `PairLeadAt`, `PairLeadPiece`) and every frame before the physics `client/PairLead.luau` aims
+> his hold at your piece, so on your screen he is at his end with no lag, backs away as you walk forwards, follows as
+> you back up, legs and all. Your walk is no longer held back (no PairStart, PairKeep or PairWall for him), the heading
+> turns at 120° a second (`Config.MoveHelper.PairLead`), and the house's walls at his end are your own rays: walking or
+> turning his end into a wall stops, sliding along it still works. The server only checks (`MoveHelperBrain.leadKept`):
+> his body more than 8 studs off his end for 1.5 s and it takes him back for that carry, never a teleport. A crew mate
+> at the far end is unchanged.
 
 The active Roblox game in this repository (Merge Blades is preserved in `../archive/merge-blades`). **You run a delivery company** in a world
 gone wrong: take a job, carry the cargo to your vehicle with your own hands (or lead the horses on a rope), drive it

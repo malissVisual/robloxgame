@@ -30,7 +30,8 @@
 -- The end of the move ends the hire. A second move (for hire again) where the room goes while he carries his piece ("Van's
 -- full, boss - drive it to the Wall?": set down beside the van), a third where nothing of his list fits, a fourth with
 -- the marble slab (two people) on his list: he waits at it ("needs you", the toast, "Lift with Danny"), long, and the
--- player lifts it with him through the grip's lift check; stuck (a new path, a nudge); his body taken away while he
+-- player lifts it with him through the grip's lift check; stuck (9.3: a new way, his ways out walked, a fade only at
+-- the end); his body taken away while he
 -- carries; an unhired Danny heads back when the crew grows; a crew mate's hire ends when they leave the move.
 local E = require("./MovingRuntime")
 local Moving = require("./MovingServer")
@@ -380,10 +381,28 @@ check("…the crew hears it, he says so; the status line: hired, nothing to carr
 E.request(sol, "helper", "hire")
 check("8.3 once a move: HIRE again takes nothing more", #E.spent == 1 and E.wallet[sol] == 400 and E.lastNotice(sol) == "Danny works for this move already.", E.lastNotice(sol))
 E.wallet[sol] = 2000 -- (the moves below hire him again)
-run(3, function()
-	return distance(body.root.Position, cargoDoor.WorldPosition) < 8
-end)
-check("8.4 …hired: he comes to the van at the house", distance(body.root.Position, cargoDoor.WorldPosition) < 8)
+do
+	-- 9.3 (the owner: no visible teleports): Sol by the van sees where he would appear, so he walks; nobody near, he is
+	-- put there (Far), faded in
+	local from = distance(body.root.Position, cargoDoor.WorldPosition)
+	local fadesAt = fades
+	run(3)
+	local walked = from - distance(body.root.Position, cargoDoor.WorldPosition)
+	check("9.3 hired far from the van, Sol by it: he walks to it (never put there in her sight)", walked > 20 and fades == fadesAt and (danny.teleports.far or 0) == 0, walked)
+	local was: { [any]: any } = {}
+	for _, player in E.Players:GetPlayers() do
+		was[player] = E.rootOf(player).Position
+		E.place(player, was[player] + V3(0, 0, -600))
+	end
+	run(3, function()
+		return distance(body.root.Position, cargoDoor.WorldPosition) < 8
+	end)
+	for player, at in was do
+		E.place(player, at)
+	end
+	check("8.4 …hired: he comes to the van at the house (9.3 nobody near: put there, faded in)", distance(body.root.Position, cargoDoor.WorldPosition) < 8
+		and fades == fadesAt + 1 and danny.teleports.far == 1)
+end
 
 -- The sofa: lifted together, carried together -------------------------------------------------------------------------------
 
@@ -452,12 +471,11 @@ check("…the strip: carrying the Sofa with you", sol:GetAttribute("MoveHelperDo
 -- Sofa's own "Put down")
 do
 	local Goal = require("./Goal")
-	-- the leader's side: who holds the far end and where (her client never pushes the piece into him on her screen)
-	local far = character:GetAttribute("PairFar")
-	local farAt = if M.typeof(far) == "Vector3" then E.rootOf(sol).CFrame * far else nil
-	check("9.0 Sol's client knows who holds the far end (PairWith: his id) and his place (PairFar, in her root's frame); no wall here (PairWall)",
-		character:GetAttribute("PairWith") == danny.id and farAt ~= nil and distance(farAt, farEnd(sofa, SOFA.Z)) < 0.1
-		and character:GetAttribute("PairWall") == nil, far)
+	-- the leader's side: who holds the far end (9.2: her client drives his end, so nothing of him is late on her screen:
+	-- no PairFar to keep the piece off him, no PairWall from the server; tests/movehelper_backwards_runtime_test.luau)
+	check("9.2 Sol leads: her client knows who holds the far end (PairWith: his id) and drives him (no PairFar, no PairWall)",
+		character:GetAttribute("PairWith") == danny.id and character:GetAttribute("PairFar") == nil and character:GetAttribute("PairWall") == nil,
+		character:GetAttribute("PairFar"))
 	-- his status line and his card while he carries it with her (MoveHelperBrain.title / status: the crew's attributes)
 	local bubble = sol:GetAttribute("MoveHelperBubble")
 	local queue = sol:GetAttribute("MoveHelperQueue")
@@ -508,6 +526,36 @@ do
 		hold.align.props.Position)
 	PairHold.drop(hold)
 	check("…let go: its constraints and its attachment gone", hold.align.Parent == nil and hold.orient.Parent == nil and hold.own.Parent == nil)
+	-- 9.2 a hold its leader's client drives (server/PairHold.luau lead): the holder's body theirs, what their client needs
+	-- on the holder's model, the server writing none of the constraints; taken back, the server's again at once
+	local leader = { UserId = 4242, Name = "Leader" }
+	holderRoot.CFrame = M.CFrame.new(0, 3, 0)
+	local driven = PairHold.make(holder, holderRoot, piece, offset, 12, { ghost = false, flat = true, owner = nil, lift = true, driver = leader :: any })
+	local value = holder:FindFirstChild("PairLeadPiece")
+	local at = holder:GetAttribute("PairLeadAt")
+	check("9.2 PairHold driven by its leader: the holder's body theirs (SetNetworkOwner), PairLead their UserId, PairLeadAt its place, PairLeadPiece the piece",
+		holderRoot.NetworkOwner == leader and holder:GetAttribute("PairLead") == 4242 and M.typeof(at) == "CFrame"
+		and (at.Position - V3(offset.X, 0, offset.Z)).Magnitude < 1e-6 and value ~= nil and value.Value == piece and PairHold.drives(driven) == leader
+		and driven.lift ~= nil and driven.lift:GetAttribute("Lift") == true and driven.align.ReactionForceEnabled == false, holderRoot.NetworkOwner)
+	local mark = V3(99, 99, 99)
+	driven.align.Position = mark -- (what the leader's client set)
+	driven.align.MaxVelocity = 400
+	piece.CFrame = M.CFrame.new(-3, 3, -5)
+	E.game:GetService("RunService").Heartbeat:Fire(1 / 60)
+	PairHold.step()
+	PairHold.aim(driven, offset, 30)
+	check("9.2 …meanwhile the server writes none of its constraints (no Heartbeat goals; aim keeps its numbers only)",
+		driven.align.props.Position == mark and driven.align.MaxVelocity == 400 and driven.limit == 30)
+	PairHold.lead(driven, nil)
+	check("9.2 …taken back (lead nil): the server's again at once: its owner, its goals from the piece, its top speed; PairLead* gone",
+		holderRoot.NetworkOwner == false and holder:GetAttribute("PairLead") == nil and holder:GetAttribute("PairLeadAt") == nil
+		and holder:FindFirstChild("PairLeadPiece") == nil and (driven.align.props.Position - (piece.CFrame * offset).Position).Magnitude < 1e-6
+		and driven.align.MaxVelocity == 30)
+	PairHold.lead(driven, leader :: any)
+	PairHold.drop(driven)
+	check("9.2 …a driven hold dropped: PairLead* gone and the holder's body the server's again (before it is stood up)",
+		holder:GetAttribute("PairLead") == nil and holder:FindFirstChild("PairLeadPiece") == nil and holderRoot.NetworkOwner == false
+		and driven.align.Parent == nil)
 	piece:Destroy()
 end
 -- walking and turning together: he moves with it, every step at its far end (8.1 walk-in doors off meanwhile: these
@@ -573,7 +621,8 @@ end)
 check("8.1 spun round at once: no snap, his first step his top speed's (the pair's walk and a margin), at the far end again within a second",
 	caught and firstStep <= Brain.holdSpeed(WALK * T.Speed.Pair) * 0.1 + 1e-6 and firstStep > 1 and jump.over <= 1e-6, `{firstStep} {jump.over}`)
 -- 8.1 stuck far behind (his constraints can't move him: a mover that keeps nothing): HoldStuck s, then eased back over
--- HoldEase s at the gap / HoldEase a second, never put there
+-- HoldEase s at the gap / HoldEase a second, never put there (9.2: more than PairLead.Sane studs off his end for Grace s,
+-- the server also takes his body back from Sol's client for the rest of the carry: its WARN)
 local kept: { any } = {}
 MoveHelper.useMover({ move = walker.move, halt = walker.halt, keep = function(b: any, anchor: any, offset: any, _dt: number, limit: number, snap: boolean)
 	table.insert(kept, { at = E.clock, limit = limit, snap = snap, gap = ((anchor.CFrame * offset).Position - b.root.Position).Magnitude })
@@ -758,8 +807,8 @@ local function look()
 	n += 1
 	local spot, role = Rules.holding(danny.s.move, danny.id)
 	loadShown = loadShown or (spot ~= nil and role == "carrier" and load.Enabled)
-	if spot == 4 and role == "carrier" and danny.action == "deliver" then
-		clockSpeed = lastSpeed
+	if spot == 4 and role == "carrier" and danny.action == "deliver" and distance(npc.PrimaryPart.Position, cargoDoor.WorldPosition) > H.Walk.Ease + 4 then
+		clockSpeed = lastSpeed -- (9.3 his walk on the way: he slows into his goal at its end)
 		arms = arms or { npc:GetAttribute("Carrying"), npc:GetAttribute("CarryHands") }
 	end
 	for _, s in { 1, 4, 5 } do
@@ -1508,54 +1557,94 @@ check("…Sol loads it: the slab in the van, both pairs of hands free", danny.s.
 Moving.admin(sol, "end")
 run(0.2)
 
--- Stuck: a new path after StuckRepath s, a nudge to the way's next point after StuckSnap s -------------------------------------
-
-Moving.admin(sol, "start")
-Moving.step()
-danny = MoveHelper.find(sol)
-E.request(sol, "helper", "hire")
-E.place(sol, outside)
-trigger(promptIn(workspace:FindFirstChild("Moves"):FindFirstChild("Move_marge"), "Enter house"), sol)
-give(itemModel(1))
-E.place(sol, outside)
-local routes: { any } = {}
-local spawn = E.task.spawn
-E.task.spawn = function(callback: any, ...: any) -- (the path in the background: at once here)
-	callback(...)
+-- 9.3 stuck (the owner: "he runs for 2 seconds and then on the spot he somehow teleports around"): an unseen wall across
+-- his way; a new way after Unstuck.Repath s, then his ways out walked (a step back, a sidestep), round again; only
+-- Unstuck.Fade s without progress the last resort, a fade over onto his way (never 8.9's nudge after 4 s); Studio's
+-- Output lines say so ("[Danny] stuck …", "[Danny] teleport stuck …")
+do
+	Moving.admin(sol, "start")
+	Moving.step()
+	danny = MoveHelper.find(sol)
+	E.request(sol, "helper", "hire")
+	E.place(sol, outside)
+	trigger(promptIn(workspace:FindFirstChild("Moves"):FindFirstChild("Move_marge"), "Enter house"), sol)
+	give(itemModel(1))
+	E.place(sol, outside)
+	local routes: { any } = {}
+	local spawn = E.task.spawn
+	E.task.spawn = function(callback: any, ...: any) -- (the path in the background: at once here)
+		callback(...)
+	end
+	local stuckAt = danny.body.root.Position -- (an unseen block: his way's walk goes nowhere; only his ways out are walked)
+	MoveHelper.useMover({
+		move = function(b: any, to: any, speed: number, dt: number)
+			local root = b.root
+			local here = root.Position
+			local way = V3(to.X - here.X, 0, to.Z - here.Z)
+			local length = way.Magnitude
+			local out = danny.recover
+			if length > 1e-6 and out and (to - out).Magnitude < 1e-6 then
+				local step = math.min(length, speed * dt)
+				root.CFrame = M.CFrame.new(here.X + way.X / length * step, here.Y, here.Z + way.Z / length * step)
+			end
+			b.walking = true
+			lastSpeed = speed
+		end,
+		halt = function(b: any)
+			b.walking = false
+		end,
+		appear = walker.appear,
+		route = function(_b: any, from: any, to: any): any
+			table.insert(routes, from)
+			return { from, from + V3(3, 0, 0), to }
+		end,
+	})
+	local lines: { string } = {}
+	MoveHelper.diagnose(true, function(line: string)
+		table.insert(lines, line)
+	end)
+	local fadesAt = fades
+	local repath, back, aside, rescued = 0, false, false, 0
+	local jumped, put = 0, 0
+	local last = danny.body.root.Position
+	local t = 0
+	run(11, function()
+		t += 0.1
+		local now = danny.body.root.Position
+		if repath == 0 and #routes >= 2 then
+			repath = t
+		end
+		back = back or (danny.phase == "back" and distance(now, stuckAt) > 0.7)
+		aside = aside or math.abs(now.Z - stuckAt.Z) > 1.5
+		if rescued == 0 and (danny.teleports.stuck or 0) > 0 then
+			rescued, put = t, distance(now, last)
+		elseif rescued == 0 then
+			jumped = math.max(jumped, distance(now, last))
+		end
+		last = now
+		return rescued > 0
+	end)
+	E.task.spawn = spawn
+	MoveHelper.useMover(walker)
+	MoveHelper.diagnose(false, nil)
+	local U = H.Unstuck
+	check("9.3 stuck: a new way from where he stands after Unstuck.Repath s", repath >= U.Repath - 0.15 and repath <= U.Repath + 0.35, repath)
+	check("…then his ways out, walked: a step back off the wall, a sidestep (never put anywhere: a walk's step at most)", back and aside
+		and jumped <= Config.Movement.Walk * H.Speed * 0.1 + 0.05, `{back} {aside} {jumped}`)
+	check("…only Unstuck.Fade s without progress the last resort: faded over onto his way, Unstuck.Rescue studs on (never the nudge on the spot)",
+		rescued >= U.Fade - 0.15 and rescued <= U.Fade + 0.35 and fades == fadesAt + 1 and put > 1 and put <= U.Rescue + 0.5, `{rescued} {fades - fadesAt} {put}`)
+	local stuckLine, teleportLine = nil, nil
+	for _, line in lines do
+		stuckLine = stuckLine or (if string.find(line, "[Danny] stuck ", 1, true) == 1 then line else nil)
+		teleportLine = teleportLine or (if string.find(line, "[Danny] teleport stuck ", 1, true) == 1 then line else nil)
+	end
+	check("9.3 Studio's Output: \"[Danny] stuck <s>s at <where> going to <where>, blocked by …\", a few seconds apart at most",
+		stuckLine ~= nil and string.find(stuckLine, "s at (", 1, true) ~= nil and string.find(stuckLine, ", blocked by ", 1, true) ~= nil and #lines <= 8, stuckLine)
+	check("…and \"[Danny] teleport stuck <studs> studs at <where>\" for the rescue", teleportLine ~= nil and string.find(teleportLine, " studs at (", 1, true) ~= nil,
+		teleportLine)
+	Moving.admin(sol, "end")
+	run(0.2)
 end
-MoveHelper.useMover({
-	move = function(b: any, _to: any, speed: number)
-		b.walking = true -- (blocked: he goes nowhere)
-		lastSpeed = speed
-	end,
-	halt = function(b: any)
-		b.walking = false
-	end,
-	route = function(_b: any, from: any, to: any): any
-		table.insert(routes, from)
-		return { from, from + V3(3, 0, 0), to }
-	end,
-})
-local stuckAt = danny.body.root.Position
-local repath, nudged = 0, 0
-local t = 0
-run(5, function()
-	t += 0.1
-	if repath == 0 and #routes >= 2 then
-		repath = t
-	end
-	if nudged == 0 and distance(danny.body.root.Position, stuckAt) > 2 then
-		nudged = t
-	end
-	return nudged > 0
-end)
-E.task.spawn = spawn
-MoveHelper.useMover(walker)
-check("7.x stuck: a new path after StuckRepath (2) s", repath >= H.StuckRepath - 0.15 and repath <= H.StuckRepath + 0.35, repath)
-check("…a nudge to his way's next point after StuckSnap (4) s", nudged >= H.StuckSnap - 0.15 and nudged <= H.StuckSnap + 0.35
-	and distance(danny.body.root.Position, stuckAt + V3(3, 0, 0)) < 0.05, `{nudged} s at {danny.body.root.Position}`)
-Moving.admin(sol, "end")
-run(0.2)
 
 -- 7.0 review: his body taken away (by something else) while he carries a piece: it falls, nobody holds it -----------------
 

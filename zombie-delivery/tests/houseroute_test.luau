@@ -13,6 +13,10 @@
 --     that spot a way back out of each door the same (two layouts of each kind)
 --   * a piece boxed in by others: no spot (he can't get to it: refused); a spot never in a doorway's zone when asked
 --   * a stuck nudge's snap: from inside a wall onto the nearest open cell, never into a wall
+--   * 9.3 (the owner: "he runs for 2 seconds and then on the spot he somehow teleports around"): round a wall's end, his
+--     walk aimed at HouseRoute.ahead's point keeps Walk.Clear off the wall all the way (8.9.5's turn a stud before the
+--     corner cut it into the wall's end), the corner kept until he sees past it; a built part (HouseRoute.solid) closes
+--     its cells and counts for the exact clearance (HouseRoute.gap); a grid with `clear` pulls its legs only that far off
 local Mk = require("./ItemMock")
 local Vector3 = Mk.Vector3
 local Config = require("./Config")
@@ -320,6 +324,87 @@ do
 	end
 	check(`9.0 slide on every layout: {ways} ways, where he gets to Clear ({clear}) studs off every wall slab, never across one`,
 		ways > 500 and worst >= clear - 1e-3 and crossed == 0, `{worst} off at least, {crossed} across`)
+end
+
+-- 9.3 round a wall's end: a room 20 × 20, a wall across it from its west side to x 12 (its end), his way from the south
+-- half to the north half round that end
+do
+	local V = Vector3.new
+	local plan = {
+		min = V(0, 0, 0),
+		max = V(20, 10, 20),
+		faces = { { min = V(0, 0, 9.5), max = V(12, 10, 10.5), header = false } },
+		rooms = { { min = V(0.5, 0, 0.5), max = V(19.5, 10, 19.5) } },
+		doors = {},
+		fixtures = {},
+		wall = 1,
+	}
+	local clear = Config.MoveHelper.Walk.Clear
+	local g = HouseRoute.grid(plan, nil, nil, clear) :: HouseRoute.Grid
+	local points = HouseRoute.path(g, 3, 5, 3, 15) :: { HouseRoute.Point }
+	local legsOff = math.huge
+	local ax, az = 3, 5
+	for _, q in points do
+		legsOff = math.min(legsOff, HouseRoute.gap(g, ax, az, q.x, q.z))
+		ax, az = q.x, q.z
+	end
+	check("9.3 a grid with `clear`: its way round the wall's end, every leg Walk.Clear off the wall exactly", #points >= 2 and legsOff >= clear - 1e-6, legsOff)
+	-- his walk: aimed every 0.1 s, straight at the point between, 9.8 studs a second (1/30 s steps)
+	local x, z, index = 3, 5, 1
+	local least, kept, arrived = math.huge, true, false
+	for _ = 1, 200 do
+		local was = index
+		local tx, tz, left
+		tx, tz, index, left = HouseRoute.ahead(g, points, index, x, z, 3.5, clear)
+		if index > was then
+			-- (a corner dropped only once he sees the next point past it)
+			kept = kept and HouseRoute.free(g, x, z, points[index].x, points[index].z, math.min(clear, HouseRoute.gap(g, x, z, x, z) - 1e-3))
+		end
+		for _ = 1, 3 do
+			local dx, dz = tx - x, tz - z
+			local l = math.sqrt(dx * dx + dz * dz)
+			if l > 1e-6 then
+				local step = math.min(l, 9.8 / 30)
+				local nx, nz = x + dx / l * step, z + dz / l * step
+				least = math.min(least, HouseRoute.gap(g, x, z, nx, nz))
+				x, z = nx, nz
+			end
+		end
+		local last = points[#points]
+		if left < 0.05 and (x - last.x) ^ 2 + (z - last.z) ^ 2 < 0.01 then
+			arrived = true
+			break
+		end
+	end
+	check("…his walk aimed along it (HouseRoute.ahead) gets there round the wall's end, never nearer to it than Walk.Clear",
+		arrived and least >= clear - 1e-3 and kept, `{arrived} {least} {kept}`)
+	-- the 8.9.5 walk on the same way: straight at the next corner, on to the next a stud before it
+	x, z, index = 3, 5, 1
+	local old = math.huge
+	for _ = 1, 200 do
+		while index < #points and (points[index].x - x) ^ 2 + (points[index].z - z) ^ 2 < 1 do
+			index += 1
+		end
+		local q = points[index]
+		local dx, dz = q.x - x, q.z - z
+		local l = math.sqrt(dx * dx + dz * dz)
+		if l < 1e-6 then
+			break
+		end
+		local step = math.min(l, 9.8 / 10)
+		local nx, nz = x + dx / l * step, z + dz / l * step
+		old = math.min(old, HouseRoute.gap(g, x, z, nx, nz))
+		x, z = nx, nz
+	end
+	check("…8.9.5's walk on it cut the corner (the cause: nearer to the wall's end than his body's half width)", old < Config.MoveHelper.Body.Radius, old)
+	-- a built part the plan does not have: its cells closed, the clearance counts it
+	local before = 0
+	for k = 1, #g.open do
+		before += g.open[k]
+	end
+	local closed = HouseRoute.solid(g, { { x0 = 15, z0 = 14, x1 = 16, z1 = 16 } })
+	check("9.3 HouseRoute.solid: a built part's cells closed for good, counted by the exact clearance", closed > 0 and not HouseRoute.open(g, 15.5, 15)
+		and HouseRoute.gap(g, 14, 15, 14, 15) <= 1 + 1e-6 and HouseRoute.block(g, {}) == before - closed, closed)
 end
 
 if failures == 0 then

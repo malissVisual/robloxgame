@@ -14,7 +14,7 @@
 --   * a pick through a wall is refused: Ann behind a wall from a piece, within the prompt's reach: no pick ("You can't
 --     reach the X through the wall."), the piece's prompts need a line of sight (RequiresLineOfSight)
 --   * Danny put at that same spot behind the wall with the piece given to him: he never takes it from there; he walks
---     round through the doorways (no step across a wall, never out of the rooms, never stuck: no stuck spell to a nudge)
+--     round through the doorways (no step across a wall, never out of the rooms, never stuck: 9.3 no stuck spell at all)
 --     and takes it from its own side, within Pick.Arm of it, his chest's ray to it clear of the walls; his pick-up:
 --     turned to it (Npcs.face), the bend with both hands on it ("lift", the Carrying attributes on its place while it
 --     still stands), then his, gliding up into his hands over steps (anchored, its weld off, never snapped), welded
@@ -369,13 +369,24 @@ for index, house in Houses do
 	end
 	HouseRoute.block(grid, rects)
 	local y = origin.Position.Y + 3
-	-- (the same walls and fixtures cell for cell; the pieces' cells the same but for a hair's float at his radius's edge)
-	local differ = 0
+	-- (the same walls and fixtures cell for cell; the pieces' cells the same but for a hair's float at his radius's edge;
+	-- 9.3 and the built interior's collidable parts the plan does not have: a cell the plan leaves open closed only by one
+	-- of those, HouseRoute.solid's rects after the plan's own solids)
+	local differ, unexplained = 0, 0
 	for k = 1, if live then #live.open else 0 do
-		differ += if live.open[k] ~= grid.open[k] then 1 else 0
+		local plain = live.open[k] ~= grid.open[k] and live.still[k] == grid.still[k]
+		differ += if plain then 1 else 0
+		if live.still[k] ~= grid.still[k] then
+			local x, z = grid.x0 + ((k - 1) % grid.nx) * grid.step, grid.z0 + ((k - 1) // grid.nx) * grid.step
+			local built = false
+			for n = #grid.solids + 1, #live.solids do
+				built = built or HouseRoute.toRect(x, z, live.solids[n]) < live.radius
+			end
+			unexplained += if live.still[k] == 1 or not built then 1 else 0
+		end
 	end
-	check(`{house.name}: his grid is the move's plan's (the walls, the fixtures, the pieces where they stand)`, live ~= nil and #live.walls == #grid.walls
-		and table.concat(live.still, "") == table.concat(grid.still, "") and differ <= #grid.open / 500, differ)
+	check(`{house.name}: his grid is the move's plan's (the walls, the fixtures, the pieces where they stand) and the built parts' (9.3)`, live ~= nil
+		and #live.walls == #grid.walls and unexplained == 0 and differ <= #grid.open / 500, `{differ} {unexplained}`)
 
 	-- his ways on the server's own grid, to every piece, against the shell's real wall parts
 	local ways = live or grid
@@ -451,8 +462,8 @@ for index, house in Houses do
 	check(`{house.name}: Danny never takes the {name} through the wall: he walks round and takes it from its side`, took and HouseRoute.sees(grid, at.X, at.Z, mx, mz)
 		and not wallPartBetween(b.model, chest, model.PrimaryPart.Position) and (at.X - qx) ^ 2 + (at.Z - qz) ^ 2 > 4, `{took} at ({at.X}, {at.Z})`)
 	check(`{house.name}: …beside it at arm's length (within Pick.Arm of its footprint: {math.floor(reachAt * 100) / 100})`, reachAt <= H.Pick.Arm)
-	check(`{house.name}: …his walk: no step across a wall, never out of the rooms and doorways, never stuck (no stuck spell to a nudge)`, w.crossed == 0 and w.outRoom == 0
-		and w.stuck < H.StuckSnap, `{w.crossed} {w.why} {w.outRoom} {w.stuck}`)
+	check(`{house.name}: …his walk: no step across a wall, never out of the rooms and doorways, never stuck (9.3: no stuck spell to a new way, let alone his ways out)`, w.crossed == 0 and w.outRoom == 0
+		and w.stuck < H.Unstuck.Repath, `{w.crossed} {w.why} {w.outRoom} {w.stuck}`)
 	check(`{house.name}: …his pick-up: turned to it, then the bend ("lift") with both hands on it as it stands`, w.faced and w.bent and w.hands, `{w.faced} {w.bent} {w.hands}`)
 	local glide = w.glide
 	local smooth = #glide >= 3
@@ -468,7 +479,7 @@ for index, house in Houses do
 		return danny.s.move.things[s.id].state == "truck"
 	end)
 	watch = nil
-	check(`{house.name}: …carried out of the house (no wall crossed on the way) and loaded`, loaded and w.crossed == 0 and w.outRoom == 0 and w.stuck < H.StuckSnap,
+	check(`{house.name}: …carried out of the house (no wall crossed on the way) and loaded`, loaded and w.crossed == 0 and w.outRoom == 0 and w.stuck < H.Unstuck.Repath,
 		danny.s.move.things[s.id].state)
 
 	if house.kind == "big" then

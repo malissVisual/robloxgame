@@ -1,42 +1,42 @@
 -- 9.0 carrying in two with Danny, walked FORWARDS (the owner, 8.9.3: "I noticed Danny carries better now, but only when
 -- I walk backwards. When I want to walk forwards, Danny can't walk backwards"; then "and he still teleports", his
--- screenshot: Danny standing inside the Sofa at its far end, The Old Farmstead). The real server/Moving.luau,
--- server/MoveHelper.luau and server/PairHold.luau on tests/runtime/MovingRuntime.luau's fakes, the game's lead
--- (Config.MoveHelper.HoldLead), and Danny's hold the GAME's: MoveHelper.gameMover's keep and free (server/PairHold.luau's
--- constraints on his root), played here as Roblox plays them every frame (1/60 s): his root toward the AlignPosition's
--- goal along the ground at its MaxVelocity, his height toward the lift's, his turn toward the AlignOrientation's at its
--- MaxAngularVelocity; PairHold's own step every Heartbeat, MoveHelper's every Tick. The piece is welded to Sol (its frame
--- from her root kept every frame). Sol's client is client/PairSteer.luau's step (shared/PairCarry.luau: the wall, the
--- start waiting for him, never the piece pushed into him as her screen shows him, the walk eased in, the heading
--- turned). Her screen shows the piece at once (welded to her body, her own) and Danny as the server had him
--- Brain.leadTime(ping) s before (the lead's own model of her screen). Two networks: Studio's (ping 0, where the owner
--- plays) and an online one (ping 0.15 s).
+-- screenshot: Danny standing inside the Sofa at its far end, The Old Farmstead). 9.2 (the owner, 8.9.5: "the carrying
+-- is better, but it feels like it's harder to control … fix it so it's playable"; 8.9.4 held her walk back to hide his
+-- lateness on her screen: its start took 0.85 s in Studio, 2 s online): SOL DRIVES HIS END. The real server/Moving.luau,
+-- server/MoveHelper.luau and server/PairHold.luau on tests/runtime/MovingRuntime.luau's fakes, Danny's hold the GAME's
+-- (MoveHelper.gameMover's keep and free: server/PairHold.luau's constraints on his root), and Sol's client the real
+-- client/PairLead.luau (E.leadClient: PairLeadClient.luau) with client/PairSteer.luau's drive branch around it (her walk,
+-- PairLead.walk, the heading at PairLead.Turn, PairLead.turn, then PairLead.step). His body is Sol's to simulate
+-- (SetNetworkOwner(Sol)): her client sets his constraints' goals every frame before the physics, and the physics here
+-- plays Roblox's constraints every frame (1/60 s) on what SHE set: his root toward the AlignPosition's goal along the
+-- ground at its MaxVelocity, his height toward the lift's, his turn toward the AlignOrientation's at its
+-- MaxAngularVelocity; her own walk is the same physics step (the piece welded to her root moves with it). The server's
+-- PairHold Heartbeat and MoveHelper's step (every Tick) run as in the game and must write none of his goals.
+-- Her screen shows her own simulation: the piece AND Danny with no lag at any ping (the ping only delays the server's
+-- and the others' view of both, together). Two networks all the same: Studio's (ping 0) and an online one (0.15 s).
 -- Two pieces at their real sizes (shared/FurnitureLooks.luau): the Sofa (7.2 × 3.2) and the Dining Table (6.0 × 3.8).
 -- Sol lifts each with Danny, faces him across it and walks FORWARDS (he must step backwards), straight, then on a
 -- curve both ways, stops; then backwards (he follows), and stops.
---   * no constraint of his hold reaches into Sol's assembly (the piece welded to her root): his AlignPosition and
---     AlignOrientation have one attachment, his own, their goals set by the server (a constraint between his body and
---     her piece makes one mechanism of the two: one network owner for both, his server-owned body and her own fighting)
---   * on the server his body never goes into the piece (his chest, his root's half depth before it, outside the
---     piece's end face along his end's axis), never a step longer than his top speed × dt (no snap), his end never
---     another one
---   * on her screen the piece never runs into his body (FORWARDS: the start, the walk, the turns, the stop) by more
---     than `screen` studs, nor does he stand in it after a stop; his hands within `keep` studs of its edge once a walk
---     is under way (his body never in the piece: following her his hands reach on, Config.MoveHelper.Edge.Reach)
---   * her walk under way (90% of the pair's) within `under` s of a start, forwards and backwards, and no stall after
---   * facing the piece all the way (never his back to it), his legs stepping backwards while his end walks away from
---     the piece (Npcs.stride < 0, MoveHelperBrain.holdLegs), forwards while it walks toward it
--- On 8.9.3's code (both constraints' Attachment1 on the piece, his lead 2.26 studs toward the piece's middle following
--- her at a ping of 0.15 s, the walk at once from standing): 2 constraints reach into her assembly; on the server his
--- chest 2.16 studs inside the Sofa after she walked backwards and stopped (the screenshot); walking forwards the piece
--- 2.42 studs into his body on her screen.
+--   * his body hers (NetworkOwner, his model's PairLead / PairLeadAt / PairLeadPiece; her PairWith, no PairFar, no
+--     PairWall), no constraint of his hold reaches into her assembly, the server writes none of his goals meanwhile
+--   * he never stands inside the piece (his chest outside its end face along his end's axis), and on her screen he is
+--     at his end with ~0 lag once a walk is under way (his root within `lag` studs of his place every frame)
+--   * her walk at the pair's carry speed from the very first frame, forwards and backwards, and never held after (8.9.4:
+--     eased in over PairStart, waiting for him)
+--   * facing the piece all the way, his legs stepping backwards while his end walks away from the piece (Npcs.stride <
+--     0, MoveHelperBrain.holdLegs), forwards while it walks toward it; never a step more than his place's own + the
+--     glide (no snap); his humanoid kept in the Physics state by her client
+--   * an exploit: her client flings him 20 studs off: the server takes him back (MoveHelperBrain.leadKept), holds him
+--     itself, walks him back to his end at its hold's speed (never put there)
+--   * out of the front door with it (the trip far off the interior): he comes through at his end at once, still hers
+--   * down: his constraints gone, his body the server's again, standing (Running), her PairWith gone
+-- (On 8.9.4's code: his body the server's, the start eased over PairStart, her screen showed him 0.06 – 0.21 s late.)
 local E = require("./MovingRuntime")
 local Moving = require("./MovingServer")
 local MoveHelper = require("./MoveHelperServer")
 local Config = require("./Config")
 local Map = require("./Map")
 local Rules = require("./MovingRules")
-local Brain = require("./MoveHelperBrain")
 local PairCarry = require("./PairCarry") -- (client/PairSteer.luau's steering)
 local FurnitureLooks = require("./FurnitureLooks")
 
@@ -52,19 +52,20 @@ end
 
 local T = Config.Moving
 local H = Config.MoveHelper
+local L = H.PairLead
 local FRAME = 1 / 60
 local TICK = 6 -- frames between two of his steps (Config.MoveHelper.Tick 0.1 s)
--- the networks: Sol's ping; the most the piece comes into his body on her screen, his hands off its edge once under way,
--- the seconds her walk takes to get under way
-type Net = { name: string, ping: number, screen: number, keep: number, under: number }
-local STUDIO: Net = { name = "Studio, ping 0", ping = 0, screen = 0.3, keep = 0.75, under = 1.2 }
-local ONLINE: Net = { name = "online, ping 0.15 s", ping = 0.15, screen = 0.35, keep = 1.75, under = 2.5 }
+-- the networks: Sol's ping (the server's view of her client's world that late; her screen her own)
+type Net = { name: string, ping: number }
+local STUDIO: Net = { name = "Studio, ping 0", ping = 0 }
+local ONLINE: Net = { name = "online, ping 0.15 s", ping = 0.15 }
+local LAG = 0.12 -- studs: the most his root is off his place on her screen once a walk is under way
 local net = STUDIO
 local M = E.Mock
 local V3 = M.Vector3.new
 local CF = M.CFrame.new
 local workspace = M.workspace
-H.HoldLead.Base, H.HoldLead.Ping = E.gameLead.Base, E.gameLead.Ping -- (the game's lead)
+H.HoldLead.Base, H.HoldLead.Ping = E.gameLead.Base, E.gameLead.Ping -- (the game's lead: a drive needs none)
 T.Doors.Walk = false -- (the walk-in doors off: these walks stay in the house)
 local SOFA = FurnitureLooks.Items.sofa.size
 local TABLE = FurnitureLooks.Items.dining_table.size
@@ -109,6 +110,7 @@ end
 Moving.useArt(E.art)
 Moving.start()
 local heartbeat = E.game:GetService("RunService").Heartbeat
+local lead = E.leadClient(sol) -- 9.2 Sol's client/PairLead.luau
 
 local function promptIn(model: any, action: string?): any
 	for _, d in model:GetDescendants() do
@@ -139,7 +141,8 @@ local function holding(): boolean
 end
 
 -- Roblox's constraints on his root, one frame: the goal of each (one attachment: its own Position / CFrame; two: its
--- Attachment1 where its part is now), his root toward it at its top speed.
+-- Attachment1 where its part is now), his root toward it at its top speed. (9.2: what Sol's client set while she drives
+-- him; the server's after it took him back.)
 local function goalOf(c: any): any?
 	if c.props.Mode == "OneAttachment" then
 		return if c.ClassName == "AlignOrientation" then c.props.CFrame else CF(c.props.Position.X, c.props.Position.Y, c.props.Position.Z)
@@ -181,9 +184,11 @@ local function physics(dt: number)
 	root.CFrame = CF(x, y, z) * M.CFrame.Angles(0, yaw, 0)
 end
 
--- One frame: Sol's walk (`before`), physics, then the scripts (PairHold's Heartbeat; his loop every TICK frames, the
--- move's every 2 TICK); `after`: the frame as it is drawn.
+-- One frame: Sol's client (`before`: her walk and turn, his goals), physics (his body toward them; her walk is in
+-- `before`'s end: the same step), then the server's scripts (PairHold's Heartbeat; his loop every TICK frames, the
+-- move's every 2 TICK), which must write none of his goals while she drives him; `after`: the frame as it is drawn.
 local frames = 0
+local serverWrote = 0 -- (frames the server wrote his goals while Sol drove him)
 local function frame(before: (() -> ())?, after: (() -> ())?)
 	frames += 1
 	E.clock += FRAME
@@ -191,12 +196,21 @@ local function frame(before: (() -> ())?, after: (() -> ())?)
 		before()
 	end
 	physics(FRAME)
+	local grip = danny and danny.body and danny.body.grip
+	local driven = grip ~= nil and danny.body.root.NetworkOwner == sol
+	local was = if grip then grip.align.props.Position else nil
+	local wasLift = if grip and grip.lift then grip.lift.props.Position else nil
+	local wasMax = if grip then grip.align.MaxVelocity else nil
 	heartbeat:Fire(FRAME)
 	if frames % TICK == 0 then
 		MoveHelper.step(TICK * FRAME)
 		if frames % (2 * TICK) == 0 then
 			Moving.step()
 		end
+	end
+	if driven and grip and grip.align.props.Parent ~= nil and danny.body.root.NetworkOwner == sol and (grip.align.props.Position ~= was
+		or (grip.lift and grip.lift.props.Position ~= wasLift) or grip.align.MaxVelocity ~= wasMax) then
+		serverWrote += 1
 	end
 	if after then
 		after()
@@ -223,29 +237,64 @@ local site = workspace:FindFirstChild("Moves"):FindFirstChild("Move_marge")
 E.place(sol, outside)
 promptIn(site, "Enter house").Triggered:Fire(sol)
 local character = sol.Character
+local humanoid = character:FindFirstChildOfClass("Humanoid")
+
+-- Sol's client, one frame (client/PairSteer.luau's drive branch): her stick (wx, wz) → the walk, the part into a wall at
+-- his end gone (PairLead.walk), the heading at PairLead.Turn toward it (PairLead.turn), the piece turned with her root
+-- (the weld moves at once), his goals from it (PairLead.step), then her walk this physics step. Returns × the pair's
+-- walk (nil: no drive: she has nothing to drive).
+local truth: any = nil
+local steer: any = nil
+local follow: () -> () = function() end
+local function client(wx: number, wz: number): number?
+	local drive = lead.of(body.model)
+	if not drive then
+		return nil
+	end
+	local x, z = lead.walk(drive, wx, wz)
+	local facingNow = yawOf(truth)
+	steer.heading = facingNow
+	local factor = PairCarry.steer(steer, x, z, FRAME, math.rad(L.Turn), false, L.TurnWalk)
+	steer.heading = lead.turn(drive, facingNow, steer.heading)
+	truth = CF(truth.Position) * M.CFrame.Angles(0, steer.heading, 0)
+	E.rootOf(sol).CFrame = truth
+	follow()
+	local speed = (character:GetAttribute("CarrySpeed") or 0) * factor
+	local velocity = V3(x, 0, z) * speed
+	E.rootOf(sol).AssemblyLinearVelocity = velocity
+	lead.step(drive, FRAME, E.rootOf(sol), humanoid) -- (before the physics: the piece a frame on by her velocity)
+	truth = CF(truth.Position + velocity * FRAME) * truth.Rotation -- (her walk: this physics step)
+	E.rootOf(sol).CFrame = truth
+	follow()
+	return factor
+end
 
 -- One carry on network `with`: Sol at the piece's +X end facing it, her Lift calls Danny, he walks to the far end and
 -- up it goes; then Sol walks forwards (toward him), on a curve, stops, walks backwards, stops.
-local function carry(spot: number, name: string, size: any, with: Net)
+local function carry(spot: number, name: string, size: any, with: Net, fling: boolean?, door: boolean?)
 	net = with
-	local late = math.floor(Brain.leadTime(net.ping) / FRAME + 0.5) -- (frames her screen shows him late)
 	local title = `{name} ({net.name})`
 	local model = itemModel(spot)
 	local root = model.PrimaryPart
 	local lying = root.CFrame
 	local at = lying * V3(size.X / 2 + 1.5, 0, 0)
 	E.rootOf(sol).CFrame = M.CFrame.lookAt(V3(at.X, E.rootOf(sol).Position.Y, at.Z), V3(lying.X, E.rootOf(sol).Position.Y, lying.Z))
+	E.rootOf(sol).AssemblyLinearVelocity = V3(0, 0, 0)
 	Config.CarryGrip.On = true -- (as in the game: his arrival opens no lift check, the steady walk)
 	promptIn(model, "Lift").Triggered:Fire(sol)
 	local up = run(30, holding)
 	Config.CarryGrip.On = false
 	check(`{title}: Sol's Lift calls Danny, up it goes with him at its far end`, up and character:GetAttribute("MoveCarry") == spot)
 	local weld = E.rootOf(sol).CFrame:ToObjectSpace(root.CFrame)
-	local function follow()
+	follow = function()
 		root.CFrame = E.rootOf(sol).CFrame * weld
 	end
+	truth = E.rootOf(sol).CFrame
+	steer = PairCarry.newSteer(yawOf(truth))
 	follow()
-	run(1, nil, follow) -- (he settles at his end)
+	run(1, nil, function()
+		client(0, 0) -- (standing: her client drives him to his end, a glide)
+	end) -- (he settles at his end)
 	local axis = danny.holdEnd -- (his end in the piece's frame: decided at the lift)
 	local out = axis.Unit -- (his end's way out of the piece's middle)
 	local half = math.abs(out.X) * size.X / 2 + math.abs(out.Z) * size.Z / 2 -- (the piece's half length along it)
@@ -253,7 +302,7 @@ local function carry(spot: number, name: string, size: any, with: Net)
 	local place = half + H.Standoff -- (his root's place out of the middle along it)
 	local front = body.root.Size.Z / 2 -- (his chest before his root)
 
-	-- the hold's constraints: none with an attachment outside his own body
+	-- his body hers to drive; the hold's constraints: none with an attachment outside his own body
 	local grip = body.grip
 	local reaching: { string } = {}
 	for _, c in body.root:GetChildren() do
@@ -264,51 +313,42 @@ local function carry(spot: number, name: string, size: any, with: Net)
 			end
 		end
 	end
-	check(`9.0 {title}: no constraint of his hold reaches into Sol's assembly (one attachment, his own; the server sets their goals)`,
-		grip ~= nil and #reaching == 0, `{#reaching}: {table.concat(reaching, ", ")}`)
-	check(`9.0 {title}: Sol's client knows him (PairWith: his id) and his place (PairFar, in her root's frame: the far end of the piece)`,
-		character:GetAttribute("PairWith") == danny.id and M.typeof(character:GetAttribute("PairFar")) == "Vector3"
-		and (flat(E.rootOf(sol).CFrame * character:GetAttribute("PairFar")) - flat(root.CFrame * (out * place))).Magnitude < 0.6,
-		character:GetAttribute("PairFar"))
+	check(`9.0 {title}: no constraint of his hold reaches into Sol's assembly (one attachment, his own; no reaction force)`,
+		grip ~= nil and #reaching == 0 and grip.align.ReactionForceEnabled == false and grip.orient.ReactionTorqueEnabled == false,
+		`{#reaching}: {table.concat(reaching, ", ")}`)
+	local value = body.model:FindFirstChild("PairLeadPiece")
+	local leadAt = body.model:GetAttribute("PairLeadAt")
+	check(`9.2 {title}: his body is Sol's to drive (SetNetworkOwner(Sol); PairLead her UserId, PairLeadAt his place, PairLeadPiece the piece)`,
+		body.root.NetworkOwner == sol and body.model:GetAttribute("PairLead") == sol.UserId and M.typeof(leadAt) == "CFrame"
+		and value ~= nil and value.Value == root and (flat(root.CFrame * leadAt.Position) - flat(root.CFrame * (out * place))).Magnitude < 0.05,
+		`{body.root.NetworkOwner} / {body.model:GetAttribute("PairLead")}`)
+	check(`9.2 {title}: Sol's client knows him (PairWith: his id) and needs nothing late (no PairFar, no PairWall)`,
+		character:GetAttribute("PairWith") == danny.id and character:GetAttribute("PairFar") == nil and character:GetAttribute("PairWall") == nil)
+	check(`9.2 {title}: his humanoid in the Physics state, her client keeping it`, body.humanoid.State == "Physics")
 
 	-- Sol's walk, frame by frame: `wx, wz` the way she wants (her stick, a world direction) for `seconds`
-	local truth = E.rootOf(sol).CFrame
-	local steer = PairCarry.newSteer(yawOf(truth))
-	local seen: { any } = {} -- (his root, frame by frame: her screen shows the one `late` frames back)
-	local reaches: { number } = {} -- (…and his hands' reach on)
 	local phase: any = nil
 	local lastRoot = body.root.Position
+	local lastPlace = flat(root.CFrame * (out * place))
 	local strides = #E.strides
-	local edge = H.Edge
-	local function reachNow(): number -- (his hands' reach on past the edge's usual place: his CarryAt)
-		local carryAt = body.model:GetAttribute("CarryAt")
-		return if M.typeof(carryAt) == "Vector3" then -carryAt.Z - (H.Standoff + edge.Depth / 2) else 0
-	end
+	local tickAt = body.root.Position -- (his root at the last of his steps: his end's way between two)
+	local tickPlace = flat(root.CFrame * (out * place))
 	local function measure()
-		local frameNow = root.CFrame -- (the piece: the same on her screen and on the server)
-		table.insert(seen, body.root.CFrame)
-		table.insert(reaches, reachNow())
-		phase.reach = math.max(phase.reach, reaches[#reaches])
-		local shown = seen[math.max(1, #seen - late)]
-		local shownReach = reaches[math.max(1, #reaches - late)]
+		local frameNow = root.CFrame -- (the piece: her screen's, the server's a ping later alike)
+		local placeNow = flat(frameNow * (out * place))
 		-- his chest against the piece's end face, along his end's axis and beside it
-		local function into(r: any): (number, number)
-			local p = frameNow:PointToObjectSpace(r.Position)
-			local along = p.X * out.X + p.Z * out.Z
-			local aside = math.abs(p.X * out.Z - p.Z * out.X)
-			return if aside < wide then half - (along - front) else 0, along - place
-		end
-		local deep = into(body.root.CFrame)
-		local shownDeep, off = into(shown)
+		local p = frameNow:PointToObjectSpace(body.root.Position)
+		local along = p.X * out.X + p.Z * out.Z
+		local aside = math.abs(p.X * out.Z - p.Z * out.X)
+		local deep = if aside < wide then half - (along - front) else 0
 		phase.deep = math.max(phase.deep, deep)
-		phase.shownDeep = math.max(phase.shownDeep, shownDeep)
-		if phase.frames >= 45 then -- (under way: 0.75 s into the leg; his hands off the edge: his body's off less their reach)
-			phase.off = math.max(phase.off, math.abs(off - shownReach))
+		if phase.frames >= 6 then -- (under way: a tenth of a second into the leg)
+			phase.lag = math.max(phase.lag, (flat(body.root.Position) - placeNow).Magnitude)
 		end
-		-- a step no longer than his top speed × dt (no snap)
+		-- a step no longer than his place's own + the glide (no snap)
 		local moved = (flat(body.root.Position) - flat(lastRoot)).Magnitude
-		phase.jump = math.max(phase.jump, moved - (grip.align.MaxVelocity * FRAME + 1e-6))
-		lastRoot = body.root.Position
+		phase.jump = math.max(phase.jump, moved - ((placeNow - lastPlace).Magnitude + L.Glide * FRAME + 0.02))
+		lastRoot, lastPlace = body.root.Position, placeNow
 		-- facing the piece's middle
 		local toPiece = flat(frameNow.Position - body.root.Position)
 		if toPiece.Magnitude > 0.5 then
@@ -317,65 +357,40 @@ local function carry(spot: number, name: string, size: any, with: Net)
 		if danny.holdEnd ~= axis then
 			phase.flips += 1
 		end
-		-- his legs: at his steps, against his end's own way along its axis (away from the piece: backwards)
-		for n = strides + 1, #E.strides do
-			local s = E.strides[n]
-			if s.npc == body.model then
-				local endWay = flat(frameNow.Rotation * out) -- (his end's way out of the piece, in the world)
-				local v = flat(V3(danny.trail.evx, 0, danny.trail.evz))
-				local along = v:Dot(endWay.Unit)
-				if math.abs(along) >= H.HoldLegs.From * 2 and math.abs(along) >= 0.7 * v.Magnitude then -- (his end mostly along its axis)
+		-- his legs: at his steps, against his end's own way along its axis between two of them (away from the piece:
+		-- backwards)
+		if #E.strides > strides then
+			local endWay = flat(frameNow.Rotation * out) -- (his end's way out of the piece, in the world)
+			local v = (placeNow - tickPlace) / (TICK * FRAME)
+			local alongWay = v:Dot(endWay.Unit)
+			for n = strides + 1, #E.strides do
+				local s = E.strides[n]
+				if s.npc == body.model and math.abs(alongWay) >= H.HoldLegs.From * 2 and math.abs(alongWay) >= 0.7 * v.Magnitude then
 					phase.legs += 1
-					if (along > 0 and s.speed > 0) or (along < 0 and s.speed < 0) then
+					if (alongWay > 0 and s.speed > 0) or (alongWay < 0 and s.speed < 0) then
 						phase.wrongLegs += 1
 					end
 				end
 			end
+			strides = #E.strides
+			tickAt, tickPlace = body.root.Position, placeNow
 		end
-		strides = #E.strides
+		if body.humanoid.State ~= "Physics" then
+			phase.state += 1
+		end
 		phase.frames += 1
 	end
 	local phases: { any } = {}
 	local function leg(label: string, wx: number, wz: number, seconds: number)
-		phase = { label = label, deep = 0, shownDeep = 0, off = 0, jump = 0, facing = 1, flips = 0, legs = 0, wrongLegs = 0, frames = 0,
-			upAt = math.huge, dip = 1, reach = 0 }
+		phase = { label = label, deep = 0, lag = 0, jump = 0, facing = 1, flips = 0, legs = 0, wrongLegs = 0, frames = 0, first = nil, least = 1,
+			state = 0 }
 		table.insert(phases, phase)
 		run(seconds, nil, function()
-			-- client/PairSteer.luau's step on her screen: the wall (PairWall), the start waiting for him and never the
-			-- piece pushed into him as her screen shows him (PairFar, PairWith), the walk eased in, the heading turned
-			steer.heading = yawOf(truth)
-			local x, z = wx, wz
-			local wall = character:GetAttribute("PairWall")
-			if M.typeof(wall) == "Vector3" then
-				x, z = PairCarry.wall(x, z, wall.X, wall.Z)
+			local factor = client(wx, wz) or 0
+			if wx * wx + wz * wz > 0.5 then -- (her walk's share of the pair's: from the first frame on)
+				phase.first = phase.first or factor
+				phase.least = math.min(phase.least, factor)
 			end
-			local far = character:GetAttribute("PairFar")
-			local shown = seen[math.max(1, #seen - late)]
-			local wait = false
-			if M.typeof(far) == "Vector3" and shown and character:GetAttribute("PairWith") == danny.id then
-				local farAt = truth * far
-				local ox, oz = farAt.X - truth.Position.X, farAt.Z - truth.Position.Z
-				local length = math.sqrt(ox * ox + oz * oz)
-				if length > 0.5 then
-					ox, oz = ox / length, oz / length
-					local gap = (shown.Position.X - farAt.X) * ox + (shown.Position.Z - farAt.Z) * oz
-					wait = PairCarry.waits(x, z, ox, oz, gap)
-					x, z = PairCarry.keep(x, z, ox, oz, gap)
-				end
-			end
-			local factor = PairCarry.steer(steer, x, z, FRAME, math.rad(H.PairTurn), wait) * PairCarry.started(steer)
-			local speed = (character:GetAttribute("CarrySpeed") or 0) * factor
-			if wx * wx + wz * wz > 0.5 then -- (her walk's share of the pair's: when it got under way, the least after)
-				local share = math.sqrt(x * x + z * z) * factor
-				if phase.upAt == math.huge and share >= 0.9 then
-					phase.upAt = phase.frames * FRAME
-				elseif phase.upAt < math.huge then
-					phase.dip = math.min(phase.dip, share)
-				end
-			end
-			truth = CF(truth.Position + V3(x, 0, z) * speed * FRAME) * M.CFrame.Angles(0, steer.heading, 0)
-			E.rootOf(sol).CFrame = truth
-			follow()
 		end, measure)
 	end
 	local f = truth.LookVector -- (toward him across the piece)
@@ -383,59 +398,117 @@ local function carry(spot: number, name: string, size: any, with: Net)
 	local rx, rz = -fz, fx -- (her right)
 	local s2 = math.sqrt(0.5)
 	leg("forwards", fx, fz, 3.5)
+	body.humanoid.State = "Running" -- (his state machine slipped on her client: hers to put back)
 	leg("stop", 0, 0, 1)
 	leg("forwards, a curve right", (fx + rx) * s2, (fz + rz) * s2, 2.5)
 	leg("forwards, a curve left", (fx - rx) * s2, (fz - rz) * s2, 2.5)
 	leg("stop", 0, 0, 1)
-	leg("backwards", -fx, -fz, 3)
+	local b = truth.LookVector -- (her facing now: straight behind her)
+	leg("backwards", -b.X, -b.Z, 3)
 	leg("stop", 0, 0, 1.5)
-	local worst = { deep = 0, shownDeep = 0, off = 0, jump = 0, facing = 1, flips = 0, legs = 0, wrongLegs = 0, upAt = 0, dip = 1, reach = 0 }
+	if door then
+		-- 9.2 out of the front door with it (Leave house: the trip puts Sol and her piece outside at once, far off the
+		-- interior): his place far off, her client puts him there (PairLead.Jump; the server's snap too), still hers
+		local origin = E.interiors[#E.interiors]
+		local exitAt = origin * V3(0, 3, 0.5)
+		run(5, function()
+			return (flat(E.rootOf(sol).Position) - flat(exitAt)).Magnitude < 5
+		end, function()
+			local to = flat(exitAt - truth.Position)
+			local unit = if to.Magnitude > 1e-3 then to.Unit else V3(0, 0, 0)
+			client(unit.X, unit.Z)
+		end)
+		local inside = E.rootOf(sol).Position
+		promptIn(workspace, "Leave house").Triggered:Fire(sol)
+		truth = E.rootOf(sol).CFrame
+		follow()
+		local came = run(1, function()
+			return (flat(body.root.Position) - flat(root.CFrame * (out * place))).Magnitude < 0.05
+		end, function()
+			client(0, 0)
+		end)
+		check(`9.2 {title}: out of the front door with it: he comes through at his end at once, his body still hers to drive (no take-back)`,
+			(E.rootOf(sol).Position - inside).Magnitude > 200 and came and holding() and body.root.NetworkOwner == sol
+			and body.model:GetAttribute("PairLead") == sol.UserId, (E.rootOf(sol).Position - inside).Magnitude)
+		lastRoot, lastPlace = body.root.Position, flat(root.CFrame * (out * place))
+		tickPlace, strides = lastPlace, #E.strides
+		local o = truth.LookVector
+		leg("outside, forwards", o.X, o.Z, 2)
+		leg("stop", 0, 0, 1)
+	end
+	local worst = { deep = 0, lag = 0, jump = 0, facing = 1, flips = 0, legs = 0, wrongLegs = 0, first = 1, least = 1, state = 0 }
 	local rows: { string } = {}
 	for _, p in phases do
 		local straight = p.label == "forwards" or p.label == "backwards"
-		for key, value in worst do
-			if key == "facing" then
-				worst.facing = math.min(value, p.facing)
-			elseif key == "upAt" or key == "dip" then
-				if straight then -- (a curve's turn slows the walk: PairTurnWalk)
-					worst.upAt = math.max(worst.upAt, p.upAt)
-					worst.dip = math.min(worst.dip, p.dip)
-				end
-			elseif key == "flips" or key == "legs" or key == "wrongLegs" then
-				worst[key] = value + p[key]
-			else
-				worst[key] = math.max(value, p[key])
-			end
+		worst.deep, worst.lag, worst.jump = math.max(worst.deep, p.deep), math.max(worst.lag, p.lag), math.max(worst.jump, p.jump)
+		worst.facing = math.min(worst.facing, p.facing)
+		worst.flips, worst.legs, worst.wrongLegs, worst.state = worst.flips + p.flips, worst.legs + p.legs, worst.wrongLegs + p.wrongLegs, worst.state + p.state
+		if straight then -- (a curve's turn slows the walk: PairLead.TurnWalk)
+			worst.first = math.min(worst.first, p.first or 0)
+			worst.least = math.min(worst.least, p.least)
 		end
-		table.insert(rows, string.format("%s: in it %.2f, on her screen %.2f, hands off the edge %.2f, under way %s s, facing %.2f, legs %d/%d wrong",
-			p.label, p.deep, p.shownDeep, p.off, if p.upAt < math.huge then string.format("%.2f", p.upAt) else "-", p.facing, p.wrongLegs, p.legs))
+		table.insert(rows, string.format("%s: in it %.2f, off his place on her screen %.3f, walk %s at once, facing %.2f, legs %d/%d wrong",
+			p.label, p.deep, p.lag, if p.first then string.format("%.2f", p.first) else "-", p.facing, p.wrongLegs, p.legs))
 	end
-	print(`   {title}, Danny shown {Brain.leadTime(net.ping)} s late on her screen:\n      ` .. table.concat(rows, "\n      "))
-	check(`9.0 {title}: on the server his body never goes into the piece (his chest outside its end face), forwards, on a curve, backwards, stopping`,
+	print(`   {title}, Danny driven by her client (0 s late on her screen):\n      ` .. table.concat(rows, "\n      "))
+	check(`9.0 {title}: his body never goes into the piece (his chest outside its end face), forwards, on a curve, backwards, stopping`,
 		worst.deep <= 0.02, string.format("%.2f studs in", worst.deep))
-	check(`9.0 {title}: on Sol's screen the piece never runs into his body by more than {net.screen} studs (walking forwards: he steps back in time), nor is he left in it at a stop`,
-		worst.shownDeep <= net.screen, string.format("%.2f studs in", worst.shownDeep))
-	check(`9.0 {title}: on her screen he keeps his end once a walk is under way (his hands within {net.keep} studs of its edge; reaching on {edge.Reach} studs at most)`,
-		worst.off <= net.keep and worst.reach <= edge.Reach + 0.05, string.format("%.2f studs off, %.2f reach", worst.off, worst.reach))
-	check(`9.0 {title}: her walk under way (90% of the pair's) within {net.under} s, forwards and backwards, and no stall after (80% at least)`,
-		worst.upAt <= net.under and worst.dip >= 0.8, string.format("%.2f s, %.2f after", worst.upAt, worst.dip))
-	check(`9.0 {title}: never a step longer than his top speed (no snap), his end never another one`, worst.jump <= 1e-3 and worst.flips == 0,
+	check(`9.2 {title}: on her screen he is at his end with ~0 lag once a walk is under way (within {LAG} studs of his place every frame)`,
+		worst.lag <= LAG, string.format("%.3f studs off", worst.lag))
+	check(`9.2 {title}: her walk at the pair's carry speed from the very first frame, forwards and backwards (no PairStart, no wait), never held after`,
+		worst.first >= 0.999 and worst.least >= 0.999, string.format("%.2f at once, %.2f the least", worst.first, worst.least))
+	check(`9.0 {title}: never a step more than his place's own and the glide (no snap), his end never another one`, worst.jump <= 1e-3 and worst.flips == 0,
 		string.format("%.3f studs over, %d flips", worst.jump, worst.flips))
 	check(`9.0 {title}: he faces the piece all the way (never his back to it)`, worst.facing >= 0.9, string.format("%.2f", worst.facing))
 	check(`9.0 {title}: his legs step backwards while his end walks away from the piece, forwards while it comes toward it (Npcs.stride)`,
 		worst.legs >= 20 and worst.wrongLegs == 0, `{worst.wrongLegs} of {worst.legs} the wrong way`)
+	check(`9.2 {title}: the server wrote none of his goals while she drove him; his humanoid kept in Physics by her client (a slip put back at once)`,
+		serverWrote == 0 and worst.state <= 1, `{serverWrote} frames written, {worst.state} frames not in Physics`)
+	if door then
+		check(`9.2 {title}: …and outside, after a walk and a stop, still hers to drive (the server's look found nothing wrong, his height its own again)`,
+			body.root.NetworkOwner == sol and body.model:GetAttribute("PairLead") == sol.UserId and holding()
+			and math.abs(danny.holdOffset.Y - (body.root.Position.Y - root.Position.Y)) < H.HoldStep)
+	end
+	if fling then
+		-- an exploit: her client flings his body 20 studs off his end (his constraints hers to aim) every frame
+		local flung = 0
+		local taken = run(4, function()
+			return body.root.NetworkOwner ~= sol
+		end, function()
+			if body.root.NetworkOwner == sol then
+				local away = (root.CFrame * (out * place)) + V3(20, 0, 0)
+				body.grip.align.Position = away
+				body.grip.align.MaxVelocity = L.Rigid
+				flung += 1
+			end
+		end)
+		check(`9.2 {title}: an exploit flings him 20 studs off his end: within PairLead.Grace s the server takes his body back (PairLead gone, the drive off, PairFar again)`,
+			taken and flung * FRAME <= L.Grace + 0.25 and body.model:GetAttribute("PairLead") == nil and body.model:FindFirstChild("PairLeadPiece") == nil
+			and lead.of(body.model) == nil and holding(), `{flung * FRAME} s`)
+		local over, lastAt = 0, body.root.Position
+		local back = run(6, function()
+			return (flat(body.root.Position) - flat(root.CFrame * (out * place))).Magnitude < 0.3
+		end, nil, function()
+			local moved = (flat(body.root.Position) - flat(lastAt)).Magnitude
+			over = math.max(over, moved - (body.grip.align.MaxVelocity * FRAME + 1e-6))
+			lastAt = body.root.Position
+		end)
+		check(`9.2 {title}: …the server's hold walks him back to his end at its top speed (never put there), still holding`,
+			back and over <= 1e-6 and holding() and character:GetAttribute("PairFar") ~= nil, string.format("%.3f over", over))
+	end
 	E.Net.get("PutDown").OnServerEvent:Fire(sol)
 	run(0.5)
-	check(`{title}: down: both pairs of hands free, his hold's constraints gone, Sol's PairWith / PairFar / PairWall gone`,
-		character:GetAttribute("MoveCarry") == nil and not holding() and body.grip == nil and character:GetAttribute("PairWith") == nil
+	check(`{title}: down: both pairs of hands free, his hold's constraints gone, his body the server's again, standing; Sol's PairWith / PairFar / PairWall gone`,
+		character:GetAttribute("MoveCarry") == nil and not holding() and body.grip == nil and body.root.NetworkOwner == false
+		and body.model:GetAttribute("PairLead") == nil and body.humanoid.State == "Running" and character:GetAttribute("PairWith") == nil
 		and character:GetAttribute("PairFar") == nil and character:GetAttribute("PairWall") == nil)
 	return model
 end
 
-carry(3, "the Sofa", SOFA, STUDIO)
+carry(3, "the Sofa", SOFA, STUDIO, true)
 carry(3, "the Sofa", SOFA, ONLINE)
 carry(6, "the Dining Table", TABLE, STUDIO)
-carry(6, "the Dining Table", TABLE, ONLINE)
+carry(6, "the Dining Table", TABLE, ONLINE, false, true)
 
 if failures == 0 then
 	print("ALL CHECKS PASSED")

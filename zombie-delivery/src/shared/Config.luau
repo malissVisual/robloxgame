@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "8.9.5"
+Config.Version = "8.9.6"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -6867,6 +6867,7 @@ Config.MoveStory = {
 --   PairStart          s the carry in two takes from standing to its full walk (client/PairSteer.luau, shared/PairCarry.
 --                      luau: the walk eases in, again after the way turns round): the far end's holder is shown on your
 --                      screen a moment late, and a start at once ran the piece into him before he could step back
+--                      (9.2: a held far end only, a crew mate's: Danny driven by the leader's client has none, PairLead)
 --   PairKeep           the far end's holder as YOUR screen shows him (the character attributes PairFar: his place in
 --                      your root's frame; PairWith: Danny's MoveHelperId, a crew mate's UserId): shown more than Wait
 --                      studs nearer than his place, your walk's start waits for him (shared/PairCarry.luau waits); From
@@ -6876,6 +6877,27 @@ Config.MoveStory = {
 --                      off the walls, sliding along them, never through; held back by a wall (his lead looks ahead), the
 --                      leader's walk into that wall loses that many studs' share of Block (the character attribute
 --                      PairWall: client/PairSteer.luau takes it away): slowed as he nears the wall, stopped against it
+--                      (9.2: Clear is also his body's clearance the leader's client keeps off a wall, PairLead)
+--   9.2 (the owner, 8.9.5: "the carrying is better, but it feels like it's harder to control … fix it so it's
+--   playable"; 8.9.4 hid his server-held body's lag by holding your walk back: its start took 0.85 s in Studio, 2 s
+--   online): while Danny holds the far end of a piece a PLAYER leads, that player's client drives his end (server/
+--   PairHold.luau lead: his body's physics theirs, SetNetworkOwner; client/PairLead.luau sets his hold's goals from
+--   their own piece every frame before the physics): nothing late to hide, so PairStart, PairKeep and PairWall are
+--   only a crew mate's now (and Danny's when the server holds him: PairLead.On false, a drive it took back)
+--   PairLead           On: the leader drives Danny's end (false: the server holds him as in 8.9.4, his lead and all);
+--                      Turn: degrees a second the leader's heading turns meanwhile (PairTurn stays a crew mate's),
+--                      TurnWalk: × the walk while it turns PairTurnFull or more (PairTurnWalk: a crew mate's); Glide:
+--                      studs a second over his place's own speed he closes on it until he is there (the first catch-up
+--                      glides the last studs, never a snap); Settle: studs off his place where he is there (rigid from
+--                      then: Rigid studs a second, Spin radians a second his turn), Loose: studs off it where he glides
+--                      again; Jump: his place this far off (a door's trip into or out of the house, its interior far
+--                      off the map): put there at once; Soft: studs before his body's clearance from a wall of the house
+--                      (HoldWall.Clear) where the leader's walk or turn pushing his end into it starts to go (all of it
+--                      at the clearance; along the wall it stays); Sane / Grace: the server's look, his body more than
+--                      Sane studs off his end in its own view for Grace s (a door's trip aside): it takes his body back
+--                      and holds him itself for the rest of that carry (an exploit's fling, a client that stopped
+--                      driving: walked back at the hold's speed, never put there); Look: s between two looks for the
+--                      house's walls and floors while a carry in two is driven
 --   RunHint           carrying in two (the character attribute CarryPair on both players, server/Moving.luau setHands)
 --                      nobody runs: the walk is held at CarrySpeed (× the admin's and kit's boosts) every step, and the
 --                      run key or button says this once a carry
@@ -6893,8 +6915,40 @@ Config.MoveStory = {
 --   FleeRange / SafeRange / FleeStep   a zombie this close: he runs FleeStep studs away until none is within SafeRange
 --                      (never while he holds the other end of your piece)
 --   WaitShut           s he waits with a piece at the van's shut back (when he may not open it) before he sets it down
---   StuckRepath / StuckSnap / Far   s without progress before a new path / before he appears at his way's next point;
---                      studs away he appears at once
+--   Far                studs on foot to his goal from which he may be put there at once (a fade in: Walk.Seen, never in
+--                      a player's sight; your call's walk and the ride's never)
+--   9.3 (the owner, 8.9.5: "Danny still annoys me. He takes it completely like a robot. For example, he runs for 2
+--   seconds and then on the spot he somehow teleports around"; tests/movehelper_stuck_runtime_test.luau sweeps his body
+--   along his ways in the six real houses, the parts as built: his walk turned to the next corner a stud before it, his
+--   2-stud body 0.35 studs off a wall's end at the closest, then pressed against it, a stuck spell, and 4 s later the
+--   nudge put him on: the teleport on the spot; server/MoveHelper.luau's go, shared/HouseRoute.luau ahead, MoveHelper-
+--   Brain progress / unstuck / ease):
+--   Walk               how he walks a way (inside a house its grid's, outside PathfindingService's): aimed at a point
+--                      Ahead studs (his walk × Lead s when that is more, AheadMost at most) along his way, the farthest
+--                      whose straight line from him keeps Clear studs off every wall, fixture and piece of the house
+--                      (exactly: his root's half diagonal and a margin; never nearer to one than he is) or, outside,
+--                      cuts the way's corners Cut studs at most; ordered again every Reorder s, or once he is within Near
+--                      studs of the point (never a stop on the way). Over the last Ease studs to his goal he slows to
+--                      EaseMin × his walk; standing still Settle s within Arrive studs of it past his `near` counts as
+--                      there (the humanoid stops a hair short). DoorIn: studs into a doorway he walks on while he fades
+--                      out (Config.Moving.Doors FadeOut + Margin, then he is put on its other side and fades in FadeIn s,
+--                      walking on: the players' walk-in doors). Seen: studs from a player within which no teleport may
+--                      be seen (the Far rule: he walks instead). Turn: s his turn on the spot takes (a short tween,
+--                      never a snap)
+--   Unstuck            no progress along his way (Progress studs nearer than its best) for Repath s: a new way from
+--                      where he stands; then every Cycle s his walking ways out: a new way (to Back s into it), walked
+--                      back BackStep studs off what blocks him (to Side s), a sidestep of SideStep studs onto open ground
+--                      (the other side each time) at Pace × his walk; only Fade s without progress the last resort: he
+--                      fades over onto his way Rescue studs on (never a pop)
+--   Body               his body as the audit sweeps it and his way keeps off things (Roblox's classic R15: the root 2
+--                      studs wide, Radius its half; Hip the HipHeight; Height his head's top; StepUp the highest rise a
+--                      Humanoid walks onto without a jump, an assumption: with the Jumping state off a higher ledge in
+--                      his way stops him); the built interior's collidable parts between StepUp and Height over the floor
+--                      close his grid's cells as the plan's walls do (HouseRoute.solid)
+--   Diag               Roblox Studio only (RunService:IsStudio): the Output's "[Danny] teleport <why> <studs> studs at
+--                      <where>" for every time he is put somewhere (Every s apart at most for the same why) and "[Danny]
+--                      stuck <s>s at <where> going to <where>, blocked by <the part's full name>" once a stuck spell lasts
+--                      Stuck s (again every Every s while it lasts; the part a ray along his walk finds)
 --   Aside              doorways he keeps clear of when he stands somewhere: within the door's half width + Margin
 --                      along its wall and Depth (FrontDepth at the front door outside) through it, his place moves Step
 --                      past its edge, Off at least from the wall
@@ -6999,9 +7053,11 @@ Config.MoveStory = {
 --                      outside): Step studs a cell; Radius studs his body keeps off every wall, solid fixture and piece
 --                      standing in the house (a cell he fits in is open: the doorways' 6 studs take him); Stand studs
 --                      from a piece's footprint at most where he stands to take it (arm's length, its near side, his
---                      line to its middle through no wall; none: "can't get to it", refused at the assignment); Snap
---                      studs he looks for the nearest open cell from a spot off them (a start, a goal, a stuck nudge:
---                      onto it, never into a wall); Again s at least between two ways worked out for the same goal
+--                      line to its middle through no wall; 9.3 1.8, was 2: his hands on it as he bends, not gliding
+--                      from afar; StandFar where no such spot is; none: "can't get to it", refused at the assignment);
+--                      Snap studs he looks for the nearest open cell from a spot off them (a start, a goal, a stuck
+--                      spell's sidestep: onto it, never into a wall); Again s at least between two ways worked out for
+--                      the same goal
 --   Pick               his pick-up: within Arm studs of the piece's footprint (Stand and the walk's give), his chest's
 --                      line to its middle through no wall (a ray at the interior's walls) he turns to it (Turn s), bends
 --                      and reaches with both arms (Bend s: shared/BodyMotion.luau's "lift", client/ArmPose.luau's hands
@@ -7049,6 +7105,8 @@ Config.MoveHelper = {
 	PairStart = 0.6, -- 9.0
 	PairKeep = { Wait = 0.1, From = 0.25, Stop = 0.8 }, -- 9.0
 	HoldWall = { Clear = 0.8, Block = 0.4 }, -- 9.0
+	PairLead = { On = true, Turn = 120, TurnWalk = 0.75, Glide = 6, Settle = 0.5, Loose = 1.5, Rigid = 400, Spin = 30, Jump = 30, Soft = 0.6, Sane = 8,
+		Grace = 1.5, Look = 0.5 }, -- 9.2
 	Edge = { Width = 2.4, Height = 0.3, Depth = 0.6, Reach = 1.2 }, -- 8.6 (9.0 Reach)
 	RunHint = "Too heavy to run with",
 	PathRadius = 1.5,
@@ -7070,9 +7128,13 @@ Config.MoveHelper = {
 	SafeRange = 24,
 	FleeStep = 18,
 	WaitShut = 8,
-	StuckRepath = 2,
-	StuckSnap = 4,
 	Far = 120,
+	-- 9.3 his walk (the owner: "he runs for 2 seconds and then on the spot he somehow teleports around")
+	Walk = { Ahead = 2.5, Lead = 0.35, AheadMost = 5, Clear = 1.15, Cut = 0.5, Reorder = 0.2, Near = 1.5, Ease = 3, EaseMin = 0.35, Arrive = 0.6,
+		Settle = 0.3, DoorIn = 0.5, Seen = 150, Turn = 0.25 },
+	Unstuck = { Progress = 0.5, Repath = 1, Cycle = 2.4, Back = 0.6, Side = 1.4, BackStep = 1.5, SideStep = 2, Pace = 0.6, Fade = 10, Rescue = 4 },
+	Body = { Radius = 1, Hip = 2, Height = 5.2, StepUp = 1 },
+	Diag = { Every = 2, Stuck = 1.5 },
 	Aside = { Margin = 1, Depth = 2.5, FrontDepth = 6, Step = 2.4, Off = 1.2 },
 	TruckFar = 150,
 	TalkGap = 3,
@@ -7123,7 +7185,7 @@ Config.MoveHelper = {
 	-- 8.6 the bubble over his head
 	Bubble = { Near = 35, Far = 75, Top = 20, Tick = 0.15, Text = 13, Tall = 26, Pad = 9, Gap = 4, Wide = 340 },
 	-- 9.0 his way inside a house, his pick-up, his list's markers
-	Route = { Step = 0.5, Radius = 1.25, Stand = 2, Snap = 3, Again = 0.5 },
+	Route = { Step = 0.5, Radius = 1.25, Stand = 1.8, StandFar = 2.4, Snap = 3, Again = 0.5 }, -- (9.3 Stand 1.8, was 2: StandFar)
 	Pick = { Arm = 2.8, Turn = 0.3, Bend = 0.45, Lift = 0.4, Tries = 3 },
 	MarkFar = 60,
 }

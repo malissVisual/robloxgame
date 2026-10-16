@@ -30,7 +30,7 @@ PURE += ("ClipboardRules",)  # 8.5 Danny's clipboard, orders mode (tests/clipboa
 PURE += ("PlayerTradeRules",)  # 8.7 sandbox, trading between players (tests/playertrade_test.luau, tests/playertrade_runtime_test.luau)
 PURE += ("VillageLooks",)  # 8.9 sandbox, Jinočany: the village's art kit (tests/villagelooks_test.luau)
 PURE += ("VillageScenery",)  # 8.9 sandbox, Jinočany step 1 on the map: where the village stands (tests/villageworld_test.luau)
-PURE += ("HouseRoute",)  # 9.0 Danny's way inside a house, on its plan's grid (tests/houseroute_test.luau, tests/dannynav_runtime_test.luau)
+PURE += ("HouseRoute",)  # 9.0 Danny's way inside a house, on its plan's grid (tests/houseroute_test.luau, tests/dannynav_runtime_test.luau; 9.3 his walk along it, audited against the built parts: tests/movehelper_stuck_runtime_test.luau)
 PURE += ("PedalRules",)  # 9.1 the drive pedals: the input, the press, where they go (tests/drivepedals_test.luau)
 luau = sys.argv[1] if len(sys.argv) > 1 else shutil.which("luau") or "luau"
 
@@ -192,9 +192,18 @@ with tempfile.TemporaryDirectory() as tmp:
     # 8.3: the real client/PairSteer.luau (the leader's side of carrying in two) as PairSteerClient.luau for
     # tests/pairsteer_test.luau: a function of the globals it reads (the test's game, a require that gives the PairCarry
     # copy above, the recorder's CFrame; 9.0 its typeof, Vector3 and workspace: PairWall, PairFar, the partner's body).
+    # 9.2 (you drive Danny's end): its script too (the test's: script.Parent's PairLead, a require of its own), and the
+    # real client/PairLead.luau as PairLeadClient.luau, a function of the globals it reads (the test's game, require,
+    # workspace and os; the recorder's CFrame, Vector3, typeof, Enum and RaycastParams) for tests/pairsteer_test.luau and
+    # the moves' runtime tests that play the leader's client (tests/movehelper_backwards_runtime_test.luau).
     source = open(os.path.join(os.path.dirname(SHARED), "client", "PairSteer.luau"), encoding="utf-8").read()
     open(os.path.join(tmp, "PairSteerClient.luau"), "w", encoding="utf-8").write(
-        "return function(game: any, require: any, CFrame: any, typeof: any, Vector3: any, workspace: any)\n" + source + "\nend\n")
+        "return function(game: any, require: any, CFrame: any, typeof: any, Vector3: any, workspace: any, script: any)\n" + source + "\nend\n")
+    source = open(os.path.join(os.path.dirname(SHARED), "client", "PairLead.luau"), encoding="utf-8").read()
+    source = re.sub(r"^export type ", "type ", source, flags=re.M)  # (only at a module's top level)
+    open(os.path.join(tmp, "PairLeadClient.luau"), "w", encoding="utf-8").write(
+        "return function(game: any, require: any, CFrame: any, typeof: any, Vector3: any, workspace: any, os: any, Enum: any, RaycastParams: any)\n"
+        + source + "\nend\n")
     # 9.0 (the sandbox's free mouse): the real client/CameraRig.luau as CameraRigClient.luau for tests/camerarig_test.luau:
     # a function of the globals it reads (the test's services, workspace, script, require, Instance, RaycastParams, task
     # and clock; ClientRuntime.luau's frames, vectors and colours), made afresh for each world (the sandbox, the city).
