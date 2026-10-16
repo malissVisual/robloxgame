@@ -4,7 +4,7 @@
 -- his hands properly, with an animation"; his screenshot: "Going for: Chair" at a wall, "Danny · 1 / 2 / 3" through the
 -- walls). The real server/Moving.luau and server/MoveHelper.luau on tests/runtime/MovingRuntime.luau's fakes
 -- (Config.Sandbox.On) with the real art (shared/FurnitureLooks.luau, shared/HouseLayout.luau, server/HouseInterior.luau
--- and its shell's real wall parts): a move into each of Jinočany's six houses, The Old Farmstead (the big house, 8.5.2
+-- and its shell's real wall parts): a move into each of the six places to empty, The Old Farmstead (the big house, 8.5.2
 -- roomy) and the five family houses, each with another layout (the back row's order, mirrored or not). His walk is a
 -- straight step toward the point he is given (useMover: his way's corners), the rays at the interior's walls the
 -- runtime's (a ray against the parts' boxes).

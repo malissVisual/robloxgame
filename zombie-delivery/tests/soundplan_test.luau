@@ -2,15 +2,16 @@
 -- the place (the park's lawns, the pond, the river), the horns by vehicle, the back's sounds, the ambience by the
 -- clock and the height; every name it gives has its region in SoundSheet.Sfx3. 8.0.1: in the sandbox
 -- (Config.Sandbox.On) none of the city's places (no pond, river, sea or park lawn; client/SoundScape.luau's fountain
--- asks SoundPlan.cityPlaces too). 8.1, the sandbox's own: where you are (the village, a warehouse, the farmstead), its
--- ambience (Jinočany's fields, never the city's traffic; the hall's hum, the room's tone; their stand-ins), the
+-- asks SoundPlan.cityPlaces too). 8.1, the sandbox's own: where you are (outdoors, a warehouse, the farmstead), its
+-- ambience (the countryside's fields, never the city's traffic; the hall's hum, the room's tone; their stand-ins), the
 -- collection's cues (on a stand, taken down, home), the income's clink (soft, not too often), the Sprinter's sliding
 -- door, step and back doors, no ramp and no Wall's gate on a sandbox move. 8.3, the 8.2 features' feedback: what the
 -- book's, the tasks' and the collection's messages play (the discovery chime, a milestone's fanfare, a task done and
 -- claimed, FILL BEST's few soft clicks, SELL…'s one bigger till), the existing sheets' sounds only, one after the other
--- (the lane: never two stings over each other, a burst is one). Jinočany (design/jinocany/NAVRH.md §5) in place of the
--- Alps: no cowbell and no alpine meadow left; the D5's far hum from the east (on the motorway of design/jinocany/plan.json),
--- the chapel's bell from its tower, a dog and a tractor far off, each with a region or a stand-in that plays. 8.9, the newest features' own
+-- (the lane: never two stings over each other, a burst is one). 8.9 in place of the Alps: no cowbell and no alpine meadow
+-- left; 9.4 the countryside (design/countryside/plan.json, no village: no chapel's bell): the D5's far hum from the east
+-- (on its motorway), a woodpecker in the forest, a dog and a tractor far off, each with a region or a stand-in that
+-- plays. 8.9, the newest features' own
 -- sounds (sfx5): every event a quiet sound of sfx5, the clipboard's out and away, a piece's tick and cross-off, an
 -- order's chirp, an answer's nope after its Notice, Danny's whistle only when he needs you, the auction's tick, gavel
 -- and bell, the trades' hook; Danny's van door as a player's. In the standalone Luau CLI.
@@ -323,7 +324,7 @@ check("in the move's house (its state's inside): the house", SoundPlan.sandboxPl
 check("a move's interior far off the map: the house", SoundPlan.sandboxPlace(9000, 400, 9000, false) == "house")
 check("in the farmstead's own box: the house", SoundPlan.sandboxPlace(h.house.x, 3, h.house.z, false) == "house")
 check("at the farmstead's front door (where you come out): outdoors", SoundPlan.sandboxPlace(h.door.x, 1, h.door.z, false) == "outdoors")
--- Jinočany: what the sheets play now. A sound has a region on a sheet (sfx … sfx4, and a newer sheet once there) or a
+-- 8.9: what the sheets play now. A sound has a region on a sheet (sfx … sfx4, and a newer sheet once there) or a
 -- stand-in that does (SoundSheet.Fallback, as client/Sounds.luau finds it).
 local SHEETS = { SoundSheet.Sfx, SoundSheet.Sfx2, SoundSheet.Sfx3, SoundSheet.Sfx4, (SoundSheet :: any).Sfx5 }
 local function region(name: string): { number }?
@@ -347,7 +348,7 @@ local function playable(name: string): boolean
 	return false
 end
 local CITY = { amb_day = true, amb_night = true, amb_roof = true, ambience = true, wind = false } -- (wind: the fields' breeze before sfx4)
--- The ambience: Jinočany's fields outdoors (birds and larks, a breeze), never the city's traffic.
+-- The ambience: the countryside's fields outdoors (birds and larks, a breeze), never the city's traffic.
 local L = SoundPlan.SandboxLoops
 check("the sandbox's outdoor loop is the fields (amb_fields), no alpine meadow, not the city's traffic (amb_day) or night",
 	L.fields == "amb_fields" and (L :: any).alpine == nil and not CITY[L.fields])
@@ -387,7 +388,7 @@ for _, mix in { out4, out3, hall, room } do
 	end
 end
 check("the warehouse's echo, none outdoors or in the house", SoundPlan.reverb("warehouse") == SB.Reverb.warehouse and SoundPlan.reverb("outdoors") == "NoReverb" and SoundPlan.reverb("house") == (SB.Reverb.house or "NoReverb"))
--- No cowbell in the sandbox (Jinočany: the Alps' cowbells and meadow are gone).
+-- No cowbell in the sandbox (8.9: the Alps' cowbells and meadow are gone).
 local named: { string } = {}
 for _, name in SoundPlan.SandboxLoops do
 	table.insert(named, name)
@@ -421,9 +422,10 @@ for _, name in SoundPlan.SandboxFar do
 	alpineWanted = alpineWanted or string.find(name, "alpine", 1, true) ~= nil
 end
 check("… and no alpine sound wanted (amb_alpine only stands in for the fields)", not alpineWanted and not string.find(L.fields, "alpine", 1, true))
--- Jinočany's far sounds: each has a region or a stand-in that plays (until the next sheet has it).
+-- the countryside's far sounds: each has a region or a stand-in that plays (until the next sheet has it).
 local F = SoundPlan.SandboxFar
-check("the far sounds: the D5, the chapel's bell, a dog, a tractor", F.motorway == "amb_motorway" and F.bell == "chapel_bell" and F.dog == "dog_far" and F.tractor == "tractor_far")
+check("the far sounds: the D5, a woodpecker in the forest (no chapel's bell: no village), a dog, a tractor", F.motorway == "amb_motorway" and F.woodpecker == "woodpecker_far"
+	and (F :: any).bell == nil and F.dog == "dog_far" and F.tractor == "tractor_far")
 local LOOPS = { motorway = true, tractor = true }
 for part, name in F do
 	local chosen = SoundPlan.sandboxSound(name, playable)
@@ -443,16 +445,16 @@ for wanted, list in SoundPlan.SandboxStandIns do
 	end
 end
 check("once a sheet has the wanted sound it plays itself, at its own pitch", (function(): boolean
-	local own = SoundPlan.sandboxSound("chapel_bell", function(name: string): boolean
-		return name == "chapel_bell" or playable(name)
+	local own = SoundPlan.sandboxSound("woodpecker_far", function(name: string): boolean
+		return name == "woodpecker_far" or playable(name)
 	end)
-	return own ~= nil and own.name == "chapel_bell" and own.pitch == 1 and own.gain == 1
+	return own ~= nil and own.name == "woodpecker_far" and own.pitch == 1 and own.gain == 1
 end)())
 check("nothing on any sheet: silence (no pick)", SoundPlan.sandboxSound("dog_far", function(): boolean
 	return false
 end) == nil)
--- The D5's far hum: on the motorway of design/jinocany/plan.json (its landmark "d5"), always from the east.
-local Plan = require("./JinocanyPlan")
+-- The D5's far hum: on the motorway of design/countryside/plan.json (its landmark "d5"), always from the east.
+local Plan = require("./CountryPlan")
 local function area(name: string): { x0: number, x1: number, z0: number, z1: number }?
 	for _, a in Plan.areas do
 		if a.name == name then
@@ -474,12 +476,14 @@ for _, z in { -9999, -100, 0, 300, 9999 } do
 	local x, at = SoundPlan.motorwaySpot(z)
 	check(`… its spot for z {z}: on the motorway, nearest you`, x == M.X and at == math.clamp(z, M.Z0, M.Z1))
 end
--- The chapel's bell: from the chapel (plan.json's landmark "chapel"), heard over the village.
-local Bl = SB.Bell
-local chapel = area("chapel")
+-- The woodpecker: in the forest (plan.json's wood "forest", out of its clearing), heard over the map.
+local Bl = SB.Woodpecker
+local forest = Plan.woods[1]
 for _, at in { { 0, 0 }, { -900, 500 } } do
-	local x, z = SoundPlan.farSpot("bell", at[1], at[2], 0.4, 0.6)
-	check(`the bell rings from the chapel's tower wherever you are ({at[1]}, {at[2]})`, chapel ~= nil and x == Bl.X and z == Bl.Z and x > chapel.x0 and x < chapel.x1 and z > chapel.z0 and z < chapel.z1)
+	local x, z = SoundPlan.farSpot("woodpecker", at[1], at[2], 0.4, 0.6)
+	local clearing = forest.clearings[1]
+	check(`the woodpecker drums in the forest wherever you are ({at[1]}, {at[2]})`, x == Bl.X and z == Bl.Z and x > forest.rect.x0 and x < forest.rect.x1
+		and z > forest.rect.z0 and z < forest.rect.z1 and not (x > clearing.x0 and x < clearing.x1 and z > clearing.z0 and z < clearing.z1))
 end
 local farthest = 0
 for _, cx in { Plan.bounds.x0, Plan.bounds.x1 } do
@@ -487,8 +491,8 @@ for _, cx in { Plan.bounds.x0, Plan.bounds.x1 } do
 		farthest = math.max(farthest, math.sqrt((cx - Bl.X) ^ 2 + (cz - Bl.Z) ^ 2))
 	end
 end
-check("… heard (faintly) anywhere in the village", Bl.Range > farthest and Bl.Near > 0 and Bl.Y > 0, `{math.floor(farthest)} studs`)
-check("… a few strokes, apart", Bl.Strokes >= 1 and Bl.Strokes <= 6 and Bl.Every >= 0.5 and Bl.Every <= 5)
+check("… heard (faintly) over most of the map, the plots among it", Bl.Range > 1200 and Bl.Range < farthest + 600 and Bl.Near > 0 and Bl.Y > 0, `{math.floor(farthest)} studs`)
+check("… a few drums, apart", Bl.Drums >= 1 and Bl.Drums <= 6 and Bl.Every >= 0.5 and Bl.Every <= 5)
 -- A dog and a tractor far off, a random way round you; the tractor drives across your view.
 for _, kind in { "dog", "tractor" } do
 	local def = if kind == "dog" then SB.Dog else SB.Tractor
@@ -517,8 +521,8 @@ check("the pass fades in and out", SoundPlan.passShare(0, T.Seconds, T.Fade) == 
 	and math.abs(SoundPlan.passShare(T.Seconds - T.Fade / 2, T.Seconds, T.Fade) - 0.5) < 1e-9 and SoundPlan.passShare(-1, T.Seconds, T.Fade) == 0
 	and T.Fade * 2 <= T.Seconds)
 -- Each now and then, on its own clock.
-for _, kind in { "bell", "dog", "tractor" } do
-	local gap = if kind == "bell" then Bl.Gap elseif kind == "dog" then SB.Dog.Gap else T.Gap
+for _, kind in { "woodpecker", "dog", "tractor" } do
+	local gap = if kind == "woodpecker" then Bl.Gap elseif kind == "dog" then SB.Dog.Gap else T.Gap
 	check(`the {kind}'s gaps (now and then: 20 s at least)`, SoundPlan.farGap(kind, 0) == gap[1] and SoundPlan.farGap(kind, 1) == gap[2]
 		and SoundPlan.farGap(kind, 2) == gap[2] and gap[1] >= 20 and gap[2] > gap[1])
 end
@@ -681,7 +685,7 @@ for _, value in { "Discovery", "Milestone", "TaskDone", "Claimed", "Fill", "Bulk
 end
 check("the gaps and the wait: a burst is one, a sting waits a few seconds at most", SB.DiscoveryGap > 0 and SB.MilestoneGap >= SB.DiscoveryGap and SB.TaskDoneGap > 0 and SB.ClaimedGap > 0
 	and SB.FillGap > 0 and SB.BulkGap > 0 and SB.FeedbackWait >= 3 and SB.FeedbackWait <= 6 and SB.FillClicks >= 2 and SB.FillClicks <= 4)
-local FAR_TABLES = { Motorway = true, Bell = true, Dog = true, Tractor = true } -- (Jinočany's far sounds: checked above)
+local FAR_TABLES = { Motorway = true, Woodpecker = true, Dog = true, Tractor = true } -- (the far sounds: checked above)
 for key, value in SB do
 	if type(value) == "number" then
 		local most = if string.find(key, "Range", 1, true) then 200 else 60 -- (a range in studs)

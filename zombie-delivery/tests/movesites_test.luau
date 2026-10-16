@@ -80,8 +80,9 @@ for _, p in city do
 end
 check("8.0.1: the plots' kiosk: as many pieces as the depot's, unique names, the same kiosk round the corkboard (the Board solid where it was)",
 	#plot == #city and not twice and sameKiosk, `{#plot} / {#city}`)
-check("8.0.1: …its corkboard says \"Bring it home to your warehouse.\" (Jinočany: the village's six houses to empty, a house on your card; none of them by name: every card its own)",
-	string.find(plotAll, "6 HOUSES TO EMPTY", 1, true) ~= nil and string.find(plotAll, "JINOČANY", 1, true) ~= nil and string.find(plotAll, "A HOUSE ON YOUR CARD", 1, true) ~= nil
+check("8.0.1: …its corkboard says \"Bring it home to your warehouse.\" (9.4: the countryside's six places to empty, a house on your card; none of them by name: every card its own)",
+	string.find(plotAll, "6 PLACES TO EMPTY", 1, true) ~= nil and string.find(plotAll, "THE COUNTRYSIDE", 1, true) ~= nil and string.find(plotAll, "A HOUSE ON YOUR CARD", 1, true) ~= nil
+	and string.find(plotAll, "JINOČANY", 1, true) == nil
 	and string.find(plotAll, "THE OLD FARMSTEAD", 1, true) == nil and string.find(plotAll, "Bring it home to your warehouse.", 1, true) ~= nil, plotAll)
 check("8.0.1: …no Marge, no Walt, no Wall, no evacuation", string.find(plotAll, "MARGE", 1, true) == nil and string.find(plotAll, "WALT", 1, true) == nil
 	and string.find(plotAll, "Wall", 1, true) == nil and string.find(string.upper(plotAll), "EVACUAT", 1, true) == nil, plotAll)

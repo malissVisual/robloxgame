@@ -3,8 +3,8 @@
 -- the plots, near the TOP MOVERS board), every part inside its footprint and within its budget, a walk free from the
 -- steps through the doorway down the aisle to the stage, the desk, the lot's pedestal, the sign and the lot display;
 -- clear of today's map (the roads and their 12 studs, the plots, the vans' ways, the house, the signpost, the lamps, 8.9
--- the village's trees, the board; flat meadow) and of design/jinocany/plan.json (JinocanyPlan.luau: the village's roads,
--- landmarks, fields, houses and tree lines: it stays where it stands when the village is built); turned with its spot;
+-- the countryside's trees, the board; flat meadow) and of design/countryside/plan.json (CountryPlan.luau: the
+-- countryside's roads, landmarks, fields, places and their lots and tree lines); turned with its spot;
 -- and the world SandboxWorld builds: nothing of it while the auction is off; on, the model, its parts as laid out, its
 -- words, the desk's prompt, the lamps, nothing of the map within 1.5 studs of it, the map's budget and rules kept.
 -- Run with tests/run_tests.py.
@@ -16,9 +16,9 @@ local Config = require("./Config")
 local Layout = require("./AuctionHouseLayout")
 local SandboxMap = require("./SandboxMap")
 local SandboxScenery = require("./SandboxScenery")
-local VillageScenery = require("./VillageScenery") -- 8.9: the village's trees
+local VillageScenery = require("./VillageScenery") -- 8.9: the countryside's trees
 local Leaders = require("./SandboxLeadersRules")
-local Plan = require("./JinocanyPlan")
+local Plan = require("./CountryPlan")
 
 local failures = 0
 local function check(name: string, ok: boolean, detail: any?)
@@ -126,7 +126,7 @@ do
 	local spot = Layout.spot()
 	check("one place for it: Config.Auction.House.Spot (on the ground)", spot == H.Spot and spot.y == 0)
 	local site = Layout.site()
-	check("on Depot Row east of the crossroads (the Jinočany plan's Corner Drugstore keeps x 40 – 120): x 132 … 184, z -26 … 12", site.x0 == 132 and site.x1 == 184 and site.z0 == -26 and site.z1 == 12,
+	check("on Depot Row east of the crossroads, across from plots 3 and 4: x 132 … 184, z -26 … 12", site.x0 == 132 and site.x1 == 184 and site.z0 == -26 and site.z1 == 12,
 		`{site.x0} … {site.x1}, {site.z0} … {site.z1}`)
 	local door = Layout.door()
 	local lx, lz = -math.sin(math.rad(door.yaw)), -math.cos(math.rad(door.yaw))
@@ -215,7 +215,7 @@ do
 	check("clear of the map: inside its edge, 12 studs off every road, off the plots, the vans' ways, the house and its path, the signpost, the lamps, 8.9 the village's trees and the TOP MOVERS board, on flat meadow", why == nil, why)
 end
 
--- ── Clear of the Jinočany plan (design/jinocany/plan.json) ──────────────────
+-- ── Clear of the countryside's plan (design/countryside/plan.json) ─────────
 do
 	local site = Layout.site()
 	local b = Plan.bounds
@@ -229,26 +229,20 @@ do
 			why = `on (or within {if road then 12 else 6} studs of) the plan's {area.name}`
 		end
 	end
-	for n, line in Plan.treeLines do
-		for i = 2, #line do
-			local a, c = line[i - 1], line[i]
-			local length = math.sqrt((c[1] - a[1]) ^ 2 + (c[2] - a[2]) ^ 2)
+	for n, line in Plan.lines do
+		local points = line.points
+		for i = 2, #points do
+			local a, c = points[i - 1], points[i]
+			local length = math.sqrt((c.x - a.x) ^ 2 + (c.z - a.z) ^ 2)
 			for t = 0, length, 2 do
 				local k = if length > 0 then t / length else 0
-				if rectDistance(site, a[1] + (c[1] - a[1]) * k, a[2] + (c[2] - a[2]) * k) < 10 then
+				if rectDistance(site, a.x + (c.x - a.x) * k, a.z + (c.z - a.z) * k) < 10 then
 					why = `on tree line {n}`
 				end
 			end
 		end
 	end
-	check(`clear of the Jinočany plan: its {#Plan.areas} roads, landmarks, fields and houses (12 studs off a road, 6 off the rest) and its tree lines`, why == nil and #Plan.areas > 100, why)
-	local drugstore: Rect? = nil
-	for _, area in Plan.areas do
-		if area.name == "drugstore" then
-			drugstore = area.rect
-		end
-	end
-	check("…beside the plan's Corner Drugstore on Depot Row (east of it, a street front together)", drugstore ~= nil and site.x0 > (drugstore :: Rect).x1 and site.x0 - (drugstore :: Rect).x1 < 20)
+	check(`clear of the countryside's plan: its {#Plan.areas} roads, landmarks, fields, places and lots (12 studs off a road, 6 off the rest) and its tree lines`, why == nil and #Plan.areas > 50, why)
 end
 
 -- ── Turned with its spot ────────────────────────────────────────────────────

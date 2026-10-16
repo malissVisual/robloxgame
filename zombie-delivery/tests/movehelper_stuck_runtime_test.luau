@@ -3,7 +3,7 @@
 -- server/Moving.luau and server/MoveHelper.luau on tests/runtime/MovingRuntime.luau's fakes (Config.Sandbox.On) with the
 -- real art (shared/FurnitureLooks.luau, shared/HouseLayout.luau, server/HouseInterior.luau and its fixtures' parts as
 -- the game builds them, server/FixtureMesh.luau's without the import): a move into each of SandboxMap.Houses (The Old
--- Farmstead and the five family houses of Jinočany). His body is Config.MoveHelper.Body (Roblox's classic R15: a
+-- Farmstead and the five other places to empty). His body is Config.MoveHelper.Body (Roblox's classic R15: a
 -- capsule Radius round his root; his collidable parts from Hip to Height over the floor; StepUp the highest rise a
 -- Humanoid walks onto with its Jumping state off, an assumption), swept against every collidable part of the built
 -- interior (CanCollide: the shell's walls, the fixtures' solid parts, the pieces' roots): a part in his way above StepUp

@@ -191,7 +191,7 @@ do
 		and warehouses ~= nil and #warehouses:GetChildren() == 4 and moves ~= nil and moves:FindFirstChild("MovingBoard1") ~= nil
 		and moves:FindFirstChild("MovingBoard4") ~= nil and workspace:FindFirstChild("Cars") ~= nil and rawget(baseplate, "destroyed") == true)
 	local door, back: any, any = nil, nil
-	local farmstead = workspace:FindFirstChild("Sandbox"):FindFirstChild("TheOldFarmstead") -- (Jinočany: the stand-ins have doors of their own)
+	local farmstead = workspace:FindFirstChild("Sandbox"):FindFirstChild("TheOldFarmstead") -- (six houses: the stand-ins have doors of their own)
 	for _, d in farmstead:GetDescendants() do
 		if d:GetAttribute("SandboxDoor") then
 			door = d
@@ -377,7 +377,7 @@ function H.takeContract(player: any, plot: any): (any, boolean, string?)
 	return card and card[2], ok, why
 end
 -- START, LAUNCH (solo); Danny waits by the van for hire (8.3: nobody hires him here, the pieces are the player's).
--- (Jinočany: the house on their card, the one the board showed them last)
+-- (six houses: the house on their card, the one the board showed them last)
 function H.launch(player: any)
 	local card = E.lastOf(player, "Moving", "contract")
 	E.fire(player, "Moving", "start", if card and card[2] then card[2].id else House.id)
@@ -385,18 +385,20 @@ function H.launch(player: any)
 	E.advance(0.5)
 end
 -- The van's middle along the roads: out of the plot, Depot Row, Pražská, round the turnaround to the curb, backed
--- toward the chalet's door (its nose north). Jinočany: `house` another house to empty (SandboxMap.Houses'): along
--- Depot Row and Hlavní to its street, then to its curb, its back to its door.
+-- toward the chalet's door (its nose north). 9.4: `house` another place to empty (SandboxMap.Houses'): the guide's
+-- path along the roads (SandboxSteps.route: Depot Row, its lanes, into its yard), then its curb, its back to its door.
 function H.toHouse(plot: any, house: any?): { any }
 	local h = house or House
 	if h ~= House then
-		local c = h.curb
-		return {
-			{ x = plot.vanSpot.x, z = -60, yaw = 180 },
-			{ x = plot.vanSpot.x, z = -60, yaw = 90 },
-			{ x = c.x, z = -60, yaw = 90 },
-			{ x = c.x, z = c.z, yaw = c.yaw },
-		}
+		local route: { number } = {}
+		local n = require("./SandboxSteps").route(plot.vanSpot.x, plot.vanSpot.z, h.curb.x, h.curb.z, route, 0)
+		local points: { any } = {}
+		for i = 2, n - 1 do
+			local x, z, dx, dz = route[i * 2 - 1], route[i * 2], route[i * 2 + 1] - route[i * 2 - 1], route[i * 2 + 2] - route[i * 2]
+			table.insert(points, { x = x, z = z, yaw = math.deg(math.atan2(-dx, -dz)) % 360 }) -- (its nose along the next leg)
+		end
+		table.insert(points, { x = h.curb.x, z = h.curb.z, yaw = h.curb.yaw })
+		return points
 	end
 	return {
 		{ x = plot.vanSpot.x, z = -60, yaw = 180 },
@@ -406,7 +408,7 @@ function H.toHouse(plot: any, house: any?): { any }
 		{ x = House.curb.x, z = House.curb.z, yaw = House.curb.yaw },
 	}
 end
--- Jinočany: the house of `player`'s move (its state's contract, a SandboxMap.Houses id).
+-- six houses: the house of `player`'s move (its state's contract, a SandboxMap.Houses id).
 function H.houseOf(player: any): any
 	local view = H.stateOf(player)
 	return SandboxMap.house(view and view.contract) or House
@@ -516,7 +518,7 @@ function H.solidOn(from: any, to: any, half: number): { string }
 	return hit
 end
 -- Walks up to the chalet's front door and on through it (8.5: from beyond its approach into its dark hall, no stop:
--- the leaf open on the way, the fade as she crosses the threshold, the move in the dark), inside. Jinočany: the front
+-- the leaf open on the way, the fade as she crosses the threshold, the move in the dark), inside. six houses: the front
 -- door of the house of their move (H.houseOf), a stand-in's as the farmstead's.
 function H.enterHouse(player: any): boolean
 	local h = H.houseOf(player)
@@ -794,8 +796,8 @@ do
 		ann:GetAttribute("MoveHelper") == "offer" and type(ann:GetAttribute("MoveHelperPrice")) == "number" and #MoveHelper.find(ann).queue == 0, ann:GetAttribute("MoveHelper"))
 	check("…the analytics: FirstContract once, MoveStarted (solo)", H.steps(11).FirstContract == 1 and #H.events("MoveStarted", ann) == 1)
 	local bobCard = H.takeContract(bob, plots[2])
-	check("…Jinočany: Bob's card another house (never Ann's at once): the next free one, The Linden House on Hlavní, a family house",
-		bobCard ~= nil and bobCard.id == SandboxMap.Houses[2].id and bobCard.name == "The Linden House" and bobCard.address == "Hlavní 5"
+	check("…Bob's card another place (never Ann's at once): the next free one, The Pond Cabin on Pond Lane",
+		bobCard ~= nil and bobCard.id == SandboxMap.Houses[2].id and bobCard.name == "The Pond Cabin" and string.find(bobCard.address, "Pond Lane", 1, true) ~= nil
 		and bobCard.time == Config.Moving.Sandbox.Houses[bobCard.id].Time and bobCard.items < card.items, bobCard and bobCard.id)
 	H.launch(bob)
 	local bobView = H.stateOf(bob)
@@ -1081,7 +1083,7 @@ do
 	S.auto[bob] = true
 	local bobHouse = H.houseOf(bob)
 	H.drive(bob, bobVan, H.toHouse(plots[2], bobHouse))
-	check("Bob: at his own house's curb (Jinočany: The Linden House on Hlavní, its back to its door)", bobHouse == SandboxMap.Houses[2]
+	check("Bob: at his own place's curb (The Pond Cabin on Pond Lane, its back to its door)", bobHouse == SandboxMap.Houses[2]
 		and H.flat(bobVan.chassis.Position, V3(bobHouse.curb.x, 0, bobHouse.curb.z)) < 0.5
 		and H.flat(H.doorOf(bobVan).WorldPosition, V3(bobHouse.door.x, 0, bobHouse.door.z)) < H.flat(bobVan.chassis.Position, V3(bobHouse.door.x, 0, bobHouse.door.z)), bobVan.chassis.Position)
 	check("(Bob's back open)", H.setBack(bob, bobVan, true), E.lastNotice(bob))
@@ -1683,7 +1685,7 @@ do
 	E.advance(1.1)
 	local card = H.takeContract(bob, plots[1])
 	check("…Ann's kiosk after his FINISH: his own card, free to start", card ~= nil and card.busy == nil, card and card.busy)
-	E.fire(bob, "Moving", "start", if card then card.id else House.id) -- (Jinočany: the house on his card)
+	E.fire(bob, "Moving", "start", if card then card.id else House.id) -- (six houses: the house on his card)
 	E.fire(bob, "MoveLobby", "launch")
 	E.advance(0.5)
 	local state = H.stateOf(bob)
@@ -1982,7 +1984,7 @@ end
 do
 	local van = S.annVan2
 	E.advance(1.1)
-	-- (Jinočany: her card moved on to the next house with each move that brought something home; the admin's REFILL
+	-- (six houses: her card moved on to the next house with each move that brought something home; the admin's REFILL
 	-- turns it on, a house at a time, until the farmstead comes round: never one another player's card has)
 	local holders = {}
 	for _, other in E.Players:GetPlayers() do -- (another player's card on the farmstead: theirs moves on first)
@@ -2000,7 +2002,7 @@ do
 			table.insert(seen, h.id)
 		end
 	end
-	check("20. Jinočany: the admin's REFILL turns Ann's card from house to house in turn until the farmstead (another player's card on it moved on first)",
+	check("20. six houses: the admin's REFILL turns Ann's card from house to house in turn until the farmstead (another player's card on it moved on first)",
 		Moving.houseOf(ann2) == House and turns <= #SandboxMap.Houses - 1, `{table.concat(holders, ", ")}: {table.concat(seen, ", ")}`)
 	E.advance(1.1)
 	local card = H.takeContract(ann2, plots[1])

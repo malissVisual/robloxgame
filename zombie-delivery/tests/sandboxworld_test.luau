@@ -1,20 +1,20 @@
 -- 8.0 SANDBOX, the map (design/sandbox/KONTRAKT.md): shared/SandboxScenery.luau's numbers and the world the real
 -- server/SandboxWorld.luau builds from them (as SandboxWorldServer.luau on tools/perf/world-mock.luau, WorldMock.luau):
 -- everything we play on inside SandboxMap.Bounds (the far view outside them), the asphalt over every road and the
--- turnaround with a shoulder down to the meadow on every edge (no step a wheel would catch; 8.9 every street of
--- Jinočany's, none across a junction), nothing that collides on the roads (but Hornická's ROAD CLOSED barrier), the
+-- turnaround with a shoulder down to the meadow on every edge (no step a wheel would catch; 9.4 every country lane
+-- and its yard, none across a junction), nothing that collides on the roads, the
 -- turnaround, the plots (but their pads), the path from the curb to the house's door or in the door's way, the trees off
 -- all of that and off the vans' ways, the part budget, the shadows only on bigger parts, the chalet in its box with
 -- its FrontDoor at House.door, the signpost's and the mailbox's words, the light; 8.9 the Alps gone (flat ground, no
--- mound, spruce, wildflower, rail fence, hill or peak: tests/villageworld_test.luau checks the village itself);
+-- mound, spruce, wildflower, rail fence, hill or peak: tests/villageworld_test.luau checks the countryside itself);
 -- 8.1: the house's box the owner's Blender house's, its parts in House_sandbox_house for server/HouseMesh.luau, the
 -- FrontDoor on the model's door; 8.3 the big move and walk-in doors: the back door, the doors' leaves door leaves that
 -- swing (shared/DoorSwing.luau's attributes; dressed, the Blender house's doors copied as leaves in front of them);
 -- 8.5 walking through: the leaves swing out of the house, the doorways walkable (the House box not solid, HouseSolid
 -- the box less a dark hall behind each doorway, nothing solid in a hall or its way out, the walls round it solid);
 -- 8.0.1: a van finds room on the first try at every vanSpot and at the house's curb (server/Vehicles.luau findRoom's
--- box query, Config.SpawnSpot.Pass leaving out the ground), and not where a player stands. Jinočany step 1: the five
--- family houses to empty in the village's look (SandboxWorld.villageHouse), each walked in as the farmstead is (its
+-- box query, Config.SpawnSpot.Pass leaving out the ground), and not where a player stands. 9.4 the countryside: the
+-- five other places to empty in their looks (SandboxWorld.villageHouse), each walked in as the farmstead is (its
 -- FrontDoor on its door, two leaves, the walls less a dark hall), nothing in its door's way or its walk to its curb.
 -- Run with tests/run_tests.py.
 local Mock = require("./WorldMock")
@@ -129,13 +129,13 @@ do
 			worst, at = margin, string.format("%.1f, %.1f (%.1f out)", x, z, out)
 		end
 	end
-	-- (Jinočany: every road but Pražská the same way, the village's streets too; a point past the world's edge is none)
+	-- (every road but Pražská the same way, the lanes and their yards too; a point past the world's edge is none)
 	local function inside(x: number, z: number): boolean
 		return x > B.x0 and x < B.x1 and z > B.z0 and z < B.z1
 	end
 	for _, out in { 0.3, 1.5, 3 } do
 		-- (8.9: every street's slab, each side and corner; Pražská's sides down to the turnaround; nothing past the
-		-- Bounds, where Hornická meets the invisible wall)
+		-- Bounds, where a road would meet the invisible wall)
 		for _, r in SLABS do
 			local south = if r.name == MAIN.name then TURN.z - TURN.r else r.z1
 			for x = r.x0, r.x1, 5 do
@@ -178,7 +178,7 @@ do
 	end
 	check("no shoulder rises over the asphalt or sinks under the meadow", tall == nil, tall)
 
-	-- 8.9 the trees: the village's (shared/VillageScenery.luau), each where the rules let it stand, apart from each other
+	-- 8.9 the trees: the countryside's (shared/VillageScenery.luau), each where the rules let it stand, apart from each other
 	local trees = VillageScenery.trees()
 	local why: string? = nil
 	for i, t in trees do
@@ -193,7 +193,7 @@ do
 			end
 		end
 	end
-	check(`8.9: {#trees} trees of the tree lines and the orchard, every one where the rules let it stand`, #trees >= 120 and why == nil, why or #trees)
+	check(`8.9: {#trees} trees of the tree lines, the orchard and 9.4 the forest, every one where the rules let it stand`, #trees >= 250 and why == nil, why or #trees)
 	local again = VillageScenery.trees()
 	check("the same trees every time", again == trees and #again == #trees)
 
@@ -231,7 +231,7 @@ check("a second build returns it as it is", SandboxWorld.build() == world)
 type Box = { part: any, name: string, x0: number, x1: number, y0: number, y1: number, z0: number, z1: number, far: boolean, cap: number? }
 local far = world:FindFirstChild("Far")
 local boxes: { Box } = {}
-local byName: { [string]: { Box } } = {} -- (Jinočany: the other houses to empty's parts are in standBoxes, by their id)
+local byName: { [string]: { Box } } = {} -- (the other places to empty's parts are in standBoxes, by their id)
 local standBoxes: { [string]: { Box } } = {}
 local unanchored = 0
 -- (the house to empty a part is of, when it is a family house's: its nearest model with SandboxHouse, not the farmstead)
@@ -279,7 +279,7 @@ end
 local function named(name: string): { Box }
 	return byName[name] or {}
 end
--- (8.9: the village has its own House, Path, EdgeLine, Trunk … : a name in one model or folder)
+-- (8.9: the countryside has its own House, Trunk … : a name in one model or folder)
 local function namedIn(name: string, root: any): { Box }
 	local out: { Box } = {}
 	for _, b in named(name) do
@@ -354,7 +354,7 @@ do
 			end
 		end
 	end
-	check(`the asphalt covers every road of SandboxMap.Roads at RoadTop ({#asphalt} slabs: 8.9 Jinočany's streets too)`, missed == nil and #asphalt == #SLABS and #SLABS == #SandboxMap.Roads, missed)
+	check(`the asphalt covers every road of SandboxMap.Roads at RoadTop ({#asphalt} slabs: 9.4 the lanes and their yards too)`, missed == nil and #asphalt == #SLABS and #SLABS == #SandboxMap.Roads, missed)
 	local labelled = true
 	for _, road in SandboxMap.Roads do
 		local found = false
@@ -363,7 +363,7 @@ do
 		end
 		labelled = labelled and found
 	end
-	check("…each slab says its road (the attribute Road: Hlavní, Školní …)", labelled)
+	check("…each slab says its road (the attribute Road: Mill Lane, Pond Lane …)", labelled)
 	local ok = disc ~= nil and disc.part.Shape == Enum.PartType.Cylinder and math.abs((disc.x1 - disc.x0) / 2 - TURN.r) < EPS
 	if disc then
 		for deg = 0, 359, 10 do
@@ -404,7 +404,7 @@ do
 	table.insert(areas, { name = "the path from the curb to the door", rect = { x0 = SandboxScenery.Path.x0, x1 = SandboxScenery.Path.x1, z0 = SandboxScenery.Path.z0, z1 = HOUSE.door.z - 0.01 } })
 	local d = HOUSE.door
 	table.insert(areas, { name = "the front door's way", rect = { x0 = d.x - 2.5, x1 = d.x + 2.5, z0 = d.z - 5, z1 = d.z - 0.01 } })
-	-- (Jinočany: every other house to empty's door's way, 5 out of it, and its walk to its curb, under its eaves: up to 8
+	-- (every other place to empty's door's way, 5 out of it, and its walk to its curb, under its eaves: up to 8
 	-- high, a mover and whatever goes through a door 7.2 high)
 	for index, h in SandboxMap.Houses do
 		if index > 1 then
@@ -422,7 +422,7 @@ do
 	local floorHigh: string? = nil
 	for _, b in boxes do
 		if b.far or not b.part.CanCollide or (barrier and b.part:IsDescendantOf(barrier)) or b.name == "InvisibleWall" then
-			continue -- (8.9: Hornická's barrier closes its road on purpose, the Bounds' wall ends it)
+			continue -- (the Bounds' wall ends the map; 8.9's barrier, none now)
 		end
 		if FLOOR[b.name] then
 			if b.y1 > TOP + EPS then
@@ -431,7 +431,7 @@ do
 			continue
 		end
 		if b.y1 <= GROUND + 0.05 or b.y0 >= 14 or (b.name == "Step" and b.y1 <= GROUND + 0.45) then
-			continue -- (Jinočany: a family house's doorstep, 0.4 high, walked up)
+			continue -- (a place's doorstep, 0.4 high, walked up)
 		end
 		for _, a in areas do
 			local r = a.rect
@@ -451,7 +451,7 @@ do
 			end
 		end
 	end
-	check("nothing that collides on the roads (but Hornická's barrier), the turnaround, the plots, the path to the door or the door's way", blocked == nil and barrier ~= nil, blocked)
+	check("nothing that collides on the roads (9.4: no road closed either), the turnaround, the plots, the path to the door or the door's way", blocked == nil and barrier == nil, blocked)
 	check("no floor (asphalt, shoulder, pad, meadow, lawn, field) rises over RoadTop", floorHigh == nil, floorHigh)
 	local pads = named("Pad")
 	local padOk = #pads == #SandboxMap.Plots
@@ -816,8 +816,8 @@ do
 	check("8.5 …each hall lined dark (DoorHalls: its back, sides, ceiling and floor, in the hall, seen, never colliding)", liningOk, #lining)
 end
 
--- Jinočany step 1: the village's five other houses to empty in the village's own look (SandboxWorld.villageHouse:
--- VillageScenery.houses with enter(), rich; the terraced one its row's whole group, one body): each a model of its own
+-- 9.4 the countryside: the five other places to empty in their looks (SandboxWorld.villageHouse: VillageScenery.houses,
+-- rich; a look VillageLooks does not draw yet: "old"): each a model of its own
 -- (SandboxHouse = its id, VillageHouse its Placed's) in its Atomic chunk (world.Village's Village_<chunk>), its pieces in
 -- House_<id> (Home) inside its box (a row's: its group's), its walls (House, a row's Row) the PrimaryPart and no longer
 -- solid, its FrontDoor (SandboxDoor, no collision, unseen; -Z out of the house as the farmstead's) the door's piece, its
@@ -828,7 +828,7 @@ end
 do
 	local D = Config.Moving.Doors
 	local placedOf: { [string]: VillageScenery.Placed } = {}
-	for _, p in VillageScenery.houses(VillageScenery.enter()) do
+	for _, p in VillageScenery.houses() do
 		local h = VillageScenery.emptied(p)
 		if h then
 			placedOf[h.id] = p
@@ -954,19 +954,15 @@ do
 			okAll, why = false, `{h.name}: {stage}`
 		end
 	end
-	check("Jinočany: the five family houses in the village's look, each its model (SandboxHouse) in its Atomic chunk, its walls the PrimaryPart in its box, its FrontDoor (SandboxDoor, -Z out) on its door, two leaves, no back door",
+	check("the five other places in their looks, each its model (SandboxHouse) in its Atomic chunk, its walls the PrimaryPart in its box, its FrontDoor (SandboxDoor, -Z out) on its door, two leaves, no back door",
 		okAll and made == 5, why)
 	check("…walkable as the farmstead's (4 HouseSolid pieces: the walls less the front door's hall, nothing solid in the hall or the door's way but the doorstep; the plinth no longer solid), the hall lined dark over the plinth, its name on its mailbox",
 		okAll, why)
-	local villageOwn: VillageScenery.Placed? = nil
-	for _, p in VillageScenery.houses(VillageScenery.enter()) do
-		if not VillageScenery.emptied(p) then
-			villageOwn = p
-		end
-	end
-	check("SandboxWorld.villageHouse and SandboxWorld.walkIn: the houses to empty's builders (a house of the village's own: none)", type(SandboxWorld.walkIn) == "function"
-		and type(SandboxWorld.villageHouse) == "function" and type(SandboxWorld.doorLeaves) == "function" and villageOwn ~= nil
-		and SandboxWorld.villageHouse(G.Instance.new("Folder"), villageOwn :: VillageScenery.Placed) == nil)
+	-- (a Placed that holds no place to empty, an old save's village house's id: nothing built)
+	local nowhere: VillageScenery.Placed = { id = "Hlavní_n_5", kind = "old", box = { x0 = 0, x1 = 30, z0 = 0, z1 = 24 }, yaw = 0, seed = 1, opts = { rich = true }, ids = { "Hlavní_n_5" }, street = "Hlavní" }
+	check("SandboxWorld.villageHouse and SandboxWorld.walkIn: the places to empty's builders (one that holds no place: none)", type(SandboxWorld.walkIn) == "function"
+		and type(SandboxWorld.villageHouse) == "function" and type(SandboxWorld.doorLeaves) == "function" and #VillageScenery.houses() == 5
+		and SandboxWorld.villageHouse(G.Instance.new("Folder"), nowhere) == nil)
 end
 
 -- the words: the signpost's boards, the gate's and the mailbox's

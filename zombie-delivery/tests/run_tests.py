@@ -29,7 +29,8 @@ PURE += ("SaveGuard",)  # 8.3 saves: what a save writes, checked; the unknown ke
 PURE += ("ClipboardRules",)  # 8.5 Danny's clipboard, orders mode (tests/clipboard_test.luau, tests/clipboard_runtime_test.luau)
 PURE += ("PlayerTradeRules",)  # 8.7 sandbox, trading between players (tests/playertrade_test.luau, tests/playertrade_runtime_test.luau)
 PURE += ("VillageLooks",)  # 8.9 sandbox, Jinočany: the village's art kit (tests/villagelooks_test.luau)
-PURE += ("VillageScenery",)  # 8.9 sandbox, Jinočany step 1 on the map: where the village stands (tests/villageworld_test.luau)
+PURE += ("VillageScenery",)  # 8.9 sandbox on the map, 9.4 the countryside: where everything stands (tests/villageworld_test.luau)
+PURE += ("CountryLooks",)  # 9.4 sandbox, the countryside's art kit (tests/countrylooks_test.luau)
 PURE += ("HouseRoute",)  # 9.0 Danny's way inside a house, on its plan's grid (tests/houseroute_test.luau, tests/dannynav_runtime_test.luau; 9.3 his walk along it, audited against the built parts: tests/movehelper_stuck_runtime_test.luau)
 PURE += ("PedalRules",)  # 9.1 the drive pedals: the input, the press, where they go (tests/drivepedals_test.luau)
 luau = sys.argv[1] if len(sys.argv) > 1 else shutil.which("luau") or "luau"
@@ -409,8 +410,8 @@ with tempfile.TemporaryDirectory() as tmp:
         "return { box = { %r, %r, %r }, door = { x0 = %r, x1 = %r, y0 = %r, y1 = %r, z0 = %r, z1 = %r }, top = %r, "
         "back = { x0 = %r, x1 = %r, y0 = %r, y1 = %r, z0 = %r, z1 = %r }, backKnob = %r }\n"
         % (*art["box"], lo[0], hi[0], lo[1], hi[1], lo[2], hi[2], top, b_lo[0], b_hi[0], b_lo[1], b_hi[1], b_lo[2], b_hi[2], sum(knobs) / len(knobs)))
-    # 8.8: the Jinočany plan (design/jinocany/plan.json: the village the sandbox becomes) as JinocanyPlan.luau for
-    # tests/auctionhouse_test.luau: the Auction House stands on none of its roads, landmarks, fields, houses or tree lines.
+    # 8.8: the Jinočany plan (design/jinocany/plan.json: the village the sandbox was, 8.9) as JinocanyPlan.luau for
+    # tests/villagelooks_test.luau (shared/VillageLooks.luau's art kit, its village kinds built from it).
     plan = json.load(open(os.path.join(os.path.dirname(HERE), "design", "jinocany", "plan.json"), encoding="utf-8"))
     def rect(r):
         return "{ x0 = %r, x1 = %r, z0 = %r, z1 = %r }" % (r["x0"], r["x1"], r["z0"], r["z1"])
@@ -442,6 +443,37 @@ with tempfile.TemporaryDirectory() as tmp:
         "enter = {\n%s\n},\nvillage = {\n%s\n},\nturnaround = { x = %r, z = %r, r = %r },\n}\n"
         % (rect(plan["bounds"]), "\n".join(lines), "\n".join(trees), "\n".join(houses), "\n".join(marks), "\n".join(roads), "\n".join(fields), "\n".join(paths),
            "\n".join(enter), "\n".join(village), plan["turnaround"]["x"], plan["turnaround"]["z"], plan["turnaround"]["r"]))
+    # 9.4 the countryside (design/countryside/plan.json, design/countryside/plan.py writes it) as CountryPlan.luau for
+    # tests/sandboxhouses_test.luau, tests/villageworld_test.luau, tests/auctionhouse_test.luau and tests/soundplan_test.luau:
+    # its bounds, roads (yards marked), spots (the six places to empty: box, yaw, door, curb, lot), landmarks, fields,
+    # lawns, woods, orchard, streams and tree lines, and every area it keeps (areas: a road's, a landmark's, a field's, a
+    # spot's box and lot) for the Auction House's check.
+    country = json.load(open(os.path.join(os.path.dirname(HERE), "design", "countryside", "plan.json"), encoding="utf-8"))
+    def spot_text(s):
+        return "{ x = %r, z = %r, yaw = %r }" % (s["x"], s["z"], s["yaw"])
+    def points_text(points):
+        return "{ " + ", ".join("{ x = %r, z = %r }" % (p["x"], p["z"]) for p in points) + " }"
+    c_areas = [("road " + r["name"], r["rect"]) for r in country["roads"]] + [(l["id"], l["rect"]) for l in country["landmarks"]]
+    c_areas += [("field " + f["kind"], f["rect"]) for f in country["fields"]] + [("spot " + h["id"], h["box"]) for h in country["spots"]]
+    c_areas += [("lot " + h["id"], h["lot"]) for h in country["spots"]]
+    c_roads = ["\t{ name = %s, rect = %s, yard = %s }," % (q(r["name"]), rect(r["rect"]), "true" if r["yard"] else "false") for r in country["roads"]]
+    c_spots = ["\t{ id = %s, name = %s, street = %s, look = %s, kind = %s, box = %s, yaw = %r, door = %s, curb = %s, lot = %s%s }," % (
+        q(h["id"]), q(h["name"]), q(h["street"]), q(h["look"]), q(h["kind"]), rect(h["box"]), h["yaw"], spot_text(h["door"]), spot_text(h["curb"]),
+        rect(h["lot"]), (", back = " + spot_text(h["back"])) if h.get("back") else "") for h in country["spots"]]
+    c_marks = ["\t{ id = %s, name = %s, kind = %s, rect = %s, yaw = %r, spot = %s }," % (q(l["id"]), q(l["name"]), q(l["kind"]), rect(l["rect"]), l["yaw"],
+               q(l["spot"]) if l["spot"] else "nil") for l in country["landmarks"]]
+    c_fields = ["\t{ kind = %s, rect = %s }," % (q(f["kind"]), rect(f["rect"])) for f in country["fields"]]
+    c_lawns = ["\t{ kind = %s, rect = %s }," % (q(l["kind"]), rect(l["rect"])) for l in country["lawns"]]
+    c_woods = ["\t{ id = %s, rect = %s, clearings = { %s } }," % (q(w["id"]), rect(w["rect"]), ", ".join(rect(c) for c in w["clearings"])) for w in country["woods"]]
+    c_streams = ["\t{ id = %s, width = %r, points = %s }," % (q(st["id"]), st["width"], points_text(st["points"])) for st in country["streams"]]
+    c_lines = ["\t{ kind = %s, points = %s }," % (q(t["kind"]), points_text(t["points"])) for t in country["treeLines"]]
+    c_area_lines = ["\t{ name = %s, rect = %s }," % (q(name), rect(r)) for name, r in c_areas]
+    open(os.path.join(tmp, "CountryPlan.luau"), "w", encoding="utf-8").write(
+        "return {\nbounds = %s,\nturnaround = { x = %r, z = %r, r = %r },\nroads = {\n%s\n},\nspots = {\n%s\n},\nlandmarks = {\n%s\n},\n"
+        "fields = {\n%s\n},\nlawns = {\n%s\n},\nwoods = {\n%s\n},\norchard = %s,\nstreams = {\n%s\n},\nlines = {\n%s\n},\nareas = {\n%s\n},\n}\n"
+        % (rect(country["bounds"]), country["turnaround"]["x"], country["turnaround"]["z"], country["turnaround"]["r"], "\n".join(c_roads),
+           "\n".join(c_spots), "\n".join(c_marks), "\n".join(c_fields), "\n".join(c_lawns), "\n".join(c_woods), rect(country["orchard"]),
+           "\n".join(c_streams), "\n".join(c_lines), "\n".join(c_area_lines)))
     # 8.0.1 review: the real server/SandboxPlots.luau as SandboxPlotsServer.luau for tests/sandboxplots_runtime_test.luau:
     # a function of the globals it reads (the test's own Players, ReplicatedStorage and task, and a `require` that gives
     # the real SandboxMap copy above).
@@ -914,10 +946,10 @@ def audio_length_check():
 if not audio_length_check():
     ok = False
 
-# 8.9 Jinočany: shared/SandboxMap.luau's village section is design/jinocany/plan.json's (tools/village/sandboxmap.py
+# 9.4 the countryside: shared/SandboxMap.luau's map section is design/countryside/plan.json's (tools/countryside/sandboxmap.py
 # writes it; a plan changed but not written again shows here).
-village = subprocess.run([sys.executable, os.path.join(os.path.dirname(HERE), "tools", "village", "sandboxmap.py"), "--check"], capture_output=True, text=True)
-print("== village data: " + (village.stdout.strip() or village.stderr.strip())[:200])
+village = subprocess.run([sys.executable, os.path.join(os.path.dirname(HERE), "tools", "countryside", "sandboxmap.py"), "--check"], capture_output=True, text=True)
+print("== map data: " + (village.stdout.strip() or village.stderr.strip())[:200])
 if village.returncode != 0:
     ok = False
 

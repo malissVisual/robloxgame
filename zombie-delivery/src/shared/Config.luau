@@ -3682,11 +3682,12 @@ Config.Soundscape = {
 	-- Fallback). Where you are (shared/SoundPlan.luau sandboxPlace): "outdoors" in the village, in a "warehouse" (8.3:
 	-- its level's building, WarehouseLayout.site) or in the "house" (inside the Old Farmstead: the move's interior, its
 	-- state's inside, or the farmstead's own box). client/SoundScape.luau blends the loops (SoundPlan.sandboxAmbience:
-	-- the city's day and night never play here), plays Jinočany's far sounds and sets the room's echo;
+	-- the city's day and night never play here), plays the countryside's far sounds and sets the room's echo;
 	-- client/SandboxSounds.luau the rest. Volumes 0 … 1.
-	-- JINOČANY (design/jinocany/NAVRH.md §5: Jinočany in place of the Alps; no cowbells, no alpine meadow): outdoors the
-	-- fields (birds and larks over them, a breeze), the D5 motorway's far hum from the east, now and then the chapel's
-	-- bell, a dog far off and a tractor on the fields. Each is a sound wanted on the next sheet; until a sheet has it, a
+	-- 8.9 in place of the Alps (no cowbells, no alpine meadow); 9.4 the countryside (design/countryside/plan.py; no
+	-- village: no chapel's bell): outdoors the fields (birds and larks over them, a breeze), the D5 motorway's far hum from
+	-- the east, now and then a woodpecker in the forest, a dog far off and a tractor on the fields. Each is a sound
+	-- wanted on the next sheet; until a sheet has it, a
 	-- sound of the sheets up now stands in (shared/SoundPlan.luau SandboxStandIns). Indoors and in a warehouse as before.
 	Sandbox = {
 		Fields = 0.24, -- the fields outdoors (amb_fields; its stand-in sfx4's amb_alpine: a breeze, finches, a lark) …
@@ -3698,19 +3699,19 @@ Config.Soundscape = {
 		-- SoundService.AmbientReverb by place (an Enum.ReverbType's name; a place not here: NoReverb), only while you are
 		-- in the game and SOUND is not all off
 		Reverb = { warehouse = "Room" } :: { [string]: string },
-		-- The D5's far hum (amb_motorway): a 3D loop on the motorway's middle line (design/jinocany/plan.json's landmark
-		-- "d5": X, from Z0 to Z1) at its point nearest you, Y up, so it always comes from the east; Volume within Near
+		-- The D5's far hum (amb_motorway): a 3D loop on the motorway's middle line (SandboxMap's landmark "d5": X, from
+		-- Z0 to Z1) at its point nearest you, Y up, so it always comes from the east; Volume within Near
 		-- studs, fading out (Roblox's inverse taper) to nothing at Range. Outdoors; × FieldsIndoors in a warehouse.
 		Motorway = { X = 360, Z0 = -680, Z1 = 760, Y = 6, Volume = 0.35, Near = 80, Range = 1900 },
 		-- Now and then outdoors, each on its own clock (Gap: seconds between two, a random pick), 3D (you hear where):
 		-- Volume within Near studs, nothing past Range.
-		--   Bell      the chapel's bell (chapel_bell, one stroke) from its little tower (plan.json's landmark "chapel":
-		--             X, Z; Y up), Strokes strokes Every s apart
+		--   Woodpecker  a woodpecker drumming in the forest (woodpecker_far, one drum) from its middle (SandboxMap's
+		--             wood "forest": X, Z; Y up in the crowns), Drums drums Every s apart
 		--   Dog       a dog barking far off (dog_far), Far studs (a random pick) a random way round you
 		--   Tractor   a tractor on the fields (tractor_far, a loop), Far studs a random way round you at the middle of
 		--             its pass: it drives across your view at Speed studs a second for Seconds s, fading in and out
 		--             over Fade s
-		Bell = { X = -700, Z = -144, Y = 28, Gap = { 150, 300 } :: { number }, Strokes = 3, Every = 1.8, Volume = 0.8, Near = 200, Range = 2200 },
+		Woodpecker = { X = -960, Z = -560, Y = 26, Gap = { 90, 200 } :: { number }, Drums = 3, Every = 0.9, Volume = 0.7, Near = 120, Range = 1500 },
 		Dog = { Gap = { 45, 110 } :: { number }, Far = { 90, 170 } :: { number }, Volume = 0.8, Near = 30, Range = 260 },
 		Tractor = { Gap = { 80, 170 } :: { number }, Far = { 150, 240 } :: { number }, Seconds = 16, Fade = 4, Speed = 5, Volume = 0.9, Near = 40, Range = 360 },
 		Display = 0.7, -- a piece put on a stand (stand_display: a soft thunk and a sparkle)
@@ -6409,10 +6410,10 @@ Config.CarryGrip = {
 --                     8.3 the big move: The Old Farmstead (the owner's big Blender house, 44 × 14.5 × 34) empties as a big
 --                     house: Kind its plan's (HouseLayout's "big", Config.Furniture.Big: more rooms, more pieces, a back
 --                     door), a longer Time (the Sprinter's bed takes it home in several trips).
---                     Jinočany step 1 (design/jinocany/NAVRH.md §3): Houses, a contract per house of SandboxMap.Houses (by
---                     its id; server/Moving.luau's kiosk offers one at a time, never one another player has): Client (a
---                     made-up Czech family), Address (by its street), Blurb (the card's), Kind (its plan: HouseLayout's
---                     "big" the farmstead, "house" a family house) and Time (the move's clock, s). Its pieces are its
+--                     8.9, 9.4 the countryside (design/countryside/plan.py): Houses, a contract per place to empty of
+--                     SandboxMap.Houses (by its id; server/Moving.luau's kiosk offers one at a time, never one another
+--                     player has): Client (a made-up Czech family), Address (by its road), Blurb (the card's), Kind (its
+--                     plan: HouseLayout's "big" the farmstead, "house" the rest) and Time (the move's clock, s). Its pieces are its
 --                     Kind's (HouseLayout): a family house Config.Furniture.Spots (18 – 24) and Collectibles.Count (1 – 2),
 --                     19 – 26 pieces worth $5,700 – 14,000 at 90 % (Config.Collection's tuning), the farmstead Big.Spots
 --                     (34 – 40) and Big.Collectibles.Count (2 – 3), 36 – 43 pieces worth $10,200 – 21,300: about half
@@ -6508,7 +6509,7 @@ Config.Moving = {
 	Pack = { Support = 0.4, Level = 0.35, Contact = 7.5, Flush = 3.6, Waste = 4.2, Base = 0.3, Side = 0.45, Depth = 0.4, Dead = 2.4, High = 2.4, Headroom = 1.1, Probe = 1, Lie = true, Repack = true },
 	Sandbox = {
 		Icon = "🏡",
-		-- Jinočany step 1: a contract per house of SandboxMap.Houses (its id), the families and numbers made up
+		-- a contract per place to empty of SandboxMap.Houses (its id), the families made up
 		Houses = {
 			sandbox_house = {
 				Client = "The Nováks", -- (The Hubers in the Alps)
@@ -6517,38 +6518,39 @@ Config.Moving = {
 				Kind = "big", -- 8.3: the big house's plan (shared/HouseLayout.luau, Config.Furniture.Big)
 				Time = 25 * 60, -- (8.3: the big house's, was 20 min: it takes several trips)
 			},
-			["Hlavní_n_5"] = {
+			-- 9.4 the countryside's five other places (their words for now: the looks' and the contracts' own come with them)
+			pond_cabin = {
 				Client = "The Dvořáks",
-				Address = "Hlavní 5",
-				Blurb = "A family house under the old linden. Grandma's things are going to the city: one trip or two home.",
+				Address = "Pond Lane, by the fish pond",
+				Blurb = "A fishing cabin on the shore of the pond. Rods, nets and old chairs: bring it all home to your warehouse.",
 				Kind = "house",
 				Time = 15 * 60,
 			},
-			["Hlavní_s_11"] = {
+			lone_house = {
 				Client = "The Svobodas",
-				Address = "Hlavní 11",
-				Blurb = "The house with the blue gate, sold at last. Empty it before the new owners come.",
+				Address = "Hill Road, the lone house",
+				Blurb = "A house all on its own by Hill Road, among the fields. Empty it before the new owners come.",
 				Kind = "house",
 				Time = 15 * 60,
 			},
-			["Školní_e_20"] = {
+			forest_lodge = {
 				Client = "The Procházkas",
-				Address = "Školní 20",
-				Blurb = "The old schoolmaster's house, full of books and odd old things. Mind the fragile ones.",
+				Address = "Wood Lane, in the forest",
+				Blurb = "The forester's lodge in its clearing, full of old things. Mind the fragile ones on the way out.",
 				Kind = "house",
 				Time = 15 * 60,
 			},
-			["Lidická_e_30"] = {
+			old_mill = {
 				Client = "The Kučeras",
-				Address = "Lidická 30",
-				Blurb = "A family house with a rose garden. The Kučeras are moving out: bring everything home to your warehouse.",
+				Address = "Mill Lane, by the millrace",
+				Blurb = "The old mill on the stream. The Kučeras are moving out: bring everything home to your warehouse.",
 				Kind = "house",
 				Time = 15 * 60,
 			},
-			["Smetanova_w_84"] = {
+			orchard_cottage = {
 				Client = "The Horáks",
-				Address = "Smetanova 84",
-				Blurb = "The end house of the row on Smetanova, packed to the roof. Narrow doors: lift the big pieces with care.",
+				Address = "Orchard Lane, in the orchard",
+				Blurb = "A cottage among the fruit trees, packed to the roof. Narrow doors: lift the big pieces with care.",
 				Kind = "house",
 				Time = 15 * 60,
 			},
@@ -6558,7 +6560,7 @@ Config.Moving = {
 		Roam = 0, -- (none, as the horde; e.g. 2: a few round the house)
 		-- 8.4: a house's seed is a whole number 1 … this (server/Moving.luau rolls it); the one a player's card shows is
 		-- kept in their save until a trip brings something home (server/PlayerData.luau's sandboxHouseSeed: another
-		-- number there is none); Jinočany: with its house (sandboxHouse, a SandboxMap.Houses id)
+		-- number there is none); with its house (sandboxHouse, a SandboxMap.Houses id)
 		Seeds = 1073741823,
 	},
 }
@@ -8130,7 +8132,7 @@ Config.VanPaint = {
 -- warehouse is a flashbang"). Every light number of the sandbox, in one place. shared/SandboxLightRules.luau has the
 -- rules; tests/sandboxlight_test.luau and tests/sandboxlight_runtime_test.luau hold every light to Caps.
 --   Sky        the fixed warm afternoon outside (server/SandboxWorld.luau lighting(), as SandboxScenery.Light): Clock
---              (Lighting.ClockTime), Latitude (Jinočany's 50° north; the Alps' 47 before), Brightness (the sun),
+--              (Lighting.ClockTime), Latitude (central Bohemia's 50° north; the Alps' 47 before), Brightness (the sun),
 --              Exposure (the base ExposureCompensation: the eyes add their place's), Ambient (the light indoors and in the shade: the house's and the hall's fill),
 --              Outdoor (OutdoorAmbient), ShiftTop / ShiftBottom (ColorShift_Top / _Bottom), Diffuse / Specular
 --              (EnvironmentDiffuseScale / SpecularScale), Softness (ShadowSoftness); the Atmosphere: Air (its Color and
@@ -8174,7 +8176,7 @@ Config.VanPaint = {
 Config.SandboxLight = {
 	Sky = {
 		Clock = 15.4,
-		Latitude = 50, -- (Jinočany, design/jinocany/NAVRH.md; 47 in the Alps: the same warm afternoon)
+		Latitude = 50, -- (central Bohemia's; 47 in the Alps: the same warm afternoon)
 		Brightness = 1.8,
 		Exposure = 0,
 		Ambient = { 78, 72, 68 } :: { number },
@@ -8473,21 +8475,20 @@ Config.Village = {
 	Far = { Reach = 1200 },
 }
 
--- 8.9 SANDBOX, Jinočany step 1 on the map (design/jinocany/NAVRH.md §4): shared/VillageScenery.luau lays
--- shared/SandboxMap.luau's village (its houses, landmarks, fields, lawns, tree lines and orchard) out with
--- shared/VillageLooks.luau's art, server/VillageWorld.luau makes the parts (tests/villageworld_test.luau), the D5's cars
--- are client/VillageTraffic.luau's (this screen's only).
---   Lawn       the village's lawns' colour and material (SandboxMap.Lawns: the gardens round its houses, a little
---              greener than the meadow)
---   Trees      a tree of a tree line or the orchard stands where the map's rules let it (SandboxScenery.treeRule: off
---              the roads and their 12 studs, the plots, the farmstead, the vans' ways; VillageScenery.treeRule: Keep
---              studs off a village house's box, a landmark's rect or the Auction House's site); where they say no it
---              moves off its spot, Step studs at a time across its line (then along it), at most Nudge studs, else it is
---              left out. Two crowns stay Apart × their radii apart
---   Shadow     a village part throws a shadow only when it is a mass (solid, not a door nor a trunk: the walls, roofs,
---              gables, chimneys, the landmarks' bodies) or a tree's crown (the tree's shadow), Low studs tall at least
---              (a plinth's, a bench's shadow is hardly seen), and big enough for SandboxScenery.Shadow and
---              RenderBudget's rule
+-- 8.9 SANDBOX on the map; 9.4 the countryside (design/countryside/plan.py, plan.json): shared/VillageScenery.luau lays
+-- shared/SandboxMap.luau's map (its six spots' houses, landmarks, fields, lawns, tree lines, woods, orchard and stream)
+-- out with shared/VillageLooks.luau's and shared/CountryLooks.luau's art, server/VillageWorld.luau makes the parts
+-- (tests/villageworld_test.luau), the D5's cars are client/VillageTraffic.luau's (this screen's only).
+--   Lawns      a ground tile's colour and material by its kind (SandboxMap.Lawns: the forest's floor, a darker green
+--              than the meadow)
+--   Trees      a tree of a tree line, the orchard or a wood stands where the map's rules let it (SandboxScenery.treeRule:
+--              off the roads and their 12 studs, the plots, the lots, the vans' ways; VillageScenery.treeRule: Keep studs
+--              off a spot's box, a landmark's rect or the Auction House's site, its crown off a stream's water and out of a
+--              wood's clearing); where they say no it moves off its spot, Step studs at a time across its line (then
+--              along it), at most Nudge studs, else it is left out. Two crowns stay Apart × their radii apart
+--   Shadow     a part throws a shadow only when it is a mass (solid, not a door nor a trunk: the walls, roofs, gables,
+--              chimneys, the landmarks' bodies) or a tree's crown (the tree's shadow), Low studs tall at least (a
+--              plinth's, a bench's shadow is hardly seen), and big enough for SandboxScenery.Shadow and RenderBudget's rule
 --   Cars      the D5's cars (client/VillageTraffic.luau): Count in all, Speed studs/s (each its own share of Spread
 --              more or less), Beyond studs past the Bounds they run on the far D5 (VillageLooks.horizon's) before they
 --              go round again unseen; a car is a body (Size: width, height, length) and a cabin on it (Cabin, its
@@ -8495,7 +8496,7 @@ Config.Village = {
 --              out from its middle each of its two lanes runs
 export type VillageCars = { Count: number, Speed: number, Spread: number, Beyond: number, Size: { number }, Cabin: { number }, Lanes: number, Colors: { { number } } }
 Config.VillageWorld = {
-	Lawn = { Color = { 104, 148, 62 } :: { number }, Material = "Grass" },
+	Lawns = { forest = { Color = { 72, 104, 52 } :: { number }, Material = "LeafyGrass" } } :: { [string]: { Color: { number }, Material: string } },
 	Trees = { Step = 4, Nudge = 12, Keep = 3, Apart = 0.85 },
 	Shadow = { Low = 2 },
 	Cars = {
@@ -8508,6 +8509,83 @@ Config.VillageWorld = {
 		Lanes = 0.25,
 		Colors = { { 196, 32, 38 }, { 236, 236, 232 }, { 34, 38, 44 }, { 46, 84, 150 }, { 150, 154, 158 }, { 92, 120, 76 }, { 226, 176, 52 } },
 	} :: VillageCars,
+}
+
+-- 9.4 SANDBOX, the countryside's art kit (shared/CountryLooks.luau, tests/countrylooks_test.luau): the six spots'
+-- surroundings (the farm's barn, tractor, bales, paddock and muck heap; the fish pond; the lone house's garden; the
+-- lodge's woodpile; the millrace's weir and footbridge; the orchard's beehives), the railway and its halt, the
+-- hedges, fences and the stream. Nothing of a village (no street, no shop, no chapel); the houses themselves are
+-- shared/VillageLooks.luau's.
+--   Palette    the colours (RGB 0-255)
+--   Budget     the most parts a landmark of each kind may give
+--   Woods      a wood's trees (SandboxMap.Woods): on a grid Spacing apart, each moved up to Jitter studs, its kind
+--              Mix's in turn at random (VillageLooks' trees)
+--   Lines      a fence's posts at most Post studs apart, its rails at Rails' heights; a hedge Height high, Width wide
+--   Streams    a stream's water Water over the ground (its top), its bed Bank wider each side, BankTop high; a tree's
+--              crown keeps Clear studs off its water (VillageScenery.treeRule)
+--   Far        the railway going on Rails studs past the Bounds at both ends (the far view)
+Config.Country = {
+	Palette = {
+		Barn = { Wall = { 116, 60, 44 }, Trim = { 72, 42, 30 }, Roof = { 86, 84, 88 }, Door = { 88, 54, 36 }, Loft = { 58, 36, 26 } } :: { [string]: { number } },
+		Tractor = { Body = { 186, 38, 32 }, Dark = { 52, 52, 56 }, Tyre = { 32, 32, 34 }, Hub = { 214, 176, 52 }, Glass = { 150, 180, 190 } } :: { [string]: { number } },
+		Trailer = { Bed = { 120, 92, 64 }, Side = { 96, 112, 72 } } :: { [string]: { number } },
+		Hay = { { 218, 190, 112 }, { 204, 176, 98 } } :: { { number } },
+		Muck = { 78, 60, 44 } :: { number },
+		Log = { 132, 96, 62 } :: { number },
+		LogEnd = { 198, 162, 114 } :: { number },
+		Stump = { 112, 84, 58 } :: { number },
+		Steel = { 150, 154, 160 } :: { number },
+		Fence = { 152, 118, 82 } :: { number },
+		Post = { 104, 78, 54 } :: { number },
+		Trough = { 120, 124, 128 } :: { number },
+		Water = { 62, 104, 112 } :: { number },
+		Bank = { 98, 118, 60 } :: { number },
+		Bed = { 92, 84, 64 } :: { number },
+		Reeds = { { 96, 120, 56 }, { 122, 136, 64 } } :: { { number } },
+		Jetty = { 146, 110, 72 } :: { number },
+		Boat = { 176, 72, 52 } :: { number },
+		BoatInside = { 150, 118, 80 } :: { number },
+		Bench = { 142, 102, 64 } :: { number },
+		Iron = { 52, 54, 58 } :: { number },
+		Stone = { 150, 148, 142 } :: { number },
+		Foam = { 226, 236, 238 } :: { number },
+		Ballast = { 128, 120, 108 } :: { number },
+		Sleepers = { 88, 70, 56 } :: { number },
+		Rail = { 150, 150, 152 } :: { number },
+		Concrete = { 170, 168, 162 } :: { number },
+		Opening = { 28, 28, 30 } :: { number },
+		Platform = { 176, 174, 168 } :: { number },
+		Edge = { 236, 236, 228 } :: { number },
+		Shelter = { 168, 92, 70 } :: { number },
+		ShelterRoof = { 62, 66, 72 } :: { number },
+		Sign = { 34, 76, 150 } :: { number },
+		Hives = { { 236, 196, 60 }, { 88, 140, 200 }, { 120, 168, 90 }, { 240, 236, 226 }, { 184, 96, 64 } } :: { { number } },
+		HiveRoof = { 96, 96, 100 } :: { number },
+		Hedge = { 58, 96, 46 } :: { number },
+		Soil = { 104, 80, 58 } :: { number },
+		Veg = { 92, 150, 62 } :: { number },
+		Washing = { { 236, 236, 240 }, { 200, 60, 60 }, { 80, 120, 190 } } :: { { number } },
+		Line = { 220, 220, 220 } :: { number },
+	},
+	Budget = {
+		barn = 12,
+		tractor = 20,
+		bales = 12,
+		paddock = 40,
+		muckheap = 12,
+		fishpond = 34,
+		garden = 30,
+		woodyard = 14,
+		weir = 6,
+		footbridge = 10,
+		apiary = 16,
+		railway = 10,
+		halt = 14,
+	} :: { [string]: number },
+	Woods = { Spacing = 26, Jitter = 5, Mix = { "oak", "linden", "oak", "birch", "linden" } :: { string } },
+	Lines = { Post = 24, Rails = { 1.5, 2.9 } :: { number }, Hedge = { Height = 3.4, Width = 2.6 } },
+	Streams = { Water = 0.22, Bank = 1.5, BankTop = 0.12, Clear = 2 },
+	Far = { Rails = 900 },
 }
 
 -- 8.3 SANDBOX, Roblox badges for the sandbox's milestones (the owner's guide: design/sandbox/BADGES.md).
