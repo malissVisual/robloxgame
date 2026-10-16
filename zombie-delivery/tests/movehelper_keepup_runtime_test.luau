@@ -44,6 +44,9 @@ local M = E.Mock
 local V3 = M.Vector3.new
 local workspace = M.workspace
 H.HoldLead.Base, H.HoldLead.Ping = E.gameLead.Base, E.gameLead.Ping -- (the game's lead)
+-- 9.2: the hold the SERVER keeps (Danny's when no leader's client drives him: a drive it took back, PairLead.On false;
+-- a crew mate's always): Sol's client drives none here (tests/movehelper_backwards_runtime_test.luau drives him)
+H.PairLead.On = false
 T.Doors.Walk = false -- (the walk-in doors off: these walks stay in the living room)
 
 local home = Map.home(T.Contracts[1].home) :: any

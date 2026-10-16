@@ -222,6 +222,65 @@ do
 	check("…away from it, or no wall: as it was", wx == -1 and wz == 0 and select(1, PairCarry.wall(1, 0, 0, 0)) == 1)
 end
 
+-- 9.2 you drive Danny's end (the owner, 8.9.5: "it feels like it's harder to control … fix it so it's playable"; client/
+-- PairLead.luau): no start, no wait, a quicker turn, his first catch-up a glide, the walls at his end your own rays -----------
+
+do
+	local L = H.PairLead
+	check("9.2 the drive's numbers: on, the heading's turn quicker than a crew mate's (100 – 180 degrees a second), the walk less slow while it turns",
+		L.On == true and L.Turn >= 100 and L.Turn <= 180 and L.Turn > H.PairTurn and L.TurnWalk > H.PairTurnWalk and L.TurnWalk <= 1, L.Turn)
+	check("…rigid once there, the first catch-up a glide (Glide studs a second over his place's own), a door's jump far past any walk",
+		L.Rigid >= 100 and L.Glide > 0 and L.Glide < 12 and L.Settle < L.Loose and L.Jump >= 20 and L.Spin > Brain.holdTurn())
+	check("…the server's look: off more than Sane studs for Grace s (a few studs, a second or two: never a stumble's)", L.Sane >= 4 and L.Sane <= 12
+		and L.Grace >= 0.5 and L.Grace <= 3)
+	-- the walk from standing: the pair's at once (9.0 eased in over PairStart)
+	local s = PairCarry.newSteer(0)
+	PairCarry.steer(s, 0, 0, DT)
+	local x, z = way(0)
+	local first = PairCarry.steer(s, x, z, DT, math.rad(L.Turn), false, L.TurnWalk)
+	check("9.2 from standing straight ahead or behind: the pair's walk at once (nothing multiplies it but the turn's)", near(first, 1)
+		and near(PairCarry.steer(PairCarry.newSteer(0), -x, -z, DT, math.rad(L.Turn), false, L.TurnWalk), 1))
+	check("…while the heading turns, the walk at TurnWalk at the worst (least)", near(PairCarry.walkFactor(math.rad(170), L.TurnWalk), L.TurnWalk)
+		and near(PairCarry.walkFactor(math.rad(170)), H.PairTurnWalk))
+	-- the turn at PairLead.Turn: a quarter round in 90 / Turn s
+	s = PairCarry.newSteer(0)
+	x, z = way(-PI / 2)
+	local steps = 0
+	while math.abs(PairCarry.wrap(s.heading + PI / 2)) > 1e-9 and steps < 1000 do
+		PairCarry.steer(s, x, z, DT, math.rad(L.Turn), false, L.TurnWalk)
+		steps += 1
+	end
+	check(`9.2 a quarter turn in 90 / {L.Turn} s (PairTurn's {H.PairTurn}: twice as long)`, near(steps * DT, (PI / 2) / math.rad(L.Turn), DT + 1e-9), steps * DT)
+	-- the catch-up
+	local limit, settled = PairCarry.catchUp(2, 0, false)
+	check("9.2 catchUp: 2 studs off his place, standing: a glide at Glide (never a snap)", near(limit, L.Glide) and not settled, limit)
+	limit, settled = PairCarry.catchUp(2, 9.8, false)
+	check("…his place walking at 9.8: a glide at 9.8 + Glide", near(limit, 9.8 + L.Glide) and not settled, limit)
+	limit, settled = PairCarry.catchUp(L.Settle - 0.01, 9.8, false)
+	check("…within Settle: there, rigid (Rigid)", limit == L.Rigid and settled)
+	limit, settled = PairCarry.catchUp((L.Settle + L.Loose) / 2, 9.8, true)
+	local stays = settled and limit == L.Rigid
+	limit, settled = PairCarry.catchUp(L.Loose + 0.01, 9.8, true)
+	check("…settled, it stays rigid until Loose studs off (no flicker), then glides again", stays and not settled and near(limit, 9.8 + L.Glide))
+	limit = PairCarry.catchUp(0 / 0, 0 / 0, false)
+	check("…no numbers (NaN): a glide at Glide", near(limit, L.Glide), limit)
+	-- the walls: how much of the walk or turn into one goes
+	local clear, soft = H.HoldWall.Clear, L.Soft
+	check("9.2 wallShare: none from his clearance + Soft studs off the wall, all of it at his clearance or nearer (or past it), between in step",
+		PairCarry.wallShare(clear + soft + 0.01) == 0 and PairCarry.wallShare(clear) == 1 and PairCarry.wallShare(-2) == 1
+		and near(PairCarry.wallShare(clear + soft / 2), 0.5) and PairCarry.wallShare(0 / 0) == 0)
+	-- a turn at a wall: the far end 9 studs ahead of the leader (+X), a wall ahead of it at an angle (its way in: (1, 1)/√2)
+	local s2 = math.sqrt(0.5)
+	local heading = PairCarry.yawOf(1, 0) -- (facing +X)
+	local towardWall = PairCarry.wallTurn(heading, heading + 0.1, 9, 0, s2, s2) -- (+0.1 swings the end toward −Z: away)
+	local intoWall = PairCarry.wallTurn(heading, heading - 0.1, 9, 0, s2, s2) -- (−0.1 swings it toward +Z: into the wall)
+	local half = PairCarry.wallTurn(heading, heading - 0.1, 9, 0, s2 / 2, s2 / 2)
+	check("9.2 wallTurn: a turn swinging his end into the wall (its push along the way in) goes, all of it at a full share, half at half",
+		near(intoWall, heading) and near(PairCarry.wrap(half - heading), -0.05, 1e-9), `{intoWall - heading} {half - heading}`)
+	check("…a turn swinging it away from the wall stays as it was, and no wall (share 0) leaves any turn", near(towardWall, PairCarry.wrap(heading + 0.1))
+		and near(PairCarry.wallTurn(heading, heading - 0.1, 9, 0, 0, 0), PairCarry.wrap(heading - 0.1)))
+end
+
 -- The far end's holder keeps up -----------------------------------------------------------------------------------------------
 
 do

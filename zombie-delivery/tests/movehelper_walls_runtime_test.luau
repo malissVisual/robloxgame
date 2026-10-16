@@ -4,23 +4,23 @@
 -- (Config.Sandbox.On) with the real art (shared/FurnitureLooks.luau, shared/HouseLayout.luau, server/HouseInterior.luau
 -- and its shell's real wall parts): a move into The Old Farmstead. Danny's hold the GAME's (MoveHelper.gameMover's keep
 -- and free: PairHold's constraints) played as Roblox plays them every frame, as tests/movehelper_backwards_runtime_
--- test.luau does; Sol's client is client/PairSteer.luau's step (shared/PairCarry.luau: the wall, the start, the
--- partner as her screen shows him).
+-- test.luau does. 9.2 (you drive his end): his body is Sol's (SetNetworkOwner), her client the real client/PairLead.luau
+-- (E.leadClient) in client/PairSteer.luau's drive branch: the house's walls at his end are HER rays (at the real shell's
+-- Wall parts), no lag, nothing of the server's (no PairWall).
 -- Sol lifts a two-person piece with Danny, then stands in the middle of a room facing one of its walls (Danny between
 -- her piece and that wall) and walks FORWARDS: Danny backs up to the wall.
 --   * he never goes through a wall: no step of his root crosses the shell's wall parts (a ray along it at his chest),
---     his root always HoldWall.Clear studs off the plan's wall slabs (HouseRoute.slide); never a snap
---   * against it Sol's walk into the wall is taken away (her character attribute PairWall, client/PairSteer.luau): her
---     piece stops, his place Clear + HoldWall.Block studs off the wall at most (the piece never pushed into him there)
+--     his root always HoldWall.Clear studs off them; never a snap
+--   * against it her client takes her walk into the wall away (PairLead.walk: her own ray, nothing late): her piece
+--     stops, his place no more than a frame's walk past his clearance (the piece never pushed into him there)
 --   * forwards and to the side along the wall: he slides along it (on along the wall, still clear of it)
---   * she walks back from the wall: PairWall gone, he follows his end again
+--   * she walks back from the wall: the wall lets go, he follows his end again
 local E = require("./MovingRuntime")
 local Config = require("./Config")
 Config.Sandbox.On = true -- (before Moving.start: it reads the mode there)
 local Moving = require("./MovingServer")
 local MoveHelper = require("./MoveHelperServer")
 local Rules = require("./MovingRules")
-local Brain = require("./MoveHelperBrain")
 local PairCarry = require("./PairCarry")
 local FurnitureLooks = require("./FurnitureLooks")
 local HouseLayout = require("./HouseLayout")
@@ -204,6 +204,7 @@ local truck = E.cars[sol]
 truck.chassis.CFrame = CF(house.curb.x, 2, house.curb.z) * M.CFrame.Angles(0, math.rad(house.curb.yaw), 0)
 E.request(sol, "helper", "hire")
 run(0.6)
+local lead = E.leadClient(sol) -- 9.2 Sol's client/PairLead.luau
 check("Danny comes, Sol hires him, his grid the house's plan", danny ~= nil and danny.hirer == sol and danny.route ~= nil)
 local plan, origin = b.plan, b.origin
 local grid = HouseRoute.grid(plan) :: HouseRoute.Grid -- (the test's own: the walls)
@@ -224,11 +225,14 @@ wallParams.FilterDescendantsInstances = walls
 local function throughWall(a: any, c: any): boolean
 	return (c - a).Magnitude > 1e-6 and E.sightRay(a, c - a, wallParams) ~= nil
 end
--- studs from a plan point to the nearest wall slab (the slide's measure: a slab grown by Clear on every side)
-local function offWalls(x: number, z: number): number
+-- 9.2 studs from a world point to the nearest of the shell's wall parts along the ground (her client's rays find those)
+local function offParts(at: any): number
 	local least = math.huge
-	for _, w in grid.walls do
-		least = math.min(least, math.max(w.x0 - x, 0, x - w.x1, w.z0 - z, 0, z - w.z1))
+	for _, part in walls do
+		local p = part.CFrame:PointToObjectSpace(at)
+		local half = part.Size * 0.5
+		local dx, dz = math.max(math.abs(p.X) - half.X, 0), math.max(math.abs(p.Z) - half.Z, 0)
+		least = math.min(least, math.sqrt(dx * dx + dz * dz))
 	end
 	return least
 end
@@ -298,7 +302,36 @@ local function follow()
 	root.CFrame = E.rootOf(sol).CFrame * weld
 end
 follow()
-run(1.5, nil, follow)
+-- Sol's client, one frame (client/PairSteer.luau's drive branch, as tests/movehelper_backwards_runtime_test.luau's): her
+-- stick → the walk without its part into a wall at his end (PairLead.walk), the heading at PairLead.Turn (PairLead.turn),
+-- the piece turned with her root, his goals (PairLead.step), her walk this physics step
+local truth = E.rootOf(sol).CFrame
+local steer = PairCarry.newSteer(yawOf(truth))
+local humanoid = character:FindFirstChildOfClass("Humanoid")
+local L = H.PairLead
+local function client(wx: number, wz: number)
+	local drive = lead.of(danny.body.model)
+	if not drive then
+		return
+	end
+	local x, z = lead.walk(drive, wx, wz)
+	local facingNow = yawOf(truth)
+	steer.heading = facingNow
+	local factor = PairCarry.steer(steer, x, z, FRAME, math.rad(L.Turn), false, L.TurnWalk)
+	steer.heading = lead.turn(drive, facingNow, steer.heading)
+	truth = CF(truth.Position) * M.CFrame.Angles(0, steer.heading, 0)
+	E.rootOf(sol).CFrame = truth
+	follow()
+	local velocity = V3(x, 0, z) * (character:GetAttribute("CarrySpeed") or 0) * factor
+	E.rootOf(sol).AssemblyLinearVelocity = velocity
+	lead.step(drive, FRAME, E.rootOf(sol), humanoid)
+	truth = CF(truth.Position + velocity * FRAME) * truth.Rotation
+	E.rootOf(sol).CFrame = truth
+	follow()
+end
+run(1.5, nil, function()
+	client(0, 0)
+end)
 local startAt = planAt(body.root.Position)
 local fromWall = sign * (wallCoord - (if d.X ~= 0 then startAt.X else startAt.Z))
 check(`{house.name}: Danny between her {name} and the wall, a few studs from it`, fromWall > H.HoldWall.Clear + 1 and fromWall < 6
@@ -306,89 +339,83 @@ check(`{house.name}: Danny between her {name} and the wall, a few studs from it`
 		local place = planAt(root.CFrame * danny.holdEnd)
 		return math.sqrt((place.X - startAt.X) ^ 2 + (place.Z - startAt.Z) ^ 2) < 0.5
 	end)(), string.format("%.2f from it", fromWall))
+check(`9.2 {house.name}: his body Sol's to drive (her client's rays at the house's walls; the server's PairWall none)`, body.root.NetworkOwner == sol
+	and lead.of(body.model) ~= nil and character:GetAttribute("PairWall") == nil)
 
--- Sol walks (her client's step, Studio's ping: her screen shows him leadTime late)
-local truth = E.rootOf(sol).CFrame
-local steer = PairCarry.newSteer(yawOf(truth))
-local seen: { any } = {}
-local late = math.floor(Brain.leadTime(0) / FRAME + 0.5)
-local worst = { crossed = 0, nearest = math.huge, jump = 0, walled = 0, deepest = -math.huge }
+-- Sol walks (her client's step: her screen her own simulation, his body in it)
+local worst = { crossed = 0, nearest = math.huge, jump = 0, walled = 0, deepest = -math.huge, serverWall = 0 }
 local lastRoot = body.root.Position
+local lastPlace = root.CFrame * danny.holdEnd
 local function measure()
-	table.insert(seen, body.root.CFrame)
 	local here = body.root.Position
 	local chest = V3(here.X, here.Y + 1, here.Z)
 	local before = V3(lastRoot.X, lastRoot.Y + 1, lastRoot.Z)
 	if throughWall(before, chest) then
 		worst.crossed += 1
 	end
-	local p = planAt(here)
-	worst.nearest = math.min(worst.nearest, offWalls(p.X, p.Z))
-	worst.jump = math.max(worst.jump, (V3(here.X, 0, here.Z) - V3(lastRoot.X, 0, lastRoot.Z)).Magnitude - (body.grip.align.MaxVelocity * FRAME + 1e-6))
-	lastRoot = here
-	if M.typeof(character:GetAttribute("PairWall")) == "Vector3" then
-		worst.walled += 1
+	worst.nearest = math.min(worst.nearest, offParts(here))
+	-- a step no longer than his place's own and the glide (no snap)
+	local place = root.CFrame * danny.holdEnd
+	worst.jump = math.max(worst.jump, (V3(here.X, 0, here.Z) - V3(lastRoot.X, 0, lastRoot.Z)).Magnitude
+		- ((V3(place.X, 0, place.Z) - V3(lastPlace.X, 0, lastPlace.Z)).Magnitude + L.Glide * FRAME + 0.02))
+	lastRoot, lastPlace = here, place
+	local drive = lead.of(body.model)
+	if drive and math.sqrt(drive.wallX ^ 2 + drive.wallZ ^ 2) >= 0.999 then
+		worst.walled += 1 -- (her client: his end against the wall, her walk into it all gone)
 	end
-	-- how far her piece's far end (his place) came toward the wall past where he is held (Clear off it)
-	local place = planAt(root.CFrame * danny.holdEnd)
-	local toward = (if d.X ~= 0 then place.X * d.X else place.Z * d.Z) - (wallCoord * (if d.X ~= 0 then d.X else d.Z) - H.HoldWall.Clear)
+	if character:GetAttribute("PairWall") ~= nil then
+		worst.serverWall += 1
+	end
+	-- how far her piece's far end (his place) came toward the wall past his clearance off it
+	local at = planAt(place)
+	local toward = (if d.X ~= 0 then at.X * d.X else at.Z * d.Z) - (wallCoord * (if d.X ~= 0 then d.X else d.Z) - H.HoldWall.Clear)
 	worst.deepest = math.max(worst.deepest, toward)
 end
 local function walk(wx: number, wz: number, seconds: number)
 	run(seconds, nil, function()
-		steer.heading = yawOf(truth)
-		local x, z = wx, wz
-		local wall = character:GetAttribute("PairWall")
-		if M.typeof(wall) == "Vector3" then
-			x, z = PairCarry.wall(x, z, wall.X, wall.Z)
-		end
-		local far = character:GetAttribute("PairFar")
-		local shown = seen[math.max(1, #seen - late)]
-		local wait = false
-		if M.typeof(far) == "Vector3" and shown then
-			local farAt = truth * far
-			local ox, oz = farAt.X - truth.Position.X, farAt.Z - truth.Position.Z
-			local length = math.sqrt(ox * ox + oz * oz)
-			if length > 0.5 then
-				ox, oz = ox / length, oz / length
-				local gap = (shown.Position.X - farAt.X) * ox + (shown.Position.Z - farAt.Z) * oz
-				wait = PairCarry.waits(x, z, ox, oz, gap)
-				x, z = PairCarry.keep(x, z, ox, oz, gap)
-			end
-		end
-		local factor = PairCarry.steer(steer, x, z, FRAME, math.rad(H.PairTurn), wait) * PairCarry.started(steer)
-		local speed = (character:GetAttribute("CarrySpeed") or 0) * factor
-		truth = CF(truth.Position + V3(x, 0, z) * speed * FRAME) * M.CFrame.Angles(0, steer.heading, 0)
-		E.rootOf(sol).CFrame = truth
-		follow()
+		client(wx, wz)
 	end, measure)
 end
 local forward = truth.LookVector
 local fx, fz = forward.X, forward.Z
 local rx, rz = -fz, fx
+local frameWalk = (character:GetAttribute("CarrySpeed") or 0) * FRAME -- (studs her walk goes in a frame)
 walk(fx, fz, 4) -- forwards: Danny backs up to the wall
 local pinned = worst.walled
-local heldAt = planAt(body.root.Position)
+local heldAt = body.root.Position
 check(`{house.name}: forwards to the {chosen.room.id}'s wall: Danny backs up to it and stops HoldWall.Clear off it, never through it (no step across the shell's wall parts)`,
-	worst.crossed == 0 and worst.nearest >= H.HoldWall.Clear - 0.02 and math.abs(offWalls(heldAt.X, heldAt.Z) - H.HoldWall.Clear) < 0.3,
-	string.format("%d across, %.2f off the walls at least, %.2f now", worst.crossed, worst.nearest, offWalls(heldAt.X, heldAt.Z)))
-check(`{house.name}: …against it Sol's walk into the wall is taken away (PairWall): her piece stops, his place no more than HoldWall.Block past where he is held`,
-	pinned > 30 and worst.deepest <= H.HoldWall.Block + 0.15, string.format("%d frames walled, %.2f past", pinned, worst.deepest))
-local slideFrom = heldAt
-walk((fx + rx) * math.sqrt(0.5), (fz + rz) * math.sqrt(0.5), 2.5) -- forwards and to her right: along the wall
+	worst.crossed == 0 and worst.nearest >= H.HoldWall.Clear - 0.02 and math.abs(offParts(heldAt) - H.HoldWall.Clear) < 0.3,
+	string.format("%d across, %.2f off the walls at least, %.2f now", worst.crossed, worst.nearest, offParts(heldAt)))
+check(`9.2 {house.name}: …against it her client takes her walk into the wall away (her own ray, no lag): her piece stops, his place a frame's walk past his clearance at most`,
+	pinned > 30 and worst.deepest <= frameWalk + 0.02 and worst.serverWall == 0, string.format("%d frames walled, %.2f past", pinned, worst.deepest))
+local slideFrom = planAt(heldAt)
+local function offFront(at: any): number -- (studs from the room's wall she walked at)
+	local q = planAt(at)
+	return sign * (wallCoord - (if d.X ~= 0 then q.X else q.Z))
+end
+walk((fx + rx) * math.sqrt(0.5), (fz + rz) * math.sqrt(0.5), 1) -- forwards and to her right: along the wall
 local slid = planAt(body.root.Position)
 local moved = if d.X ~= 0 then math.abs(slid.Z - slideFrom.Z) else math.abs(slid.X - slideFrom.X)
 check(`{house.name}: forwards and to the side: he slides along the wall (on along it, still clear of it, never through)`,
 	moved > 2 and worst.crossed == 0 and worst.nearest >= H.HoldWall.Clear - 0.02, string.format("%.2f along it, %d across, %.2f off", moved, worst.crossed, worst.nearest))
 walk(-fx, -fz, 2) -- backwards, away from the wall: he follows his end
-local back = planAt(body.root.Position)
-check(`{house.name}: walked back from the wall: PairWall gone, he follows his end again (off the wall), never a snap`,
-	character:GetAttribute("PairWall") == nil and offWalls(back.X, back.Z) > H.HoldWall.Clear + 1 and worst.jump <= 1e-3,
-	string.format("%.2f off the walls, %.3f over", offWalls(back.X, back.Z), worst.jump))
+local into = (origin.Rotation * d).Unit -- (the way into that wall, in the world)
+local drive = lead.of(body.model)
+check(`{house.name}: walked back from the wall: the wall lets go, he follows his end again (off the wall), never a snap`,
+	drive ~= nil and math.abs(drive.wallX * into.X + drive.wallZ * into.Z) < 1e-3 and offFront(body.root.Position) > H.HoldWall.Clear + 1
+	and worst.jump <= 1e-3, string.format("%.2f off the wall, %.3f over", offFront(body.root.Position), worst.jump))
+walk((fx + rx) * math.sqrt(0.5), (fz + rz) * math.sqrt(0.5), 5) -- into the wall again and on along it into the room's corner
+local corner = planAt(body.root.Position)
+local room = chosen.room
+local offSide = if d.X ~= 0 then math.min(corner.Z - room.min.Z, room.max.Z - corner.Z) else math.min(corner.X - room.min.X, room.max.X - corner.X)
+check(`9.2 {house.name}: …on into the room's corner: the wall beside his end stops him too (her ray the way she walks or turns him), never through`,
+	worst.crossed == 0 and worst.nearest >= H.HoldWall.Clear - 0.05 and worst.jump <= 1e-3 and offSide <= H.HoldWall.Clear + 0.3
+	and offFront(body.root.Position) <= H.HoldWall.Clear + 0.3,
+	string.format("%d across, %.2f off, %.3f over, %.2f / %.2f off the two walls", worst.crossed, worst.nearest, worst.jump, offFront(body.root.Position), offSide))
 E.Net.get("PutDown").OnServerEvent:Fire(sol)
 run(0.5)
-check("put down: Sol's PairWith / PairFar / PairWall gone", character:GetAttribute("PairWith") == nil and character:GetAttribute("PairFar") == nil
-	and character:GetAttribute("PairWall") == nil)
+check("put down: his body the server's again; Sol's PairWith / PairFar / PairWall gone", body.root.NetworkOwner == false and character:GetAttribute("PairWith") == nil
+	and character:GetAttribute("PairFar") == nil and character:GetAttribute("PairWall") == nil)
 
 if failures == 0 then
 	print("ALL CHECKS PASSED")

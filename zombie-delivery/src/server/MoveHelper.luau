@@ -199,6 +199,21 @@
 --     walk into it goes (PairWall: HoldWall.Block's share), slowed as he nears it, stopped against it.
 --   * Nothing else steers him while he holds it: his way (HouseRoute), a stuck nudge, placeAt and the van's outline are
 --     other actions' (actHold alone runs; think only blocks his grid's cells again).
+-- 9.2 you drive his end (the owner, 8.9.5: "the carrying is better, but it feels like it's harder to control … fix it so
+-- it's playable"; 9.0's start waited 0.85 s in Studio, 2 s online, for his late body on your screen):
+--   * Holding the far end of a piece a player leads (its carrier: Config.MoveHelper.PairLead.On), his body's physics is
+--     that player's (gripOn → server/PairHold.luau make / lead: root:SetNetworkOwner(them); his model's PairLead,
+--     PairLeadAt, PairLeadPiece): their client sets his hold's goals from their own piece every frame (client/
+--     PairLead.luau), so on their screen he is at his end with no lag, and their walk is not held back at all (client/
+--     PairSteer.luau). The server writes none of his constraints meanwhile, aims him with no lead (actHold: his hands on
+--     the edge, never into the piece) and leaves the house's walls to their client (its rays: no slide here, no PairWall).
+--   * A door's trip still puts him there (snap: the server's PivotTo moves a body a client owns on every machine; their
+--     client also puts him there when his place is Jump studs off).
+--   * The server looks (MoveHelperBrain.leadKept): his body more than PairLead.Sane studs off his end in its own view for
+--     Grace s (an exploit flinging him, a client that stopped driving) and it takes his body back for the rest of that
+--     carry (h.leadOff): the 9.0 hold again (lead, slide, PairFar), never a snap.
+--   * Let go (put down, dropped, his fall, you leave, his body gone): the hold's drop takes his body back before
+--     Npcs.carried stands him. A crew mate at the far end is the server's as before (server/PairHold.luau follow).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -261,12 +276,13 @@ export type Body = {
 -- How he walks: one step toward `to` at `speed` studs / s; a stop; his way round the walls (may yield; nil: straight).
 -- 7.x carrying together: keep him at `offset` in `anchor`'s frame (the far end of your piece) / let go of it; a fade-in
 -- where he was just put (the fade-over). 8.1: keep walks him there at `limit` studs / s at most (snap: put there, a
--- door's fade only). Without keep he steps there at `limit` × dt at most (a test: no physics).
+-- door's fade only). Without keep he steps there at `limit` × dt at most (a test: no physics). 9.2 `driver`: the leader
+-- whose client drives his hold (server/PairHold.luau lead; nil: the server holds him).
 export type Mover = {
 	move: (body: Body, to: Vector3, speed: number, dt: number) -> (),
 	halt: (body: Body) -> (),
 	route: ((body: Body, from: Vector3, to: Vector3) -> { Vector3 }?)?,
-	keep: ((body: Body, anchor: BasePart, offset: CFrame, dt: number, limit: number, snap: boolean) -> ())?,
+	keep: ((body: Body, anchor: BasePart, offset: CFrame, dt: number, limit: number, snap: boolean, driver: Player?) -> ())?,
 	free: ((body: Body) -> ())?,
 	appear: ((body: Body) -> ())?,
 }
@@ -356,6 +372,8 @@ type Helper = {
 	holdLimit: number, -- 8.1 his top speed holding it now (the tests read it)
 	steadied: Model?, -- 7.x the carrier's character with GripSteady
 	walled: Model?, -- 9.0 the carrier's character with PairWith / PairFar / PairWall (pairOn)
+	leadOff: BasePart?, -- 9.2 the piece whose drive the server took back (its look: MoveHelperBrain.leadKept): his for that carry
+	leadAway: number?, -- 9.2 …s his body has been off his end while driven
 	wallWay: Vector3?, -- 9.0 his end against a wall of the house: the way into it × how much of the walk into it goes
 	bound: ((Vector3, Vector3) -> Vector3)?, -- 9.0 his hold's bound along the house's walls (boundOf: made once)
 	lineKey: string?, -- 7.x a line to say at lineAt ("On three... lift!" after "Got the other end!")
@@ -491,12 +509,13 @@ end
 -- 7.x his root glued to `offset` in the piece's frame: AlignPosition and AlignOrientation on his root aimed there (the
 -- physics engine moves him every step, the server owns him; 9.0 one attachment each, his own: the server sets their
 -- goals, nothing joins him to the piece), his own walk off, his parts in the group nothing collides with (8.1
--- server/PairHold.luau's make: at `limit` studs / s at most).
-local function gripOn(body: Body, anchor: BasePart, offset: CFrame, limit: number)
+-- server/PairHold.luau's make: at `limit` studs / s at most). 9.2 `driver`: the leader whose client drives him (his body
+-- theirs, PairHold.lead), after Npcs.carried set his Physics state while the server owned him.
+local function gripOn(body: Body, anchor: BasePart, offset: CFrame, limit: number, driver: Player?)
 	gripOff(body)
 	Npcs.carried(body.model, true)
 	body.walking, body.ordered = false, nil
-	body.grip = PairHold.make(body.model, body.root, anchor, offset, limit, { ghost = true, flat = false, owner = nil, lift = true }) -- (8.3 lift)
+	body.grip = PairHold.make(body.model, body.root, anchor, offset, limit, { ghost = true, flat = false, owner = nil, lift = true, driver = driver }) -- (8.3 lift)
 end
 
 local mover: Mover = {
@@ -521,15 +540,17 @@ local mover: Mover = {
 	route = computeRoute,
 	-- 7.x carrying together: the constraints made once (again for another piece), the far end's attachment re-aimed
 	-- when his place moved (the floor under it); 8.1 his top speed (the pair's walk and a margin), put there at once
-	-- only through a door's fade (snap: MoveHelperBrain.holdTrack); his legs: actHold's
-	keep = function(body: Body, anchor: BasePart, offset: CFrame, _dt: number, limit: number, snap: boolean)
+	-- only through a door's fade (snap: MoveHelperBrain.holdTrack); his legs: actHold's. 9.2 driven by `driver`'s client
+	-- (PairHold.lead: given to them, or taken back when nil)
+	keep = function(body: Body, anchor: BasePart, offset: CFrame, _dt: number, limit: number, snap: boolean, driver: Player?)
 		local grip = body.grip
 		if not grip or not PairHold.alive(grip, anchor) then
-			gripOn(body, anchor, offset, limit)
+			gripOn(body, anchor, offset, limit, driver)
 			grip = body.grip
 		end
 		local g = grip :: Grip
 		PairHold.aim(g, offset, limit)
+		PairHold.lead(g, driver)
 		if snap then
 			PairHold.snap(g, anchor.CFrame * offset)
 		end
@@ -1153,7 +1174,8 @@ local function setPair(character: Model, name: string, value: any)
 		end
 	end
 end
-local function pairOn(h: Helper, character: Model?, far: Vector3?, way: Vector3?)
+-- 9.2 `with`: PairWith all the same (their client finds his body by it: a drive needs no PairFar).
+local function pairOn(h: Helper, character: Model?, far: Vector3?, way: Vector3?, with: boolean?)
 	local was = h.walled
 	if was and was ~= character and was.Parent then
 		for _, name in PAIR_ATTRIBUTES do
@@ -1164,7 +1186,7 @@ local function pairOn(h: Helper, character: Model?, far: Vector3?, way: Vector3?
 	if not character then
 		return
 	end
-	setPair(character, "PairWith", if far then h.id else nil)
+	setPair(character, "PairWith", if far or with then h.id else nil)
 	setPair(character, "PairFar", far)
 	setPair(character, "PairWall", way)
 end
@@ -1179,6 +1201,7 @@ local function ungrip(h: Helper, body: Body?)
 	pairOn(h, nil, nil, nil) -- 9.0
 	h.wallWay = nil
 	h.gripped, h.holdOffset, h.lineKey, h.holdAt, h.holdEnd = nil, nil, nil, nil, nil
+	h.leadOff, h.leadAway = nil, nil -- 9.2
 end
 
 -- …and on his feet on the floor where he is.
@@ -2470,11 +2493,12 @@ local function endOffset(h: Helper, body: Body, thing: Rules.Thing, anchor: Base
 end
 
 -- 7.x kept at `offset` in the piece's frame (the mover's constraints; 8.1 at `limit` studs / s at most, put there only
--- on `snap`; a test's mover without them: his root stepped there, limit × dt at most).
-local function keepAt(body: Body, anchor: BasePart, offset: CFrame, dt: number, limit: number, snap: boolean)
+-- on `snap`; a test's mover without them: his root stepped there, limit × dt at most; 9.2 `driver`: the leader whose
+-- client drives the constraints, the mover's keep).
+local function keepAt(body: Body, anchor: BasePart, offset: CFrame, dt: number, limit: number, snap: boolean, driver: Player?)
 	local keep = mover.keep
 	if keep then
-		keep(body, anchor, offset, dt, limit, snap)
+		keep(body, anchor, offset, dt, limit, snap, driver)
 		return
 	end
 	local goal = anchor.CFrame * offset
@@ -2490,13 +2514,14 @@ end
 
 -- 8.1 his legs holding the far end: his root's real velocity since the last step, in his frame (8.3 MoveHelperBrain.
 -- holdLegs: his whole speed along the ground, backwards when the way is behind him, sideways as they went; Npcs.stride:
--- the walk played in reverse backwards); none across a door's fade. (Near players the clients' gait poses his legs from
--- the same velocity: Npcs.carried's Physics state.)
+-- the walk played in reverse backwards); none across a door's fade (9.2: nor across a jump of more than HoldPace.Jump
+-- studs: the leader's client put him there before the server saw the fade). (Near players the clients' gait poses his
+-- legs from the same velocity: Npcs.carried's Physics state.)
 local function strideOf(h: Helper, body: Body, dt: number, snap: boolean)
 	local here = body.root.Position
 	local last = h.holdAt
 	h.holdAt = here
-	if snap or not last or dt <= 0 then
+	if snap or not last or dt <= 0 or (here - last).Magnitude > cfg.HoldPace.Jump then -- (9.2 or put there by the leader's client)
 		Npcs.stride(body.model, 0)
 		return
 	end
@@ -2557,6 +2582,7 @@ local function actHold(h: Helper, body: Body, spot: number, dt: number, clock: n
 	if h.gripped ~= item.root or not h.holdEnd then
 		h.trail, h.holdAt = Brain.newTrail(), nil -- (8.1 a new hold)
 		h.holdEnd = endIn(thing, item.root.CFrame, carrierRoot) -- 8.6 his end, decided once: kept in the piece's frame
+		h.leadOff, h.leadAway = nil, nil -- (9.2 a new carry: the leader drives it again)
 	end
 	local offset = endOffset(h, body, thing, item.root, carrierRoot, h.trail, dt, h.holdEnd) -- (8.3 his height: holdClimb's)
 	h.holdOffset, h.gripped = offset, item.root
@@ -2564,6 +2590,18 @@ local function actHold(h: Helper, body: Body, spot: number, dt: number, clock: n
 	local here = body.root.Position
 	local crossed = insideAt(h, here) ~= insideAt(h, (item.root.CFrame * offset).Position)
 	local carrier = playerOf(thing.carrier)
+	-- 9.2 the leader drives his end (their client: no lag, no lead); the server only looks (MoveHelperBrain.leadKept: his
+	-- body more than PairLead.Sane studs off his end for Grace s, a door's trip aside: taken back for this carry, h.leadOff)
+	local driver = if cfg.PairLead.On and carrier and carrierRoot and h.leadOff ~= item.root then carrier else nil
+	if driver then
+		local off = (here - (item.root.CFrame * offset).Position).Magnitude
+		local away, kept = Brain.leadKept(h.leadAway or 0, off, crossed, dt)
+		h.leadAway = away
+		if not kept then
+			h.leadOff, h.leadAway, driver = item.root, nil, nil
+			warn(`[MoveHelper] {cfg.Name} {string.format("%.1f", off)} studs off his end of the piece on its leader's client: the server holds him for this carry`)
+		end
+	end
 	-- 8.3 keeping up (the owner: "when I run, he just goes behind me"): his top speed follows your real speed (your
 	-- root's, MoveHelperBrain.holdPace), and he is aimed ahead × leadTime (your screen shows his body late). 8.6 (the
 	-- owner: "he teleports from side to side"): ahead along his END's own way (the piece's turn in it), the lead changing
@@ -2573,45 +2611,58 @@ local function actHold(h: Helper, body: Body, spot: number, dt: number, clock: n
 	local pace = Brain.holdPace(h.trail, if from then from.X else 0 / 0, if from then from.Z else 0 / 0, dt, crossed or from == nil)
 	local speed = Brain.holdSpeed(PairHold.walkOf(carrier, Rules.carrySpeed(walkSpeed(), "pair", thing.weight)), pace)
 	local endAt = item.root.CFrame * offset.Position
-	-- 9.0 (the owner's screenshot: Danny inside the Sofa): his lead toward the piece's middle HoldLead.In studs at most,
-	-- along his end's way out of it (his body never in the piece: following you, his hands reach on instead)
-	local out = item.root.CFrame.Rotation * (h.holdEnd :: Vector3)
-	local outFlat = Vector3.new(out.X, 0, out.Z)
-	local way = if outFlat.Magnitude > 1e-6 then outFlat.Unit else Vector3.zero
-	local leadX, leadZ = Brain.endLead(h.trail, endAt.X, endAt.Z, dt, Brain.leadTime(PairHold.pingOf(carrier)), crossed or from == nil, way.X, way.Z)
-	local aim = if leadX == 0 and leadZ == 0 then offset
-		else CFrame.new(item.root.CFrame:PointToObjectSpace(item.root.Position + Vector3.new(leadX, 0, leadZ))) * offset
-	local goal = (item.root.CFrame * aim).Position
-	-- 9.0 inside the house along the walls, never through them (slideAlong; following you, his end goes where you went,
-	-- a corner cut through a doorway's jamb as the piece itself cuts it): this step's goal, and every Heartbeat's (the
-	-- hold's bound). How far a wall held it back (his lead looks ahead by the time your screen shows him late) makes
-	-- h.wallWay: the way into that wall × HoldWall.Block's share, the part of your walk into it client/PairSteer.luau
-	-- takes away (slowed as he nears it, stopped against it).
-	local following = h.trail.evx * way.X + h.trail.evz * way.Z < -cfg.HoldLegs.From
-	local walls = not crossed and not following and h.route ~= nil
+	local aim = offset
+	local walls = false
 	h.wallWay = nil
-	if walls then
-		local along, held, into = slideAlong(h, here, goal)
-		if held > 0 then
-			goal = along
-			aim = CFrame.new(item.root.CFrame:PointToObjectSpace(goal)) * offset.Rotation
-			if into then
-				h.wallWay = into * math.clamp(held / math.max(cfg.HoldWall.Block, 0.01), 0, 1)
+	if driver then
+		-- 9.2 driven: his place itself (nothing late to lead: his body is where the leader's screen has it), his hands on
+		-- the edge (no reach on), the walls the leader's client's
+		local trail = h.trail
+		trail.leadX, trail.leadZ, trail.reach, trail.endX, trail.endZ, trail.evx, trail.evz = 0, 0, 0, nil, nil, 0, 0
+	else
+		-- 9.0 (the owner's screenshot: Danny inside the Sofa): his lead toward the piece's middle HoldLead.In studs at
+		-- most, along his end's way out of it (his body never in the piece: following you, his hands reach on instead)
+		local out = item.root.CFrame.Rotation * (h.holdEnd :: Vector3)
+		local outFlat = Vector3.new(out.X, 0, out.Z)
+		local way = if outFlat.Magnitude > 1e-6 then outFlat.Unit else Vector3.zero
+		local leadX, leadZ = Brain.endLead(h.trail, endAt.X, endAt.Z, dt, Brain.leadTime(PairHold.pingOf(carrier)), crossed or from == nil, way.X, way.Z)
+		aim = if leadX == 0 and leadZ == 0 then offset
+			else CFrame.new(item.root.CFrame:PointToObjectSpace(item.root.Position + Vector3.new(leadX, 0, leadZ))) * offset
+		-- 9.0 inside the house along the walls, never through them (slideAlong; following you, his end goes where you
+		-- went, a corner cut through a doorway's jamb as the piece itself cuts it): this step's goal, and every
+		-- Heartbeat's (the hold's bound). How far a wall held it back (his lead looks ahead by the time your screen shows
+		-- him late) makes h.wallWay: the way into that wall × HoldWall.Block's share, the part of your walk into it
+		-- client/PairSteer.luau takes away (slowed as he nears it, stopped against it).
+		local following = h.trail.evx * way.X + h.trail.evz * way.Z < -cfg.HoldLegs.From
+		walls = not crossed and not following and h.route ~= nil
+		if walls then
+			local goal = (item.root.CFrame * aim).Position
+			local along, held, into = slideAlong(h, here, goal)
+			if held > 0 then
+				aim = CFrame.new(item.root.CFrame:PointToObjectSpace(along)) * offset.Rotation
+				if into then
+					h.wallWay = into * math.clamp(held / math.max(cfg.HoldWall.Block, 0.01), 0, 1)
+				end
 			end
 		end
 	end
+	local goal = (item.root.CFrame * aim).Position
 	local limit, snap = Brain.holdTrack(h.trail, (goal - here).Magnitude, crossed, speed, dt)
 	h.holdLimit = limit
-	keepAt(body, item.root, aim, dt, limit, snap)
+	keepAt(body, item.root, aim, dt, limit, snap, driver)
 	local grip = body.grip
+	if driver and grip and PairHold.drives(grip) ~= driver then
+		h.leadOff, driver = item.root, nil -- (9.2 his body could not be the leader's: the server holds him for this carry)
+	end
 	if grip then
 		grip.bound = if walls then boundOf(h) else nil -- (9.0 the goal every Heartbeat: along the walls)
 	end
 	strideOf(h, body, dt, snap)
 	steady(h, if carrierRoot then carrierRoot.Parent :: Model? else nil)
-	-- 9.0 your side of it: his place in your root's frame (your screen: never the piece pushed into him), the wall
-	local far = if carrierRoot and not crossed then carrierRoot.CFrame:PointToObjectSpace(endAt) else nil
-	pairOn(h, if carrierRoot then carrierRoot.Parent :: Model? else nil, far, h.wallWay)
+	-- 9.0 your side of it: his place in your root's frame (your screen: never the piece pushed into him), the wall; 9.2
+	-- driven: who he is only (your client drives him: nothing late on your screen)
+	local far = if carrierRoot and not crossed and not driver then carrierRoot.CFrame:PointToObjectSpace(endAt) else nil
+	pairOn(h, if carrierRoot then carrierRoot.Parent :: Model? else nil, far, h.wallWay, driver ~= nil)
 	local at = item.root.Position
 	if insideAt(h, at) and nearDoorway(h, at, cfg.DoorWarn) then
 		say(h, "door", clock)

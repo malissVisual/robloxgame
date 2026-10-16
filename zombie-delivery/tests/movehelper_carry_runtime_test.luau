@@ -55,6 +55,9 @@ local V3 = M.Vector3.new
 local CF = M.CFrame.new
 local workspace = M.workspace
 H.HoldLead.Base, H.HoldLead.Ping = E.gameLead.Base, E.gameLead.Ping -- (the game's lead)
+-- 9.2: the hold the SERVER keeps, his lead and all (Danny's when no leader's client drives him: a drive it took back,
+-- PairLead.On false): Sol's client drives none here (tests/movehelper_backwards_runtime_test.luau drives him)
+H.PairLead.On = false
 local RATE = H.HoldLead.Rate or 5 -- (the lead's change a second at most; 8.5's code had none: the same bound for it)
 local EDGE = (H.Edge or { Width = 0 }).Width
 T.Doors.Walk = false -- (the walk-in doors off: these walks stay in the house)

@@ -6867,6 +6867,7 @@ Config.MoveStory = {
 --   PairStart          s the carry in two takes from standing to its full walk (client/PairSteer.luau, shared/PairCarry.
 --                      luau: the walk eases in, again after the way turns round): the far end's holder is shown on your
 --                      screen a moment late, and a start at once ran the piece into him before he could step back
+--                      (9.2: a held far end only, a crew mate's: Danny driven by the leader's client has none, PairLead)
 --   PairKeep           the far end's holder as YOUR screen shows him (the character attributes PairFar: his place in
 --                      your root's frame; PairWith: Danny's MoveHelperId, a crew mate's UserId): shown more than Wait
 --                      studs nearer than his place, your walk's start waits for him (shared/PairCarry.luau waits); From
@@ -6876,6 +6877,27 @@ Config.MoveStory = {
 --                      off the walls, sliding along them, never through; held back by a wall (his lead looks ahead), the
 --                      leader's walk into that wall loses that many studs' share of Block (the character attribute
 --                      PairWall: client/PairSteer.luau takes it away): slowed as he nears the wall, stopped against it
+--                      (9.2: Clear is also his body's clearance the leader's client keeps off a wall, PairLead)
+--   9.2 (the owner, 8.9.5: "the carrying is better, but it feels like it's harder to control … fix it so it's
+--   playable"; 8.9.4 hid his server-held body's lag by holding your walk back: its start took 0.85 s in Studio, 2 s
+--   online): while Danny holds the far end of a piece a PLAYER leads, that player's client drives his end (server/
+--   PairHold.luau lead: his body's physics theirs, SetNetworkOwner; client/PairLead.luau sets his hold's goals from
+--   their own piece every frame before the physics): nothing late to hide, so PairStart, PairKeep and PairWall are
+--   only a crew mate's now (and Danny's when the server holds him: PairLead.On false, a drive it took back)
+--   PairLead           On: the leader drives Danny's end (false: the server holds him as in 8.9.4, his lead and all);
+--                      Turn: degrees a second the leader's heading turns meanwhile (PairTurn stays a crew mate's),
+--                      TurnWalk: × the walk while it turns PairTurnFull or more (PairTurnWalk: a crew mate's); Glide:
+--                      studs a second over his place's own speed he closes on it until he is there (the first catch-up
+--                      glides the last studs, never a snap); Settle: studs off his place where he is there (rigid from
+--                      then: Rigid studs a second, Spin radians a second his turn), Loose: studs off it where he glides
+--                      again; Jump: his place this far off (a door's trip into or out of the house, its interior far
+--                      off the map): put there at once; Soft: studs before his body's clearance from a wall of the house
+--                      (HoldWall.Clear) where the leader's walk or turn pushing his end into it starts to go (all of it
+--                      at the clearance; along the wall it stays); Sane / Grace: the server's look, his body more than
+--                      Sane studs off his end in its own view for Grace s (a door's trip aside): it takes his body back
+--                      and holds him itself for the rest of that carry (an exploit's fling, a client that stopped
+--                      driving: walked back at the hold's speed, never put there); Look: s between two looks for the
+--                      house's walls and floors while a carry in two is driven
 --   RunHint           carrying in two (the character attribute CarryPair on both players, server/Moving.luau setHands)
 --                      nobody runs: the walk is held at CarrySpeed (× the admin's and kit's boosts) every step, and the
 --                      run key or button says this once a carry
@@ -7049,6 +7071,8 @@ Config.MoveHelper = {
 	PairStart = 0.6, -- 9.0
 	PairKeep = { Wait = 0.1, From = 0.25, Stop = 0.8 }, -- 9.0
 	HoldWall = { Clear = 0.8, Block = 0.4 }, -- 9.0
+	PairLead = { On = true, Turn = 120, TurnWalk = 0.75, Glide = 6, Settle = 0.5, Loose = 1.5, Rigid = 400, Spin = 30, Jump = 30, Soft = 0.6, Sane = 8,
+		Grace = 1.5, Look = 0.5 }, -- 9.2
 	Edge = { Width = 2.4, Height = 0.3, Depth = 0.6, Reach = 1.2 }, -- 8.6 (9.0 Reach)
 	RunHint = "Too heavy to run with",
 	PathRadius = 1.5,
