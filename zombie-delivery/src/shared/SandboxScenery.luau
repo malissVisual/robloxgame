@@ -2,28 +2,29 @@
 -- 8.0 SANDBOX, the map (design/sandbox/KONTRAKT.md): the small test world's dress as plain numbers, laid round
 -- shared/SandboxMap.luau's fixed data (the plots, the roads, the turnaround, the house never move). server/SandboxWorld.luau
 -- builds it; tests/sandboxworld_test.luau checks the numbers and the built world. Pure (no Roblox at its top level),
--- deterministic. 8.9 Jinočany (design/jinocany/NAVRH.md): the Alps are gone (the spruces, the wildflowers, the rail
--- fence, the mounds, the green hills and the snowy peaks); the village's own dress is shared/VillageScenery.luau's.
+-- deterministic. 8.9: the Alps are gone (the spruces, the wildflowers, the rail fence, the mounds, the green hills and
+-- the snowy peaks); 9.4 the countryside's own dress (design/countryside/plan.py) is shared/VillageScenery.luau's.
 --
 --   The ground     a flat meadow (Grass, its top at SandboxMap.GroundTop) over the Bounds in a few tiles that leave
---                  out the plots' concrete pads, the house's lawn and 8.9 the village's fields and lawns
---                  (SandboxMap.Fields, Lawns: each flush with it, no two tops on one plane)
+--                  out the plots' concrete pads, the house's lawn and 8.9 the fields and the lawns (SandboxMap.Fields,
+--                  Lawns: each flush with it, no two tops on one plane); 9.4 cut in bands along z or along x, whichever
+--                  takes fewer tiles
 --   The roads      the asphalt (SandboxMap.Roads, the Turnaround) stands RoadTop over the meadow; every edge drops back
 --                  to it on a gravel shoulder, a slope Run studs wide (a wedge: the cars' frictionless wheels roll up
 --                  and down it anywhere, like the city's kerbs in shared/CurbShape.luau, only gentler), a hip at a
---                  convex corner, a ring of wedges round the turnaround; 8.9 every street's edges but where another
---                  street's asphalt goes on (a junction: no shoulder across it) or the Bounds end it (Hornická at the
---                  map's west edge); the white markings (a dashed centre line, the edge lines, the give-way line where
---                  Pražská meets Depot Row; Pražská's edge line open where Mirešická comes in; a village lane none)
+--                  convex corner, a ring of wedges round the turnaround; 8.9 every road's edges but where another
+--                  road's asphalt goes on (a junction, a lane's next rect or its yard: no shoulder across it) or the
+--                  Bounds end it; the white markings (a dashed centre line, the edge lines, the give-way line where
+--                  Pražská meets Depot Row; Pražská's edge line open where Pond Lane comes in; a lane none)
 --   The house      the curb-to-door Path, the garden's fence round its lot (decoration: nothing stops a mover), the
 --                  gate with its THE OLD FARMSTEAD board, the mailbox, the flower boxes (the house itself is
 --                  shared/ChaletLooks.luau's, on SandboxMap.House.house; 8.1: the owner's Blender house once imported)
 --   The scenery    the street lamps along Pražská; the signpost at the crossroads; where a tree may stand (treeRule:
---                  never on a road, a plot, a house to empty's lot or a van's way: Jinočany's six houses' lots and
---                  curbs, SandboxMap.Houses, the farmstead's among them)
+--                  never on a road, a plot, a place to empty's lot or a van's way: the six places' lots and curbs,
+--                  SandboxMap.Houses, the farmstead's among them)
 --
 --   SandboxScenery.meadow()             the meadow's tiles (Rects) and the holes they leave (holes(): the pads, the
---                                       lawn, the fields, the village's lawns)
+--                                       farmstead's lawn, the fields, the lawns)
 --   SandboxScenery.groundAt(x, z)       the ground's top there (8.9: flat, GroundTop everywhere)
 --   SandboxScenery.asphalt()            8.9: the asphalt's slabs (a road's name and rect; Pražská's from Depot Row's
 --                                       south edge: the junction is Depot Row's), none over another
@@ -89,7 +90,7 @@ SandboxScenery.Colors = {
 	Line = { 236, 236, 228 } :: { number },
 	Fence = { 120, 86, 56 } :: { number },
 	Path = { 178, 168, 148 } :: { number },
-	Sign = { 244, 244, 238 } :: { number }, -- 8.9: the signpost's boards (a Czech village's white direction signs)
+	Sign = { 244, 244, 238 } :: { number }, -- 8.9: the signpost's boards (white Czech direction signs)
 	Ink = { 30, 30, 34 } :: { number },
 }
 
@@ -112,8 +113,8 @@ end
 
 -- ── The ground ─────────────────────────────────────────────────────────────
 
--- The holes in the meadow: the plots' pads, the house's lawn and 8.9 the village's fields and lawns (each its own part,
--- flush with the meadow).
+-- The holes in the meadow: the plots' pads, the house's lawn and 8.9 the fields and the lawns (each its own part, flush
+-- with the meadow).
 function SandboxScenery.holes(): { Rect }
 	local list: { Rect } = {}
 	for _, plot in MAP.Plots do
@@ -124,39 +125,43 @@ function SandboxScenery.holes(): { Rect }
 		table.insert(list, { x0 = f.x0, x1 = f.x1, z0 = f.z0, z1 = f.z1 })
 	end
 	for _, lawn in MAP.Lawns do
-		table.insert(list, lawn)
+		table.insert(list, { x0 = lawn.x0, x1 = lawn.x1, z0 = lawn.z0, z1 = lawn.z1 })
 	end
 	return list
 end
 
--- The meadow's tiles: the Bounds less the holes, in bands along z, 8.9 a tile joined to the one before it in z when
--- they meet edge to edge with the same sides (fewer parts round the fields); no two tiles overlap, none longer than a
--- part may be.
-function SandboxScenery.meadow(): ({ Rect }, { Rect })
-	local holes = SandboxScenery.holes()
-	local cuts = { BOUNDS.z0, BOUNDS.z1 }
+-- The meadow's tiles: the Bounds less the holes, in bands along one axis, a tile joined to the one before it in that
+-- band's direction when they meet edge to edge with the same sides (fewer parts round the fields); 9.4 both ways (bands
+-- along z, bands along x), the one with fewer tiles. No two tiles overlap, none longer than a part may be.
+local function sweep(holes: { Rect }, alongX: boolean): { Rect }
+	-- (u: the axis the bands cut, v: across them; alongX swaps x and z)
+	local function u0(r: Rect): number return if alongX then r.x0 else r.z0 end
+	local function u1(r: Rect): number return if alongX then r.x1 else r.z1 end
+	local function v0(r: Rect): number return if alongX then r.z0 else r.x0 end
+	local function v1(r: Rect): number return if alongX then r.z1 else r.x1 end
+	local cuts = { u0(BOUNDS), u1(BOUNDS) }
 	for _, h in holes do
-		table.insert(cuts, h.z0)
-		table.insert(cuts, h.z1)
+		table.insert(cuts, u0(h))
+		table.insert(cuts, u1(h))
 	end
 	table.sort(cuts)
-	local tiles: { Rect } = {}
+	local tiles: { { number } } = {} -- { v0, v1, u0, u1 }
 	for i = 1, #cuts - 1 do
-		local z0, z1 = cuts[i], cuts[i + 1]
-		if z1 - z0 > 1e-6 then
-			local open = { { BOUNDS.x0, BOUNDS.x1 } }
+		local a, b = cuts[i], cuts[i + 1]
+		if b - a > 1e-6 then
+			local open = { { v0(BOUNDS), v1(BOUNDS) } }
 			for _, h in holes do
-				if h.z0 < z1 - 1e-6 and h.z1 > z0 + 1e-6 then
+				if u0(h) < b - 1e-6 and u1(h) > a + 1e-6 then
 					local next: { { number } } = {}
 					for _, span in open do
-						if h.x1 <= span[1] or h.x0 >= span[2] then
+						if v1(h) <= span[1] or v0(h) >= span[2] then
 							table.insert(next, span)
 						else
-							if h.x0 > span[1] then
-								table.insert(next, { span[1], h.x0 })
+							if v0(h) > span[1] then
+								table.insert(next, { span[1], v0(h) })
 							end
-							if h.x1 < span[2] then
-								table.insert(next, { h.x1, span[2] })
+							if v1(h) < span[2] then
+								table.insert(next, { v1(h), span[2] })
 							end
 						end
 					end
@@ -166,19 +171,29 @@ function SandboxScenery.meadow(): ({ Rect }, { Rect })
 			for _, span in open do
 				local joined = false
 				for _, t in tiles do
-					if t.x0 == span[1] and t.x1 == span[2] and math.abs(t.z1 - z0) < 1e-6 then
-						t.z1 = z1
+					if t[1] == span[1] and t[2] == span[2] and math.abs(t[4] - a) < 1e-6 and b - t[3] <= 2048 then
+						t[4] = b
 						joined = true
 						break
 					end
 				end
 				if not joined then
-					table.insert(tiles, { x0 = span[1], x1 = span[2], z0 = z0, z1 = z1 })
+					table.insert(tiles, { span[1], span[2], a, b })
 				end
 			end
 		end
 	end
-	return tiles, holes
+	local out: { Rect } = {}
+	for _, t in tiles do
+		table.insert(out, if alongX then { x0 = t[3], x1 = t[4], z0 = t[1], z1 = t[2] } else { x0 = t[1], x1 = t[2], z0 = t[3], z1 = t[4] })
+	end
+	return out
+end
+
+function SandboxScenery.meadow(): ({ Rect }, { Rect })
+	local holes = SandboxScenery.holes()
+	local byZ, byX = sweep(holes, false), sweep(holes, true)
+	return if #byX < #byZ then byX else byZ, holes
 end
 
 -- The ground's top at (x, z) off the asphalt (8.9: flat everywhere, the Alps' mounds are gone).
@@ -441,7 +456,7 @@ function SandboxScenery.markings(): { Strip }
 	strip(list, "EdgeLine", depot.x0 + inset, depot.z1 - inset, main.x0 - inset, depot.z1 - inset, w, top)
 	strip(list, "EdgeLine", main.x1 + inset, depot.z1 - inset, depot.x1 - inset, depot.z1 - inset, w, top)
 	-- Pražská's, up to where they meet the turnaround's (a circle `inset` inside its edge); 8.9 open where a street
-	-- comes in from the side (Mirešická from the west)
+	-- comes in from the side (9.4: Pond Lane from the west)
 	local r = TURN.r - inset
 	local function meet(x: number): number
 		return TURN.z - math.sqrt(r * r - (x - TURN.x) ^ 2)
@@ -478,7 +493,7 @@ end
 SandboxScenery.Signpost = { x = MAP.Roads[1].x0 - 12, z = MAP.Roads[2].z1 + 12 } -- the crossroads' south-west corner
 
 -- The vans' ways off the asphalt: each plot's apron from the van's spot to Depot Row, every house to empty's curb
--- (Jinočany: SandboxMap.Houses', the farmstead's first).
+-- (SandboxMap.Houses', the farmstead's first).
 function SandboxScenery.vanPaths(): { Rect }
 	local list: { Rect } = {}
 	local depot = MAP.Roads[2]
@@ -493,8 +508,8 @@ function SandboxScenery.vanPaths(): { Rect }
 	return list
 end
 
--- Why something `r` wide (a tree's crown) may not stand at (x, z): nil when it may. (8.9: the village's houses and
--- landmarks too: shared/VillageScenery.luau treeRule.)
+-- Why something `r` wide (a tree's crown) may not stand at (x, z): nil when it may. (The places' boxes, the landmarks,
+-- the stream and the clearings too: shared/VillageScenery.luau treeRule.)
 function SandboxScenery.treeRule(x: number, z: number, r: number): string?
 	local C = SandboxScenery.Clear
 	local inset = C.Edge
@@ -514,7 +529,7 @@ function SandboxScenery.treeRule(x: number, z: number, r: number): string?
 			return "plot"
 		end
 	end
-	for _, h in MAP.Houses do -- (Jinočany: every house to empty's lot, the farmstead's first)
+	for _, h in MAP.Houses do -- (every place to empty's lot, the farmstead's first)
 		if rectDistance(h.lot, x, z) < r + C.Lot then
 			return "house"
 		end

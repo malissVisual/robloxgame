@@ -29,8 +29,8 @@
 --                                           stock order), each on the next free stand of 1 … stands
 --   SandboxAdmin.standCount(warehouse)      Config.Warehouse's Stands (a count, or a list of stands), 0 without it
 --   SandboxAdmin.zones()                    SHOW ZONES' fixed marks (shared/SandboxMap.luau): each plot's unload
---                                           circle and the houses' curbs (a van's footprint at the spot; Jinočany:
---                                           every house to empty's, SandboxMap.Houses' order, its name on it)
+--                                           circle and the houses' curbs (a van's footprint at the spot: every
+--                                           place to empty's, SandboxMap.Houses' order, its name on it)
 
 local SandboxMap = require(script.Parent.SandboxMap)
 
@@ -58,7 +58,7 @@ SandboxAdmin.Groups = {
 	{
 		id = "moves",
 		name = "Moves",
-		hint = "The sandbox's houses (Moving's admin; Jinočany: six, one on your card). REFILL calls a running move off: the next START brings the next house, filled anew. SKIP CLOCK: one minute left. HORDE NOW: the horde comes.",
+		hint = "The sandbox's places to empty (Moving's admin: six, one on your card). REFILL calls a running move off: the next START brings the next place, filled anew. SKIP CLOCK: one minute left. HORDE NOW: the horde comes.",
 	},
 	{
 		id = "collection",
@@ -216,7 +216,7 @@ function SandboxAdmin.zones(): { Zone }
 		})
 	end
 	local NOSE = { [0] = "north", [90] = "west", [180] = "south", [270] = "east" } :: { [number]: string }
-	for _, house in SandboxMap.Houses do -- (Jinočany: every house to empty's curb, the farmstead's first)
+	for _, house in SandboxMap.Houses do -- (every place to empty's curb, the farmstead's first)
 		local curb = house.curb
 		table.insert(list, {
 			kind = "curb",

@@ -1,8 +1,8 @@
-// 8.3, tools/sandbox-map: lays out the map sheet (design/sandbox/map.png). 8.9 Jinočany: the whole map from above,
-// north up (screen right = +X, screen down = +Z), the village's streets, landmarks and the six houses to empty labelled;
-// a panel on the right with the title, the legend, plot 1 up close (its warehouse's roof off, north up, its parts
-// numbered) and the scale. The labels' spots from the export's facts (shared/SandboxMap.luau, SandboxLeadersRules.spot,
-// VillageScenery's barrier, plan.json's houses to empty). data = { world: [part], van: [part], facts }
+// 8.3, tools/sandbox-map: lays out the map sheet (design/sandbox/map.png). 8.9: the whole map from above, north up
+// (screen right = +X, screen down = +Z); 9.4 the countryside: its lanes, landmarks and the six places to empty
+// labelled; a panel on the right with the title, the legend, plot 1 up close (its warehouse's roof off, north up, its
+// parts numbered) and the scale. The labels' spots from the export's facts (shared/SandboxMap.luau,
+// SandboxLeadersRules.spot). data = { world: [part], van: [part], facts }
 (function () {
   const FONT = "Montserrat, 'DejaVu Sans', sans-serif";
   const INK = '#1f2328', ORANGE = '#f0842c', WHITE = '#ffffff', CREAM = '#fff6e8', GREEN = '#38c172';
@@ -69,11 +69,12 @@
   }
 
   // A street's longest stretch between its junctions (other streets touching it): where its name goes.
-  function nameSpot(road, roads) {
+  function nameSpot(road, roads, avoid) {
     const alongX = road.x1 - road.x0 >= road.z1 - road.z0;
     const lo = alongX ? road.x0 : road.z0, hi = alongX ? road.x1 : road.z1;
     let spans = [[lo, hi]];
-    for (const q of roads) {
+    // (9.4: off the other roads that meet it and off the plots' name pills (`avoid`) lying over it)
+    for (const q of roads.concat(avoid || [])) {
       if (q === road) continue;
       const touch = q.x0 <= road.x1 && q.x1 >= road.x0 && q.z0 <= road.z1 && q.z1 >= road.z0;
       if (!touch) continue;
@@ -165,11 +166,16 @@
       const [ax, ay] = S(r.x0, r.z0), [bx, by] = S(r.x1, r.z1);
       el(svg, 'rect', { x: ax, y: ay, width: bx - ax, height: by - ay, fill: 'none', stroke: ORANGE, 'stroke-width': 3, 'stroke-dasharray': '10 7', rx: 4 });
     }
-    // the streets' names (Czech, as in the game; Hlavní's on its west stretch, clear of the green's leader line)
-    const NAME_AT = { 'Hlavní': -920 };
+    // the roads' names (each once: on its longest rect, never on a yard)
+    const longest = {};
     for (const road of facts.roads) {
-      const at = nameSpot(road, facts.roads);
-      if (NAME_AT[road.name] !== undefined) at.x = NAME_AT[road.name];
+      const len = Math.max(road.x1 - road.x0, road.z1 - road.z0);
+      if (!road.yard && (!longest[road.name] || len > longest[road.name].len)) longest[road.name] = { road, len };
+    }
+    // (the plots' name pills, about 230 × 64 px from each plot's north-west corner: a lane's name keeps off them)
+    const pills = plots.map(plot => ({ x0: plot.rect.x0, x1: plot.rect.x0 + 230 / k, z0: plot.rect.z0, z1: plot.rect.z0 + 64 / k }));
+    for (const { road } of Object.values(longest)) {
+      const at = nameSpot(road, facts.roads, pills);
       const [x, y] = S(at.x, at.z);
       roadText(svg, road.name.toUpperCase(), x, y, road.lane ? 14 : 16, at.alongX ? 0 : -90);
     }
@@ -182,18 +188,23 @@
     const mark = id => (facts.landmarks || []).find(l => l.id === id);
     const mid = r => [(r.x0 + r.x1) / 2, (r.z0 + r.z1) / 2];
     const labels = [];
-    const green = mark('green'), chapel = mark('chapel'), shop = mark('drugstore'), pond = mark('pond'), d5 = mark('d5');
-    if (chapel) labels.push({ lines: [['THE CHAPEL GREEN', 'Náves: the chapel, the cross, the lindens,', 'the MOVING CONTRACTS noticeboard']], at: S(-1000, 70), to: S(...mid(chapel)), align: 'l' });
-    if (shop) labels.push({ lines: [['CORNER DRUGSTORE', 'a made-up shop: scenery']], at: S(110, 95), to: S(shop.x0 + 30, shop.z0 + 50), align: 'l' });
-    if (pond) labels.push({ lines: [['LITTLE POND', 'Malý rybník']], at: S(108, 300), to: S(...mid(pond)), align: 'c' });
-    if (d5) labels.push({ lines: [['D5 MOTORWAY', 'cars on it (on every screen,', 'scenery only)']], at: S(250, -450), to: S(360, -330), align: 'r' });
-    if (facts.orchard) labels.push({ lines: [['THE ORCHARD', 'ovocný sad']], at: S(-235, 140), to: null, align: 'c', plain: true });
-    if (facts.barrier) labels.push({ lines: [['ROAD CLOSED', "Hornická: the map's west end"]], at: S(-1165, -150), to: S((facts.barrier.x0 + facts.barrier.x1) / 2, -60), align: 'l' });
+    const pond = mark('pond'), d5 = mark('d5'), barn = mark('barn'), halt = mark('halt'), apiary = mark('apiary');
+    const woods = (facts.woods || [])[0];
+    const spot = id => (facts.enter || []).find(h => h.id === id);
+    const at = (h, dx, dz) => S((h.box.x0 + h.box.x1) / 2 + dx, (h.box.z0 + h.box.z1) / 2 + dz);
+    if (pond && spot('pond_cabin')) labels.push({ lines: [['THE POND CABIN (2)', 'by the fish pond: a jetty, reeds, a boat']], at: S(-1160, 640), to: at(spot('pond_cabin'), 0, 0), align: 'l' });
+    if (spot('lone_house')) labels.push({ lines: [['THE LONE HOUSE (3)', 'alone by Hill Road, its garden']], at: S(-760, -380), to: at(spot('lone_house'), 0, 0), align: 'l' });
+    if (woods && spot('forest_lodge')) labels.push({ lines: [['THE FOREST LODGE (4)', 'in a clearing of the forest']], at: S(-1160, -620), to: at(spot('forest_lodge'), 0, 0), align: 'l' });
+    if (spot('old_mill')) labels.push({ lines: [['THE OLD MILL (5)', 'the millrace past it, a weir, a footbridge']], at: S(-990, 120), to: at(spot('old_mill'), 0, 0), align: 'l' });
+    if (apiary && spot('orchard_cottage')) labels.push({ lines: [['THE ORCHARD COTTAGE (6)', 'fruit trees, beehives, a fence']], at: S(-120, -620), to: at(spot('orchard_cottage'), 0, 0), align: 'l' });
+    if (d5) labels.push({ lines: [['D5 MOTORWAY', 'cars on it (on every screen,', 'scenery only)']], at: S(300, 230), to: S(360, 250), align: 'r' });
+    if (halt) labels.push({ lines: [['MEADOW HALT', 'the railway, under the D5']], at: S(120, 650), to: S(...mid(halt)), align: 'r' });
+    if (barn) labels.push({ lines: [['THE FARM', 'barn, tractor, bales, paddock']], at: S(-420, 470), to: S(...mid(barn)), align: 'l' });
     {
       const t = facts.turnaround;
       labels.push({ lines: [['Turnaround']], at: S(t.x + 70, t.z - 60), to: S(t.x + t.r * 0.5, t.z - t.r * 0.3), align: 'l' });
       const h = facts.house;
-      labels.push({ lines: [['THE OLD FARMSTEAD', 'Statek: the big house to empty (1)']], at: S(h.lot.x1 + 40, h.house.z + 30), to: S(h.house.x + h.house.sx * 0.3, h.house.z), align: 'l' });
+      labels.push({ lines: [['THE OLD FARMSTEAD (1)', 'the farm: the big house to empty']], at: S(h.lot.x1 + 40, h.house.z + 30), to: S(h.house.x + h.house.sx * 0.3, h.house.z), align: 'l' });
       labels.push({ lines: [['TOP MOVERS board', 'the leaderboard at the crossroads']], at: S(-40, -8), to: S(facts.leaders.x, facts.leaders.z), align: 'r' });
     }
     for (const l of labels) {
@@ -208,12 +219,12 @@
       let y = 30;
       const title = pill(svg, [
         { text: 'ZOMBIE DELIVERY · THE SANDBOX MAP', size: 25, weight: 800 },
-        { text: 'Jinočany, step 1 · seen from above, north up', size: 17, weight: 600, color: CREAM },
-        { text: `4 plots · ${facts.roads.length} streets · ${facts.villageHouses} village houses · 6 houses to empty`, size: 17, weight: 600, color: CREAM },
+        { text: 'The countryside · seen from above, north up', size: 17, weight: 600, color: CREAM },
+        { text: `4 plots · ${Object.keys(longest).length} roads · 6 places to empty, each on its own`, size: 17, weight: 600, color: CREAM },
       ], [PL, y], { align: 'l', valign: 't', padX: 18, padY: 14 });
       y = title.y + title.h + 16;
-      const rows = ['unload circle (not painted in the game)', 'a Sprinter van at its plot', 'kiosk: take a move there (E)', 'a house to empty (their looks come with the moves):'];
-      const names = (facts.enter || []).map((h, i) => `${i + 1} ${i === 0 ? 'The Old Farmstead' : h.name.replace(' house', '')}`);
+      const rows = ['unload circle (not painted in the game)', 'a Sprinter van at its plot', 'kiosk: take a move there (E)', 'a place to empty:'];
+      const names = (facts.enter || []).map((h, i) => `${i + 1} ${h.name.replace(/^The /, '')}`);
       if (names.length) rows.push('   ' + names.slice(0, 3).join(' · '), '   ' + names.slice(3).join(' · '));
       const lh = 30 * F;
       const lw = PANEL - 68;

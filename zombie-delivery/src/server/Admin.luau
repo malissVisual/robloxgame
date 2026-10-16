@@ -1609,7 +1609,7 @@ Sandbox.run.van = function(player: Player)
 end
 
 -- To the house's front door (facing it: Enter house); driving your van: the van to its curb, its back to the door.
--- (Jinočany: your move's house, else your card's: Moving.houseOf; none yet: the farmstead)
+-- (your move's place, else your card's: Moving.houseOf; none yet: the farmstead)
 Sandbox.run.house = function(player: Player)
 	local ok, found = pcall(function(): any
 		return require(Server.Moving).houseOf(player)

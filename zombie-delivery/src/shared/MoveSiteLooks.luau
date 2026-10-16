@@ -22,7 +22,7 @@
 --   MoveSiteLooks.board(sandbox?)       the Moving contracts kiosk (frame: its foot, -Z toward the yard); Moving hangs its
 --                                       prompt on the piece named "Board" (the corkboard). 8.0 SANDBOX (sandbox true: the
 --                                       plots' kiosks, server/MoveSites.luau plotBoard): no evacuation, no Wall, no city
---                                       houses on it: the village's houses to empty (Jinočany: six, one on each card)
+--                                       houses on it: the countryside's places to empty (9.4: six, one on each card)
 --                                       and notices about bringing it home to your warehouse, the same kiosk round them
 --   MoveSiteLooks.house(title, park)    a contract's house dressed for moving day (frame: its front door's foot, -Z out
 --                                       to the street; park: studs from the door to the truck's kerb spot, Map.Home park)
@@ -340,12 +340,12 @@ local function photo(emoji: string, caption: string, sky: { number }): { Words }
 end
 
 -- 8.0 SANDBOX: the plots' corkboard (four columns, two rows as the depot's): the houses to empty, what to do with them.
--- Jinočany: one kiosk for every player, each card its own house of six (SandboxMap.Houses): the village's, not one's.
+-- One kiosk for every player, each card its own place of six (SandboxMap.Houses): out in the countryside, each alone.
 local function sandboxPins(p: { Piece }, top: number, low: number)
 	local count = #SandboxMap.Houses
-	pinned(p, "PhotoHouse", { 1.3, 1.15 }, -2.55, top, 3, PAPER, photo("🏡", `{count} HOUSES TO EMPTY`, { 148, 196, 228 }), RED)
+	pinned(p, "PhotoHouse", { 1.3, 1.15 }, -2.55, top, 3, PAPER, photo("🏡", `{count} PLACES TO EMPTY`, { 148, 196, 228 }), RED)
 	pinned(p, "FlyerHouse", { 1.3, 1.5 }, -0.85, top, -2, PAPER, { { face = "Front", lines = {
-		line("JINOČANY", RED, 0.16, "Black"), -- (by hand: string.upper leaves č)
+		line("THE COUNTRYSIDE", RED, 0.16, "Black"),
 		line("A HOUSE ON YOUR CARD", CHARCOAL, 0.12, "Bold"),
 		line("Bring it home to your warehouse.", CHARCOAL, 0.1),
 	} } }, YELLOW)

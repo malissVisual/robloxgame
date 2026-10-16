@@ -1,7 +1,7 @@
 -- 9.0 Danny's way inside a house (shared/HouseRoute.luau; the owner, 8.9: "Danny can't walk around things logically. He
 -- goes to take things through the wall: he can't get to the thing, he got stuck on the wall"), on the REAL plans
 -- (shared/HouseLayout.luau on the recorder, tests/run_tests.py): the big house (The Old Farmstead, kind "big", 8.5.2
--- roomy) and the family house (the five houses of Jinočany, kind "house"), every layout of each (the back row's four
+-- roomy) and the family house (the five other places to empty, kind "house"), every layout of each (the back row's four
 -- orders, mirrored or not: a seed for each).
 --   * the cause, measured: 8.9's aim (server/MoveHelper.luau besidePiece: straight out of the piece toward where he came
 --     in, half its size and 1.5 studs) put a fifth of the pieces' spots behind a wall (in the next room, in the wall,

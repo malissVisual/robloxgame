@@ -1,42 +1,53 @@
 --!strict
--- 8.9 SANDBOX, Jinočany step 1 on the map (design/jinocany/NAVRH.md §4): where shared/VillageLooks.luau's art stands,
--- as plain numbers, from shared/SandboxMap.luau's village section (tools/village/sandboxmap.py writes it from
--- design/jinocany/plan.json). Pure (no Roblox at its top level), deterministic: server/VillageWorld.luau makes the parts,
--- client/VillageTraffic.luau drives the D5's cars on its lanes, tests/villageworld_test.luau checks it all. Its numbers
--- are Config.VillageWorld's (and Config.Village's, the art kit's).
+-- 8.9 SANDBOX on the map; 9.4 the countryside (design/countryside/plan.py, plan.json): where the map's art stands, as
+-- plain numbers, from shared/SandboxMap.luau's map section (tools/countryside/sandboxmap.py writes it from the plan) and
+-- its Houses: shared/VillageLooks.luau's houses, the D5, the trees and the fields, shared/CountryLooks.luau's landmarks,
+-- hedges, fences and the stream. Pure (no Roblox at its top level), deterministic: server/VillageWorld.luau makes the
+-- parts, client/VillageTraffic.luau drives the D5's cars on its lanes, tests/villageworld_test.luau checks it all. Its
+-- numbers are Config.VillageWorld's (and Config.Village's and Config.Country's, the art kits').
 --
---   The houses     SandboxMap.Village (the moves' houses to empty are not in it: SandboxMap.Houses, the moves' own
---                  exteriors), each in its box turned by its yaw, its dice its id's (VillageLooks.seedOf); the terraced
---                  ones in their groups (VillageLooks.rowGroups: one body for up to four). Jinočany step 1: with the
---                  houses to empty (enter(): houses' extra) each dressed rich, the terraced one its group's richUnit
---                  (the group one body again, no gap)
---   The landmarks  SandboxMap.Landmarks looking Config.Village.Facing's way (the green round its chapel), and
---                  Hornická's ROAD CLOSED barrier at its west end (VillageLooks.barrierAt); the D5 is kept on every
---                  client (far = true: its cars run on it)
---   The trees      the tree lines' and the orchard's (VillageLooks.lineTrees, orchard: the census's dice), each where
---                  treeRule lets its crown stand: else moved off its spot (Config.VillageWorld.Trees: Step studs at a
---                  time across its line, then along it, at most Nudge), else left out
+--   The houses     the places to empty but the farmstead (SandboxMap.Houses 2 … 6: server/SandboxWorld.luau builds
+--                  them, their doors walked in; the farmstead its own look), each in its box turned by its yaw, rich,
+--                  its dice its id's (VillageLooks.seedOf), in its look: VillageLooks.house's kind (lookOf: "old" for
+--                  a look VillageLooks does not draw yet)
+--   The landmarks  SandboxMap.Landmarks, each looking its own yaw: CountryLooks' kinds (the spots' surroundings, the
+--                  railway and its halt), else VillageLooks' (the D5); the D5 and the railway are kept on every client
+--                  (far = true: the D5's cars run on it, the railway crosses the whole map)
+--   The trees      the tree lines' (windbreaks, alleys: VillageLooks.lineTrees), the orchard's (VillageLooks.orchard)
+--                  and the woods' (a jittered grid, Config.Country.Woods), each where treeRule lets its crown stand:
+--                  else moved off its spot (Config.VillageWorld.Trees: Step studs at a time across its line, then
+--                  along it, at most Nudge), else left out
+--   The lines      the hedges and fences of SandboxMap.TreeLines (CountryLooks.line)
+--   The streams    SandboxMap.Streams (CountryLooks.stream: its bed and its water)
 --   The fields     SandboxMap.Fields, a tile each (VillageLooks.field: the ground in its crop's colour, its rows)
---   The far view   VillageLooks.horizon round SandboxMap.Bounds
+--   The far view   VillageLooks.horizon round SandboxMap.Bounds but its far roofs and church tower (no village on the
+--                  horizon either), the railway going on past them (CountryLooks.farRails)
 --
---   VillageScenery.houses(extra?)    { Placed }: a house (or a terraced group): kind, box, yaw, seed, opts, ids, street;
---                                    extra: the houses to empty, rich (their row's group rebuilt round one)
---   VillageScenery.enter()           Jinočany: the houses to empty in the village (SandboxMap.Houses but the farmstead,
---                                    its own look) as houses' extra: server/VillageWorld.luau builds the village with
---                                    them, server/SandboxWorld.luau dresses the ones they are in (their doors walked in)
---   VillageScenery.emptied(placed)   the house to empty a Placed holds (SandboxMap.Houses'; nil: none)
+--   VillageScenery.houses(extra?)    { Placed }: the places to empty but the farmstead (rich): kind (the look drawn),
+--                                    box, yaw, seed, opts, ids, street (extra: their PlanHouses, enter()'s; the same)
+--   VillageScenery.enter()           the places to empty but the farmstead as VillageLooks PlanHouses (kind: lookOf)
+--   VillageScenery.lookOf(look)      the look VillageLooks.house draws for a place's look: itself once VillageLooks
+--                                    knows it, else "old" (so the map builds before a look exists)
+--   VillageScenery.emptied(placed)   the place to empty a Placed holds (SandboxMap.Houses'; nil: none)
 --   VillageScenery.landmarks()       { Mark }: id, name, kind, box, yaw, seed, opts, far
 --   VillageScenery.pieces(thing)     a house's or a landmark's pieces on the map (VillageLooks.place)
---   VillageScenery.trees()           { TreeSpot }: kind, x, z, seed, its crown's radius and height, the line or "orchard"
+--   VillageScenery.trees()           { TreeSpot }: kind, x, z, seed, its crown's radius and height, where it is from
+--                                    (a line, "orchard" or a wood's id)
 --   VillageScenery.treeRule(x, z, r) why a crown r wide may not stand there (nil: it may): SandboxScenery.treeRule's
---                                    reasons, then "house", "landmark", "auction" (Keep studs off each)
+--                                    reasons, then "house", "landmark", "auction" (Keep studs off each), "stream" (its
+--                                    crown off the water by Config.Country.Streams.Clear), "clearing" (in a wood's)
+--   VillageScenery.lines()           the hedges' and fences' pieces on the map
+--   VillageScenery.streams()         the streams' pieces on the map
 --   VillageScenery.fields()          { FieldTile }: kind, rect, seed
 --   VillageScenery.lanes()           { Lane }: the D5's four lanes (x, the road's top y, z0 … z1 run Beyond past the
 --                                    Bounds, dz: -1 northbound, 1 southbound; right-hand traffic)
 --   VillageScenery.far()             the far view's pieces
+--   VillageScenery.streamDistance(x, z)   how far (x, z) is from the nearest stream's middle line, less its half width
+--                                    (≤ 0: in its water)
 
 local AuctionHouseLayout = require(script.Parent.AuctionHouseLayout)
 local Config = require(script.Parent.Config)
+local CountryLooks = require(script.Parent.CountryLooks)
 local SandboxMap = require(script.Parent.SandboxMap)
 local SandboxScenery = require(script.Parent.SandboxScenery)
 local VillageLooks = require(script.Parent.VillageLooks)
@@ -51,8 +62,8 @@ export type FieldTile = { kind: string, rect: Rect, seed: number }
 export type Lane = { x: number, y: number, z0: number, z1: number, dz: number }
 
 local MAP = SandboxMap
-local V = Config.Village
 local W = Config.VillageWorld
+local CW = Config.Country
 
 local function rect(r: { x0: number, x1: number, z0: number, z1: number }): Rect
 	return { x0 = r.x0, x1 = r.x1, z0 = r.z0, z1 = r.z1 }
@@ -60,53 +71,21 @@ end
 
 -- ── The houses and the landmarks ───────────────────────────────────────────
 
-local houseCache: { Placed }? = nil
-local enterCache: { VillageLooks.PlanHouse }? = nil
-local enterHouses: { Placed }? = nil
+local known: { [string]: boolean } = {}
 
--- extra: the hook for the houses to empty (plan.json's enter: SandboxMap.Houses' exteriors, the moves'), each a
--- PlanHouse with enter = true: dressed rich (VillageLooks' "rich"), a terraced one in its row's group (the group's
--- richUnit). Without it the village's own houses alone (the same list every time; with enter()'s, the same too).
-function VillageScenery.houses(extra: { VillageLooks.PlanHouse }?): { Placed }
-	if houseCache and not extra then
-		return houseCache
+function VillageScenery.lookOf(look: string): string
+	if known[look] == nil then
+		-- (VillageLooks draws it once it lists it or builds it without an error: the other looks come in their own time)
+		local ok = table.find(VillageLooks.Houses, look) ~= nil or pcall(VillageLooks.house, look, { x0 = -12, x1 = 12, z0 = -10, z1 = 10 }, 0, 1, { rich = true })
+		known[look] = ok
 	end
-	if enterHouses and extra ~= nil and extra == enterCache then
-		return enterHouses
-	end
-	local list: { Placed } = {}
-	local rows: { VillageLooks.PlanHouse } = {}
-	local streets: { [string]: string } = {}
-	local all: { VillageLooks.PlanHouse } = {}
-	for _, h in MAP.Village do
-		table.insert(all, { id = h.id, kind = h.kind, box = rect(h), yaw = h.yaw, step = 1, enter = false, street = h.street })
-	end
-	if extra then
-		for _, h in extra do
-			table.insert(all, h)
-		end
-	end
-	for _, h in all do
-		streets[h.id] = h.street or ""
-		if h.kind == "row" then
-			table.insert(rows, h)
-		else
-			table.insert(list, { id = h.id, kind = h.kind, box = h.box, yaw = h.yaw, seed = VillageLooks.seedOf(h.id), opts = { rich = h.enter == true }, ids = { h.id }, street = h.street or "" })
-		end
-	end
-	for _, g in VillageLooks.rowGroups(rows) do
-		table.insert(list, { id = g.ids[1], kind = "row", box = g.box, yaw = g.yaw, seed = g.seed, opts = { units = #g.ids, rich = g.richUnit ~= nil, richUnit = g.richUnit }, ids = g.ids, street = streets[g.ids[1]] })
-	end
-	if not extra then
-		houseCache = list
-	elseif extra == enterCache then
-		enterHouses = list
-	end
-	return list
+	return if known[look] then look else "old"
 end
 
--- Jinočany: the houses to empty (SandboxMap.Houses but the farmstead) as the hook's PlanHouses (their look, box and
--- yaw; the same list every time).
+local enterCache: { VillageLooks.PlanHouse }? = nil
+local houseCache: { Placed }? = nil
+
+-- The places to empty but the farmstead (its own look) as PlanHouses (their look, box and yaw; the same list every time).
 function VillageScenery.enter(): { VillageLooks.PlanHouse }
 	if enterCache then
 		return enterCache
@@ -114,10 +93,23 @@ function VillageScenery.enter(): { VillageLooks.PlanHouse }
 	local list: { VillageLooks.PlanHouse } = {}
 	for index, h in MAP.Houses do
 		if index > 1 then
-			table.insert(list, { id = h.id, kind = h.look, box = rect(h.box), yaw = h.yaw, step = 1, enter = true, street = h.street })
+			table.insert(list, { id = h.id, kind = VillageScenery.lookOf(h.look), box = rect(h.box), yaw = h.yaw, step = 1, enter = true, street = h.street })
 		end
 	end
 	enterCache = list
+	return list
+end
+
+-- (extra: today's callers hand enter() in; the list is the same either way)
+function VillageScenery.houses(extra: { VillageLooks.PlanHouse }?): { Placed }
+	if houseCache then
+		return houseCache
+	end
+	local list: { Placed } = {}
+	for _, h in VillageScenery.enter() do
+		table.insert(list, { id = h.id, kind = h.kind, box = h.box, yaw = h.yaw, seed = VillageLooks.seedOf(h.id), opts = { rich = true }, ids = { h.id }, street = h.street or "" })
+	end
+	houseCache = list
 	return list
 end
 
@@ -131,6 +123,8 @@ function VillageScenery.emptied(placed: Placed): SandboxMap.House?
 	return nil
 end
 
+local FAR = { motorway = true, railway = true } -- (kept on every client)
+
 local markCache: { Mark }? = nil
 
 function VillageScenery.landmarks(): { Mark }
@@ -138,23 +132,8 @@ function VillageScenery.landmarks(): { Mark }
 		return markCache
 	end
 	local list: { Mark } = {}
-	local chapel: Rect? = nil
 	for _, l in MAP.Landmarks do
-		if l.kind == "chapel" then
-			chapel = rect(l)
-		end
-	end
-	for _, l in MAP.Landmarks do
-		local yaw = V.Facing[l.kind]
-		if yaw then
-			table.insert(list, { id = l.id, name = l.name, kind = l.kind, box = rect(l), yaw = yaw, seed = VillageLooks.seedOf(l.id), opts = { chapel = chapel }, far = l.kind == "motorway" })
-		end
-	end
-	for _, road in MAP.Roads do
-		if road.name == V.Barrier.Road then
-			local box, yaw = VillageLooks.barrierAt(rect(road))
-			table.insert(list, { id = "barrier", name = `{road.name}: road closed`, kind = "barrier", box = box, yaw = yaw, seed = VillageLooks.seedOf(road.name), opts = {}, far = false })
-		end
+		table.insert(list, { id = l.id, name = l.name, kind = l.kind, box = rect(l), yaw = l.yaw, seed = VillageLooks.seedOf(l.id), opts = {}, far = FAR[l.kind] == true })
 	end
 	markCache = list
 	return list
@@ -162,13 +141,36 @@ end
 
 -- A house's or a landmark's pieces on the map.
 function VillageScenery.pieces(thing: Placed | Mark): { VillageLooks.Piece }
-	local made = if (thing :: any).ids
-		then VillageLooks.house(thing.kind, thing.box, thing.yaw, thing.seed, thing.opts)
-		else VillageLooks.landmark(thing.kind, thing.box, thing.yaw, thing.seed, thing.opts)
+	local made
+	if (thing :: any).ids then
+		made = VillageLooks.house(thing.kind, thing.box, thing.yaw, thing.seed, thing.opts)
+	elseif table.find(CountryLooks.Landmarks, thing.kind) then
+		made = CountryLooks.landmark(thing.kind, thing.box, thing.yaw, thing.seed)
+	else
+		made = VillageLooks.landmark(thing.kind, thing.box, thing.yaw, thing.seed, thing.opts)
+	end
 	return VillageLooks.place(made, thing.box, thing.yaw)
 end
 
 -- ── The trees ──────────────────────────────────────────────────────────────
+
+-- How far (x, z) is from a segment.
+local function segmentDistance(x: number, z: number, ax: number, az: number, bx: number, bz: number): number
+	local dx, dz = bx - ax, bz - az
+	local t = math.clamp(((x - ax) * dx + (z - az) * dz) / math.max(dx * dx + dz * dz, 1e-9), 0, 1)
+	return math.sqrt((x - ax - dx * t) ^ 2 + (z - az - dz * t) ^ 2)
+end
+
+function VillageScenery.streamDistance(x: number, z: number): number
+	local best = math.huge
+	for _, s in MAP.Streams do
+		for i = 1, #s.points - 1 do
+			local a, b = s.points[i], s.points[i + 1]
+			best = math.min(best, segmentDistance(x, z, a.x, a.z, b.x, b.z) - s.width / 2)
+		end
+	end
+	return best
+end
 
 function VillageScenery.treeRule(x: number, z: number, r: number): string?
 	local why = SandboxScenery.treeRule(x, z, r)
@@ -176,12 +178,7 @@ function VillageScenery.treeRule(x: number, z: number, r: number): string?
 		return why
 	end
 	local keep = r + W.Trees.Keep
-	for _, h in MAP.Village do
-		if SandboxScenery.rectDistance(rect(h), x, z) < keep then
-			return "house"
-		end
-	end
-	for _, h in MAP.Houses do -- (Jinočany: the houses to empty's boxes; their lots and curbs SandboxScenery.treeRule's)
+	for _, h in MAP.Houses do -- (the places' boxes; their lots and curbs SandboxScenery.treeRule's)
 		if SandboxScenery.rectDistance(h.box, x, z) < keep then
 			return "house"
 		end
@@ -195,8 +192,20 @@ function VillageScenery.treeRule(x: number, z: number, r: number): string?
 	if SandboxScenery.rectDistance(AuctionHouseLayout.site(), x, z) < keep then
 		return "auction"
 	end
+	if VillageScenery.streamDistance(x, z) < r + CW.Streams.Clear then
+		return "stream"
+	end
+	for _, wood in MAP.Woods do
+		for _, c in wood.clearings do
+			if SandboxScenery.rectDistance(c, x, z) < r * 0.5 then
+				return "clearing"
+			end
+		end
+	end
 	return nil
 end
+
+local TREE_LINES = { windbreak = true, alley = true } -- (the tree lines of trees; the rest, hedges and fences, are lines())
 
 local treeCache: { TreeSpot }? = nil
 
@@ -239,20 +248,64 @@ function VillageScenery.trees(): { TreeSpot }
 		end
 	end
 	for n, line in MAP.TreeLines do
-		local a, b = line.points[1], line.points[#line.points]
-		local length = math.max(math.sqrt((b.x - a.x) ^ 2 + (b.z - a.z) ^ 2), 1e-9)
-		for _, spot in VillageLooks.lineTrees(line.points, line.kind, n) do
-			plant(spot, (b.x - a.x) / length, (b.z - a.z) / length, `{line.kind} {n}`)
+		if TREE_LINES[line.kind] then
+			local a, b = line.points[1], line.points[#line.points]
+			local length = math.max(math.sqrt((b.x - a.x) ^ 2 + (b.z - a.z) ^ 2), 1e-9)
+			for _, spot in VillageLooks.lineTrees(line.points, line.kind, n) do
+				plant(spot, (b.x - a.x) / length, (b.z - a.z) / length, `{line.kind} {n}`)
+			end
 		end
 	end
 	for _, spot in VillageLooks.orchard(rect(MAP.Orchard), VillageLooks.seedOf("orchard")) do
 		plant(spot, 1, 0, "orchard")
 	end
+	-- the woods: a jittered grid, each tree a kind of the mix, none in a clearing (treeRule)
+	local Wd = CW.Woods
+	for _, wood in MAP.Woods do
+		local seed = VillageLooks.seedOf(wood.id)
+		local n = 0
+		local x = wood.x0 + Wd.Spacing / 2
+		while x <= wood.x1 - Wd.Spacing / 4 do
+			local z = wood.z0 + Wd.Spacing / 2
+			while z <= wood.z1 - Wd.Spacing / 4 do
+				n += 1
+				local s = (seed + n * 7919) % 999983 + 1
+				local jx = ((s * 37) % 1000 / 1000 - 0.5) * 2 * Wd.Jitter
+				local jz = ((s * 91) % 1000 / 1000 - 0.5) * 2 * Wd.Jitter
+				local kind = Wd.Mix[(s * 13) % #Wd.Mix + 1]
+				plant({ x = x + jx, z = z + jz, kind = kind, seed = s }, 1, 0, wood.id)
+				z += Wd.Spacing
+			end
+			x += Wd.Spacing
+		end
+	end
 	treeCache = list
 	return list
 end
 
--- ── The ground and far away ────────────────────────────────────────────────
+-- ── The lines, the streams, the ground and far away ────────────────────────
+
+function VillageScenery.lines(): { VillageLooks.Piece }
+	local out: { VillageLooks.Piece } = {}
+	for n, line in MAP.TreeLines do
+		if not TREE_LINES[line.kind] then
+			for _, p in CountryLooks.line(line.kind, line.points, n) do
+				table.insert(out, p)
+			end
+		end
+	end
+	return out
+end
+
+function VillageScenery.streams(): { VillageLooks.Piece }
+	local out: { VillageLooks.Piece } = {}
+	for n, s in MAP.Streams do
+		for _, p in CountryLooks.stream(s.points, s.width, n) do
+			table.insert(out, p)
+		end
+	end
+	return out
+end
 
 function VillageScenery.fields(): { FieldTile }
 	local list: { FieldTile } = {}
@@ -262,8 +315,26 @@ function VillageScenery.fields(): { FieldTile }
 	return list
 end
 
+-- (the horizon's far roofs and church tower are a village's: none on the countryside's horizon)
+local VILLAGE_FAR = { FarHouse = true, FarRoof = true, FarChurch = true, FarSpire = true }
+
 function VillageScenery.far(): { VillageLooks.Piece }
-	return VillageLooks.horizon(MAP.Bounds, 1)
+	local out: { VillageLooks.Piece } = {}
+	for _, p in VillageLooks.horizon(MAP.Bounds, 1) do
+		if not VILLAGE_FAR[p.name] then
+			table.insert(out, p)
+		end
+	end
+	local rails: { Rect } = {}
+	for _, l in MAP.Landmarks do
+		if l.kind == "railway" then
+			table.insert(rails, rect(l))
+		end
+	end
+	for _, p in CountryLooks.farRails(rails, MAP.Bounds) do
+		table.insert(out, p)
+	end
+	return out
 end
 
 -- ── The D5's lanes ─────────────────────────────────────────────────────────

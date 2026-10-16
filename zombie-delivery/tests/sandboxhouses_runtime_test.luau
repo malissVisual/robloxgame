@@ -1,4 +1,4 @@
--- Jinočany step 1 (design/jinocany/NAVRH.md §3; the blocks marked "Jinočany" in server/Moving.luau): the six houses to
+-- 8.9 six houses, 9.4 the countryside (the blocks marked "six houses" in server/Moving.luau): the six houses to
 -- empty of shared/SandboxMap.luau (Houses: The Old Farmstead and five family houses in the village) with the real
 -- server/Moving.luau (MoveLobby, MoveGreeters, MoveHelper and MoveSites with it) on tests/runtime/MovingRuntime.luau's
 -- fakes, Config.Sandbox.On (tests/run_tests.py builds them; the fake art's plans record their seeds and kinds):
@@ -191,7 +191,7 @@ do
 			ok, why = false, `{h.name}: {mats} mats, back {back ~= nil}`
 		end
 	end
-	check("Jinočany: a site per house (Move_<id>), a doormat at each of its doors; a back door only on the farmstead (its own mat)", ok and #Houses == 6, why)
+	check("six houses: a site per house (Move_<id>), a doormat at each of its doors; a back door only on the farmstead (its own mat)", ok and #Houses == 6, why)
 end
 
 -- Two players, two houses ------------------------------------------------------------------------------------------------
@@ -211,8 +211,8 @@ local bobCard = cardAt(bob, plot2)
 check("Ann's first card: the farmstead (the first house), The Nováks at the end of Pražská, its big plan, 25 minutes", annCard ~= nil and annCard.id == Farm.id
 	and annCard.client == "The Nováks" and annCard.address == "the end of Pražská" and annCard.time == 25 * 60 and plans[#plans - 1].kind == "big" and annCard.busy == nil,
 	annCard and annCard.id)
-check("Bob's: never Ann's house, the next free one, The Linden House (The Dvořáks, Hlavní 5), a family house's plan, 15 minutes", bobCard ~= nil
-	and bobCard.id == Houses[2].id and bobCard.name == "The Linden House" and bobCard.client == "The Dvořáks" and bobCard.address == "Hlavní 5"
+check("Bob's: never Ann's house, the next free one, The Pond Cabin (The Dvořáks, on Pond Lane), a house's plan, 15 minutes", bobCard ~= nil
+	and bobCard.id == Houses[2].id and bobCard.name == "The Pond Cabin" and bobCard.client == "The Dvořáks" and string.find(bobCard.address, "Pond Lane", 1, true) ~= nil
 	and bobCard.time == 15 * 60 and plans[#plans].kind == "house" and #bobCard.contracts == 1 and bobCard.contracts[1].id == bobCard.id, bobCard and bobCard.id)
 check("…each card lists only its own house (one at a time)", #annCard.contracts == 1 and annCard.contracts[1].id == Farm.id)
 check("…their saves keep each card's house and seed", E.profiles[ann].sandboxHouse == Farm.id and E.profiles[bob].sandboxHouse == Houses[2].id
@@ -468,8 +468,8 @@ do
 	E.profiles[last] = { money = 5000 }
 	local planned = #plans
 	local card = cardAt(last, plot3)
-	check("…a seventh: no card, no house rolled; the board says every house is being emptied", card == nil and #plans == planned
-		and string.find(E.lastNotice(last), "Every house", 1, true) ~= nil and Moving.houseOf(last) == nil, E.lastNotice(last))
+	check("…a seventh: no card, no house rolled; the board says every place is being emptied", card == nil and #plans == planned
+		and string.find(E.lastNotice(last), "Every place", 1, true) ~= nil and Moving.houseOf(last) == nil, E.lastNotice(last))
 	E.leave(players[1])
 	card = cardAt(last, plot3)
 	check("…one leaves: theirs is free again, the seventh gets it", card ~= nil and Moving.houseOf(last) ~= nil, card and card.id)

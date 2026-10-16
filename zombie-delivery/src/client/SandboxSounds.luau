@@ -25,7 +25,7 @@
 --   the money a claim, a milestone or a sale brought plays no income clink (SoldQuiet s); the move's result card's
 --                jingle holds the lane too (SoundPlan.hold: the chime waits for it)
 -- The rest of the sandbox's sound is client/SoundScape.luau's (the fields, the warehouse's hall, the farmstead's room,
--- Jinočany's far sounds, the room's echo, the Sprinter's back doors); client/Sounds.luau leaves the sandbox's money to this
+-- the countryside's far sounds, the room's echo, the Sprinter's back doors); client/Sounds.luau leaves the sandbox's money to this
 -- module and plays everything (Sounds.play / playAt: the SOUND setting, the stand-ins).
 -- 8.9, the newest features' own sounds (art/audio/sfx5.ogg; until it is up their stand-ins or silence): one entry for
 -- every module, by the event's name (shared/SoundPlan.luau Events; Config.Soundscape.Danny, .Trade, .Auction):

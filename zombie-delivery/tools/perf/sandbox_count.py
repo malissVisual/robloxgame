@@ -20,9 +20,10 @@ every warehouse a Logistics Center (8.3: level 5, the biggest, More stands at it
 move running with the inside and Danny, the server's cap of visitors. The players' own avatars, the
 greeters on the porch and the owner's Blender imports (the Sprinter, the furniture, the chalet) are not in it. 8.3 the
 big move: its inside is counted for every player at once too (4 moves running: a worst case past the one move's).
-8.9 Jinočany: the map is the village's now (server/VillageWorld.luau: world/Village, world/Motorway, world/Far; step 1's
-five family houses to empty among world/Village's houses, rich, with their walk-in doors' leaves, solid pieces and dark
-halls: server/SandboxWorld.luau's villageHouse); then the
+8.9: the map is server/VillageWorld.luau's; 9.4 the countryside (design/countryside/plan.py): world/Village (the
+places' surroundings, the trees of the tree lines, the orchard and the forest, the hedges, fences and the stream; the
+five other places to empty among them, rich, with their walk-in doors' leaves, solid pieces and dark halls:
+server/SandboxWorld.luau's villageHouse), world/Motorway, world/Railway, world/Far; then the
 map with 8.8's Auction House (built once Config.Auction.On) against SandboxScenery.Budget: over it, the run fails.
 
     python3 tools/perf/sandbox_count.py <path to the luau binary> [zombie-delivery dir]
@@ -107,7 +108,7 @@ def world_rows(luau, game):
 
 
 def map_budget(rows, game):
-    """8.9 Jinočany: the map (SandboxWorld's, the village built) with the Auction House (once Config.Auction.On) against
+    """8.9: the map (SandboxWorld's, 9.4 the countryside built) with the Auction House (once Config.Auction.On) against
     SandboxScenery.Budget; False when over it."""
     scenery = open(os.path.join(game, "src", "shared", "SandboxScenery.luau"), encoding="utf-8").read()
     budget = int(re.search(r"^SandboxScenery\.Budget = (\d+)", scenery, re.M).group(1))

@@ -1,35 +1,34 @@
 --!strict
--- 8.9 SANDBOX, Jinočany step 1 (design/jinocany/NAVRH.md §4): builds the village into the sandbox's map in place of
--- the Alps, from shared/VillageScenery.luau (where everything stands) and shared/VillageLooks.luau (its art: each
--- piece a part). server/SandboxWorld.luau calls it once, after its ground, roads, farmstead and scenery. Everything is
--- anchored, in workspace.Sandbox:
+-- 8.9 SANDBOX on the map; 9.4 the countryside (design/countryside/plan.py, plan.json): builds the map's countryside into
+-- the sandbox's world, from shared/VillageScenery.luau (where everything stands) and shared/VillageLooks.luau's and
+-- shared/CountryLooks.luau's art (each piece a part). server/SandboxWorld.luau calls it once, after its ground, roads,
+-- farmstead and scenery; it builds the five other places to empty itself (SandboxWorld.villageHouse, with model and
+-- chunk here). Everything is anchored, in workspace.Sandbox:
 --
---   Ground     (SandboxWorld's) the fields in their crops' colours with their rows and the village's lawns
---              (VillageLawn, Config.VillageWorld.Lawn), flat, flush with the meadow
---   Village    the houses (a Model "VillageHouse" each, attribute VillageHouse its plan id; a terraced group one, its
---              ids in VillageHouses), the landmarks (a Model "Landmark_<id>", attribute VillageLandmark: the chapel
---              green with its MOVING CONTRACTS noticeboard (attribute VillageContracts: decoration for now; the kiosks
---              at the warehouses take the moves), the chapel, the Little Pond, the Corner Drugstore, Hornická's ROAD
---              CLOSED barrier) and the trees of the tree lines and the orchard, in one Atomic model per chunk
---              ("Village_<chunk>", Config.Village.Chunk: with StreamingEnabled each streams whole)
+--   Ground     (SandboxWorld's) the fields in their crops' colours with their rows and the lawns by their kind
+--              ("Lawn_<kind>": the forest's floor, Config.VillageWorld.Lawns), flat, flush with the meadow
+--   Village    (its old name kept: the chunks hold the countryside) the spots' surroundings (a Model "Landmark_<id>"
+--              each, attribute VillageLandmark: the farm's barn, tractor, bales, paddock and muck heap, the fish pond,
+--              the lone house's garden, the lodge's woodpile, the millrace's weir and footbridge, the orchard's beehives,
+--              the halt), the trees of the tree lines, the orchard and the forest, the hedges and fences, the stream, in
+--              one Atomic model per chunk ("Village_<chunk>", Config.Village.Chunk: with StreamingEnabled each streams
+--              whole); the five places to empty in theirs (server/SandboxWorld.luau)
 --   Motorway   (a Persistent model: every client always has it, client/VillageTraffic.luau's cars run on it) the D5 at
 --              the east edge: its embankment, carriageways, crash barrier and noise wall
+--   Railway    (a Persistent model: it crosses the whole map) the railway along the south edge, under the D5
 --   Far        (a Persistent model) outside the Bounds: VillageLooks.horizon's far fields, tree lines, the power line,
---              the D5 going on, the far roofs and a church tower; no shadows, nothing but its fields collide
+--              the D5 going on, the railway going on; no shadows, nothing but its fields collide
 -- A piece's words (its `text`) are on its +Z face (Enum.NormalId.Back). Decoration (a piece not solid) never collides
 -- nor stops a ray; a shadow only from a mass or a tree's crown big enough to throw one you notice
 -- (Config.VillageWorld.Shadow, SandboxScenery.Shadow, RenderBudget).
 --
 --   VillageWorld.build(world)   builds it into workspace.Sandbox's folder `world` (before it is parented); returns
---                               the houses, the landmarks and the trees it made. Jinočany: the village with the
---                               houses to empty (VillageScenery.houses(VillageScenery.enter()): a terraced group one
---                               body round its house to empty), but not those (nor such a group): server/SandboxWorld.luau
---                               builds them with model and chunk, their doors walked in
+--                               the houses (none: SandboxWorld counts its own), landmarks and trees it made
 --   VillageWorld.model(name, pieces)   a Model (unparented) of VillageLooks pieces on the map (VillageLooks.place's),
---                               one part each, the way build makes them (Jinočany: the five houses to empty are,
---                               server/SandboxWorld.luau's villageHouse)
+--                               one part each, the way build makes them (the places to empty are: server/SandboxWorld
+--                               .luau's villageHouse)
 --   VillageWorld.chunk(world, key)     the Atomic chunk model Village_<key> (VillageLooks.chunkOf) in world.Village,
---                               made when first wanted (where such a house goes)
+--                               made when first wanted (where a place to empty goes)
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -180,17 +179,17 @@ end
 export type Built = { houses: number, landmarks: number, trees: number }
 
 function VillageWorld.build(world: Instance): Built
-	-- the ground: the fields, the village's lawns (SandboxWorld's meadow leaves their holes)
+	-- the ground: the fields, the lawns (SandboxWorld's meadow leaves their holes)
 	local ground = world:FindFirstChild("Ground") or folder(world, "Ground")
 	for _, f in VillageScenery.fields() do
 		for _, p in VillageLooks.field(f.kind, f.rect, f.seed) do
 			part(ground, p)
 		end
 	end
-	local L = W.Lawn
 	for _, r in SandboxMap.Lawns do
+		local L = W.Lawns[r.kind] or W.Lawns.forest
 		local lawn = Instance.new("Part")
-		lawn.Name = "VillageLawn"
+		lawn.Name = `Lawn_{r.kind}`
 		lawn.Anchored = true
 		lawn.Size = Vector3.new(r.x1 - r.x0, 2, r.z1 - r.z0)
 		lawn.CFrame = CFrame.new((r.x0 + r.x1) / 2, SandboxMap.GroundTop - 1, (r.z0 + r.z1) / 2)
@@ -203,41 +202,44 @@ function VillageWorld.build(world: Instance): Built
 		lawn.Parent = ground
 	end
 
-	-- the village: its houses, landmarks and trees in their chunks
+	-- the countryside: the landmarks, the trees, the hedges, fences and the stream in their chunks
 	local village = folder(world, "Village")
 	local chunks: { [string]: Model } = {}
 	local built: Built = { houses = 0, landmarks = 0, trees = 0 }
-	for _, h in VillageScenery.houses(VillageScenery.enter()) do
-		if VillageScenery.emptied(h) then
-			continue -- (Jinočany: a house to empty, or the terraced group it is in: server/SandboxWorld.luau builds it)
+	local persistent: { [string]: Model } = {}
+	local function keptModel(name: string): Model -- (a Persistent model: on every client always)
+		local model = persistent[name]
+		if not model then
+			local made = Instance.new("Model")
+			made.Name = name
+			made.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
+			persistent[name] = made
+			model = made
 		end
-		local pieces = VillageScenery.pieces(h)
-		local model = VillageWorld.model("VillageHouse", pieces)
-		model:SetAttribute("VillageHouse", h.id)
-		model:SetAttribute("Street", h.street)
-		if #h.ids > 1 then
-			model:SetAttribute("VillageHouses", table.concat(h.ids, ","))
-		end
-		model.Parent = chunkOf(village, chunks, if pieces[1] then pieces[1].chunk else VillageLooks.chunkOf(h.box.x0, h.box.z0))
-		built.houses += 1
+		return model :: Model
 	end
-	local motorway = Instance.new("Model")
-	motorway.Name = "Motorway"
-	motorway.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
 	for _, m in VillageScenery.landmarks() do
 		local pieces = VillageScenery.pieces(m)
 		local model = VillageWorld.model(`Landmark_{m.id}`, pieces)
 		model:SetAttribute("VillageLandmark", m.id)
-		model.Parent = if m.far then motorway else chunkOf(village, chunks, if pieces[1] then pieces[1].chunk else "far")
+		model.Parent = if m.far then keptModel(if m.kind == "motorway" then "Motorway" else "Railway") else chunkOf(village, chunks, if pieces[1] then pieces[1].chunk else "far")
 		built.landmarks += 1
 	end
-	motorway.Parent = world
+	for _, model in persistent do
+		model.Parent = world
+	end
 	for _, t in VillageScenery.trees() do
 		local key = VillageLooks.chunkOf(t.x, t.z)
 		for _, p in VillageLooks.tree(t.kind, t.x, t.z, t.seed, key) do
 			part(chunkOf(village, chunks, key), p)
 		end
 		built.trees += 1
+	end
+	for _, p in VillageScenery.lines() do
+		part(chunkOf(village, chunks, p.chunk), p)
+	end
+	for _, p in VillageScenery.streams() do
+		part(chunkOf(village, chunks, p.chunk), p)
 	end
 
 	-- far away: outside the Bounds, on every client
