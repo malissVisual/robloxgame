@@ -30,7 +30,8 @@
 -- The end of the move ends the hire. A second move (for hire again) where the room goes while he carries his piece ("Van's
 -- full, boss - drive it to the Wall?": set down beside the van), a third where nothing of his list fits, a fourth with
 -- the marble slab (two people) on his list: he waits at it ("needs you", the toast, "Lift with Danny"), long, and the
--- player lifts it with him through the grip's lift check; stuck (a new path, a nudge); his body taken away while he
+-- player lifts it with him through the grip's lift check; stuck (9.3: a new way, his ways out walked, a fade only at
+-- the end); his body taken away while he
 -- carries; an unhired Danny heads back when the crew grows; a crew mate's hire ends when they leave the move.
 local E = require("./MovingRuntime")
 local Moving = require("./MovingServer")
@@ -380,10 +381,28 @@ check("…the crew hears it, he says so; the status line: hired, nothing to carr
 E.request(sol, "helper", "hire")
 check("8.3 once a move: HIRE again takes nothing more", #E.spent == 1 and E.wallet[sol] == 400 and E.lastNotice(sol) == "Danny works for this move already.", E.lastNotice(sol))
 E.wallet[sol] = 2000 -- (the moves below hire him again)
-run(3, function()
-	return distance(body.root.Position, cargoDoor.WorldPosition) < 8
-end)
-check("8.4 …hired: he comes to the van at the house", distance(body.root.Position, cargoDoor.WorldPosition) < 8)
+do
+	-- 9.3 (the owner: no visible teleports): Sol by the van sees where he would appear, so he walks; nobody near, he is
+	-- put there (Far), faded in
+	local from = distance(body.root.Position, cargoDoor.WorldPosition)
+	local fadesAt = fades
+	run(3)
+	local walked = from - distance(body.root.Position, cargoDoor.WorldPosition)
+	check("9.3 hired far from the van, Sol by it: he walks to it (never put there in her sight)", walked > 20 and fades == fadesAt and (danny.teleports.far or 0) == 0, walked)
+	local was: { [any]: any } = {}
+	for _, player in E.Players:GetPlayers() do
+		was[player] = E.rootOf(player).Position
+		E.place(player, was[player] + V3(0, 0, -600))
+	end
+	run(3, function()
+		return distance(body.root.Position, cargoDoor.WorldPosition) < 8
+	end)
+	for player, at in was do
+		E.place(player, at)
+	end
+	check("8.4 …hired: he comes to the van at the house (9.3 nobody near: put there, faded in)", distance(body.root.Position, cargoDoor.WorldPosition) < 8
+		and fades == fadesAt + 1 and danny.teleports.far == 1)
+end
 
 -- The sofa: lifted together, carried together -------------------------------------------------------------------------------
 
@@ -758,8 +777,8 @@ local function look()
 	n += 1
 	local spot, role = Rules.holding(danny.s.move, danny.id)
 	loadShown = loadShown or (spot ~= nil and role == "carrier" and load.Enabled)
-	if spot == 4 and role == "carrier" and danny.action == "deliver" then
-		clockSpeed = lastSpeed
+	if spot == 4 and role == "carrier" and danny.action == "deliver" and distance(npc.PrimaryPart.Position, cargoDoor.WorldPosition) > H.Walk.Ease + 4 then
+		clockSpeed = lastSpeed -- (9.3 his walk on the way: he slows into his goal at its end)
 		arms = arms or { npc:GetAttribute("Carrying"), npc:GetAttribute("CarryHands") }
 	end
 	for _, s in { 1, 4, 5 } do
@@ -1508,54 +1527,94 @@ check("…Sol loads it: the slab in the van, both pairs of hands free", danny.s.
 Moving.admin(sol, "end")
 run(0.2)
 
--- Stuck: a new path after StuckRepath s, a nudge to the way's next point after StuckSnap s -------------------------------------
-
-Moving.admin(sol, "start")
-Moving.step()
-danny = MoveHelper.find(sol)
-E.request(sol, "helper", "hire")
-E.place(sol, outside)
-trigger(promptIn(workspace:FindFirstChild("Moves"):FindFirstChild("Move_marge"), "Enter house"), sol)
-give(itemModel(1))
-E.place(sol, outside)
-local routes: { any } = {}
-local spawn = E.task.spawn
-E.task.spawn = function(callback: any, ...: any) -- (the path in the background: at once here)
-	callback(...)
+-- 9.3 stuck (the owner: "he runs for 2 seconds and then on the spot he somehow teleports around"): an unseen wall across
+-- his way; a new way after Unstuck.Repath s, then his ways out walked (a step back, a sidestep), round again; only
+-- Unstuck.Fade s without progress the last resort, a fade over onto his way (never 8.9's nudge after 4 s); Studio's
+-- Output lines say so ("[Danny] stuck …", "[Danny] teleport stuck …")
+do
+	Moving.admin(sol, "start")
+	Moving.step()
+	danny = MoveHelper.find(sol)
+	E.request(sol, "helper", "hire")
+	E.place(sol, outside)
+	trigger(promptIn(workspace:FindFirstChild("Moves"):FindFirstChild("Move_marge"), "Enter house"), sol)
+	give(itemModel(1))
+	E.place(sol, outside)
+	local routes: { any } = {}
+	local spawn = E.task.spawn
+	E.task.spawn = function(callback: any, ...: any) -- (the path in the background: at once here)
+		callback(...)
+	end
+	local stuckAt = danny.body.root.Position -- (an unseen block: his way's walk goes nowhere; only his ways out are walked)
+	MoveHelper.useMover({
+		move = function(b: any, to: any, speed: number, dt: number)
+			local root = b.root
+			local here = root.Position
+			local way = V3(to.X - here.X, 0, to.Z - here.Z)
+			local length = way.Magnitude
+			local out = danny.recover
+			if length > 1e-6 and out and (to - out).Magnitude < 1e-6 then
+				local step = math.min(length, speed * dt)
+				root.CFrame = M.CFrame.new(here.X + way.X / length * step, here.Y, here.Z + way.Z / length * step)
+			end
+			b.walking = true
+			lastSpeed = speed
+		end,
+		halt = function(b: any)
+			b.walking = false
+		end,
+		appear = walker.appear,
+		route = function(_b: any, from: any, to: any): any
+			table.insert(routes, from)
+			return { from, from + V3(3, 0, 0), to }
+		end,
+	})
+	local lines: { string } = {}
+	MoveHelper.diagnose(true, function(line: string)
+		table.insert(lines, line)
+	end)
+	local fadesAt = fades
+	local repath, back, aside, rescued = 0, false, false, 0
+	local jumped, put = 0, 0
+	local last = danny.body.root.Position
+	local t = 0
+	run(11, function()
+		t += 0.1
+		local now = danny.body.root.Position
+		if repath == 0 and #routes >= 2 then
+			repath = t
+		end
+		back = back or (danny.phase == "back" and distance(now, stuckAt) > 0.7)
+		aside = aside or math.abs(now.Z - stuckAt.Z) > 1.5
+		if rescued == 0 and (danny.teleports.stuck or 0) > 0 then
+			rescued, put = t, distance(now, last)
+		elseif rescued == 0 then
+			jumped = math.max(jumped, distance(now, last))
+		end
+		last = now
+		return rescued > 0
+	end)
+	E.task.spawn = spawn
+	MoveHelper.useMover(walker)
+	MoveHelper.diagnose(false, nil)
+	local U = H.Unstuck
+	check("9.3 stuck: a new way from where he stands after Unstuck.Repath s", repath >= U.Repath - 0.15 and repath <= U.Repath + 0.35, repath)
+	check("…then his ways out, walked: a step back off the wall, a sidestep (never put anywhere: a walk's step at most)", back and aside
+		and jumped <= Config.Movement.Walk * H.Speed * 0.1 + 0.05, `{back} {aside} {jumped}`)
+	check("…only Unstuck.Fade s without progress the last resort: faded over onto his way, Unstuck.Rescue studs on (never the nudge on the spot)",
+		rescued >= U.Fade - 0.15 and rescued <= U.Fade + 0.35 and fades == fadesAt + 1 and put > 1 and put <= U.Rescue + 0.5, `{rescued} {fades - fadesAt} {put}`)
+	local stuckLine, teleportLine = nil, nil
+	for _, line in lines do
+		stuckLine = stuckLine or (if string.find(line, "[Danny] stuck ", 1, true) == 1 then line else nil)
+		teleportLine = teleportLine or (if string.find(line, "[Danny] teleport stuck ", 1, true) == 1 then line else nil)
+	end
+	check("9.3 Studio's Output: \"[Danny] stuck <s>s at <where> going to <where>, blocked by …\", a few seconds apart at most",
+		stuckLine ~= nil and string.find(stuckLine, "s at (", 1, true) ~= nil and string.find(stuckLine, ", blocked by ", 1, true) ~= nil and #lines <= 8, stuckLine)
+	check("…and \"[Danny] teleport stuck <studs> studs at <where>\" for the rescue", teleportLine ~= nil and string.find(teleportLine, " studs at (", 1, true) ~= nil,
+		teleportLine)
+	Moving.admin(sol, "end")
+	run(0.2)
 end
-MoveHelper.useMover({
-	move = function(b: any, _to: any, speed: number)
-		b.walking = true -- (blocked: he goes nowhere)
-		lastSpeed = speed
-	end,
-	halt = function(b: any)
-		b.walking = false
-	end,
-	route = function(_b: any, from: any, to: any): any
-		table.insert(routes, from)
-		return { from, from + V3(3, 0, 0), to }
-	end,
-})
-local stuckAt = danny.body.root.Position
-local repath, nudged = 0, 0
-local t = 0
-run(5, function()
-	t += 0.1
-	if repath == 0 and #routes >= 2 then
-		repath = t
-	end
-	if nudged == 0 and distance(danny.body.root.Position, stuckAt) > 2 then
-		nudged = t
-	end
-	return nudged > 0
-end)
-E.task.spawn = spawn
-MoveHelper.useMover(walker)
-check("7.x stuck: a new path after StuckRepath (2) s", repath >= H.StuckRepath - 0.15 and repath <= H.StuckRepath + 0.35, repath)
-check("…a nudge to his way's next point after StuckSnap (4) s", nudged >= H.StuckSnap - 0.15 and nudged <= H.StuckSnap + 0.35
-	and distance(danny.body.root.Position, stuckAt + V3(3, 0, 0)) < 0.05, `{nudged} s at {danny.body.root.Position}`)
-Moving.admin(sol, "end")
-run(0.2)
 
 -- 7.0 review: his body taken away (by something else) while he carries a piece: it falls, nobody holds it -----------------
 
