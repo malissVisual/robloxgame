@@ -209,6 +209,18 @@
 > PairKeep, PairWall). One put-down: while you carry in two only the piece's own G Put down prompt shows (no PUT IT
 > DOWN pill), and Danny's card reads "Carrying: Sofa with you" like his bubble. A crew mate holding the far end gets
 > the same hold.
+>
+> **8.9.5** (the owner: "add a drive pedal to the game … just visible pedals on PC, and on mobile as driving buttons"):
+> while you drive your own van, **GAS** (tall and narrow, on the floor) and **BRAKE** (wider and shorter, hanging from
+> its arm) stand at the lower right in the contract look, rubber ribs and all (`client/DrivePedals.luau`,
+> `shared/PedalRules.luau`, `Config.DrivePedals`). On a **phone or tablet** they are the driving buttons: hold GAS to
+> drive, BRAKE to brake and then back up (as S does), both to stop; the thumbstick still steers and each thumb is its
+> own touch (`Drive.setPedal`). They sit at the bottom just left of EXIT, a finger's size or more, clear of the jump
+> button, the thumbstick, EXIT, the speed and a visitor's offer card, and never jump from under a finger. On a
+> **computer** they are small, over the speed, and show your feet: W / S, a gamepad's R2 / L2 part way (R2 / L2 under
+> them); a mouse can hold them too. Pressed, a pedal tips down, darkens and its red line lights; let go, it springs
+> back. Only in your own driver's seat, with the HUD up and no window open (`tests/drivepedals_test.luau`,
+> `tools/phone-ui/drivepedals.luau`).
 
 The active Roblox game in this repository (Merge Blades is preserved in `../archive/merge-blades`). **You run a delivery company** in a world
 gone wrong: take a job, carry the cargo to your vehicle with your own hands (or lead the horses on a rope), drive it

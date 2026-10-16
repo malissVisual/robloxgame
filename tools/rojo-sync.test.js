@@ -607,7 +607,7 @@ async function serverTest() {
 		// Malá změna bez potvrzení → varování s radou.
 		write("src/shared/Small.luau", "return 2\n");
 		check(await run.waitFor(/! Studio nepotvrdilo změnu \(~1\)/, 12000), "server: varuje, když Studio nepotvrdí");
-		check(/smaž ReplicatedStorage\.Shared, ServerScriptService\.Server/.test(run.output()), "server: rada, co smazat");
+		check(await run.waitFor(/smaž ReplicatedStorage\.Shared, ServerScriptService\.Server/, 3000), "server: rada, co smazat");
 		const late = ws.packets[ws.packets.length - 1].body.messages[0].updated[0];
 		await request(port, "POST", "/api/serialize", sync.encode({ sessionId, ids: [late.id] }));
 		check(await run.waitFor(/✓ Studio převzalo změnu \(~1\) \(za [\d.]+ s, pozdě\)/), "server: pozdní potvrzení");
