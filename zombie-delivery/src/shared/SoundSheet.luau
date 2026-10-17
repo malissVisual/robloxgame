@@ -28,7 +28,7 @@ SoundSheet.Sfx2Id = "rbxassetid://86322785000784" -- "rbxassetid://…" of art/a
 SoundSheet.Sfx3Id = "rbxassetid://86357789297571" -- "rbxassetid://…" of art/audio/sfx3.ogg (6.12)
 SoundSheet.Sfx4Id = "rbxassetid://134212774972582" -- "rbxassetid://…" of art/audio/sfx4.ogg (7.1)
 SoundSheet.Sfx5Id = "rbxassetid://100303087856022" -- "rbxassetid://…" of art/audio/sfx5.ogg (8.9)
-SoundSheet.Sfx6Id = "" -- "rbxassetid://…" of art/audio/sfx6.ogg (10.1)
+SoundSheet.Sfx6Id = "rbxassetid://84428335686764" -- "rbxassetid://…" of art/audio/sfx6.ogg (10.1)
 
 SoundSheet.Sfx = {
 	gun_light = { 0.0, 0.349977 },
