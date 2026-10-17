@@ -239,7 +239,7 @@ E.advance(Config.Collection.Tick * 2)
 check("everything again: no step logged twice", #onboarding == logged, #onboarding - logged)
 check("MoveStarted counts the session's moves (the second: 2)", #events(ann, "MoveStarted") == 2 and events(ann, "MoveStarted")[2].value == 2)
 local profile = PlayerData.get(ann) :: any
-check("the profile holds every sandbox step, the city's field untouched", profile.sandboxOnboarding == Plan.allOf(Plan.SandboxSteps) and profile.onboarding == 0,
+check("the profile holds every sandbox step (10.5: no city funnel field)", profile.sandboxOnboarding == Plan.allOf(Plan.SandboxSteps) and profile.onboarding == nil,
 	`{profile.sandboxOnboarding} {profile.onboarding}`)
 
 -- ── Leaving and coming back ────────────────────────────────────────────────

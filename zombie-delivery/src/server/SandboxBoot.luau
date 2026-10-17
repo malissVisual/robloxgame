@@ -138,7 +138,7 @@ end
 -- The van is the player's one vehicle: profile.car, the only car in the sandbox save (no bike).
 local function ownVan(player: Player, profile: PlayerData.Profile): string
 	local id = SandboxBoot.vanId()
-	local changed = profile.car ~= id or profile.bike ~= nil or profile.lastCar ~= nil or profile.cars[id] ~= true
+	local changed = profile.car ~= id or profile.cars[id] ~= true
 	for other in profile.cars do
 		if other ~= id then
 			profile.cars[other] = nil
@@ -146,7 +146,7 @@ local function ownVan(player: Player, profile: PlayerData.Profile): string
 		end
 	end
 	profile.cars[id] = true
-	profile.car, profile.bike, profile.lastCar = id, nil, nil
+	profile.car = id
 	if changed then
 		PlayerData.notify(player)
 	end

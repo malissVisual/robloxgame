@@ -127,9 +127,7 @@ local function newPlayer(name: string, plot: number?): any
 	profiles[player] = {
 		money = Config.Sandbox.StartMoney,
 		car = Config.CompanyVan.Car,
-		cars = { [Config.CompanyVan.Car] = true, citybike = true },
-		bike = "citybike",
-		lastCar = nil,
+		cars = { [Config.CompanyVan.Car] = true, citybike = true }, -- (an old save's bike: ownVan drops it)
 		carHealth = {},
 	}
 	E.fire("Players.PlayerAdded", player)
@@ -284,7 +282,7 @@ local owned = 0
 for _ in profile.cars do
 	owned += 1
 end
-check("the only vehicle: profile.car the van, no other car, no bike", profile.car == vanId and profile.cars[vanId] == true and owned == 1 and profile.bike == nil)
+check("the only vehicle: profile.car the van, no other car (the old bike gone)", profile.car == vanId and profile.cars[vanId] == true and owned == 1)
 check("Marge's tutorial is never asked (Tutorial.ahead)", touched("Tutorial") == nil)
 E.fire("Net.get(Play).OnServerEvent", ann)
 check("a second PLAY changes nothing", #placed == 0)
