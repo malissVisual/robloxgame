@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "8.9.4"
+Config.Version = "8.9.3"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -1750,19 +1750,6 @@ Config.ItemTuning = {
 	-- the breath when it changes and divides the sprint's drain by EnergyBreath until then)
 	EnergyTime = 30,
 	EnergyBreath = 1.3,
-}
-
--- 8.9.4 (the owner: "on the screen as if driving with pedals, an automatic"): the driving dashboard over the speed while
--- you drive your own car (client/DrivePedals.luau in the HUD's vehicle line; shared/PedalRules.luau decides what it
--- shows): an automatic's selector P R N D and its two pedals, the brake and the gas, pressed as you drive (W / S, the
--- arrows, a gamepad's triggers or a phone's thumbstick: the van drives as before, the pedals only show it).
---   On      the dashboard shows (false: the speed and the fuel as before)
---   Stop    studs a second: slower than this the car stands (P when nothing is pressed; S then backs up: R)
---   Ease    a pedal follows your foot this fast (its share a second: 1 / Ease s from up to down)
-Config.DrivePedals = {
-	On = true,
-	Stop = 0.5,
-	Ease = 9,
 }
 
 -- 5.4, fuel (shared/FuelMath.luau, server/Fuel.luau, client/FuelGauge.luau). Every car (never a bike or the scooter)

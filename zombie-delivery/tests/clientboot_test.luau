@@ -2,7 +2,8 @@
 -- 8.0 SANDBOX (design/sandbox/KONTRAKT.md), the client's boot: the real client/Main.client.luau (tests/run_tests.py
 -- copies it as ClientMain.luau, a function of the globals it reads) runs on recorders: every module it requires is a
 -- stand-in that takes any field, call or assignment and writes the calls down. Checked:
---   * 10.0 (only the sandbox is the game): Config.Sandbox.On = false starts the sandbox all the same;
+--   * the city (Config.Sandbox.On = false): the same systems start, in the same order, as before the sandbox (the
+--     list below is the 7.x client's);
 --   * the sandbox (On = true): only the sandbox's systems start, none of the city's is even required; the sandbox's
 --     own modules (SandboxHud, WarehouseUi, SandboxGuide: other workers') start only when they are there, one that
 --     fails to load or has no start is skipped; 8.1: SandboxSounds (the sandbox's sounds) starts last, with or without
@@ -28,6 +29,18 @@ local function check(name: string, ok: boolean, detail: any?)
 		print("FAIL  " .. name .. (if detail ~= nil then "  (" .. tostring(detail) .. ")" else ""))
 	end
 end
+
+-- The city's client before the sandbox (7.x): what it starts, in order (X.start, or JobThumbUi.preload).
+local CITY = {
+	"Drive", "Shooting", "ZombieAnimator", "CarVisuals", "Weather", "Hud", "ReadyCheck", "CameraRig", "ArmPose",
+	"AdminPanel", "AdminFly", "AnimalAnimator", "Leaderboard", "CrewPanel", "EstateUi", "BusinessUi", "TrafficAnimator",
+	"Sounds", "MissionsUi", "WeaponWheel", "DispatchUi", "Secrets", "GarageUi", "Stamina", "Discovery", "TutorialUi",
+	"Holster", "CarBoarding", "LocationTag", "CareerUi", "RoadEventUi", "Phone", "CargoPrompts", "BusRide", "BusMapBoard",
+	"RentalUi", "ZipRide", "GaitPose", "BodyLife", "BagSway", "KeyHints", "Throw", "Unstuck", "CurbRide", "ShopPropMotion",
+	"PerfOverlay", "GrindChips", "EnemyOutline", "JobThumbUi.preload", "ZombieLife", "ZombieFx", "EventBanner", "CarSway",
+	"TyreFx", "CrashFx", "SpeedLines", "MovingHud", "MoveHelperHud", "MoveLobbyUi", "QuickChat", "CarryGripUi",
+	"RegularsApp", "SpecialOrderUi",
+}
 
 -- The sandbox's client: walking, the camera and the body, the cars, the sounds, the admin, the move's horde, the moves
 -- (with the crew panel for the planning's + INVITE; 8.3 the walk-in doors' leaves and arrival: WalkDoors), the HUD and
@@ -269,12 +282,20 @@ local function concat(...: { string }): { string }
 	return out
 end
 
--- ── 10.0: no city any more (Config.Sandbox.On = false) ─────────────────────
+-- ── The city (Config.Sandbox.On = false) ────────────────────────────────────
 
 do
-	local run = boot(false, { SandboxHud = "ok", WarehouseUi = "ok", SandboxGuide = "ok", UpgradeUi = "ok", CollectionBookUi = "ok", SandboxTasksUi = "ok", MoveHelperCard = "ok", DannyOrders = "ok", OfferCard = "ok", VanPaintUi = "ok", TradeUi = "ok" }, true)
-	local ok, where = same(starts(run), concat(SANDBOX, OWN, LAST))
-	check("10.0: Config.Sandbox.On false starts the sandbox all the same", ok, where)
+	local run = boot(false, { SandboxHud = "ok", WarehouseUi = "ok", SandboxGuide = "ok", UpgradeUi = "ok", CollectionBookUi = "ok", SandboxTasksUi = "ok", MoveHelperCard = "ok", DannyOrders = "ok", OfferCard = "ok", VanPaintUi = "ok", TradeUi = "ok" })
+	local ok, where = same(starts(run), CITY)
+	check(`the city starts its {#CITY} systems as before, in the same order`, ok, where)
+	check("the city starts none of the sandbox's own modules (even when they are there)", run.required.SandboxHud == nil and run.required.WarehouseUi == nil and run.required.SandboxGuide == nil and run.required.UpgradeUi == nil and run.required.CollectionBookUi == nil and run.required.SandboxTasksUi == nil
+		and run.required.MoveHelperCard == nil and run.required.DannyOrders == nil and run.required.VanPaintUi == nil and run.required.OfferCard == nil
+		and run.required.TradeUi == nil and run.required.TradePrompts == nil)
+	check("the city: the start screen, PLAY, RequestState as before", called(run, "Menu.show") and called(run, "Net.get(RequestState).FireServer"))
+	check("8.3: the city never requires the sandbox's walk-in doors' client (WalkDoors)", run.required.WalkDoors == nil)
+	check("9.0: the city's camera keeps its locked aiming (CameraRig.aimOnly and armed never set: Alt and MOUSE as before)",
+		run.modules.CameraRig.aimOnly ~= true and run.modules.CameraRig.armed ~= run.modules.CameraRig.toolEquipped)
+	check("the city: no warnings", #run.warnings == 0, table.concat(run.warnings, " | "))
 end
 
 -- ── The sandbox (Config.Sandbox.On = true) ──────────────────────────────────

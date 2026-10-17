@@ -1,0 +1,2012 @@
+--!strict
+-- Approved courier phone UI: charcoal rectangular surfaces, white glyphs, red accents (design/phone-ui/).
+-- Q / gamepad down opens it after Marge gives it. The same server-authoritative orders, messages, board,
+-- career, shopping GPS, bike/car switch, tow and PhoneHold lifecycle remain in use. Home shows the live focused
+-- contract and eight apps; ORDERS adds a discovered-only road preview. BANK displays existing cash (no banking
+-- transactions); SETTINGS uses the existing sound cycle. Home scrolls; short viewports use a slightly smaller,
+-- shorter upright device (it never turns sideways). Hardware alone has modest corner rounding.
+-- PhoneContract draws art, PhoneLayout computes sizing/payload text, PhoneRoute draws the actual route.
+-- No new gameplay remotes, currencies or prices. Phone does not change character joints.
+-- 5.5, the HUD MENU in the phone (client/PhoneApps.luau, client/PhoneMotion.luau):
+--   * The MENU's actions are apps under the first eight: MISSIONS, CREW, TOP, ESTATE (the phone closes and their window
+--     opens: Phone.onMissions / onCrew / onTop / onEstate), BAG (in the phone), GARAGE (BRING MY CAR, MY BIKE, CALL
+--     CAR, TOW). GIVE UP sits at the bottom of ORDERS (a second press within 4 s, CancelJob). SETTINGS lists every key
+--     and the version; BANK adds what you earned since you joined. The HUD's MENU opens the phone once you have one
+--     (Main: Hud.onMenu); before Marge it keeps its list.
+--   * BOARD: the job board in the phone (ACCEPT / + ADD ORDER fire AcceptJob; FULL BOARD opens the Dispatch board).
+--   * New messages and new boards drop a banner from the top of the open phone (a tap opens MESSAGES or BOARD).
+-- 6.0.1, the owner's wish: the phone never turns sideways (5.5's turn for BOARD / CAREER / SHOP / BAG is gone). Every
+--   app opens in a centred popup over the game (client/PhonePopup.luau: a dim, lightly blurred backdrop, a ZDC panel
+--   with Ui.window's header, the app in a scrolling body; it grows from the tapped tile). The phone stays at its place
+--   under the backdrop, on its home screen; closing the app (✕, the backdrop, Q, ESC, gamepad B) returns to it, and Q /
+--   ESC / B again put the phone away. A wide popup shows BOARD, CAREER and SHOP in two columns. MISSIONS, CREW, TOP,
+--   ESTATE, MAP and FULL BOARD still put the phone away and open their windows. The right-mouse camera
+--   (CameraRig.freeLook, Main) is off while an app is open: the mouse is needed.
+-- 6.5, the home of everything ("I can't find my way in anything"): home is six big tiles in this order, each with its
+--   line glyph, its name and a one-line subtitle: JOBS (the board, or ORDERS during a run; its badge counts the open
+--   orders, off duty the new runs), MAP (the big map), SHOP (client/PhoneApps.luau: the shops and what they sell, a
+--   tap sets the GPS and puts the phone away; under them what to save up for, as before; 6.18 wave 2: PhoneApps.shop, SAVE
+--   UP and SHOPS in the UI kit's look), BAG & ITEMS (the I window's
+--   BAG / ITEMS / BAGS tabs), GARAGE and MORE (a sub-screen in the phone: CAREER, MISSIONS, CREW, TOP, ESTATE, BANK,
+--   MESSAGES, SETTINGS; ESC or ‹ BACK returns to the tiles). Under the tiles a messages row (always there: the unread
+--   count and the newest line), the focused contract and the courier card. Every app and window is the same as
+--   before; only home is regrouped.
+-- 6.12, MORE → TASKS (client/TasksApp.luau): the daily and weekly tasks in the popup. The rewards waiting to be
+--   claimed go on its row, on MORE and on the phone's dot (with the unread messages: Phone.onUnread).
+-- 6.12, MORE → STYLE (client/StyleApp.luau): the wardrobe; the looks are bought from the clerks at the shops. A clerk's
+--   "Style" prompt (the Style remote's ("open", tab)) opens the phone on STYLE at that tab; the ticker re-checks the
+--   shop you stand at while it shows.
+-- 6.12.8 (the owner: "I don't need to see this window, I want a list of the jobs and what I earn"): JOBS always opens
+--   BOARD, during a run too (YOUR RUN and NEXT UP on top, + ADD / + QUEUE / ADD ALL: client/PhoneApps.luau); the
+--   home's contract card still opens ORDERS, and so does YOUR RUN's DETAILS. The JobQueue remote's state (the NEXT UP
+--   queue, server/JobQueue.luau) is kept in refs.queue: JOBS' line says "Your run · 2 orders · 3 next".
+-- 6.14, MORE → REGULARS (client/RegularsApp.luau): every business that gives jobs, your tier with it and the way to the
+--   next one, in the popup.
+-- 6.14, get ready for the mission (the owner: "jobs are the daily work: grind, save up for something, then progress in
+--   the mission"; client/ReadyCheck.luau, shared/Readiness.luau): home opens with two wide tiles instead of 6.12.5's
+--   three equal ones. NEXT MISSION (the chapter and n/N, the mission, "2 of 3 ready" in red or "READY · START" in green,
+--   the savings goal's bar) opens the READY CHECK in the popup (app "ready": the checklist with its GPS / INVITE / JOBS
+--   / GARAGE actions, START, MISSIONS). WORK is the JOBS app as before (id "jobs", the board) with a second line, what
+--   you earn for ("Earn for the Old Van · $1,160 to go"; 6.15: while a live event pays, "🌕 BLOOD MOON · jobs pay ×2"
+--   in amber first, shared/LiveEvents.luau workLine). TASKS and MISSIONS join the smaller tiles (their lines, bars
+--   and badges as before).
+-- 6.17, JOBS at a glance (client/JobsView.luau): the app is titled JOBS; its chips (YOUR RUN, NEXT UP, rush hour) sit
+--   in the popup's header (PhonePopup.bar, host.bar / host.room); a tap on JOBS opens it on its list
+--   (PhoneApps.boardHome); Phone.showing() names the open app (Main: J closes JOBS again).
+-- 6.18, the home in the UI kit's look (the owner: "I need it unified so the phone looks like that [JOBS]"; client/
+--   PhoneHome.luau draws it with client/CardKit.luau): the header's chips (cash, level, shift), ONE hero card (NEXT
+--   MISSION with its READY state and savings bar; during a run YOUR RUN with the next stop, its pay and clock), then a
+--   compact row an app (JOBS "7 jobs · best $1,140", TASKS, MISSIONS, MAP, SHOP, BAG & ITEMS, GARAGE, STYLE, MORE: an
+--   icon, one live line, a badge, "›"), MESSAGES and the quick switch. MORE's sub-screen is rows too. The rows keep
+--   their names (jobsApp …) for Marge's arrows; WORK is JOBS again; every app opens as before.
+
+local GuiService = game:GetService("GuiService")
+local Lighting = game:GetService("Lighting")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Career = require(Shared.Career)
+local Config = require(Shared.Config)
+local Economy = require(Shared.Economy)
+local Levels = require(Shared.Levels)
+local Map = require(Shared.Map)
+local Net = require(Shared.Net)
+local Transport = require(Shared.Transport)
+local Ui = require(script.Parent.Ui)
+local Theme = require(script.Parent.Theme)
+local P = require(script.Parent.HudContract)
+local MapView = require(script.Parent.MapView)
+local KitShop = require(script.Parent.KitShop)
+local CareerUi = require(script.Parent.CareerUi)
+local OrdersUi = require(script.Parent.OrdersUi) -- 5.2: every order of your run
+
+local K = Theme.Contract
+local Phone = {}
+
+-- Set by Main.
+Phone.onOpen = nil :: (() -> ())? -- the phone opens: close the other windows (Hud.closeWindows)
+Phone.onUnread = nil :: ((number) -> ())? -- 6.5: the unread messages, for the HUD's PHONE button (Hud.setPhoneUnread)
+Phone.onBoard = nil :: (() -> ())? -- FULL BOARD: DispatchUi.open
+Phone.onMissions = nil :: (() -> ())? -- 5.5, the MENU's apps: MissionsUi.toggle
+-- 6.12.5: the MISSIONS tile's line (set by Main: MissionsUi.summary, the chapter you are at)
+Phone.missionInfo = nil :: (() -> { name: string, done: number, total: number, open: boolean, why: string?, new: boolean })?
+Phone.onCrew = nil :: (() -> ())? -- CrewPanel.toggle
+Phone.onTop = nil :: (() -> ())? -- Leaderboard.toggle
+Phone.onEstate = nil :: (() -> ())? -- EstateUi.toggleList
+Phone.onSound = nil :: (() -> ())? -- Sounds.cycle
+Phone.onOutline = nil :: (() -> boolean)? -- 6.15, SETTINGS: the enemies' outline off / on, the new state (EnemyOutline.toggle)
+Phone.outlineOn = nil :: (() -> boolean)? -- 6.15: is it on (EnemyOutline.isOn)
+Phone.onCareer = nil :: (() -> ())? -- FULL CAREER: CareerUi.open
+Phone.boardOpen = nil :: (() -> boolean)? -- is the Dispatch board open (DispatchUi.isOpen): no "new runs" then
+Phone.blocked = nil :: (() -> boolean)? -- the NEW PHONE pop-up waits while this says so (Marge's dialog, a result)
+Phone.notify = nil :: ((string) -> ())? -- a toast (Hud.toast)
+Phone.onTour = nil :: ((kind: string) -> ())? -- 6.7, SETTINGS: "screen" / "around", Marge's tours (client/TutorialUi.luau)
+
+local player = Players.LocalPlayer
+local KEY = Enum.KeyCode.Q -- 5.4.1 (was O; the weapon wheel moved to T)
+local PAD_KEY = Enum.KeyCode.DPadDown
+local BEZEL = 9
+local SLIDE = TweenInfo.new(0.24, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+local SLIDE_OUT = TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+local MAX_MESSAGES = 30
+
+-- The phone's own surfaces around the contract tokens: the body a step lighter than charcoal (it reads as a device),
+-- the screen nearly black, the app tiles raised.
+local BODY = Color3.fromRGB(36, 40, 47)
+local BODY_EDGE = Color3.fromRGB(70, 75, 83)
+local SCREEN = Color3.fromRGB(10, 12, 15)
+local TILE_HOVER = Color3.fromRGB(40, 45, 53)
+
+type Message = { from: string, text: string, time: string, unread: boolean, kind: string }
+-- 5.5: `window` opens a window of its own (the phone closes first); the others open in the popup (6.0.1).
+-- 6.5: `sub`, the one line under the name. 6.12.5 / 6.14: `bar`, a thin progress bar along the tile's foot.
+type AppDef = { id: string, name: string, sub: string, window: boolean?, bar: boolean? }
+
+-- 6.12.5 (the owner: "the main things, jobs, missions and tasks, more visible in the phone"): the main apps first, with
+-- their live lines. 6.14: NEXT MISSION (its READY CHECK: the app "ready", client/ReadyCheck.luau) on top. 6.18: NEXT
+-- MISSION is the home's hero card (client/PhoneHome.luau, id "next"); then a compact row an app, in this order (JOBS
+-- always opens BOARD; MORE its sub-screen) …
+local APPS: { AppDef } = {
+	{ id = "jobs", name = "JOBS", sub = "Take a delivery" },
+	{ id = "tasks", name = "TASKS", sub = "Daily and weekly", bar = true },
+	{ id = "missions", name = "MISSIONS", sub = "Story chapters", window = true, bar = true },
+	{ id = "map", name = "MAP", sub = "The city, your GPS", window = true },
+	{ id = "shop", name = "SHOP", sub = "Where to buy what" },
+	{ id = "bag", name = "BAG & ITEMS", sub = "Bag, items, bags" },
+	{ id = "garage", name = "GARAGE", sub = "Bike, car, tow" },
+	{ id = "style", name = "STYLE", sub = "Your looks" }, -- 6.12 (the clerks sell them: client/StyleApp.luau)
+	{ id = "more", name = "MORE", sub = "Career, crew, estate …" },
+}
+
+-- … and MORE's entries (the 5.5 MENU's windows among them).
+local MORE: { AppDef } = {
+	{ id = "career", name = "CAREER", sub = "Your level and what's next" },
+	{ id = "regulars", name = "REGULARS", sub = "Businesses that know you" }, -- 6.14 (client/RegularsApp.luau)
+	{ id = "crew", name = "CREW", sub = "Work with friends", window = true },
+	{ id = "top", name = "TOP", sub = "The best couriers", window = true },
+	{ id = "estate", name = "ESTATE", sub = "Homes, garages, offices", window = true },
+	{ id = "bank", name = "BANK", sub = "Your cash and earnings" },
+	{ id = "messages", name = "MESSAGES", sub = "From Marge and dispatch" },
+	{ id = "settings", name = "SETTINGS", sub = "Sound, keys, version" },
+}
+
+local state: any = nil
+local job: any = nil
+local gui: ScreenGui? = nil
+local refs: { [string]: any } = {} -- the instances (one table: few locals)
+refs.design = require(script.Parent.PhoneContract)
+refs.layout = require(script.Parent.PhoneLayout)
+refs.routes = require(script.Parent.PhoneRoute)
+refs.apps = require(script.Parent.PhoneApps) -- 5.5: BOARD, BAG, GARAGE, the keys
+refs.motion = require(script.Parent.PhoneMotion) -- 5.5: the banner
+refs.popup = require(script.Parent.PhonePopup) -- 6.0.1: the apps' centred popup
+refs.tasks = require(script.Parent.TasksApp) -- 6.12: TASKS, the daily and weekly tasks (6.12.5: on home)
+refs.style = require(script.Parent.StyleApp) -- 6.12: STYLE, the cosmetics
+refs.regulars = require(script.Parent.RegularsApp) -- 6.14: REGULARS, the businesses that know you
+refs.queueRules = require(Shared.JobQueue) -- 6.12.8: the NEXT UP queue's words (refs.queue: the server's state)
+refs.ready = require(script.Parent.ReadyCheck) -- 6.14: NEXT MISSION, its READY CHECK, WORK's goal line
+refs.gps = require(script.Parent.Gps) -- 6.14: the GPS to a shop or a landmark (gpsTo)
+refs.homeUi = require(script.Parent.PhoneHome) -- 6.18: the home in the UI kit's look (the hero, the app rows)
+refs.moreApps = require(script.Parent.PhoneMore) -- 6.18 wave 2: CAREER, BANK, MESSAGES and SETTINGS in the UI kit's look
+local tiles: { [string]: any } = {} -- the app tiles' badges by app id
+refs.subs = {} -- 6.5: the tiles' and MORE rows' subtitles by app id (JOBS says what it opens)
+refs.bars = {} -- 6.12.5: the MAIN tiles' progress bars by app id (MISSIONS, TASKS: fillMain)
+refs.page = "home" -- 6.5: the home's page: "home" (the six tiles) or "more" (MORE's sub-screen)
+local isOpen = false
+local app = "home"
+local messages: { Message } = {}
+local boardNew = 0 -- runs pushed while the board was closed
+local lastRefreshAt: number? = nil
+local phoneBefore: boolean? = nil -- the state's phone at the last state (nil before the first state)
+local momentShown = false
+local seeded = false
+local shownLevel: number? = nil
+
+-- ── What the phone knows ───────────────────────────────────────────────────
+
+local function hasPhone(): boolean
+	return state ~= nil and state.phone == true
+end
+
+local function myXp(): number
+	local xp = tonumber(player:GetAttribute("Xp"))
+	if xp == nil and state and type(state.xp) == "number" then
+		xp = state.xp
+	end
+	return xp or 0
+end
+
+local function myLevel(): number
+	return Levels.levelFor(myXp())
+end
+
+local function money(): number
+	return if state then tonumber(state.money) or 0 else 0
+end
+
+local function kit(): Transport.Kit
+	return KitShop.owned(state)
+end
+
+-- "18:42" from the game's clock.
+local function clockText(): string
+	local hour = Lighting.ClockTime % 24
+	local h = math.floor(hour)
+	local m = math.floor((hour - h) * 60)
+	return string.format("%02d:%02d", h, m)
+end
+
+local function shiftText(): string
+	if Map.isNight(Lighting.ClockTime) then
+		return `NIGHT SHIFT · JOBS PAY ×{Config.DayNight.NightPay}`
+	end
+	return "DAY SHIFT · THE BOARD IS OPEN"
+end
+
+-- How you get around: "ON FOOT · HANDS 2 / TOTE 5" or the vehicle's name (5.1: 🚲 a bike).
+local function transportText(): string
+	if state and type(state.car) == "string" then
+		local def = Economy.findCar(state.car)
+		return `{if def and def.stand then "🛴" elseif def and def.bike then "🚲" else "🚐"} {string.upper(if def then def.name else state.car)}`
+	end
+	return `🚶 ON FOOT · {KitShop.roomText(kit(), if state and type(state.bag) == "string" then state.bag else nil)}` -- (6.4: the bag in use)
+end
+
+-- The first vehicles you can own (dealer cars, not bikes), the earliest first.
+local function vehicles(): { Config.CarDef }
+	local list: { Config.CarDef } = {}
+	for _, def in Config.Cars do
+		if not def.company and not def.bike and not def.sandboxOnly then -- (8.0: never the sandbox's ZDC Sprinter)
+			table.insert(list, def)
+		end
+	end
+	table.sort(list, function(a: Config.CarDef, b: Config.CarDef): boolean
+		if (a.level or 1) ~= (b.level or 1) then
+			return (a.level or 1) < (b.level or 1)
+		end
+		return a.price < b.price
+	end)
+	return list
+end
+
+-- Marge's tips: what a level opens, in her words, all from Config. Level 1 has two.
+local function margeTips(level: number): { string }
+	local tips: { string } = {}
+	if level == 1 then
+		table.insert(tips, "Welcome to Dead End Dispatch. Your first runs are on foot: letters, medicine, pizza, parcels. Take the ON FOOT runs on the board (J). Be quick and they tip.")
+		-- 7.x (one car, Config.CompanyVan): the van is yours from day one
+		local van = Economy.findCar(Config.CompanyVan.Car)
+		table.insert(tips, `The company's {if van then van.name else "van"} is yours: CAR brings it anywhere. The ★ car jobs open at level {Config.Jobs.Tiers[1].level}.`)
+		-- (6.6: no backpacks: the next bag up, at ZDC Bags by the spawn; 6.23: every bag is bought for each game, the
+		-- cheapest first)
+		local cheapest: Config.KitDef? = nil
+		for _, def in Config.Kit do
+			if def.extra and (cheapest == nil or def.price < (cheapest :: Config.KitDef).price) then
+				cheapest = def
+			end
+		end
+		-- (6.12.2: no Running Shoes in her tip any more: they are gone)
+		if cheapest then
+			table.insert(tips, `Your hands hold {Config.Cargo.HandsMax}. A bag holds more, and you buy it for each game at {Config.BagShop.Name} (by the spawn): the {cheapest.name} holds {cheapest.extra or 0} ({Career.money(cheapest.price)}). The SHOP app says what you can afford.`)
+		end
+	end
+	-- (5.1: the bike shop at Career.BIKE_LEVEL is Marge's own text from the server, with the GPS: server/Tutorial.luau)
+	local first = vehicles()[1]
+	if first and (first.level or 1) == level and level > 1 and not first.starter then -- (7.x: the ZDC Van is yours from level 1)
+		table.insert(tips, `Level {level}: the {first.name} is yours to buy at Dead End Motors ({Career.money(first.price)}). With a vehicle the car jobs open, and the missions.`)
+	end
+	for _, tier in Config.Jobs.Tiers do
+		if tier.level == level and level > 1 then
+			table.insert(tips, `{string.rep("★", tier.stars)} {tier.name} jobs are on the board from now on{if state and type(state.car) ~= "string" then ", once you have a vehicle" else ""}.`)
+		end
+	end
+	return tips
+end
+
+-- ── Messages ───────────────────────────────────────────────────────────────
+
+local refreshBadges: () -> () = function() end
+local renderApp: () -> () = function() end
+local setApp: (id: string) -> () = function() end -- (── Showing ──)
+local lastUnread = -1 -- 6.5: the unread count last told to Phone.onUnread
+local crewInvites = 0 -- 6.5 review: the crew invitations waiting (Phone.setCrewInvites): a badge on MORE
+local placeButton: () -> () = function() end -- (the PHONE action's place, ── The PHONE action ──)
+
+local function unreadCount(): number
+	local count = 0
+	for _, message in messages do
+		if message.unread then
+			count += 1
+		end
+	end
+	return count
+end
+
+local function addMessage(from: string, text: string, kind: string, unread: boolean)
+	table.insert(messages, { from = from, text = text, time = clockText(), unread = unread, kind = kind })
+	while #messages > MAX_MESSAGES do
+		table.remove(messages, 1)
+	end
+	refreshBadges()
+	if isOpen and (app == "messages" or app == "home") then
+		renderApp()
+	end
+	-- 5.5: a banner drops from the top of the open phone (a tap opens BOARD for a new board, else MESSAGES); 6.0.1: from
+	-- the top of the open app's popup.
+	local target = if kind == "board" then "board" else "messages"
+	if isOpen and unread and app ~= target and refs.screen then
+		local panel = refs.popup.panel()
+		refs.motion.banner(panel or refs.screen, if panel then 0 else refs.statusH or 30, from, text, function()
+			setApp(target)
+		end)
+	end
+end
+
+-- The first state: Marge's tips up to your level are already in the phone (read).
+local function seed()
+	if seeded or not state then
+		return
+	end
+	seeded = true
+	local level = myLevel()
+	shownLevel = level
+	for n = 1, level do
+		for _, tip in margeTips(n) do
+			addMessage("Marge", tip, "marge", false)
+		end
+	end
+end
+
+-- ── Small pieces ───────────────────────────────────────────────────────────
+-- 5.4, the phone's type and spacing scale (every app): a section label caps 11 secondary; a title HeadingFont 16 – 18;
+-- the body Font 14; meta Font 12 secondary. Gaps of 4, 8, 12 and 16.
+
+local function text(parent: Instance, value: string, size: UDim2, props: { [string]: any }?): any
+	local label = Ui.label(parent, value, size, { TextColor3 = K.text, Font = Theme.Font, TextSize = 14, TextWrapped = true })
+	if props then
+		for key, v in props do
+			label[key] = v
+		end
+	end
+	return label
+end
+
+local function caps(parent: Instance, value: string, order: number, color: Color3?): any
+	return P.caps(parent, value, UDim2.new(1, 0, 0, 16), { LayoutOrder = order, TextStrokeTransparency = 1, TextColor3 = color or K.secondary })
+end
+
+local function click()
+	local sound = Ui.onClick
+	if sound then
+		sound()
+	end
+end
+
+-- A square contract surface with a fine outline; the automatic inner Body owns the layout.
+-- Selected contracts carry a narrow red left rule. Returns the Body.
+local function block(parent: Instance, order: number, selected: boolean?): any
+	local card = Ui.make("Frame", {
+		Name = "Card",
+		Size = UDim2.new(1, 0, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		BackgroundColor3 = K.row,
+		BorderSizePixel = 0,
+		LayoutOrder = order,
+	}, parent)
+	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = if selected then 0.7 else 0.82 }, card)
+	local body = Ui.make("Frame", { Name = "Body", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1 }, card)
+	Ui.list(body, true, 4)
+	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, if selected then 15 else 12), PaddingRight = UDim.new(0, 12), PaddingTop = UDim.new(0, 10), PaddingBottom = UDim.new(0, 12) }, body)
+	if selected then
+		Ui.make("Frame", { Name = "Accent", Size = UDim2.new(0, 2, 1, 0), BackgroundColor3 = K.red, BorderSizePixel = 0, ZIndex = 2 }, card)
+	end
+	return body
+end
+
+-- A thin bar in a list (share 0 … 1).
+local function bar(parent: Instance, share: number, color: Color3, order: number)
+	local holder = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 8), BackgroundTransparency = 1, LayoutOrder = order }, parent)
+	local back, fill = P.bar(holder, UDim2.new(1, 0, 0, 4), color)
+	back.Position = UDim2.fromOffset(0, 2)
+	Ui.corner(back, 2)
+	Ui.corner(fill, 2)
+	fill.Size = UDim2.fromScale(math.clamp(share, 0, 1), 1)
+end
+
+-- Keep the hover marker inside a square phone button.
+local function squareButton(made: any): any
+	local edge = made:FindFirstChild("Edge")
+	if edge and edge:IsA("GuiObject") then
+		edge.Size = UDim2.new(0, 2, 1, 0)
+		edge.Position = UDim2.fromOffset(0, 0)
+	end
+	return made
+end
+
+-- A window action inside the phone (P.button), full width.
+local function button(parent: Instance, label: string, kind: P.ButtonKind, order: number, onClick: () -> ()): any
+	local made = squareButton(P.button(parent, label, UDim2.new(1, 0, 0, 54), kind, onClick))
+	made.LayoutOrder = order
+	made.TextSize = 13
+	if kind == "main" then
+		refs.design.primary(made)
+	end
+	return made
+end
+
+-- 5.4: the rest of the kit, in one table (Phone sits near the register limit: no new top-level locals). OrdersUi.Kit
+-- names the same pieces; OrdersUi draws with them too.
+local look: OrdersUi.Kit
+do
+	local TextService = game:GetService("TextService")
+
+	-- How wide a line of text is (unscaled pixels).
+	local function width(value: string, size: number, font: Enum.Font): number
+		local ok, bounds = pcall(function(): Vector2
+			return TextService:GetTextSize(value, size, font, Vector2.new(1000, 100))
+		end)
+		return if ok then math.ceil(bounds.X) + 2 else #value * size * 0.6
+	end
+
+	local function section(list: Instance, label: string, order: number): any
+		local holder = Ui.make("Frame", { Name = "Section", Size = UDim2.new(1, 0, 0, 24), BackgroundTransparency = 1, LayoutOrder = order }, list)
+		P.caps(holder, label, UDim2.new(1, -4, 0, 14), {
+			Position = UDim2.new(0, 2, 1, -2),
+			AnchorPoint = Vector2.new(0, 1),
+			TextSize = 11,
+			TextColor3 = K.secondary,
+			TextStrokeTransparency = 1,
+		})
+		return holder
+	end
+
+	local function meta(parent: Instance, value: string, order: number, color: Color3?): any
+		return text(parent, value, UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = order, TextSize = 12, TextColor3 = color or K.secondary })
+	end
+
+	local function chip(parent: Instance, value: string, color: Color3?): any
+		local tint = color or K.secondary
+		local made = Ui.label(parent, string.upper(value), UDim2.fromOffset(0, 22), {
+			Name = "Chip",
+			AutomaticSize = Enum.AutomaticSize.X,
+			BackgroundColor3 = K.raised,
+			BackgroundTransparency = 0,
+			Font = Theme.HeadingFont,
+			TextSize = 11,
+			TextColor3 = tint,
+			TextWrapped = false,
+			TextXAlignment = Enum.TextXAlignment.Center,
+		})
+		Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = tint, Thickness = 1, Transparency = 0.72 }, made)
+		Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 9), PaddingRight = UDim.new(0, 9) }, made)
+		return made
+	end
+
+	local function chipRow(parent: Instance, order: number): any
+		local row = Ui.make("Frame", { Name = "Chips", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = order }, parent)
+		local layout = Ui.make("UIListLayout", {
+			FillDirection = Enum.FillDirection.Horizontal,
+			Padding = UDim.new(0, 6),
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			VerticalAlignment = Enum.VerticalAlignment.Center,
+		}, row)
+		pcall(function()
+			layout.Wraps = true -- (long rule lines go to a second line)
+		end)
+		return row
+	end
+
+	local function row2(parent: Instance, leftText: string, rightText: string, order: number, strong: boolean?): (any, any, any)
+		local font = if strong then Theme.HeadingFont else Theme.Font
+		local size = if strong then 14 else 12
+		local w = width(rightText, size, font)
+		local row = Ui.make("Frame", { Name = "Row2", Size = UDim2.new(1, 0, 0, 20), BackgroundTransparency = 1, LayoutOrder = order }, parent)
+		local right = text(row, rightText, UDim2.new(0, w, 1, 0), {
+			Position = UDim2.fromScale(1, 0),
+			AnchorPoint = Vector2.new(1, 0),
+			Font = font,
+			TextSize = size,
+			TextColor3 = if strong then K.text else K.secondary,
+			TextWrapped = false,
+			TextXAlignment = Enum.TextXAlignment.Right,
+		})
+		local left = text(row, leftText, UDim2.new(1, -(w + 8), 1, 0), { TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd })
+		return row, left, right
+	end
+
+	local function emptyState(list: Instance, glyph: string, title: string, sub: string?, order: number): any
+		local box = Ui.make("Frame", { Name = "Empty", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = order }, list)
+		Ui.list(box, true, 8, Enum.HorizontalAlignment.Center)
+		Ui.make("UIPadding", { PaddingTop = UDim.new(0, 24), PaddingBottom = UDim.new(0, 16) }, box)
+		local circle = Ui.make("Frame", { Size = UDim2.fromOffset(64, 64), BackgroundColor3 = K.row, BorderSizePixel = 0, LayoutOrder = 1 }, box)
+		Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = 0.8 }, circle)
+		text(circle, glyph, UDim2.fromScale(1, 1), { TextSize = 30, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Center })
+		text(box, title, UDim2.new(1, -24, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 2, Font = Theme.HeadingFont, TextSize = 17, TextXAlignment = Enum.TextXAlignment.Center })
+		if sub then
+			text(box, sub, UDim2.new(1, -32, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 3, TextSize = 12, TextColor3 = K.secondary, TextXAlignment = Enum.TextXAlignment.Center })
+		end
+		return box
+	end
+
+	local function stepper(parent: Instance, stops: { any }, order: number): any
+		local holder = Ui.make("Frame", { Name = "Stops", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = order }, parent)
+		Ui.list(holder, true, 4)
+		local count = #stops
+		for index, stop in stops do
+			if type(stop) ~= "table" then
+				continue
+			end
+			local done, current, open = stop.done == true, stop.current == true, stop.open == true
+			local mark = if done then "✓" elseif current then "▶" elseif open then "●" else "○"
+			local color = if done then K.secondary elseif current then K.red elseif open then K.text else K.secondary
+			local row = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = index }, holder)
+			Ui.make("UISizeConstraint", { MinSize = Vector2.new(0, 18) }, row)
+			text(row, mark, UDim2.fromOffset(16, 18), { Font = Theme.HeadingFont, TextSize = if current then 10 else 12, TextColor3 = color, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Center, TextTransparency = if done then 0.3 else 0 })
+			if index < count then
+				-- (a hairline down to the next stop's dot)
+				Ui.make("Frame", { Size = UDim2.new(0, 1, 1, -14), Position = UDim2.fromOffset(8, 18), BackgroundColor3 = K.line, BackgroundTransparency = 0.7, BorderSizePixel = 0 }, row)
+			end
+			local label = tostring(stop.label or (if stop.kind == "pickup" then "Pick up" else "Deliver"))
+			text(row, label, UDim2.new(1, -24, 0, 0), {
+				Position = UDim2.fromOffset(24, 1),
+				AutomaticSize = Enum.AutomaticSize.Y,
+				Font = if current then Theme.HeadingFont else Theme.Font,
+				TextSize = 13,
+				TextColor3 = if current or open then K.text else K.secondary,
+				TextTransparency = if done then 0.3 else 0,
+			})
+		end
+		return holder
+	end
+
+	local function pill(parent: Instance, value: string, onClick: () -> (), accent: boolean?): any
+		local hit = Ui.make("TextButton", {
+			Name = "Pill",
+			Size = UDim2.fromOffset(0, 54), -- at least 44 physical px on a 320 px touch screen
+			AutomaticSize = Enum.AutomaticSize.X,
+			AnchorPoint = Vector2.new(1, 0.5),
+			Position = UDim2.new(1, 0, 0.5, 0),
+			BackgroundTransparency = 1,
+			AutoButtonColor = false,
+			Text = "",
+			ZIndex = 3,
+		}, parent)
+		if parent:IsA("GuiObject") and parent.Name == "Head" then
+			parent.Size = UDim2.new(parent.Size.X.Scale, parent.Size.X.Offset, 0, 54)
+		end
+		local tint = if accent then K.red else K.line
+		local face = Ui.label(hit, string.upper(value), UDim2.fromOffset(0, 24), {
+			AutomaticSize = Enum.AutomaticSize.X,
+			Position = UDim2.fromScale(0, 0.5),
+			AnchorPoint = Vector2.new(0, 0.5),
+			BackgroundColor3 = K.raised,
+			BackgroundTransparency = 0,
+			Font = Theme.HeadingFont,
+			TextSize = 11,
+			TextColor3 = if accent then K.red else K.text,
+			TextWrapped = false,
+			TextXAlignment = Enum.TextXAlignment.Center,
+			ZIndex = 3,
+		})
+		Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = tint, Thickness = 1, Transparency = if accent then 0.35 else 0.6 }, face)
+		Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) }, face)
+		local function lit(on: boolean)
+			face.BackgroundColor3 = if on then TILE_HOVER else K.raised
+		end
+		hit.MouseEnter:Connect(function()
+			lit(true)
+		end)
+		hit.MouseLeave:Connect(function()
+			lit(false)
+		end)
+		hit.SelectionGained:Connect(function()
+			lit(true)
+		end)
+		hit.SelectionLost:Connect(function()
+			lit(false)
+		end)
+		hit.Activated:Connect(function()
+			click()
+			onClick()
+		end)
+		return hit
+	end
+
+	look = {
+		block = block,
+		caps = caps,
+		text = text,
+		button = button,
+		section = section,
+		meta = meta,
+		chip = chip,
+		chipRow = chipRow,
+		row2 = row2,
+		emptyState = emptyState,
+		stepper = stepper,
+		pill = pill,
+		width = width,
+	}
+end
+
+-- The GPS to one of Map.Shops or a landmark (5.0: "earl", Earl's Used Wheels) (the white route on both maps, the HUD's
+-- beam and label). 6.14: client/Gps.luau does it (the READY CHECK and the level-up card use it too).
+local function gpsTo(shopId: string)
+	refs.gps.to(shopId)
+end
+
+-- ── The apps ───────────────────────────────────────────────────────────────
+
+-- "&", "<", ">" for RichText.
+local function rich(value: string): string
+	return (string.gsub(string.gsub(string.gsub(value, "&", "&amp;"), "<", "&lt;"), ">", "&gt;"))
+end
+
+local function ordersApp(list: Instance)
+	local bag = require(script.Parent.BagUi)
+	local function openBoard()
+		setApp("board") -- 5.5: the board in the phone
+	end
+	local function openBag()
+		refs.apps.bagTab = "bag" -- (6.5: BAG & ITEMS on its BAG tab)
+		setApp("bag") -- 5.5: the bag in the phone
+	end
+	if not job then
+		look.emptyState(list, "📦", "No active orders", "Grab a job from the board, on foot from level 1.", 1)
+		button(list, "OPEN BOARD", "main", 2, openBoard)
+		button(list, "🛍 BAG", "quiet", 3, openBag)
+		return
+	end
+	local orders = if type(job.orders) == "table" then job.orders else {}
+	local focused = OrdersUi.focused(job)
+	-- The hero: the focused order.
+	local b = block(list, 1, true)
+	local head = Ui.make("Frame", { Name = "Head", Size = UDim2.new(1, 0, 0, 18), BackgroundTransparency = 1, LayoutOrder = 1 }, b)
+	P.caps(head, `{if #orders > 1 then `Now · order {job.focus or "?"}` else "Now · active order"}{if job.mission then " · mission" else ""}`, UDim2.new(1, -96, 1, 0), {
+		TextSize = 11,
+		TextColor3 = K.red,
+		TextStrokeTransparency = 1,
+	})
+	if #orders > 1 and focused then
+		OrdersUi.pinPill(head, focused, look)
+	end
+	text(b, string.upper(tostring(job.stopLabel or job.customer or "ACTIVE DELIVERY")), UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 2, Font = Theme.HeadingFont, TextSize = 17 })
+	look.meta(b, `{job.address or "?"}{if job.district then `, {job.district}` else ""}`, 3)
+	refs.route = refs.spareRoute or refs.routes.create(b, if typeof(job.position) == "Vector3" then job.position else nil, 4, function() return isOpen and app == "orders" end)
+	refs.spareRoute = nil
+	refs.route.holder.Parent = b
+	refs.route.update()
+	-- The clock (ticked by the open loop) and the pay, their captions under them.
+	local line = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 34), BackgroundTransparency = 1, LayoutOrder = 5 }, b)
+	Ui.make("UIPadding", { PaddingTop = UDim.new(0, 7) }, line)
+	refs.timer = text(line, if type(job.endsAt) == "number" then Ui.clock(math.max(0, job.endsAt - workspace:GetServerTimeNow())) else "", UDim2.new(0.5, 0, 1, 0), { Font = Theme.HeadingFont, TextSize = 24, TextWrapped = false })
+	text(line, Ui.money(tonumber(job.pay) or 0), UDim2.new(0.5, 0, 1, 0), { Position = UDim2.fromScale(0.5, 0), Font = Theme.HeadingFont, TextSize = 22, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Right })
+	local labels = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 14), BackgroundTransparency = 1, LayoutOrder = 6 }, b)
+	P.caps(labels, "Time left", UDim2.fromScale(0.5, 1), { TextStrokeTransparency = 1, TextSize = 11 })
+	P.caps(labels, "Pay", UDim2.fromScale(0.5, 1), { Position = UDim2.fromScale(0.5, 0), TextStrokeTransparency = 1, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Right })
+	local gap = Ui.make("Frame", { Size = UDim2.new(1, 0, 0, 10), BackgroundTransparency = 1, LayoutOrder = 7 }, b)
+	P.rule(gap, UDim2.new(1, 0, 0, 1), { Position = UDim2.fromOffset(0, 5), BackgroundTransparency = 0.75 })
+	-- The stops: the focused order's own (the stepper), else "Stop 1 / 3"; then what to do now.
+	if focused and type(focused.stops) == "table" and #focused.stops > 0 then
+		look.stepper(b, focused.stops, 8)
+	else
+		caps(b, `Stop {tonumber(job.stopIndex) or 1} / {tonumber(job.stopCount) or 1} · {if job.stage == "pickup" then "pick up" else "deliver"}`, 8).TextSize = 11
+	end
+	if type(job.step) == "string" and job.step ~= "" then
+		text(b, job.step, UDim2.new(1, 0, 0, 0), { AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 9, TextSize = 14 })
+	end
+	-- Chips: how it travels, what you carry (5.0; 6.6: CARRYING n / room, the hands, the bag and the bike's bag: the
+	-- PackCount / PackRoom attributes are live), the condition, the cargo's rules.
+	local chips = look.chipRow(b, 10)
+	look.chip(chips, if job.mode == "foot" then "🚶 On foot" elseif job.mode == "bike" then "🚲 By bike" else string.rep("★", math.max(1, tonumber(job.stars) or 1)))
+	local packRoom = tonumber(player:GetAttribute("PackRoom")) or tonumber(job.packRoom) or 0
+	if job.mode == "foot" or job.mode == "bike" then
+		local inHands = 0
+		for _, piece in (if type(job.carried) == "table" then job.carried else {}) :: { any } do
+			if type(piece) == "table" and piece.where == "hands" then
+				inHands += 1
+			end
+		end
+		local packed = inHands + (tonumber(player:GetAttribute("PackCount")) or tonumber(job.pack) or 0)
+		local Skills = require(ReplicatedStorage.Shared.Skills) -- (6.20: + Strong Back's piece in your hands)
+		local room = Config.Cargo.HandsMax + Skills.effect(Skills.decode(player:GetAttribute("Skills")), "hands") + packRoom
+		look.chip(chips, `CARRYING {packed} / {room}`, if packed >= room then K.red else nil)
+	end
+	local condition = tonumber(job.condition)
+	if condition and condition < 0.999 then
+		look.chip(chips, `Condition {math.floor(condition * 100 + 0.5)}%`, if condition < 0.5 then K.red else K.warn)
+	end
+	if type(job.ruleLine) == "string" and job.ruleLine ~= "" then
+		for part in string.gmatch(job.ruleLine .. " · ", "(.-) · ") do
+			if part ~= "" then
+				look.chip(chips, part)
+			end
+		end
+	end
+	-- The pieces delivered.
+	local total = tonumber(job.total) or 0
+	if total > 0 then
+		local done = tonumber(job.deliveredTotal) or 0
+		local _, left = look.row2(b, `{done} / {total} {if total == 1 then (job.piece or "piece") else (job.pieces or "pieces")} delivered`, if (tonumber(job.lost) or 0) > 0 then `{job.lost} lost` else "", 11)
+		left.TextSize = 12
+		left.TextColor3 = K.secondary
+		bar(b, done / total, K.text, 12)
+	end
+	-- 5.2: the other orders of the run (their stops, clocks, pay, PIN), then the actions.
+	local n = OrdersUi.render(list, job, look, 2)
+	local map = button(list, "SHOW ROUTE", "main", n, function()
+		Phone.close()
+		if not MapView.isOpen() then MapView.toggle() end
+	end)
+	map.Name = "ShowRoute"
+	-- Preserve the full bag and stack actions beneath the route button.
+	local carried = bag.line(job)
+	local pack = button(list, `BAG · {if carried then rich(string.sub(carried, 6)) else "EMPTY"}`, "quiet", n + 1, openBag)
+	pack.RichText = true
+	pack.TextTruncate = Enum.TextTruncate.AtEnd
+	button(list, "OPEN BOARD · ADD MORE", "quiet", n + 2, openBoard) -- (6.12.8: + ADD to the run, or + QUEUE)
+	-- 5.5: GIVE UP (the MENU's), quiet and red at the bottom; a second press within 4 s gives the delivery up.
+	local giveUp: any = nil
+	giveUp = button(list, "GIVE UP THIS DELIVERY", "quiet", n + 3, function()
+		local now = os.clock()
+		if now - (refs.giveUpAt or 0) > 4 then
+			refs.giveUpAt = now
+			giveUp.Text = "PRESS AGAIN TO GIVE IT UP"
+			local notify = Phone.notify
+			if notify then
+				notify("Give up this delivery? Press again.")
+			end
+			task.delay(4, function()
+				if giveUp.Parent and os.clock() - (refs.giveUpAt or 0) >= 4 then
+					giveUp.Text = "GIVE UP THIS DELIVERY"
+				end
+			end)
+			return
+		end
+		refs.giveUpAt = 0
+		Net.get("CancelJob"):FireServer()
+	end)
+	giveUp.Name = "GiveUp"
+	giveUp.TextColor3 = K.red
+	local outline = giveUp:FindFirstChild("Outline")
+	if outline and outline:IsA("UIStroke") then
+		outline.Color = K.red
+	end
+end
+
+local function careerApp(list: Instance, wide: boolean)
+	-- 6.18 wave 2: in the UI kit (client/PhoneMore.luau): the next level the hero, the road ahead its rows.
+	refs.moreApps.career(list, look, refs.moreCtx(wide))
+end
+
+-- 6.18 wave 2: SHOP is client/PhoneApps.luau's (PhoneApps.shop: SAVE UP and SHOPS in the UI kit's look).
+local function shopApp(list: Instance, wide: boolean)
+	local goal = refs.ready.current().goal -- (6.14: the savings goal is SAVE UP's hero while a counter sells it)
+	refs.apps.shop(list, look, refs.host, wide, if goal then goal.name else nil)
+end
+
+-- MESSAGES (6.18 wave 2: client/PhoneMore.luau, the kit's rows: the sender's initial, who and when, the first line, a
+-- red dot while unread; a tap opens the message whole). Read now: the badge goes; the dots stay until it is drawn again.
+local function messagesApp(list: Instance)
+	refs.moreApps.messages(list, look, refs.moreCtx(false))
+	for _, message in messages do
+		message.unread = false
+	end
+	refreshBadges()
+end
+
+-- ── Building ───────────────────────────────────────────────────────────────
+
+-- 6.0.1: `from` (the tapped tile or card) is where the app's popup grows from.
+local function launch(id: string, from: GuiObject?)
+	click()
+	if from then
+		local at, size = from.AbsolutePosition, from.AbsoluteSize
+		refs.from = Vector2.new(at.X + size.X / 2, at.Y + size.Y / 2)
+		refs.lastTile = from
+		refs.lastPage = refs.page
+	end
+	-- 6.5: MORE turns the home to its sub-screen; BAG & ITEMS opens on the tab that fits (BAG during a run). 6.12.8:
+	-- JOBS is always the board (YOUR RUN and NEXT UP on top during a run; its DETAILS opens ORDERS).
+	if id == "more" then
+		refs.showPage("more", true)
+		return
+	elseif id == "next" then
+		id = "ready" -- 6.14: NEXT MISSION's READY CHECK (client/ReadyCheck.luau)
+	elseif id == "jobs" then
+		id = "board"
+	elseif id == "bag" then
+		refs.apps.bagTab = nil
+	end
+	if id == "board" then
+		boardNew = 0
+		refs.apps.boardHome() -- 6.17: JOBS opens on its list (not on a job's details, YOUR RUN or NEXT UP)
+		refreshBadges()
+	end
+	-- MAP and the MENU's windows (5.5): the phone closes, their window opens.
+	if id == "map" then
+		Phone.close()
+		if not MapView.isOpen() then
+			MapView.toggle()
+		end
+		return
+	end
+	if id == "missions" or id == "crew" or id == "top" or id == "estate" then
+		Phone.close()
+		local open: (() -> ())? = if id == "missions" then Phone.onMissions elseif id == "crew" then Phone.onCrew elseif id == "top" then Phone.onTop else Phone.onEstate
+		if open then
+			open()
+		else
+			local notify = Phone.notify
+			if notify then
+				notify(`The {id} window is not ready yet.`)
+			end
+		end
+		return
+	end
+	setApp(id)
+end
+
+-- 6.18: the home's lending to client/PhoneHome.luau (its refs, the badges, the launch, the glyphs, the READY CHECK).
+refs.homeHost = function(): any
+	return {
+		refs = refs,
+		badges = tiles,
+		launch = launch,
+		glyph = function(face: Instance, id: string, size: number)
+			refs.design.glyph(face, id, size)
+		end,
+		ready = refs.ready,
+	}
+end
+
+-- The status bar: the time, the camera's pill in the middle, the signal and the battery.
+local function statusBar(screen: Instance, height: number)
+	local bar0 = Ui.make("Frame", { Name = "Status", Size = UDim2.new(1, 0, 0, height), BackgroundTransparency = 1, ZIndex = 4 }, screen)
+	refs.statusTime = text(bar0, clockText(), UDim2.new(0, 60, 1, 0), { Position = UDim2.fromOffset(22, 0), Font = Theme.HeadingFont, TextSize = 13, TextWrapped = false, ZIndex = 4 })
+	local pill = Ui.make("Frame", { Size = UDim2.fromOffset(64, 16), Position = UDim2.new(0.5, 0, 0.5, 0), AnchorPoint = Vector2.new(0.5, 0.5), BackgroundColor3 = Color3.new(0, 0, 0), BorderSizePixel = 0, ZIndex = 5 }, bar0)
+	Ui.corner(pill, 8)
+	Ui.make("Frame", { Size = UDim2.fromOffset(5, 5), Position = UDim2.new(1, -11, 0.5, 0), AnchorPoint = Vector2.new(0.5, 0.5), BackgroundColor3 = Color3.fromRGB(28, 32, 44), BorderSizePixel = 0, ZIndex = 6 }, pill)
+	-- The signal: four bars, three lit.
+	for n = 1, 4 do
+		local h = 3 + n * 2
+		Ui.make("Frame", {
+			Size = UDim2.fromOffset(3, h),
+			Position = UDim2.new(1, -78 + n * 5, 0.5, 5 - h),
+			BackgroundColor3 = K.text,
+			BackgroundTransparency = if n <= 3 then 0 else 0.7,
+			BorderSizePixel = 0,
+			ZIndex = 4,
+		}, bar0)
+	end
+	-- The battery: an outline, a fill, the nub.
+	local battery = Ui.make("Frame", { Size = UDim2.fromOffset(22, 11), Position = UDim2.new(1, -46, 0.5, -5), BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 4 }, bar0)
+	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.text, Thickness = 1, Transparency = 0.3 }, battery)
+	Ui.corner(battery, 3)
+	local fill = Ui.make("Frame", { Size = UDim2.new(0.78, -3, 1, -4), Position = UDim2.fromOffset(2, 2), BackgroundColor3 = K.text, BorderSizePixel = 0, ZIndex = 4 }, battery)
+	Ui.corner(fill, 1)
+	Ui.make("Frame", { Size = UDim2.fromOffset(2, 4), Position = UDim2.new(1, 2, 0.5, -2), BackgroundColor3 = K.text, BackgroundTransparency = 0.3, BorderSizePixel = 0, ZIndex = 4 }, battery)
+end
+
+-- Home (6.5; 6.18: client/PhoneHome.luau draws the header's chips, the hero, the app rows and MESSAGES at 1 .. 4): the
+-- quick switch under them (5.1: MY BIKE, CALL CAR; 5.4: TOW).
+local function homeWidgets(parent: Instance)
+	local fit = refs.fit or refs.layout.fit(1150, 680, false, 1)
+	refs.homeUi.build(parent, APPS, refs.homeHost(), refs.layout.heroHeight(fit))
+	local card = Ui.make("Frame", { Name = "Courier", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = 5 }, parent)
+	Ui.list(card, true, 6)
+	-- 5.1: the quick switch (fillHome shows it when you own a bike): MY BIKE, and CALL CAR with a car of your own too.
+	local switch = Ui.make("Frame", { Name = "Switch", Size = UDim2.new(1, 0, 0, 54), BackgroundTransparency = 1, LayoutOrder = 1, Visible = false }, card)
+	Ui.list(switch, false, 6)
+	local function switchButton(label: string, order: number, how: string): any
+		local made = P.button(switch, label, UDim2.new(0.5, -3, 1, 0), "quiet", function()
+			Net.get("Equip"):FireServer(how)
+			Phone.close()
+		end)
+		made.LayoutOrder = order
+		made.TextSize = 12
+		squareButton(made)
+		return made
+	end
+	refs.switch = switch
+	refs.rideBike = switchButton("🚲 MY BIKE", 1, "ride")
+	refs.callCar = switchButton("🚐 CALL CAR", 2, "drive")
+	-- 5.4: TOW, while your own car's tank is empty (fillHome and the ticker show it).
+	refs.tow = button(card, `⛽ TOW  {Ui.money(Config.Fuel.TowPrice)}`, "main", 2, function()
+		Net.get("Fuel"):FireServer("tow")
+		Phone.close()
+	end)
+	refs.tow.Visible = false
+	refs.towShown = function(): boolean
+		local cars = workspace:FindFirstChild("Cars")
+		for _, car in if cars then cars:GetChildren() else {} do
+			if car:GetAttribute("OwnerId") == player.UserId then
+				local tank, fuel = car:GetAttribute("Tank"), car:GetAttribute("Fuel")
+				return type(tank) == "number" and tank > 0 and type(fuel) == "number" and fuel <= 1e-3
+			end
+		end
+		return false
+	end
+end
+
+-- 6.12.5: the main apps' live lines (6.18: client/PhoneHome.luau apps and jobs): MISSIONS the chapter you are at,
+-- TASKS today's dailies and the rewards waiting, JOBS the board's or the run's line and its big value, the hero.
+refs.fillMain = function()
+	local home = refs.homeKit
+	if not home then
+		return
+	end
+	local done, total, ready = refs.tasks.summary()
+	refs.homeUi.apps(home, Phone.missionInfo and Phone.missionInfo(), done, total, ready)
+	refs.homeUi.jobs(home, job, refs.offers, workspace:GetServerTimeNow())
+end
+
+-- Fills the home widgets with the state right now.
+local function fillHome()
+	if not refs.idMoney then
+		return
+	end
+	refs.fillMain() -- 6.12.5
+	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+	local pos = if root and root:IsA("BasePart") then root.Position else nil
+	local home = refs.homeKit
+	-- 6.18: the hero (YOUR RUN during a run), the header's chips, GARAGE's line (how you get around)
+	refs.homeUi.run(home, refs.layout.summary(job, workspace:GetServerTimeNow(), if pos then pos.X else nil, if pos then pos.Z else nil), job)
+	refs.homeUi.header(home, Ui.money(money()), myLevel(), Levels.progress(myXp()), shiftText(), Map.isNight(Lighting.ClockTime))
+	if refs.subs.garage then
+		refs.subs.garage.Text = transportText()
+	end
+	-- 5.1: the quick switch: which of a bike and a car of your own you have.
+	local hasBike, hasCar = false, false
+	for _, def in Config.Cars do
+		if state and type(state.cars) == "table" and state.cars[def.id] and not def.company then
+			hasBike = hasBike or def.bike == true
+			hasCar = hasCar or not def.bike
+		end
+	end
+	refs.switch.Visible = hasBike
+	refs.callCar.Visible = hasCar
+	refs.rideBike.Size = if hasCar then UDim2.new(0.5, -3, 1, 0) else UDim2.new(1, 0, 1, 0)
+	refs.tow.Visible = refs.towShown() -- 5.4
+	local newest: Message? = nil
+	for _, message in messages do
+		if message.unread then
+			newest = message
+		end
+	end
+	-- 6.5: the messages row stays; the unread count shows on it (the home always says it).
+	local unread = unreadCount()
+	refs.noteFrom.Text = if newest then `MESSAGES · {string.upper(newest.from)} · {newest.time}` else "MESSAGES"
+	refs.noteText.Text = if newest then newest.text else "No new messages"
+	refs.noteText.TextColor3 = if newest then K.text else K.secondary
+	refs.noteCount.Visible = unread > 0
+	refs.noteCount.Text = if unread > 9 then "9+" else tostring(unread)
+	refs.noteCount.Size = UDim2.fromOffset(if unread > 9 then 24 else 18, 18)
+end
+refs.fillHome = fillHome -- 6.18: client/PhoneHome.luau fills the home again after its hero was rebuilt
+
+-- The phone: its body, the screen, the status bar and the home screen (6.0.1: always upright; the apps open in the
+-- popup, client/PhonePopup.luau).
+local function buildBody()
+	local made = gui :: ScreenGui
+	refs.route = nil
+	refs.spareRoute = nil
+	if refs.body then
+		refs.body:Destroy()
+	end
+	table.clear(tiles)
+	table.clear(refs.subs)
+	refs.page = "home"
+	refs.idMoney = nil
+	local size = refs.fit or refs.layout.fit(1150, 680, false, 1)
+	local body = Ui.make("Frame", {
+		Name = "Phone",
+		Size = UDim2.fromOffset(size.width, size.height),
+		BackgroundColor3 = BODY,
+		BorderSizePixel = 0,
+		Visible = false,
+		Active = true, -- (clicks on the phone do not reach the world)
+	}, made)
+	refs.body = body
+	Ui.corner(body, 18)
+	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = BODY_EDGE, Thickness = 1.5 }, body)
+	refs.scale = Ui.make("UIScale", {}, body)
+	-- The side keys (power on the right, the volume on the left).
+	Ui.make("Frame", { Size = UDim2.fromOffset(3, 60), Position = UDim2.new(1, 0, 0, 120), BackgroundColor3 = BODY_EDGE, BorderSizePixel = 0 }, body)
+	Ui.make("Frame", { Size = UDim2.fromOffset(3, 36), Position = UDim2.new(0, -3, 0, 100), BackgroundColor3 = BODY_EDGE, BorderSizePixel = 0 }, body)
+	Ui.make("Frame", { Size = UDim2.fromOffset(3, 36), Position = UDim2.new(0, -3, 0, 144), BackgroundColor3 = BODY_EDGE, BorderSizePixel = 0 }, body)
+	local screen = Ui.make("Frame", {
+		Name = "Screen",
+		Size = UDim2.new(1, -BEZEL * 2, 1, -BEZEL * 2),
+		Position = UDim2.fromOffset(BEZEL, BEZEL),
+		BackgroundColor3 = SCREEN,
+		BorderSizePixel = 0,
+		ClipsDescendants = true, -- (5.5: the banner drops in from above the screen)
+	}, body)
+	Ui.corner(screen, 12)
+	refs.screen = screen
+	local STATUS_H = 30
+	refs.statusH = STATUS_H
+	statusBar(screen, STATUS_H)
+	-- The NEW PHONE ribbon (the moment Marge gives it).
+	refs.ribbon = P.tag(screen, "New phone", K.red)
+	refs.ribbon.AnchorPoint = Vector2.new(0.5, 0)
+	refs.ribbon.Position = UDim2.new(0.5, 0, 0, STATUS_H + 2)
+	refs.ribbon.ZIndex = 6
+	refs.ribbon.Visible = false
+	-- The home bar at the bottom: it puts the phone away (6.0.1: the apps close in their popup).
+	local homeBar = Ui.make("TextButton", {
+		Name = "HomeBar",
+		Size = UDim2.new(0, 196, 0, 54),
+		Position = UDim2.new(0.5, 0, 1, -2),
+		AnchorPoint = Vector2.new(0.5, 1),
+		BackgroundTransparency = 1,
+		AutoButtonColor = false,
+		Text = "CLOSE",
+		Font = Theme.HeadingFont,
+		TextSize = 12,
+		TextColor3 = K.secondary,
+		ZIndex = 5,
+	}, screen)
+	local pill = Ui.make("Frame", { Size = UDim2.fromOffset(104, 2), Position = UDim2.new(.5,0,1,-5), AnchorPoint = Vector2.new(0.5, 1), BackgroundColor3 = K.text, BackgroundTransparency = 0.25, BorderSizePixel = 0, ZIndex = 5 }, homeBar)
+	Ui.corner(pill, 2)
+	homeBar.MouseEnter:Connect(function()
+		pill.BackgroundTransparency = 0
+	end)
+	homeBar.MouseLeave:Connect(function()
+		pill.BackgroundTransparency = 0.25
+	end)
+	homeBar.Activated:Connect(function()
+		click()
+		Phone.close()
+	end)
+	refs.homeBar = homeBar
+	local BOTTOM = 56
+	-- Scrollable home: cards and launcher never overlap, even with transport/tow actions or long messages.
+	local home = Ui.make("ScrollingFrame", {
+		Name = "Home", Size = UDim2.new(1, -24, 1, -(STATUS_H + BOTTOM)), Position = UDim2.fromOffset(12, STATUS_H),
+		BackgroundTransparency = 1, BorderSizePixel = 0, ScrollingDirection = Enum.ScrollingDirection.Y,
+		ScrollBarThickness = 2, ScrollBarImageColor3 = K.line, AutomaticCanvasSize = Enum.AutomaticSize.Y,
+		CanvasSize = UDim2.new(), ClipsDescendants = true,
+	}, screen)
+	refs.home = home
+	local widgets = Ui.make("Frame", {
+		Name = "Widgets", Size = UDim2.new(1, -4, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1,
+	}, home)
+	Ui.list(widgets, true, 8)
+	Ui.make("UIPadding", { PaddingTop = UDim.new(0, 6), PaddingBottom = UDim.new(0, 16) }, widgets)
+	homeWidgets(widgets)
+	-- 6.5: MORE's sub-screen in the phone (home's place): ‹ BACK, then a row an app.
+	local more = Ui.make("ScrollingFrame", {
+		Name = "More", Size = home.Size, Position = home.Position, Visible = false,
+		BackgroundTransparency = 1, BorderSizePixel = 0, ScrollingDirection = Enum.ScrollingDirection.Y,
+		ScrollBarThickness = 2, ScrollBarImageColor3 = K.line, AutomaticCanvasSize = Enum.AutomaticSize.Y,
+		CanvasSize = UDim2.new(), ClipsDescendants = true,
+	}, screen)
+	refs.more = more
+	local rows = Ui.make("Frame", { Name = "Rows", Size = UDim2.new(1, -4, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1 }, more)
+	Ui.list(rows, true, 8)
+	Ui.make("UIPadding", { PaddingTop = UDim.new(0, 6), PaddingBottom = UDim.new(0, 16) }, rows)
+	local back = Ui.make("TextButton", {
+		Name = "MoreBack", Size = UDim2.new(1, 0, 0, 44), BackgroundTransparency = 1, AutoButtonColor = false,
+		Text = "‹  BACK", Font = Theme.HeadingFont, TextSize = 14, TextColor3 = K.secondary,
+		TextXAlignment = Enum.TextXAlignment.Left, LayoutOrder = 0,
+	}, rows)
+	P.caps(back, "MORE", UDim2.new(0.5, 0, 1, 0), { Position = UDim2.fromScale(0.5, 0), TextXAlignment = Enum.TextXAlignment.Right, TextStrokeTransparency = 1, TextSize = 12 })
+	back.Activated:Connect(function()
+		click()
+		refs.showPage("home", true)
+	end)
+	for order, def in MORE do
+		local cell = refs.homeUi.appRow(rows, def, order, refs.homeKit) -- 6.18: the UI kit's rows, as on home
+		if order == 1 then refs.firstMore = cell end
+	end
+	-- Shows home's tiles or MORE (`focus`: the gamepad goes to its first button).
+	refs.showPage = function(page: string, focus: boolean?)
+		refs.page = page
+		home.Visible = page ~= "more"
+		more.Visible = page == "more"
+		if focus then
+			Ui.gamepadFocus(if page == "more" then refs.firstMore else refs.firstTile)
+		end
+	end
+end
+
+-- ── Showing ────────────────────────────────────────────────────────────────
+
+local APP_TITLES: { [string]: string } = { orders = "ORDERS", career = "CAREER", shop = "SHOP", messages = "MESSAGES", bank = "BALANCE", settings = "SETTINGS", board = "JOBS", bag = "BAG & ITEMS", garage = "GARAGE", tasks = "TASKS", style = "STYLE", regulars = "REGULARS", ready = "READY CHECK" }
+
+-- Home in the phone, or (6.0.1) the app in its centred popup over the phone (client/PhonePopup.luau).
+-- 6.18 wave 2: what client/PhoneMore.luau's apps read (CAREER, BANK, MESSAGES, SETTINGS) and their actions' paths.
+refs.moreCtx = function(wide: boolean): any
+	return {
+		wide = wide,
+		room = refs.popup.room(),
+		redraw = function()
+			renderApp()
+		end,
+		xp = myXp(),
+		level = myLevel(),
+		cars = if state and type(state.cars) == "table" then state.cars else {},
+		skills = if state and type(state.skills) == "table" then state.skills else {}, -- 6.20: CAREER's SKILLS tab
+		toGo = CareerUi.toGo,
+		onCareer = Phone.onCareer,
+		money = money(),
+		earned = refs.earned or 0,
+		onBoard = function()
+			launch("board")
+		end,
+		messages = messages,
+		onSound = function()
+			local cycle = Phone.onSound -- 5.5 (Main: Sounds.cycle)
+			if cycle then
+				cycle()
+			else
+				require(script.Parent.Sounds).cycle()
+			end
+		end,
+		outlineOn = Phone.outlineOn,
+		onOutline = Phone.onOutline,
+		notify = Phone.notify,
+		onClose = Phone.close,
+		onTour = Phone.onTour,
+		keys = refs.apps.keys,
+	}
+end
+
+renderApp = function()
+	if not refs.body then
+		return
+	end
+	refs.timer = nil
+	local previousRoute = refs.route
+	refs.route = nil
+	if previousRoute then
+		if app == "orders" and job and previousRoute.destination == job.position then
+			-- Keep the road/fog instances when only cargo or the countdown changed in another Job payload.
+			previousRoute.holder.Parent = nil
+			refs.spareRoute = previousRoute
+		else
+			previousRoute.holder:Destroy()
+		end
+	end
+	OrdersUi.clear()
+	if app == "home" then
+		refs.popup.hide()
+		fillHome()
+		-- (6.5: back to the tapped tile or row when it is on the page that shows, else that page's first)
+		local back = refs.lastTile
+		local more = refs.page == "more"
+		Ui.gamepadFocus(if back and back.Parent and back.Visible and refs.lastPage == refs.page then back elseif more then refs.firstMore else refs.firstTile)
+		return
+	end
+	local list, wide = refs.popup.show(app, APP_TITLES[app] or string.upper(app), refs.from)
+	refs.from = nil
+	local ok, err = pcall(function()
+		if app == "orders" then
+			ordersApp(list)
+		elseif app == "career" then
+			careerApp(list, wide)
+		elseif app == "shop" then
+			shopApp(list, wide)
+		elseif app == "messages" then
+			messagesApp(list)
+		elseif app == "bank" then
+			refs.moreApps.bank(list, look, refs.moreCtx(wide)) -- 6.18 wave 2: the cash the hero (client/PhoneMore.luau)
+		elseif app == "settings" then
+			refs.moreApps.settings(list, look, refs.moreCtx(wide)) -- 6.18 wave 2: a row a setting, the keys
+		elseif app == "board" then
+			refs.apps.board(list, look, refs.host, wide) -- 5.5; 6.0.1: two columns in a wide popup
+		elseif app == "bag" then
+			refs.apps.bag(list, look, refs.host, wide) -- 6.5: BAG & ITEMS, the I window's tabs
+		elseif app == "garage" then
+			refs.apps.garage(list, look, refs.host, wide) -- 6.18 wave 2: the kit's hero and rows
+		elseif app == "tasks" then
+			refs.tasks.draw(list, look, wide) -- 6.12
+		elseif app == "style" then
+			refs.style.render(list, look, refs.host, wide) -- 6.12: the cosmetics (client/StyleApp.luau)
+		elseif app == "regulars" then
+			refs.regulars.draw(list, look, wide) -- 6.14: the businesses that know you
+		elseif app == "ready" then
+			refs.readyKey = refs.ready.key()
+			refs.ready.draw(list, look, refs.host, wide) -- 6.14: NEXT MISSION's READY CHECK (client/ReadyCheck.luau)
+		end
+	end)
+	if refs.spareRoute then
+		refs.spareRoute.holder:Destroy()
+		refs.spareRoute = nil
+	end
+	if not ok then
+		warn(`[Phone] the {app} app failed: {err}`)
+	end
+	refs.popup.focus()
+end
+
+-- Can anything in the SHOP app be bought right now (your level, your money)?
+local function affordable(): boolean
+	local owned = kit()
+	local level = myLevel()
+	for _, def in Config.Kit do
+		-- (6.23: no bag: bought for each game, not in the SHOP app's SAVE UP)
+		if not def.extra and not owned[def.id] and level >= def.level and money() >= def.price then
+			return true
+		end
+	end
+	return false
+end
+
+-- 6.5 review: the crew invitations waiting (client/CrewPanel.luau through Hud.onCrewBadge, set by Main).
+function Phone.setCrewInvites(count: number)
+	if crewInvites ~= count then
+		crewInvites = math.max(0, count)
+		refreshBadges()
+	end
+end
+
+refreshBadges = function()
+	local unread = unreadCount()
+	local function set(id: string, count: number, word: string?)
+		local badge = tiles[id]
+		if badge then
+			badge.Visible = count > 0 or word ~= nil
+			badge.Text = word or (if count > 9 then "9+" else tostring(count))
+			badge.Size = UDim2.fromOffset(if word and #word > 2 then 34 elseif (word or "") ~= "" or count > 9 then 24 else 18, 18)
+		end
+	end
+	set("messages", unread)
+	local open = 0 -- 5.2: the orders on the go
+	if job then
+		open = 1
+		if type(job.orders) == "table" then
+			open = 0
+			for _, entry in job.orders do
+				if type(entry) == "table" and entry.state == "open" then
+					open += 1
+				end
+			end
+		end
+	end
+	-- 6.5: JOBS counts the open orders during a run, the new runs off duty; its subtitle says which it opens. 6.12.8:
+	-- and the jobs waiting in NEXT UP ("Your run · 2 orders · 3 next").
+	local queued = if type(refs.queue) == "table" and type(refs.queue.list) == "table" then #refs.queue.list else 0
+	set("jobs", if job then open elseif queued > 0 then queued else boardNew)
+	-- (6.18: the line itself is client/PhoneHome.luau jobs': a live event's, these words, or "7 jobs · best $X")
+	refs.jobsState = { open = if job then math.max(1, open) else 0, queued = queued, fresh = boardNew, paused = type(refs.queue) == "table" and refs.queue.paused == true }
+	if refs.homeKit then
+		refs.homeUi.jobs(refs.homeKit, job, refs.offers, workspace:GetServerTimeNow())
+	end
+	set("shop", 0, if affordable() then "$" else nil)
+	local ready = refs.tasks.ready() -- 6.12: the task rewards waiting (TASKS and the dot; 6.12.5: TASKS is on home)
+	set("tasks", ready)
+	local info = Phone.missionInfo and Phone.missionInfo() -- 6.12.5: a chapter newly open: NEW on MISSIONS
+	set("missions", 0, if info and info.new then "NEW" else nil)
+	set("more", crewInvites) -- (6.5 review: MORE → CREW has your invitations)
+	-- 6.20: CAREER (in MORE) counts the free skill points (home's level chip shows a dot: client/PhoneHome.luau header)
+	set("career", require(Shared.Skills).free(if state and type(state.skills) == "table" then state.skills else {}, myLevel()))
+	set("garage", 0, if refs.apps.towDue() then "!" else nil) -- 5.5: the tank ran dry: TOW
+	local dot = refs.buttonDot
+	if dot then
+		local total = unread + (if boardNew > 0 then 1 else 0) + ready
+		dot.Visible = total > 0
+		dot.Text = if unread > 9 then "9+" elseif unread > 1 then tostring(unread) else ""
+		dot.Size = UDim2.fromOffset(if unread > 9 then 20 else 14, 14)
+	end
+	if isOpen and app == "home" then
+		fillHome()
+	end
+end
+
+-- The phone's scale for this screen (6.0.1: always upright; a short screen gets a shorter body that scrolls).
+local function fit(): number
+	local screen = Ui.screenSize()
+	local cap = if Ui.touchLayout() then 1 else math.clamp(Ui.screenScale() * 0.95, 0.85, 1)
+	refs.fit = refs.layout.fit(screen.X, screen.Y, Ui.touchLayout(), cap)
+	return refs.fit.scale
+end
+
+-- Where the phone rests (and where it slides from).
+local function restPosition(): (UDim2, UDim2)
+	return UDim2.new(1, -24, 1, -16), UDim2.new(1, -24, 1, 40)
+end
+
+local function hudOn(): boolean
+	local playerGui = player:FindFirstChild("PlayerGui")
+	local hud = playerGui and playerGui:FindFirstChild("ZombieDeliveryHud")
+	return hud ~= nil and hud:IsA("ScreenGui") and hud.Enabled
+end
+
+-- Shows an app (6.0.1: in the centred popup) or home (the popup closes).
+setApp = function(id: string)
+	if not refs.body then
+		return
+	end
+	app = id
+	renderApp()
+end
+
+-- The clock, the timer and the shift while the phone is open (twice a second).
+local ticking = false
+local function startTicker()
+	if ticking then
+		return
+	end
+	ticking = true
+	task.spawn(function()
+		local lastErr: string? = nil
+		while isOpen do
+			-- 5.7: one bad tick (a missing ref, an app's error) is warned once and skipped: the loop never dies, so
+			-- `ticking` never sticks on true with no clock running.
+			local ok, err = pcall(function()
+				local now = clockText()
+				if refs.statusTime then
+					refs.statusTime.Text = now
+				end
+				if refs.shift then refs.shift.Text = shiftText() end
+				if app == "home" then fillHome() end
+				local timer = refs.timer
+				if timer and job and type(job.endsAt) == "number" then
+					local left = job.endsAt - workspace:GetServerTimeNow()
+					timer.Text = Ui.clock(math.max(0, left))
+					timer.TextColor3 = if left < 30 then K.red else K.text
+				end
+				if app == "orders" then
+					OrdersUi.tick() -- 5.2: every order's clock
+					if refs.route then refs.route.update() end
+				elseif app == "board" then
+					OrdersUi.tick() -- 6.12.8: YOUR RUN's clocks
+				elseif app == "tasks" then
+					refs.tasks.tick() -- 6.12: the time until the tasks are new
+				elseif app == "style" then
+					refs.style.tick() -- 6.12: you walked up to a shop that sells looks, or away: BUY there, "AT …" elsewhere
+				elseif app == "ready" then
+					refs.ready.tick() -- 6.14: the savings goal's money and bar
+				end
+				if refs.tow and refs.idMoney then
+					refs.tow.Visible = refs.towShown() -- 5.4: the tank ran dry (or the tow came)
+				end
+				local due = refs.apps.towDue() -- 5.5: GARAGE's badge and its TOW
+				if due ~= refs.towDue then
+					refs.towDue = due
+					refreshBadges()
+					if app == "garage" then
+						renderApp()
+					end
+				end
+			end)
+			if not ok and tostring(err) ~= lastErr then
+				lastErr = tostring(err)
+				warn(`[Phone] ticker: {err}`)
+			end
+			task.wait(0.5)
+		end
+		ticking = false
+	end)
+end
+
+function Phone.isOpen(): boolean
+	return isOpen
+end
+
+-- 6.0.1: is an app open in its popup over the phone? (Main: no right-mouse camera then, the mouse is needed.)
+function Phone.appOpen(): boolean
+	return isOpen and refs.popup.isOpen()
+end
+
+-- 6.0.1: Q, ESC and the gamepad's B: an open app closes first (back to the phone's home), then the phone. (ESC can
+-- arrive twice, as the Roblox menu and as the key: the menu that just closed an app leaves the phone open.)
+function Phone.back()
+	if not isOpen then
+		return
+	end
+	if refs.popup.isOpen() then
+		setApp("home")
+	elseif refs.page == "more" then
+		refs.showPage("home", true) -- 6.5: MORE's sub-screen goes back to the tiles first
+	elseif os.clock() - (refs.menuAt or -1) > 0.3 then
+		Phone.close()
+	end
+end
+
+-- 6.17: the app open in the popup, nil for none (Main: J closes JOBS while it shows).
+function Phone.showing(): string?
+	return if isOpen and refs.popup.isOpen() then app else nil
+end
+
+-- 5.5: does the player have the phone (Marge gave it)? The HUD's MENU opens it then (Main: Hud.onMenu).
+function Phone.has(): boolean
+	return hasPhone()
+end
+
+-- 6.14: scrolls the open phone's home so the tile `name` ("mapApp") shows whole (Marge's arrow tour points at it,
+-- client/TutorialUi.luau: under the hero, MAP or BAG may sit under the fold of a short phone).
+-- 6.14 review: from the layout (PhoneLayout.tileSpan / homeView), not from where the tile is drawn now: right after
+-- the phone opens or the screen is resized those positions are a frame old. 6.18: the hero ("nextApp", YOUR RUN's
+-- "HomeContract") and the app rows (APPS' order).
+function Phone.reveal(name: string)
+	local home, fit, layout = refs.home, refs.fit, refs.layout
+	if not (isOpen and home and fit) then
+		return
+	end
+	local top, height = nil :: number?, 0
+	if name == "nextApp" or name == "HomeContract" then
+		top, height = layout.tileSpan(true, 1, fit)
+	end
+	for index, def in APPS do
+		if `{def.id}App` == name then
+			top, height = layout.tileSpan(false, index, fit)
+		end
+	end
+	if top == nil then
+		return
+	end
+	home.CanvasPosition = Vector2.new(0, layout.reveal(top, height, home.CanvasPosition.Y, layout.homeView(fit)))
+end
+
+function Phone.close()
+	if not isOpen then
+		return
+	end
+	isOpen = false
+	app = "home"
+	-- 6.0.1: an open app goes with it (its popup, its route chart, its timers).
+	local route = refs.route
+	refs.route = nil
+	refs.timer = nil
+	refs.from = nil
+	if route then
+		route.holder:Destroy()
+	end
+	OrdersUi.clear()
+	refs.popup.hide()
+	if refs.showPage then
+		refs.showPage("home") -- 6.5: it opens on its tiles next time
+	end
+	Net.get("PhoneHold"):FireServer(false) -- (5.0: the phone leaves your hand: server/KitWear.luau)
+	local body = refs.body
+	if body then
+		Ui.gamepadRelease(body)
+		if refs.motion.reducedMotion() then
+			body.Visible = false
+		else
+			local _, hidden = restPosition()
+			local tween = TweenService:Create(body, SLIDE_OUT, { Position = hidden })
+			tween.Completed:Connect(function()
+				if not isOpen then
+					body.Visible = false
+				end
+			end)
+			tween:Play()
+		end
+	end
+	if refs.buttonLine then
+		refs.buttonLine.BackgroundTransparency = 1
+	end
+	task.delay(0.2, placeButton)
+end
+
+local openPhone: (startApp: string?) -> ()
+
+-- 5.4.1: a phone that fails to open says why in the Output (it was a silent no-op) and is put away cleanly.
+function Phone.open(startApp: string?)
+	local ok, err = pcall(function()
+		openPhone(startApp)
+	end)
+	if not ok then
+		warn(`[Phone] it failed to open: {err}`)
+		if isOpen then
+			Net.get("PhoneHold"):FireServer(false)
+		end
+		isOpen = false
+		if refs.body then
+			refs.body.Visible = false
+		end
+	end
+end
+
+openPhone = function(startApp: string?)
+	if not gui then
+		warn("[Phone] not built yet")
+		return
+	end
+	if not hasPhone() then
+		local tell = Phone.notify
+		if tell then
+			tell("No phone yet: Marge by the job board gives you one.")
+		end
+		return
+	end
+	local hook = Phone.onOpen
+	if hook then
+		pcall(hook) -- (the other windows close; their onCloseWindows closes nothing open here yet)
+	end
+	local scale = fit()
+	if not refs.body then
+		buildBody()
+	end
+	refs.homeUi.fit(refs.homeKit, refs.layout.heroHeight(refs.fit)) -- 6.18: the hero follows the room it has
+	refs.body.Size = UDim2.fromOffset(refs.fit.width, refs.fit.height)
+	refs.scale.Scale = scale
+	local body = refs.body
+	body.AnchorPoint = Vector2.new(1, 1)
+	local rest, hidden = restPosition()
+	app = startApp or "home"
+	if app == "board" then
+		refs.apps.boardHome() -- 6.17: on its list
+	end
+	if not isOpen then
+		Net.get("PhoneHold"):FireServer(true) -- (5.0: everybody sees it in your hand while you are on foot: server/KitWear.luau)
+	end
+	isOpen = true
+	renderApp()
+	refreshBadges()
+	local reduced = refs.motion.reducedMotion()
+	if not body.Visible or reduced then
+		body.Position = if reduced then rest else hidden
+	end
+	body.Visible = true
+	TweenService:Create(body, SLIDE, { Position = rest }):Play()
+	if refs.buttonLine then
+		refs.buttonLine.BackgroundTransparency = 0
+	end
+	placeButton()
+	if app == "home" then
+		Ui.gamepadFocus(refs.firstTile)
+	end
+	startTicker()
+end
+
+function Phone.toggle()
+	if isOpen then
+		Phone.close()
+	else
+		Phone.open()
+	end
+end
+
+-- ── The PHONE action (lower right) ─────────────────────────────────────────
+
+local function buildButton(made: ScreenGui)
+	local touch = Ui.touchLayout()
+	local action = Ui.make("TextButton", {
+		Name = "PhoneButton",
+		Size = UDim2.fromOffset(0, 44),
+		AutomaticSize = Enum.AutomaticSize.X,
+		AnchorPoint = Vector2.new(1, 1),
+		Position = UDim2.new(1, -16, 1, -220),
+		BackgroundTransparency = 1,
+		AutoButtonColor = false,
+		Text = "",
+		Visible = false,
+	}, made)
+	Ui.make("UIListLayout", {
+		FillDirection = Enum.FillDirection.Horizontal,
+		HorizontalAlignment = Enum.HorizontalAlignment.Right,
+		VerticalAlignment = Enum.VerticalAlignment.Center,
+		Padding = UDim.new(0, 8),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+	}, action)
+	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 2) }, action)
+	Ui.make("UISizeConstraint", { MinSize = Vector2.new(44, 44) }, action)
+	refs.buttonScale = Ui.make("UIScale", {}, action)
+	-- The little phone: a rounded outline with its screen and a home bar.
+	local glyph = Ui.make("Frame", { Size = UDim2.fromOffset(13, 22), BackgroundColor3 = K.charcoal, BackgroundTransparency = 0.3, BorderSizePixel = 0, LayoutOrder = 1 }, action)
+	Ui.corner(glyph, 3)
+	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.text, Thickness = 1.5 }, glyph)
+	Ui.make("Frame", { Size = UDim2.new(1, -6, 0, 1), Position = UDim2.new(0, 3, 1, -4), BackgroundColor3 = K.text, BorderSizePixel = 0 }, glyph)
+	local label = P.text(action, if touch then "PHONE" else "PHONE  [Q]", UDim2.fromOffset(0, 44), {
+		AutomaticSize = Enum.AutomaticSize.X,
+		Font = Theme.HeadingFont,
+		TextSize = 13,
+		TextColor3 = K.secondary,
+		LayoutOrder = 2,
+	})
+	local line = Ui.make("Frame", { Name = "Underline", Size = UDim2.new(1, 0, 0, 1), Position = UDim2.new(0, 0, 0.5, 11), BackgroundColor3 = K.red, BackgroundTransparency = 1, BorderSizePixel = 0 }, label)
+	refs.buttonLine = line
+	P.hover(action, line, label)
+	refs.buttonDot = P.dot(glyph, { Position = UDim2.new(1, 3, 0, 1) })
+	action.Activated:Connect(function()
+		click()
+		Phone.toggle()
+	end)
+	refs.button = action
+end
+
+-- Puts the PHONE action just over the weapon line (the HUD's right column), at its scale; left of the column when that
+-- would run into the MENU row (a touch screen with the column over the buttons). Twice a second while it shows.
+placeButton = function()
+	local action = refs.button
+	local made = gui
+	if not action or not made then
+		return
+	end
+	-- (6.5: on a computer the HUD's PHONE [Q] top right is the one; this action stays for touch screens, and the
+	-- unread count goes to the HUD's button through Phone.onUnread)
+	local onUnread = Phone.onUnread
+	if onUnread then
+		local count = if Ui.touchLayout() then 0 else unreadCount() + refs.tasks.ready() -- (6.5 review: on touch the phone's own dot says it; 6.12: + the task rewards)
+		if count ~= lastUnread then
+			lastUnread = count
+			pcall(onUnread, count)
+		end
+	end
+	local shown = hasPhone() and hudOn() and not isOpen and Ui.touchLayout() -- (the open phone covers its place)
+	if action.Visible ~= shown then
+		action.Visible = shown
+	end
+	if not shown then
+		return
+	end
+	local playerGui = player:FindFirstChild("PlayerGui")
+	local hud = playerGui and playerGui:FindFirstChild("ZombieDeliveryHud")
+	local right = hud and hud:FindFirstChild("RightStack")
+	local weapon = right and right:FindFirstChild("WeaponBar")
+	if not (right and weapon and right:IsA("GuiObject") and weapon:IsA("GuiObject")) then
+		return
+	end
+	local layoutScale = right:FindFirstChild("LayoutScale")
+	local s = if layoutScale and layoutScale:IsA("UIScale") then layoutScale.Scale else 1
+	if Ui.touchLayout() then
+		s = math.max(s, 0.8)
+	end
+	if math.abs(refs.buttonScale.Scale - s) > 0.001 then
+		refs.buttonScale.Scale = s
+	end
+	local origin = made.AbsolutePosition
+	local columnRight = right.AbsolutePosition.X + right.AbsoluteSize.X - origin.X
+	local top = weapon.AbsolutePosition.Y - origin.Y
+	local x, y = columnRight, top - 4
+	-- Clear of the MENU row (upper right) or the screen's top: then left of the column, level with the weapon line.
+	local row = hud and hud:FindFirstChild("HudButtons")
+	local rowBottom = if row and row:IsA("GuiObject") then row.AbsolutePosition.Y + row.AbsoluteSize.Y - origin.Y else 0
+	if y - 44 * s < rowBottom + 8 then
+		x = right.AbsolutePosition.X - origin.X - 8
+		y = top + weapon.AbsoluteSize.Y
+	end
+	local position = UDim2.fromOffset(math.floor(x + 0.5), math.floor(y + 0.5))
+	if action.Position ~= position then
+		action.Position = position
+	end
+end
+
+-- ── The NEW PHONE moment ───────────────────────────────────────────────────
+
+local function phoneMoment()
+	if momentShown then
+		return
+	end
+	momentShown = true
+	seed()
+	-- (6.14: NEXT MISSION on top; 6.18: JOBS the first row under it)
+	addMessage("Marge", "That's my old phone. It's yours now: NEXT MISSION says what you're working toward, JOBS has the jobs and your run, MAP the city, SHOP where to buy what. Don't lose it.", "marge", true)
+	local notify = Phone.notify
+	if notify then
+		notify(if Ui.touchLayout() then "📱 NEW PHONE · Marge gave you her old phone · tap PHONE" else "📱 NEW PHONE · Marge gave you her old phone · Q opens it")
+	end
+	-- It pops up once, when nothing covers the middle any more (her dialog, a result) and the state says it is yours.
+	task.spawn(function()
+		local waited = 0
+		while waited < 60 do
+			local blocked = Phone.blocked
+			if hasPhone() and hudOn() and not (blocked and blocked()) then
+				break
+			end
+			waited += task.wait(0.25)
+		end
+		if not hasPhone() or isOpen then
+			return
+		end
+		Phone.open()
+		local ribbon = refs.ribbon
+		if ribbon then
+			ribbon.Visible = true
+			task.delay(4, function()
+				if ribbon.Parent then
+					ribbon.Visible = false
+				end
+			end)
+		end
+	end)
+end
+
+-- ── Updates ────────────────────────────────────────────────────────────────
+
+function Phone.setState(newState: any)
+	if type(newState) ~= "table" then
+		return
+	end
+	state = newState
+	-- 5.5: what you earned since you joined (BANK): every rise of your money.
+	local cash = tonumber(state.money)
+	if cash then
+		local seen = refs.cashSeen
+		if seen and cash > seen then
+			refs.earned = (refs.earned or 0) + (cash - seen)
+		end
+		refs.cashSeen = cash
+	end
+	local now = state.phone == true
+	if phoneBefore == false and now then
+		phoneMoment() -- (the tutorial's message may not come: the state turning says it too)
+	end
+	phoneBefore = now
+	if now then
+		seed()
+	end
+	placeButton()
+	refreshBadges()
+	-- 6.12: STYLE: a purchase asked for there plays "cash"; the app is drawn again only for what it shows
+	local styleChanged = refs.style.changed(state)
+	if isOpen then
+		if app == "home" then
+			fillHome()
+		elseif app == "shop" or app == "career" or app == "bank" or app == "garage" or app == "bag" or (app == "style" and styleChanged) then
+			renderApp()
+		end
+	end
+end
+
+-- A level-up while you play: Marge's tips for it and the career's note go to MESSAGES.
+local function onXp()
+	if not seeded then
+		return
+	end
+	local level = myLevel()
+	local before = shownLevel or level
+	shownLevel = level
+	for n = before + 1, level do
+		local summary = Career.summary(Career.unlocksAt(n), 3, if state and type(state.cars) == "table" then state.cars else nil)
+		addMessage("Career", `Level {n} · {Levels.rank(n)}.{if summary ~= "" then ` Unlocked: {summary}.` else ""}`, "level", true)
+		for _, tip in margeTips(n) do
+			addMessage("Marge", tip, "marge", true)
+		end
+	end
+	if isOpen and app == "home" then
+		fillHome()
+	end
+end
+
+-- New offers on the board (Net "Offers"): pushed by the server when the board refreshes. While the board is closed
+-- the dispatcher texts you about them.
+local function onOffers(list: any, refreshAt: any, info: any)
+	if type(list) ~= "table" then
+		return
+	end
+	local isNew = type(refreshAt) == "number" and refreshAt ~= lastRefreshAt
+	lastRefreshAt = if type(refreshAt) == "number" then refreshAt else lastRefreshAt
+	-- 5.5: the phone's own BOARD keeps the last board (and draws it again while it shows).
+	refs.offers = list
+	refs.offersInfo = info
+	local inPhone = isOpen and app == "board"
+	if inPhone then
+		renderApp()
+	end
+	local dispatch = Phone.boardOpen
+	local function boardOpen(): boolean
+		return inPhone or (dispatch ~= nil and dispatch())
+	end
+	if not isNew or boardOpen() or not hasPhone() or job then
+		if boardOpen() then
+			boardNew = 0
+			refreshBadges()
+		end
+		return
+	end
+	local open, walks, best = 0, 0, 0
+	for _, offer in list do
+		if type(offer) == "table" and offer.locked ~= true and offer.tooBig ~= true then
+			open += 1
+			if offer.mode == "foot" then
+				walks += 1
+			end
+			best = math.max(best, tonumber(offer.pay) or 0)
+		end
+	end
+	if open == 0 then
+		return
+	end
+	boardNew = open
+	-- (one dispatcher's note at a time: a newer board replaces the last one)
+	for index = #messages, 1, -1 do
+		if messages[index].kind == "board" then
+			table.remove(messages, index)
+		end
+	end
+	addMessage("Dispatch", `{open} new {if open == 1 then "run" else "runs"} on the board{if walks > 0 then ` · {walks} on foot` else ""}. Best pay {Ui.money(best)}. Open JOBS in your phone or press J.`, "board", true)
+end
+
+function Phone.start()
+	local made = Ui.make("ScreenGui", {
+		Name = "ZombieDeliveryPhone",
+		ResetOnSpawn = false,
+		ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets, -- like the HUD: the same coordinates as its right column
+		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+		DisplayOrder = 2,
+	}, player:WaitForChild("PlayerGui"))
+	gui = made
+	-- 5.5: what client/PhoneApps.luau's apps may know and do.
+	refs.host = {
+		job = function(): any
+			return job
+		end,
+		state = function(): any
+			return state
+		end,
+		board = function(): ({ any }?, any, number?)
+			return refs.offers, refs.offersInfo, lastRefreshAt
+		end,
+		queue = function(): any
+			return refs.queue -- 6.12.8
+		end,
+		go = function(id: string)
+			setApp(id)
+		end,
+		close = function()
+			Phone.close()
+		end,
+		redraw = function()
+			if isOpen then
+				renderApp()
+			end
+		end,
+		notify = function(message: string)
+			local tell = Phone.notify
+			if tell then
+				tell(message)
+			end
+		end,
+		fullBoard = function()
+			local cb = Phone.onBoard
+			if cb then
+				cb() -- (the board's onOpen closes the phone)
+			end
+		end,
+		transport = transportText,
+		gps = gpsTo, -- 6.5: SHOP's list of the shops
+		bar = function(): (any, number)
+			return refs.popup.bar() -- 6.17: the JOBS app's chips in the popup's header (and its width)
+		end,
+		room = function(): number
+			return refs.popup.room() -- 6.17: the hero card's height
+		end,
+	}
+	buildButton(made)
+	buildBody()
+	refs.body.Visible = false
+	-- 6.12: the TASKS app's state (server/Tasks.luau): the badges and the dot, the app while it shows, its toasts.
+	refs.tasks.notify = function(message: string)
+		local tell = Phone.notify
+		if tell then
+			tell(message)
+		end
+	end
+	refs.tasks.changed = function()
+		refreshBadges()
+		placeButton()
+		if isOpen and app == "tasks" then
+			renderApp()
+		end
+	end
+	refs.tasks.start()
+	-- 6.14: the next mission's answer changed (client/ReadyCheck.luau: a state, the Missions state, the XP): home's
+	-- NEXT MISSION and WORK tiles; the READY CHECK drawn again only when what it shows changed (its ticker keeps the
+	-- money live).
+	refs.ready.listen(function()
+		if not isOpen then
+			return
+		end
+		if app == "home" then
+			fillHome()
+		elseif app == "ready" and refs.ready.key() ~= refs.readyKey then
+			renderApp()
+		end
+	end)
+	Net.get("Job").OnClientEvent:Connect(function(payload)
+		job = if type(payload) == "table" then payload else nil
+		refreshBadges()
+		-- 6.12.8: BOARD's YOUR RUN is drawn again when the run's orders or its next stop change (not every payload).
+		local runKey = ""
+		if job then
+			runKey = tostring(job.stopLabel)
+			for _, entry in (if type(job.orders) == "table" then job.orders else {}) :: { any } do
+				if type(entry) == "table" and entry.state == "open" then
+					runKey ..= `|{entry.id}:{entry.pay}`
+				end
+			end
+		end
+		local runChanged = runKey ~= refs.runKey
+		refs.runKey = runKey
+		if isOpen and (app == "orders" or app == "bag" or (app == "board" and runChanged)) then -- (6.5: BAG & ITEMS shows what you carry)
+			renderApp()
+		end
+	end)
+	-- 6.12.8: the NEXT UP queue (server/JobQueue.luau): the JOBS tile's line, BOARD's NEXT UP while it shows.
+	Net.get("JobQueue").OnClientEvent:Connect(function(action, data)
+		if action == "state" and type(data) == "table" then
+			refs.queue = data
+			refreshBadges()
+			if isOpen and app == "board" then
+				renderApp()
+			end
+		end
+	end)
+	Net.get("JobQueue"):FireServer("open")
+	Net.get("Offers").OnClientEvent:Connect(onOffers)
+	-- 5.0: the tutorial's "phone" (server/Tutorial.luau: Marge gives it). Only the name is shared; it may not come.
+	Net.get("Tutorial").OnClientEvent:Connect(function(phase, data)
+		if phase == "phone" then
+			phoneMoment()
+		elseif phase == "message" and type(data) == "table" and type(data.text) == "string" then
+			-- 5.0: a text from the server (Marge about Earl's van, server/VanQuest.luau); `gps`: a landmark to route to.
+			addMessage(if type(data.from) == "string" then data.from else "Marge", data.text, "marge", true)
+			local gps = data.gps
+			if type(gps) == "table" and type(gps.id) == "string" then
+				gpsTo(gps.id)
+			end
+		end
+	end)
+	-- 6.12, the clerks: Dot's, Gus's or Kip's "Style" prompt (server/ShopClerks.luau, StyleWear.invite): the STYLE app
+	-- on their tab (no phone: openPhone says so).
+	Net.get("Style").OnClientEvent:Connect(function(action, tab)
+		if action == "open" then
+			refs.style.show(tab)
+			Phone.open("style")
+		end
+	end)
+	player:GetAttributeChangedSignal("Xp"):Connect(onXp)
+	player:GetAttributeChangedSignal("PackCount"):Connect(function()
+		if isOpen and app == "orders" then
+			renderApp() -- 5.0: the CARRYING chip (6.6)
+		end
+	end)
+	-- 6.0.1: the popup's ✕ and backdrop return to the phone's home.
+	refs.popup.onClose = function()
+		if isOpen then
+			setApp("home")
+		else
+			refs.popup.hide()
+		end
+	end
+	UserInputService.InputBegan:Connect(function(input, processed)
+		if UserInputService:GetFocusedTextBox() then
+			return
+		end
+		-- 6.0.1: ESC and the gamepad's B close an open app, then the phone (also when Roblox took the key).
+		if input.KeyCode == Enum.KeyCode.Escape or input.KeyCode == Enum.KeyCode.ButtonB then
+			Phone.back()
+			return
+		end
+		if processed then
+			return
+		end
+		if (input.KeyCode == KEY or input.KeyCode == PAD_KEY) and hudOn() and hasPhone() then
+			if Phone.appOpen() then
+				Phone.back() -- (6.0.1: Q closes the app first)
+			else
+				Phone.toggle()
+			end
+		end
+	end)
+	GuiService.MenuOpened:Connect(function()
+		if Phone.appOpen() then
+			refs.menuAt = os.clock()
+			setApp("home") -- (the Roblox menu: the app closes, like a window; the phone stays)
+		end
+	end)
+	-- The screen turned or resized: a phone that is open is fitted again (6.0.1: upright, and its app's popup).
+	local camera = workspace.CurrentCamera
+	if camera then
+		local resized = 0
+		camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
+			resized += 1
+			local mine = resized
+			task.delay(0.3, function()
+				if mine ~= resized or not isOpen then
+					return
+				end
+				local scale = fit()
+				refs.homeUi.fit(refs.homeKit, refs.layout.heroHeight(refs.fit)) -- 6.18
+				refs.body.Size = UDim2.fromOffset(refs.fit.width, refs.fit.height)
+				refs.scale.Scale = scale
+				refs.body.Position = (restPosition())
+				if refs.popup.refit() and app ~= "home" then
+					renderApp() -- (the popup's two columns came or went)
+				end
+			end)
+		end)
+	end
+	task.spawn(function()
+		while true do
+			placeButton()
+			if isOpen and not hudOn() then
+				Phone.close()
+			end
+			task.wait(0.3)
+		end
+	end)
+end
+
+return Phone

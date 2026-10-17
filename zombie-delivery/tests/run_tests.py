@@ -9,7 +9,7 @@ import glob, json, os, re, shutil, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SHARED = os.path.join(os.path.dirname(HERE), "src", "shared")
-PURE = ("Config", "ZombieKinds", "Economy", "Map", "FootbridgeShape", "Explore", "Roads", "Icons", "Levels", "TrafficLanes", "Crossings", "SoundSheet", "Cast", "NpcLooks", "Missions", "Challenges", "TutorialSteps", "Melee", "Boarding", "Freight", "BuddyBrain", "Career", "JobRules", "Transport", "VanQuest", "KitFit", "RiderPose", "Bag", "Deliveries", "FuelMath", "Residents", "BusLines", "Shortcuts", "RentalDocks", "ZipLines", "Gestures", "FootEvents", "TowerLooks", "StreetProps", "WeatherPlan", "InteractPose", "Armour", "Throws", "RunCycle", "Holding", "BagFill", "Goal", "BodyMotion", "AvatarLook", "ScooterRide", "CurbShape", "Tasks", "SoundPlan", "Style", "JobQueue", "JobThumbs", "MissionArt", "AnalyticsPlan", "RenderBudget", "Shift", "Regulars", "SpecialOrders", "Readiness", "OutlinePick", "MissionPlan", "LiveEvents", "ShotFeel", "Suspension", "DriveFeel", "ZombieStyle", "CardLayout", "ShopPick", "Skills", "Inventory", "KitArt", "CarUpright", "SpawnSpot", "Gait", "MovingRules", "MoveStory", "MoveHelperBrain", "MoveRoles", "CarryGrip", "ChaletLooks", "AlpineLayout", "SandboxMap", "SandboxAdmin", "CollectionRules", "SandboxSteps", "WarehouseLayout", "SprinterLooks")
+PURE = ("Config", "ZombieKinds", "Economy", "Map", "FootbridgeShape", "Explore", "Roads", "Icons", "Levels", "TrafficLanes", "Crossings", "SoundSheet", "Cast", "NpcLooks", "Missions", "Challenges", "TutorialSteps", "Melee", "Boarding", "Freight", "LocationTags", "BuddyBrain", "Career", "JobRules", "Transport", "VanQuest", "KitFit", "RiderPose", "Bag", "Deliveries", "FuelMath", "Residents", "BusLines", "Shortcuts", "RentalDocks", "ZipLines", "Gestures", "FootEvents", "TowerLooks", "StreetProps", "WeatherPlan", "InteractPose", "Armour", "Throws", "RunCycle", "Holding", "BagSwing", "BagFill", "Goal", "BodyMotion", "AvatarLook", "ScooterRide", "CurbShape", "Tasks", "SoundPlan", "Style", "StyleLooks", "JobQueue", "JobThumbs", "MissionArt", "AnalyticsPlan", "RenderBudget", "Shift", "Regulars", "SpecialOrders", "Readiness", "OutlinePick", "MissionPlan", "LiveEvents", "ShotFeel", "SkyGrade", "Suspension", "DriveFeel", "ZombieStyle", "JobPick", "CardLayout", "ShopPick", "Skills", "Inventory", "KitArt", "CareerArt", "CarUpright", "SpawnSpot", "Gait", "MovingRules", "MoveStory", "MoveHelperBrain", "MoveRoles", "CarryGrip", "ChaletLooks", "AlpineLayout", "SandboxMap", "SandboxAdmin", "CollectionRules", "SandboxSteps", "WarehouseLayout", "SprinterLooks")
 PURE += ("SandboxScenery",)  # 8.0 sandbox, the map (tests/sandboxworld_test.luau)
 PURE += ("PairCarry",)  # 8.1 carrying in two: the leader's steering (tests/paircarry_test.luau)
 PURE += ("UpgradeRules",)  # 8.1 sandbox, the upgrades (tests/upgrades_test.luau)
@@ -31,7 +31,6 @@ PURE += ("PlayerTradeRules",)  # 8.7 sandbox, trading between players (tests/pla
 PURE += ("VillageLooks",)  # 8.9 sandbox, Jinočany: the village's art kit (tests/villagelooks_test.luau)
 PURE += ("VillageScenery",)  # 8.9 sandbox, Jinočany step 1 on the map: where the village stands (tests/villageworld_test.luau)
 PURE += ("HouseRoute",)  # 9.0 Danny's way inside a house, on its plan's grid (tests/houseroute_test.luau, tests/dannynav_runtime_test.luau)
-PURE += ("PedalRules",)  # 8.9.4 the driving dashboard: the gear and the pedals (tests/pedalrules_test.luau)
 luau = sys.argv[1] if len(sys.argv) > 1 else shutil.which("luau") or "luau"
 
 ok = True
@@ -41,7 +40,7 @@ with tempfile.TemporaryDirectory() as tmp:
         source = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', source)
         open(os.path.join(tmp, name + ".luau"), "w", encoding="utf-8").write(source)
     # 3.7: the client's pure modules (no Roblox at their top level) that a test requires.
-    for name in ("Stamina", "TouchLayout"):
+    for name in ("Stamina", "TouchLayout", "PhoneLayout", "MissionsLayout"):
         shutil.copy(os.path.join(os.path.dirname(SHARED), "client", name + ".luau"), os.path.join(tmp, name + ".luau"))
     # 8.0 SANDBOX: the client's real client/Main.client.luau as ClientMain.luau, a function of the globals it reads, so
     # tests/clientboot_test.luau runs it on recorders (the city's start list unchanged, the sandbox's only its own).
@@ -575,6 +574,31 @@ if not styles_check():
 if not finish_check():  # 6.22
     ok = False
 
+# 6.12, the clerks: the looks' clerks (Config.Cosmetics.Counters) are server/ShopClerks.luau's people at those shops,
+# and their "Style" prompt's keys (R, the gamepad's L2) stay free: nothing else in src binds them.
+def clerks_check():
+    root = os.path.dirname(HERE)
+    config = open(os.path.join(root, "src", "shared", "Config.luau"), encoding="utf-8").read()
+    clerks = open(os.path.join(root, "src", "server", "ShopClerks.luau"), encoding="utf-8").read()
+    start = config.index("\tCounters = {")
+    counters = dict(re.findall(r'^\t\t(\w+) = \{ clerk = "(\w+)"', config[start:config.index("} :: { [string]: CosmeticCounter }", start)], re.M))
+    people = dict(re.findall(r'^\t(\w+) = \{ name = "(\w+)"', clerks, re.M))
+    bad = [f"{shop}: {name} in Config.Cosmetics.Counters, {people.get(shop)} in ShopClerks" for shop, name in counters.items() if people.get(shop) != name]
+    if not counters:
+        bad.append("no Counters in Config.Cosmetics")
+    if "STYLE_KEY = Enum.KeyCode.R " not in clerks or "STYLE_PAD = Enum.KeyCode.ButtonL2 " not in clerks:
+        bad.append("ShopClerks: the Style prompt's keys moved; update tests/run_tests.py")
+    for folder, _, files in os.walk(os.path.join(root, "src")):
+        for name in files:
+            if name.endswith(".luau") and name != "ShopClerks.luau":
+                if re.search(r"Enum\.KeyCode\.(R|ButtonL2)\b", open(os.path.join(folder, name), encoding="utf-8").read()):
+                    bad.append(f"{name} binds R or L2, the clerks' Style prompt's keys")
+    print("== clerks: " + (f"the looks' clerks are ShopClerks' people ({', '.join(f'{k} {v}' for k, v in counters.items())}); R and L2 only for their Style prompt" if not bad else "; ".join(bad)))
+    return not bad
+
+if not clerks_check():
+    ok = False
+
 # 6.13, analytics: every money reason the server passes (PlayerData.addMoney / spend, Analytics.money) is one of
 # shared/AnalyticsPlan.luau's Sources or Sinks, and every custom event it names (Analytics.event, custom) one of its
 # Events: a typo would only show as "Other" or a refused event in the dashboard, never here otherwise.
@@ -622,6 +646,30 @@ def analytics_check():
     return not bad
 
 if not analytics_check():
+    ok = False
+
+# 7.1 review: a new server answers PLAY and has its lighting before the Alps' terrain is built. World.build lights the
+# world before its last piece starts the Alps (the cheap part only: Alpine.start), and Main.server.luau defers
+# World.buildLate (the terrain's fills, the forests) right after World.build, before the PLAY listener.
+def alps_order_check():
+    root = os.path.dirname(HERE)
+    world = open(os.path.join(root, "src", "server", "World.luau"), encoding="utf-8").read()
+    main = open(os.path.join(root, "src", "server", "Main.server.luau"), encoding="utf-8").read()
+    bad = []
+    start, late = world.find("function World.build()"), world.find("function World.buildLate()")
+    build = world[start:late] if 0 <= start < late else ""
+    light, alps = build.find('piece("lighting"'), build.find("Alpine).start(")
+    if "Alpine).build(" in world:
+        bad.append("World.luau builds all of the Alps at once (Alpine.build)")
+    if light < 0 or alps < 0 or light > alps:
+        bad.append("World.build: the lighting before the Alps' start")
+    built, deferred, play = main.find("World.build()"), main.find("task.defer(World.buildLate)"), main.find('Net.get("Play").OnServerEvent')
+    if min(built, deferred, play) < 0 or not built < deferred < play:
+        bad.append("Main.server.luau: task.defer(World.buildLate) right after World.build(), before the PLAY listener")
+    print("== alps order: " + ("the lighting before the Alps, their terrain and forests deferred past PLAY" if not bad else "; ".join(bad)))
+    return not bad
+
+if not alps_order_check():
     ok = False
 
 # 8.0 SANDBOX: the HUD's city parts stay hidden in the sandbox (client/Hud.luau ── Sandbox ──, read as text: the HUD is
@@ -682,6 +730,28 @@ def sandbox_hud_check():
 if not sandbox_hud_check():
     ok = False
 
+# 7.2 review: two server wirings the Luau tests cannot run. PlayerData.save writes the one-car flag into `rewards` too
+# (an older server drops unknown fields but keeps that table's short keys: Economy.vanMigrated reads either mark), and
+# the Tutorial remote's ("story", key) marks only a card's key (MoveStory.isCardKey): a chapter done is the server's.
+def review72_check():
+    root = os.path.dirname(HERE)
+    data = open(os.path.join(root, "src", "server", "PlayerData.luau"), encoding="utf-8").read()
+    tutorial = open(os.path.join(root, "src", "server", "Tutorial.luau"), encoding="utf-8").read()
+    bad = []
+    start = data.find("function PlayerData.save(")
+    save = data[start:data.find("\nend\n", start)] if start >= 0 else ""
+    if "profile.rewards[Config.CompanyVan.Flag] = true" not in save:
+        bad.append("PlayerData.save: the one-car flag into rewards too")
+    start = tutorial.find('if action == "story" then')
+    story = tutorial[start:tutorial.find("return", start)] if start >= 0 else ""
+    if "isCardKey(arg)" not in story or "PlayerData.markStory(player, arg)" not in story:
+        bad.append("Tutorial: the story action marks only MoveStory.isCardKey keys")
+    print("== 7.2 review: " + ("the one-car flag saved into rewards too; the client marks only story cards" if not bad else "; ".join(bad)))
+    return not bad
+
+if not review72_check():
+    ok = False
+
 # 8.0.2: the owner's Blender imports leave the Workspace before anything can yield (Import 3D leaves their parts loose:
 # the sandbox builds no Marge's house, so ZDCHouseArt fell apart over the plots).
 def imports_first_check():
@@ -710,15 +780,16 @@ if not upgrades_hooks_check():
     ok = False
 
 # 8.3 SANDBOX: the gamepad's D-pad (← the STOCK list, → the book, ↓ the TASKS panel: Config's StockPad / Pad,
-# shared/SandboxPad.luau) is free in the sandbox: no module the sandbox's client starts (client/Main.client.luau: what
-# it requires, its own modules) reads a D-pad button itself, none of the city's D-pad users (the
+# shared/SandboxPad.luau) is free in the sandbox: no module the sandbox's client starts (client/Main.client.luau's
+# sandbox block: what it requires, its own modules) reads a D-pad button itself, none of the city's D-pad users (the
 # weapon wheel ↑, the phone ↓, the hands ← →) is started there, no prompt of the server's (GamepadKeyCode) is on the
 # D-pad, and the three chips are on three different D-pad buttons, never ↑ (Roblox's emote wheel).
 def pad_check():
     root = os.path.dirname(HERE)
     client = os.path.join(root, "src", "client")
     main = open(os.path.join(client, "Main.client.luau"), encoding="utf-8").read()
-    block = main  # (10.0: the whole client is the sandbox's)
+    start = main.index("if Config.Sandbox.On then")
+    block = main[start:main.index("\nend\n", start)]
     started = set(re.findall(r"require\(Client\.(\w+)\)", block))
     own = re.search(r"for _, name in \{([^}]*)\} do", block)
     started |= set(re.findall(r'"(\w+)"', own.group(1))) if own else set()
