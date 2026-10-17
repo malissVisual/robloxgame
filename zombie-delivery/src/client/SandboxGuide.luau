@@ -60,6 +60,9 @@
 --   SandboxGuide.setEnabled(on)     shows or hides the guide (the G hold, the ✕, a settings row)
 --   SandboxGuide.enabled()          is it on?
 --   SandboxGuide.close()            the hint's ✕ (8.3: a soft step dismissed, else the guide off)
+--   SandboxGuide.goTo(at?, label?, seconds?)   10.x the map: a place picked on the big map (client/SandboxMapUi.luau:
+--                                   a portal) takes the chevron and the path until you are there, a run starts or
+--                                   `seconds` pass (180); nil lets go. SandboxGuide.picked: the pick now
 --   SandboxGuide.step()             the step now (its id, SandboxSteps.Steps), nil before the first look
 --   SandboxGuide.hint()             the hint line (a top block), for the layout checks
 --   SandboxGuide.covered / windowOpen   8.3 hooks: what covers the screen, the sandbox window open now (nil: asked of
@@ -97,7 +100,7 @@ local K = Theme.Contract
 local player = Players.LocalPlayer
 local COLOR = Color3.fromRGB(G.Color[1], G.Color[2], G.Color[3])
 local ABOVE = { "MovePanel", "MoveHelper", "PlanningPill" } -- the top's middle blocks the line goes under (TopBlocks)
-local SIDE_GUIS = { "SandboxHud", "SandboxTasksChip" } -- the HUD at the top's sides the line keeps clear of (client/SandboxHud.luau; 8.2: client/SandboxTasksUi.luau's chip)
+local SIDE_GUIS = { "SandboxHud", "SandboxTasksChip", "SandboxMiniMap" } -- the HUD at the top's sides the line keeps clear of (client/SandboxHud.luau; 8.2: client/SandboxTasksUi.luau's chip; 10.x: a touch screen's minimap in a run, client/SandboxMiniMap.luau)
 local MAX_POINTS = 8 -- SandboxSteps.route's most points (SandboxSteps.MaxPoints; 8.9: 8, was 6: a path of seven beams)
 local PAD_L, PAD_R, PAD_V = 14, 4, 5 -- the line's padding (at scale 1)
 local LINE_H = G.TextSize + 4 -- one line of words
@@ -1159,6 +1162,17 @@ local function look()
 	if guide and root and not state.inside then
 		at, label = targetOf(step.target, px, pz)
 	end
+	-- 10.x the map: a place picked on the big map takes the chevron and the path until you are there (G.Near), a run
+	-- starts or its time is up
+	local picked = SandboxGuide.picked
+	if picked then
+		local dx, dz = picked.at.X - px, picked.at.Z - pz
+		if state.move or os.clock() > picked.untilAt or (root ~= nil and dx * dx + dz * dz < G.Near * G.Near) then
+			SandboxGuide.picked = nil
+		elseif root then
+			at, label = picked.at, picked.label
+		end
+	end
 	if at and label then
 		showWorld(at, label, px, pz)
 	else
@@ -1182,6 +1196,21 @@ end
 
 function SandboxGuide.enabled(): boolean
 	return on
+end
+
+-- 10.x the map (client/SandboxMapUi.luau): a place picked there (a portal's pad) is the chevron's and the path's for
+-- `seconds` (or until you are there, or a run starts); nil `at` lets go. It turns the guide on.
+SandboxGuide.picked = nil :: { at: Vector3, label: string, untilAt: number }?
+function SandboxGuide.goTo(at: Vector3?, label: string?, seconds: number?)
+	if at and label then
+		SandboxGuide.picked = { at = at, label = label, untilAt = os.clock() + (seconds or 180) }
+		SandboxGuide.setEnabled(true)
+	else
+		SandboxGuide.picked = nil
+	end
+	if started then
+		pcall(look)
+	end
 end
 
 -- The hint's ✕: 8.3, on a soft step that step alone is dismissed (for the session; the next soft one waits SoftGap s),

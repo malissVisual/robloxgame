@@ -12,6 +12,9 @@
 --     says its state (WALK ONTO THE PAD, STARTING IN 7 · 2/4, IN USE) and its glow its colour (Config.Runs.Portal); the
 --     players on it get the pad panel ({ kind = "pad", … }). When the countdown ends the first MaxParty on it go.
 --   * A portal whose house is in a run already shows IN USE: nobody joins its pad (they hear so once).
+--   * 10.x the map (read-only, for client/SandboxMapUi.luau's lobby): each portal model's attributes RunState ("free",
+--     "wait": counting down, "use": in a run), RunEndsAt (the countdown's end), RunWho (who is on the pad, else the
+--     run's party) and RunDifficulty, written in the same look as its sign, only when they change.
 --   * The start: the host's van is parked at the house's curb (Moving.parkVan: server/SandboxBoot.luau's, repaired),
 --     not drivable (its model's Config.Runs.Truck.Attribute: client/CarVisuals.luau shows no Drive / Ride along, its
 --     seats Disabled), the party is the run's (Crew.members and Crew.ownerOf are wrapped: a run's party is its host's
@@ -79,8 +82,9 @@ local runs: { [string]: Run } = {} -- by house
 local runOf: { [Player]: Run } = {} -- every party member's
 local away: { [Player]: number } = {} -- on a jump (os.clock until): no pad, no join
 local padKey: { [Player]: string } = {} -- the last pad view sent ("" none)
-local signs: { [string]: { status: TextLabel?, pad: BasePart? } } = {}
+local signs: { [string]: { status: TextLabel?, pad: BasePart?, model: Instance? } } = {}
 local signText: { [string]: string } = {}
+local shownState: { [string]: string } = {} -- 10.x the map: the portal's attributes as last written (a key)
 local inUseSaid: { [Player]: string } = {}
 local adminPick: { [Player]: string } = {}
 local started = false
@@ -142,6 +146,7 @@ local function findSigns()
 			signs[house] = {
 				status = if status and status:IsA("TextLabel") then status else nil,
 				pad = if pad and pad:IsA("BasePart") then pad else nil,
+				model = model,
 			}
 		end
 	end
@@ -165,6 +170,25 @@ local function paint(house: string, text: string, color: { number })
 	if found.pad then
 		found.pad.Color = c
 	end
+end
+
+-- 10.x the map (client/SandboxMapUi.luau, read-only): the portal model's attributes RunState ("free" | "wait": a
+-- countdown | "use": a run in its house), RunEndsAt (the countdown's end, the server's time), RunWho (who is on the pad,
+-- or the run's party: display names, comma-joined) and RunDifficulty (the pad's pick, the run's): written only when
+-- they change.
+local function publish(house: string, state: string, endsAt: number?, who: { string }, difficulty: string?)
+	local names = table.concat(who, ", ")
+	local key = `{state}|{endsAt or ""}|{names}|{difficulty or ""}`
+	local found = signs[house]
+	local model = found and found.model
+	if not model or shownState[house] == key then
+		return
+	end
+	shownState[house] = key
+	model:SetAttribute("RunState", state)
+	model:SetAttribute("RunEndsAt", endsAt)
+	model:SetAttribute("RunWho", if names ~= "" then names else nil)
+	model:SetAttribute("RunDifficulty", difficulty)
 end
 
 -- The map's house model of a place (its attribute SandboxHouse), nil when none.
@@ -648,9 +672,15 @@ function Runs.step()
 		table.sort(here) -- (newcomers in one look: a stable order)
 		local pad = pads[house] or RunRules.newPad()
 		pads[house] = pad
-		if runs[house] then
+		local run = runs[house]
+		if run then
 			RunRules.padStep(pad, {}, now, R.Countdown)
 			paint(house, "IN USE · A RUN IS ON", R.Portal.InUse)
+			local party: { string } = {}
+			for _, member in run.party do
+				table.insert(party, member.DisplayName)
+			end
+			publish(house, "use", nil, party, run.difficulty) -- (10.x the map)
 			continue
 		end
 		local hostBefore = pad.host
@@ -661,8 +691,10 @@ function Runs.step()
 		end
 		if #pad.order == 0 then
 			paint(house, "WALK ONTO THE PAD", R.Portal.Free)
+			publish(house, "free", nil, {}, nil) -- (10.x the map)
 		else
 			paint(house, `STARTING IN {RunRules.left(pad, now)} · {math.min(#pad.order, R.MaxParty)}/{R.MaxParty}`, R.Portal.Waiting)
+			publish(house, "wait", pad.endsAt, partyNames(pad.order), pad.difficulty)
 		end
 		if RunRules.due(pad, now) then
 			local ids = RunRules.party(pad, R.MaxParty)

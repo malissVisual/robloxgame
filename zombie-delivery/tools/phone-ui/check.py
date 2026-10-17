@@ -58,6 +58,9 @@ controls, the speed and the offer card, held to drive on a touch screen, the fee
 9.7 runs: the pad panel (the host's difficulty buttons, another player's line) and the run's results card (the real
 RunUi beside SandboxHud and SandboxTasksUi: runs.luau) on phones, a computer and a big screen: on the screen, clear of the
 rest, the words fitting, a finger's size, the requests.
+10.x the map: the big map in the lobby and in a run and a run's minimap (the real SandboxMapUi, SandboxMapDraw,
+SandboxMapData and SandboxMiniMap beside SandboxHud, SandboxTasksUi and RunUi: sandboxmap.luau) on phones, a computer and
+a big screen: on the screen, clear of the rest, nothing on each other, the words fitting, a finger's size, the fog.
 """
 import argparse
 from pathlib import Path
@@ -415,3 +418,14 @@ from lootenv import loot_env  # noqa: E402
 with tempfile.TemporaryDirectory() as folder:
     loot_env(Path(folder))
     subprocess.run([args.luau, "loot.luau"], cwd=folder, check=True)
+# 10.x the map: the big map (client/SandboxMapUi.luau with client/SandboxMapDraw.luau, client/SandboxMapData.luau and
+# shared/SandboxMapRules.luau: the lobby's plan with the portals' live states, a run's house with its yard, the loot's
+# fog) and a run's minimap (client/SandboxMiniMap.luau) beside the real SandboxHud, SandboxTasksUi and RunUi:
+# tools/phone-ui/sandboxmap.luau (sandboxmapenv.py builds the folder; sandboxmap_preview.py draws the same scenes) at
+# 844 x 390, 667 x 375, 1280 x 800 and 1920 x 1080: on the screen, nothing on each other, the words fitting, a finger's
+# size, the 🗺 MAP chip, M / ESC / L2 / B, a portal's pick for the guide, the minimap clear of the HUD, no warnings.
+from sandboxmapenv import sandboxmap_env  # noqa: E402
+
+with tempfile.TemporaryDirectory() as folder:
+    sandboxmap_env(Path(folder), args.luau)
+    subprocess.run([args.luau, "sandboxmap.luau"], cwd=folder, check=True)

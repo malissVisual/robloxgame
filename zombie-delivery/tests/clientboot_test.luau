@@ -480,6 +480,29 @@ do -- 9.x loot: the outlines and the stars start with the sandbox's own modules;
 	end)())
 end
 
+do -- 10.x the map: the big map (a window like the others) and a run's minimap start with the sandbox's own modules
+	local run = boot(true, { SandboxMapUi = "ok", SandboxMiniMap = "ok", VanPaintUi = "ok" }, true)
+	check("10.x the map: the big map (SandboxMapUi) and the minimap (SandboxMiniMap) start with the sandbox's own modules",
+		called(run, "SandboxMapUi.start") and called(run, "SandboxMiniMap.start"))
+	check("… the open big map frees the mouse (CameraRig.windowOpen)", run.modules.CameraRig.windowOpen() == true)
+	local onOpen = run.modules.SandboxMapUi.onOpen
+	if type(onOpen) == "function" then
+		table.clear(run.calls)
+		run.modules.Hud.closeWindows = run.modules.Hud.onCloseWindows
+		onOpen()
+	end
+	check("… opening it closes the PAINT shop's window but not itself", type(onOpen) == "function" and called(run, "VanPaintUi.close") and not called(run, "SandboxMapUi.close"))
+	run.modules.Hud.onCloseWindows()
+	check("… ESC (the HUD's close) closes it like the others", called(run, "SandboxMapUi.close"))
+	check("… the minimap with Main's covered check (a window open, the big map too: none)", run.modules.SandboxMiniMap.covered == run.modules.CameraRig.windowOpen)
+	local alone = boot(true, { SandboxMapUi = "ok" }, false)
+	check("… the big map shut: the mouse stays the camera's", alone.modules.CameraRig.windowOpen() == false)
+	check("… and the city never requires them", (function(): boolean
+		local city = boot(false, { SandboxMapUi = "ok", SandboxMiniMap = "ok" })
+		return city.required.SandboxMapUi == nil and city.required.SandboxMiniMap == nil
+	end)())
+end
+
 do -- none of the sandbox's own modules there yet (the other workers' branches not merged)
 	local run = boot(true, {})
 	local ok, where = same(starts(run), concat(SANDBOX, LAST))

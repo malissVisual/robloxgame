@@ -13,7 +13,10 @@
 --                                       spot id) and Star (★), under the folder "Items". The safety ground under the
 --                                       house (Config.Furniture.Ground) and the walls and ceiling round it keep
 --                                       everyone in; the porch's daylight wall stops a walk out of the front door.
---   HouseInterior.slot(index)           the origin of interior number `index` (0, 1, 2 ...): far off the map
+--                                       10.x the map: the model's attribute MapPlan is the plan in one short string
+--                                       (shared/SandboxMapRules.luau encode: its rooms, doorways, fixtures, windows
+--                                       and the origin), the clients' big map and minimap draw a run's floor plan from it
+--   HouseInterior.slot(index)          the origin of interior number `index` (0, 1, 2 ...): far off the map
 --                                       (Config.Furniture.Slot, past Map.Bounds), Spacing apart, never overlapping
 --   HouseInterior.destroy(model)        takes an interior down (pieces carried out of it are not in it any more)
 --
@@ -66,6 +69,7 @@ local FixtureMesh = require(script.Parent.FixtureMesh) -- 8.9.1: the fixtures in
 local FurnitureMesh = require(script.Parent.FurnitureMesh)
 local HouseLayout = require(Shared.HouseLayout)
 local LightRules = require(Shared.SandboxLightRules) -- 8.5.2: the rooms' ceiling lamps
+local MapRules = require(Shared.SandboxMapRules) -- 10.x the map: the floor plan published on the model (MapPlan)
 
 local T = Config.Furniture
 local LIT = Config.SandboxLight.House -- 8.3: the lights' numbers and the Neon's colours (Config.SandboxLight)
@@ -1036,6 +1040,11 @@ function HouseInterior.build(plan: HouseLayout.Plan, origin: CFrame): (Model, { 
 	model.Name = "HouseInterior"
 	model:SetAttribute("Seed", plan.seed)
 	model:SetAttribute("Kind", plan.kind)
+	-- 10.x the map: the floor plan in one short string (shared/SandboxMapRules.luau encode; the clients' big map and
+	-- minimap draw it), written once with the interior. (A recorder's frame has no LookVector: no turn.)
+	local facing = (origin :: any).LookVector
+	local yaw = if facing then math.deg(math.atan2(-facing.X, -facing.Z)) else 0
+	model:SetAttribute("MapPlan", MapRules.encode(plan, { x = origin.Position.X, y = origin.Position.Y, z = origin.Position.Z, yaw = yaw }))
 	local shell = folder(model, "Shell")
 	local decor = folder(model, "Decor")
 	local items = folder(model, "Items")
