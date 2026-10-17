@@ -4,21 +4,18 @@
 -- tests/movehelper_runtime_test.luau: his walk a straight step a tick, a carried piece moved with its carrier here).
 --   * the bubble's words (the crew's MoveHelperBubble, MoveHelperAlert) always the same action's as the status line's
 --     MoveHelperDoing (MoveHelperBrain.doing / bubble), waiting (10.1: free, never "for hire"), going for a piece, carrying it, carrying with
---     you, at a two-person piece (orange), in the van, getting out, staying out; the orders that apply
---     (MoveHelperOrders) with them; all gone when the move ends
+--     you, at a two-person piece (orange), down in a run (orange); the orders that apply (MoveHelperOrders) with them;
+--     all gone when the move ends
 --   * PUT IT DOWN ("helper", "putdown"): a piece in his arms set down where he stands, its condition kept, off his
 --     list ("Setting it down."); a two-person piece he holds with you: both ends down, your hands free, his hold off;
 --     nothing in his hands: refused ("Danny isn't carrying anything.")
---   * GET OUT ("helper", "getout"): seated, out at once as a player gets out (8.5 boardOut: the door open, the slide
---     out, on his feet at his spot by the door), "Hopping out, boss."; while the owner stays at the wheel he does not
---     get back in (seconds later still out); the owner out of the seat and in again: in he gets; refused when he is not
---     in the van, and while the van rolls ("Stop the van first"); on his way to the van to ride: he stays out
+--   (10.5: nobody drives the van in a run, so he never rides in it: no GET OUT)
 --   * a player not of the crew: nothing; the rate limit (MoveHelperOrder, Config.Robust.Limits.MoveHelperOrder)
 local E = require("./MovingRuntime")
 local Moving = require("./MovingServer")
 local MoveHelper = require("./MoveHelperServer")
 local Config = require("./Config")
-local Map = require("./Map")
+local SandboxMap = require("./SandboxMap")
 local Rules = require("./MovingRules")
 local Brain = require("./MoveHelperBrain")
 
@@ -39,11 +36,9 @@ local M = E.Mock
 local V3 = M.Vector3.new
 local workspace = M.workspace
 
-local home = Map.home(T.Contracts[1].home) :: any
-local door = V3(home.door.x, 3, home.door.z)
-local facing = V3(home.facing.x, 0, home.facing.z)
-local outside = door + facing * 3
-E.truckAt = V3(home.door.x + 30, 2, home.door.z - 20)
+local HOUSE = "lone_house" -- (10.5: a run on the lone house, the van at its curb)
+local door, facing, outside = E.doorOf(SandboxMap.house(HOUSE))
+local lobby = V3(SandboxMap.Lobby.spawn.x, 3, SandboxMap.Lobby.spawn.z)
 E.Zombies.findSpot = function(center: any): any
 	return center + V3(900, 0, 0) -- (the move's own roamers far off)
 end
@@ -64,9 +59,10 @@ MoveHelper.useMover({
 	end,
 })
 
-local sol = E.player(44, "Sol", V3(Map.Depot.x, 3, Map.Depot.z))
-local rex = E.player(66, "Rex", V3(Map.Depot.x + 8, 3, Map.Depot.z)) -- (not of the crew)
+local sol = E.player(44, "Sol", lobby)
+local rex = E.player(66, "Rex", lobby + V3(8, 0, 0)) -- (not of the crew)
 Moving.useArt(E.art)
+Moving.parkVan = E.parkVan
 Moving.start()
 
 local function promptIn(model: any, action: string): any
@@ -168,8 +164,8 @@ end
 
 -- The move; Danny with you from the start (10.1: free): his bubble says he waits, no orders ---------------------------------
 
-local started = Moving.admin(sol, "start")
-check("a solo move starts", string.find(started, "started", 1, true) ~= nil, started)
+local started = E.startRun(sol, HOUSE)
+check("a solo run starts", started == nil, started)
 local truck = E.cars[sol]
 truck.model:SetAttribute("BackOpen", true)
 Moving.step()
@@ -184,13 +180,10 @@ local noticeAt = #E.messages
 E.request(sol, "helper", "putdown")
 check("8.6 PUT IT DOWN with nothing in his hands: refused, \"Danny isn't carrying anything.\"", told(sol, "Danny isn't carrying anything.", noticeAt)
 	and danny.hirer == sol, E.lastNotice(sol))
-noticeAt = #E.messages
-E.request(sol, "helper", "getout")
-check("8.6 GET OUT, him not in the van: refused, \"Danny isn't in the van.\"", told(sol, "Danny isn't in the van.", noticeAt) and not danny.stayOut, E.lastNotice(sol))
 
 -- PUT IT DOWN: a piece in his arms -------------------------------------------------------------------------------------------
 
-local site = workspace:FindFirstChild("Moves"):FindFirstChild("Move_marge")
+local site = workspace:FindFirstChild("Moves"):FindFirstChild(`Move_{HOUSE}`)
 local enter = promptIn(site, "Enter house")
 E.place(sol, outside)
 enter.Triggered:Fire(sol)
@@ -270,104 +263,9 @@ do
 	end
 	noticeAt = #E.messages
 	E.request(sol, "helper", "putdown")
-	E.request(sol, "helper", "getout")
 	E.Net.limit = realLimit
 	check("8.6 every order asks its rate limit (MoveHelperOrder, Config.Robust.Limits.MoveHelperOrder: 3 a second); over it: dropped (not even a refusal)",
 		asked and Config.Robust.Limits.MoveHelperOrder == 3 and not told(sol, "Danny", noticeAt))
-end
-
--- GET OUT -------------------------------------------------------------------------------------------------------------------
-
-do
-	local seat = truck.passengers[1]
-	local function swingsSince(from: number): { any }
-		local list = {}
-		for index = from + 1, #E.doorSwings do
-			local swing = E.doorSwings[index]
-			if swing.car == truck and swing.door == 2 then
-				table.insert(list, swing)
-			end
-		end
-		return list
-	end
-	E.place(sol, truck.chassis.Position + V3(-5, 1, -3))
-	E.seated[sol] = truck
-	local riding = run(1, function()
-		return danny.action == "ride"
-	end)
-	run(0.2)
-	check("8.6 Sol at the wheel: \"🚐 Getting in the van\", GET OUT applies already (on his way)", riding and sol:GetAttribute("MoveHelperBubble") == "🚐 Getting in the van"
-		and agreed() == "ride" and sol:GetAttribute("MoveHelperOrders") == "getout", sol:GetAttribute("MoveHelperBubble"))
-	local sat = run(40, function()
-		return danny.seat ~= nil
-	end)
-	run(0.4)
-	check("8.6 seated: \"🪑 Riding\", the orders: GET OUT", sat and danny.seat == seat and sol:GetAttribute("MoveHelperBubble") == "🪑 Riding" and agreed() == "seat"
-		and sol:GetAttribute("MoveHelperOrders") == "getout", sol:GetAttribute("MoveHelperBubble"))
-	truck.speed = 20
-	noticeAt = #E.messages
-	E.request(sol, "helper", "getout")
-	check("8.6 GET OUT while the van rolls (20 studs/s): refused, \"Stop the van first: then Danny can get out.\", he stays in", danny.seat == seat
-		and danny.board == nil and told(sol, "Stop the van first: then Danny can get out.", noticeAt) and not danny.stayOut, E.lastNotice(sol))
-	truck.speed = 0
-	local swingsAt = #E.doorSwings
-	said = #E.said
-	noticeAt = #E.messages
-	E.request(sol, "helper", "getout")
-	local b = danny.board
-	local open = swingsSince(swingsAt)[1]
-	check("8.6 GET OUT, the van standing: out of the seat now as a player gets out (8.5: the seat free, the door open now, the slide out), \"Hopping out, boss.\"",
-		b ~= nil and b.out and danny.seat == nil and seat.Occupant == nil and open ~= nil and open.openAt == open.now and E.saidSince(Brain.Lines.getOut, said)
-		and told(sol, "Danny gets out and stays out of the van until the driver leaves the wheel.", noticeAt), E.lastNotice(sol))
-	run(0.3)
-	check("8.6 …\"🚪 Getting out of the van\" meanwhile, GET OUT no more (he is on his way out)", sol:GetAttribute("MoveHelperBubble") == "🚪 Getting out of the van"
-		and agreed() == "alight" and sol:GetAttribute("MoveHelperOrders") == nil, sol:GetAttribute("MoveHelperBubble"))
-	noticeAt = #E.messages
-	E.request(sol, "helper", "getout")
-	check("8.6 …GET OUT again then: \"Danny is getting out already.\"", told(sol, "Danny is getting out already.", noticeAt), E.lastNotice(sol))
-	local out = run(2, function()
-		return danny.board == nil
-	end)
-	local stayed = true
-	run(8, function()
-		stayed = stayed and danny.seat == nil and danny.board == nil and danny.action ~= "ride"
-		return false
-	end)
-	check("8.6 …on his feet by the van, and while Sol stays at the wheel he does not get back in (8 s later still out: no ride)", out and stayed
-		and danny.seat == nil and seat.Occupant == nil and danny.stayOut)
-	check("8.6 …his bubble: \"✋ Staying out of the van\" (the status line: staying out, your order), no orders", sol:GetAttribute("MoveHelperBubble") == "✋ Staying out of the van"
-		and agreed() == "stay" and sol:GetAttribute("MoveHelperDoing") == "Staying out of the van (your order)" and sol:GetAttribute("MoveHelperOrders") == nil,
-		sol:GetAttribute("MoveHelperBubble"))
-	E.seated[sol] = nil
-	run(0.4)
-	check("8.6 Sol leaves the wheel: the order is over (he waits by the van as ever)", not danny.stayOut and agreed() == "wait")
-	E.seated[sol] = truck
-	sat = run(40, function()
-		return danny.seat ~= nil
-	end)
-	check("8.6 …Sol at the wheel again: in he gets (as a player gets in)", sat and danny.seat == seat)
-	-- on his way to the van to ride: GET OUT keeps him out
-	E.seated[sol] = nil
-	run(2, function()
-		return danny.seat == nil and danny.board == nil
-	end)
-	danny.body.root.CFrame = M.CFrame.new(truck.chassis.Position + V3(30, 0, 30)) -- (a way off: he walks to the van)
-	E.seated[sol] = truck
-	run(0.3)
-	said = #E.said
-	noticeAt = #E.messages
-	local walking = danny.action == "ride" and danny.board == nil and danny.seat == nil
-	E.request(sol, "helper", "getout")
-	check("8.6 GET OUT while he walks to the van to ride: he stays out (\"Okay, I'll stay out.\")", walking and danny.stayOut and E.saidSince(Brain.Lines.stayOut, said)
-		and told(sol, "Danny stays out of the van until the driver leaves the wheel.", noticeAt), E.lastNotice(sol))
-	stayed = true
-	run(6, function()
-		stayed = stayed and danny.seat == nil and danny.board == nil and danny.action ~= "ride"
-		return false
-	end)
-	check("8.6 …never in while Sol stays at the wheel", stayed)
-	E.seated[sol] = nil
-	run(0.3)
 end
 
 -- The two-person piece of his list: he needs you (orange) ------------------------------------------------------------------
@@ -392,11 +290,11 @@ do
 	body.humanoid.Health = 0
 	body.humanoid.HealthChanged:Fire(0)
 	run(0.3)
-	check("8.6 down: \"🤕 Down: back at the van soon\", orange, the status line's", danny.dead and sol:GetAttribute("MoveHelperBubble") == "🤕 Down: back at the van soon"
-		and sol:GetAttribute("MoveHelperAlert") == true and agreed() == "down", sol:GetAttribute("MoveHelperBubble"))
+	check("8.6 down in the run: \"🆘 Down! Hold E to revive\", orange, the status line's", danny.dead and sol:GetAttribute("MoveHelperBubble") == "🆘 Down! Hold E to revive"
+		and sol:GetAttribute("MoveHelperAlert") == true and agreed() == "revive", sol:GetAttribute("MoveHelperBubble"))
 	noticeAt = #E.messages
-	E.request(sol, "helper", "getout")
-	run(4) -- (his body gone meanwhile)
+	E.request(sol, "helper", "putdown")
+	run(4)
 	E.request(sol, "helper", "putdown")
 	local downTold = 0
 	for index = noticeAt + 1, #E.messages do
@@ -405,13 +303,12 @@ do
 			downTold += 1
 		end
 	end
-	check("8.6 …an order while he is down (lying there, or his body gone): refused, \"Danny is down: get them up, or wait a moment.\"", downTold == 2
-		and danny.body == nil, downTold)
+	check("8.6 …an order while he is down (lying there): refused, \"Danny is down: get them up, or wait a moment.\"", downTold == 2, downTold)
 end
 
 -- The end ------------------------------------------------------------------------------------------------------------------
 
-Moving.admin(sol, "end")
+Moving.endRun(sol)
 run(0.2)
 check("8.6 the move ends: the bubble's words and the orders go with the rest", MoveHelper.find(sol) == nil and sol:GetAttribute("MoveHelperBubble") == nil
 	and sol:GetAttribute("MoveHelperAlert") == nil and sol:GetAttribute("MoveHelperOrders") == nil and sol:GetAttribute("MoveHelperDoing") == nil)

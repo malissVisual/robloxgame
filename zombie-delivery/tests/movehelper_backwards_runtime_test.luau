@@ -35,7 +35,7 @@ local E = require("./MovingRuntime")
 local Moving = require("./MovingServer")
 local MoveHelper = require("./MoveHelperServer")
 local Config = require("./Config")
-local Map = require("./Map")
+local SandboxMap = require("./SandboxMap")
 local Rules = require("./MovingRules")
 local PairCarry = require("./PairCarry") -- (client/PairSteer.luau's steering)
 local FurnitureLooks = require("./FurnitureLooks")
@@ -73,11 +73,9 @@ E.items.sofa.size = V3(SOFA.X, SOFA.Y, SOFA.Z) -- (the runtime's sofa and slab a
 E.items.slab.size = V3(TABLE.X, TABLE.Y, TABLE.Z)
 E.items.slab.name = "Dining Table"
 
-local home = Map.home(T.Contracts[1].home) :: any
-local door = V3(home.door.x, 3, home.door.z)
-local facing = V3(home.facing.x, 0, home.facing.z)
-local outside = door + facing * 3
-E.truckAt = V3(home.door.x + 30, 2, home.door.z - 20)
+local HOUSE = "lone_house" -- (10.5: a run on the lone house, the van at its curb)
+local door, facing, outside = E.doorOf(SandboxMap.house(HOUSE))
+local lobby = V3(SandboxMap.Lobby.spawn.x, 3, SandboxMap.Lobby.spawn.z)
 E.Zombies.findSpot = function(center: any): any
 	return center + V3(900, 0, 0)
 end
@@ -103,11 +101,12 @@ MoveHelper.useMover({
 	free = gameMover.free,
 })
 
-local sol = E.player(44, "Sol", V3(Map.Depot.x, 3, Map.Depot.z))
+local sol = E.player(44, "Sol", lobby)
 sol.GetNetworkPing = function()
 	return net.ping
 end
 Moving.useArt(E.art)
+Moving.parkVan = E.parkVan
 Moving.start()
 local heartbeat = E.game:GetService("RunService").Heartbeat
 local lead = E.leadClient(sol) -- 9.2 Sol's client/PairLead.luau
@@ -226,13 +225,13 @@ local function run(seconds: number, done: (() -> boolean)?, before: (() -> ())?,
 	return done == nil
 end
 
-local started = Moving.admin(sol, "start")
-check("a solo move starts", string.find(started, "started", 1, true) ~= nil, started)
+local started = E.startRun(sol, HOUSE)
+check("a solo run starts", started == nil, started)
 Moving.step()
 danny = MoveHelper.find(sol)
 check("Danny comes, Sol's from the start (10.1 free)", danny ~= nil and danny.body ~= nil and danny.hirer == sol)
 local body = danny.body
-local site = workspace:FindFirstChild("Moves"):FindFirstChild("Move_marge")
+local site = workspace:FindFirstChild("Moves"):FindFirstChild(`Move_{HOUSE}`)
 E.place(sol, outside)
 promptIn(site, "Enter house").Triggered:Fire(sol)
 local character = sol.Character

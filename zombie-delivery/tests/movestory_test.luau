@@ -3,8 +3,8 @@
 -- outcome), unique ids and titles, every text non-empty and inside its card's limit, a valid unlock order, the prologue
 -- the one playable chapter (its contract on the board), the speakers real people (shared/Cast.luau, Dana of Big Move
 -- Movers), the outcomes, the phone texts, the greeters' lines (the porch, the Wall, the kiosk: each inside its bubble),
--- the seen flags of the save; then the real server/Moving.luau (MovingServer
--- on tests/runtime/MovingRuntime.luau's fakes) sends Marge's texts through its MoveStory hook at START and at the end.
+-- the seen flags of the save. (10.5: no move of the game tells the story any more: server/Moving.luau's hook is gone;
+-- this is shared/MoveStory.luau's own data.)
 local MoveStory = require("./MoveStory")
 local Config = require("./Config")
 local Cast = require("./Cast")
@@ -282,105 +282,6 @@ check("7.2 review: the chapters done come back from the save's rewards (a save t
 	and back["done:ranch"] == true and back["done:nowhere"] == nil and (back :: any).secrets == nil)
 check("…only the chapters done from there: never a card (intro) the story does not have", MoveStory.cleanSeen({}, { intro = true }).intro == nil
 	and next(MoveStory.cleanSeen(nil, { ["done:prologue"] = "yes" })) == nil and next(MoveStory.cleanSeen(nil, "done:prologue")) == nil)
-
--- The real server/Moving.luau: Marge's texts through the MoveStory hook -----------------------------------------------
-
-local E = require("./MovingRuntime")
-local Moving = require("./MovingServer")
-local Map = require("./Map")
-local T = Config.Moving
-local V3 = E.Mock.Vector3.new
-
-local home = Map.home(T.Contracts[1].home) :: any
-E.truckAt = V3(home.park.x, 2, home.park.z)
-local depot = V3(Map.Depot.x, 3, Map.Depot.z)
-local ann = E.player(11, "Ann", depot)
-local bob = E.player(22, "Bob", depot + V3(3, 0, 0))
-local cid = E.player(33, "Cid", depot + V3(-90, 0, 0))
-E.crew[ann] = { bob }
-Moving.useArt(E.art)
-Moving.start()
-
--- Marge's texts to `player` (the Tutorial remote's "message"), in order.
-local function texts(player: any): { any }
-	local list = {}
-	for _, m in E.messages do
-		if m.player == player and m.remote == "Tutorial" and m.kind == "message" then
-			table.insert(list, m.a)
-		end
-	end
-	return list
-end
-
-Moving.admin(ann, "start")
-Moving.step()
-local annTexts, bobTexts = texts(ann), texts(bob)
-check("START: Marge texts the owner about Grandpa's clock", #annTexts == 1 and annTexts[1].from == "Marge" and annTexts[1].text == prologue.dispatch, #annTexts)
-check("… and the crew too, a stranger nothing", #bobTexts == 1 and bobTexts[1].text == prologue.dispatch and #texts(cid) == 0)
-check("… on the phone only: no toast of its own (the move's toasts stay as they were)", (function()
-	for _, m in E.messages do
-		if m.remote == "Notice" and string.find(tostring(m.kind), "Grandpa's clock", 1, true) then
-			return false
-		end
-	end
-	return true
-end)())
-Moving.admin(ann, "deliver")
-annTexts = texts(ann)
-local result = E.last(ann, "Moving", "result")
-local delivered = MoveStory.outcome(result and result.a.how, result and result.a.stars)
-check("delivered: her debrief for the outcome, after the result card", #annTexts == 2 and annTexts[2].text == (prologue.debrief :: any)[delivered] and #texts(bob) == 2, delivered)
--- (7.x van moves: the clock runs out with a lamp in the van, which reaches the Wall in the grace: the end, late. 7.2
--- review: a lamp there in time and then 0:00 with an empty van is no late end: tests/moving_runtime_test.luau)
-local function trigger(prompt: any, player: any)
-	prompt.Triggered:Fire(player)
-end
-local function promptIn(model: any, action: string): any
-	for _, d in model:GetDescendants() do
-		if d.ClassName == "ProximityPrompt" and d.ActionText ~= nil and string.find(tostring(d.ActionText), action, 1, true) == 1 then
-			return d
-		end
-	end
-	return nil
-end
-local function spotModel(spot: number): any
-	for _, d in E.Mock.workspace:GetDescendants() do
-		if d.ClassName == "Model" and d:GetAttribute("MoveSpot") == spot and not d.destroyed then
-			return d
-		end
-	end
-	return nil
-end
-Moving.admin(ann, "start")
-Moving.step()
-do
-	local outside = V3(home.door.x, 3, home.door.z) + V3(home.facing.x, 0, home.facing.z) * 3
-	E.place(ann, outside)
-	trigger(promptIn(E.Mock.workspace:FindFirstChild("Moves"):FindFirstChild("Move_marge"), "Enter house"), ann)
-	local lamp = spotModel(1)
-	E.place(ann, lamp.PrimaryPart.Position + V3(1, 0, 0))
-	trigger(promptIn(lamp, "Pick up"), ann)
-	E.place(ann, E.interiors[#E.interiors].Position + V3(0, 3, 1))
-	trigger(promptIn(E.Mock.workspace, "Leave house"), ann)
-	local van = E.cars[ann]
-	van.model:SetAttribute("BackOpen", true)
-	E.place(ann, van.chassis:FindFirstChild("CargoDoor").WorldPosition + V3(0, 0, 2))
-	E.clock += 0.3
-	Moving.step()
-	trigger(promptIn(van.model, "Load"), ann)
-end
-Moving.admin(ann, "time")
-E.now += 61
-E.clock += 0.3
-Moving.step()
-Moving.admin(ann, "trip") -- (the lamp at the Wall in the grace: late)
-annTexts = texts(ann)
-check("the clock ran out: the late debrief", #annTexts == 4 and annTexts[3].text == prologue.dispatch and annTexts[4].text == prologue.debrief.late, #annTexts)
-Moving.admin(ann, "start")
-Moving.step()
-Moving.admin(ann, "end")
-annTexts = texts(ann)
-check("called off: the failed one", #annTexts == 6 and annTexts[6].text == prologue.debrief.failed, #annTexts)
 
 if failures == 0 then
 	print("ALL CHECKS PASSED")

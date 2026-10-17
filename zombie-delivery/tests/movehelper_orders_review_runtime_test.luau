@@ -1,22 +1,18 @@
 -- 8.6 review (Danny's bubble and the crew's orders): the real server/Moving.luau and server/MoveHelper.luau on
 -- tests/runtime/MovingRuntime.luau's fakes (as tests/movehelper_orders_runtime_test.luau: his walk a straight step a
--- tick, a carried piece moved with its carrier here), Sol's move with Bob of her crew far off at the depot, and a
--- stand-in Animator on Danny (the fakes' bodies have none: his sit track's Play / Stop kept as IsPlaying).
---   * his move into the van called off (MoveHelper's boardEnd): GET OUT while he slides in, or the owner off the wheel
---     meanwhile: on his feet by the door, his sit pose stopped (never walking and carrying in the looping sit pose)
+-- tick, a carried piece moved with its carrier here), Sol's run with Bob of her crew far off in the lobby.
 --   * PUT IT DOWN (putDown, who asked): a piece for two only from whoever carries it with him; a crew mate's elsewhere
 --     does nothing (the piece still carried, a wobble check open on the carrier's end not a miss: no knock), and tells
 --     them who can ("Sol carries the Sofa with Danny: only they can set it down."); the carrier's own sets it down as
 --     ever. A piece in his arms alone: anybody's, the rest of the crew told who asked ("Bob had Danny set the Lamp
 --     down: off his list.")
---   * GET OUT's stay-out (stepHelper): the owner off the wheel ends it even while Danny is down; at the wheel again
---     before he is back, back on his feet he gets in (never "staying out" for good)
+-- (10.5: nobody drives the van in a run, so he never rides in it: no GET OUT.)
 -- (Each fix taken back on its own, its checks here fail.)
 local E = require("./MovingRuntime")
 local Moving = require("./MovingServer")
 local MoveHelper = require("./MoveHelperServer")
 local Config = require("./Config")
-local Map = require("./Map")
+local SandboxMap = require("./SandboxMap")
 local Rules = require("./MovingRules")
 
 local failures = 0
@@ -35,9 +31,9 @@ local M = E.Mock
 local V3 = M.Vector3.new
 local workspace = M.workspace
 
-local home = Map.home(T.Contracts[1].home) :: any
-local outside = V3(home.door.x, 3, home.door.z) + V3(home.facing.x, 0, home.facing.z) * 3
-E.truckAt = V3(home.door.x + 30, 2, home.door.z - 20)
+local HOUSE = "lone_house" -- (10.5: a run on the lone house, the van at its curb)
+local _, _, outside = E.doorOf(SandboxMap.house(HOUSE))
+local lobby = V3(SandboxMap.Lobby.spawn.x, 3, SandboxMap.Lobby.spawn.z)
 E.Zombies.findSpot = function(center: any): any
 	return center + V3(900, 0, 0) -- (the move's own roamers far off)
 end
@@ -58,9 +54,10 @@ MoveHelper.useMover({
 	end,
 })
 
-local sol = E.player(44, "Sol", V3(Map.Depot.x, 3, Map.Depot.z))
-local bob = E.player(77, "Bob", V3(Map.Depot.x + 400, 3, Map.Depot.z + 400)) -- (of Sol's crew, far off)
+local sol = E.player(44, "Sol", lobby)
+local bob = E.player(77, "Bob", lobby + V3(400, 0, 400)) -- (of Sol's crew, far off)
 Moving.useArt(E.art)
+Moving.parkVan = E.parkVan
 Moving.start()
 
 local function promptIn(model: any, action: string): any
@@ -129,8 +126,8 @@ end
 
 -- The move; Danny Sol's (10.1 free); Bob joins Sol's crew --------------------------------------------------------------------------------
 
-local started = Moving.admin(sol, "start")
-check("a solo move starts", string.find(started, "started", 1, true) ~= nil, started)
+local started = E.startRun(sol, HOUSE)
+check("a solo run starts", started == nil, started)
 local truck = E.cars[sol]
 truck.model:SetAttribute("BackOpen", true)
 Moving.step()
@@ -138,94 +135,13 @@ danny = MoveHelper.find(sol)
 run(0.3)
 E.crew[sol] = { bob }
 Moving.step()
-check("Danny Sol's (10.1 free); Bob of her crew (far off at the depot): the same Danny, with him too", danny ~= nil and danny.hirer == sol
+check("Danny Sol's (10.1 free); Bob of her crew (far off in the lobby): the same Danny, with him too", danny ~= nil and danny.hirer == sol
 	and MoveHelper.find(bob) == danny and bob:GetAttribute("MoveHelper") == "hired", bob:GetAttribute("MoveHelper"))
-
--- His move into the van called off: his sit pose stopped (boardEnd) ---------------------------------------------------------
-
-do
-	-- A stand-in Animator on his body: its one track (his sit, the only animation MoveHelper loads) keeps IsPlaying.
-	local animator = M.Instance.new("Animator")
-	animator.Name = "Animator"
-	local sit: any = { IsPlaying = false, Looped = false, Priority = nil }
-	function sit.Play(self: any)
-		self.IsPlaying = true
-	end
-	function sit.Stop(self: any)
-		self.IsPlaying = false
-	end
-	animator.LoadAnimation = function(_self: any, _animation: any): any
-		return sit
-	end
-	animator.Parent = danny.body.humanoid
-	local function slidingIn(): boolean
-		return danny.board ~= nil and not danny.board.out
-	end
-	E.place(sol, truck.chassis.Position + V3(-5, 1, -3))
-	E.seated[sol] = truck
-	local sliding = run(40, slidingIn)
-	check("Sol at the wheel: Danny slides into the van, his sit pose on (his legs bend as he slides in)", sliding and sit.IsPlaying)
-	E.request(sol, "helper", "getout")
-	check("8.6 review: GET OUT while he slides in: his move in called off, on his feet by the door (staying out), his sit pose stopped",
-		danny.board == nil and danny.seat == nil and danny.stayOut and not sit.IsPlaying)
-	run(3)
-	check("…seconds later still on his feet, not sitting", danny.board == nil and danny.seat == nil and not sit.IsPlaying)
-	E.seated[sol] = nil
-	run(0.4)
-	E.seated[sol] = truck
-	sliding = run(40, slidingIn)
-	check("Sol off the wheel and at it again: in he slides once more, sitting", sliding and sit.IsPlaying)
-	E.seated[sol] = nil
-	local off = run(2, function()
-		return danny.board == nil
-	end)
-	check("8.6 review: Sol leaves the wheel while he slides in: his move in called off, on his feet by the door, his sit pose stopped",
-		off and danny.seat == nil and not sit.IsPlaying)
-	run(3)
-	check("…seconds later still on his feet, not sitting", danny.board == nil and danny.seat == nil and not sit.IsPlaying)
-end
-
--- GET OUT's stay-out ends with the owner off the wheel, even while he is down (stepHelper) ---------------------------------
-
-do
-	E.seated[sol] = truck
-	local sat = run(40, function()
-		return danny.seat ~= nil
-	end)
-	E.request(sol, "helper", "getout")
-	local out = run(3, function()
-		return danny.board == nil and danny.seat == nil
-	end)
-	check("Sol at the wheel, Danny seated; GET OUT: out he gets, and stays out", sat and out and danny.stayOut)
-	local body = danny.body
-	body.humanoid.Health = 0
-	body.humanoid.HealthChanged:Fire(0)
-	run(0.5)
-	check("Danny goes down while he stays out", danny.dead and danny.stayOut)
-	E.seated[sol] = nil
-	run(1)
-	check("8.6 review: Sol leaves the wheel while Danny is down: his stay-out over all the same", danny.dead and not danny.stayOut)
-	E.seated[sol] = truck
-	run(1)
-	local back = run(H.Respawn + 2, function()
-		return not danny.dead and danny.body ~= nil
-	end)
-	local rides = run(20, function()
-		return danny.action == "ride" or danny.board ~= nil or danny.seat ~= nil
-	end)
-	check("8.6 review: …Sol at the wheel again before he is back: back on his feet, he gets in the van (never \"staying out\" for good)",
-		back and rides and not danny.stayOut, sol:GetAttribute("MoveHelperDoing"))
-	E.seated[sol] = nil
-	run(4, function()
-		return danny.board == nil and danny.seat == nil
-	end)
-	run(0.5)
-end
 
 -- PUT IT DOWN from a crew mate elsewhere (putDown, who asked) ---------------------------------------------------------------
 
 E.place(sol, outside)
-promptIn(workspace:FindFirstChild("Moves"):FindFirstChild("Move_marge"), "Enter house").Triggered:Fire(sol)
+promptIn(workspace:FindFirstChild("Moves"):FindFirstChild(`Move_{HOUSE}`), "Enter house").Triggered:Fire(sol)
 
 do
 	local lamp = itemModel(1)
@@ -279,7 +195,7 @@ end
 
 -- The end ------------------------------------------------------------------------------------------------------------------
 
-Moving.admin(sol, "end")
+Moving.endRun(sol)
 run(0.2)
 check("the move ends: Danny gone", MoveHelper.find(sol) == nil and MoveHelper.find(bob) == nil)
 E.leave(bob)

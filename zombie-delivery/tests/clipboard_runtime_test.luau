@@ -11,8 +11,8 @@
 --     his list never taken back), allowed with it out; the rate limit kept (MoveHelperAssign) and its own
 --     (Config.Robust.Limits.Clipboard). 9.0: with it out the server's piece prompts stay as they are (each client hides
 --     its own player's: client/DannyOrders.luau; E sends this same assign).
---   * Away by itself: a pick (you can't carry with it: the pick puts it away), a seat, death, the phone, a gun up, the
---     move's end; refused while you carry or sit.
+--   * Away by itself: a pick (you can't carry with it: the pick puts it away), a seat, death, a weapon up, the move's
+--     end; refused while you carry or sit.
 --   * A crew mate may hold it too (Danny with the whole crew); garbage requests; leaving.
 local E = require("./MovingRuntime")
 local M = E.Mock
@@ -33,7 +33,7 @@ local Moving = require("./MovingServer")
 local MoveHelper = require("./MoveHelperServer")
 local Clipboard = require("./ClipboardServer")
 local Config = require("./Config")
-local Map = require("./Map")
+local SandboxMap = require("./SandboxMap")
 
 local failures = 0
 local function check(name: string, ok: boolean, detail: any?)
@@ -50,11 +50,9 @@ local H = Config.MoveHelper
 local V3 = M.Vector3.new
 local workspace = M.workspace
 
-local home = Map.home(T.Contracts[1].home) :: any
-local door = V3(home.door.x, 3, home.door.z)
-local facing = V3(home.facing.x, 0, home.facing.z)
-local outside = door + facing * 3
-E.truckAt = V3(home.door.x + 30, 2, home.door.z - 20)
+local HOUSE = "lone_house" -- (10.5: a run on the lone house, the van at its curb)
+local door, facing, outside = E.doorOf(SandboxMap.house(HOUSE))
+local lobby = V3(SandboxMap.Lobby.spawn.x, 3, SandboxMap.Lobby.spawn.z)
 E.Zombies.findSpot = function(center: any): any
 	return center + V3(900, 0, 0)
 end
@@ -76,7 +74,7 @@ MoveHelper.useMover({
 })
 
 -- Ann (the move's owner) and Bob (a crew mate later), each with a right hand (the courier's: 0.22 × 0.36 × 0.4)
-local depot = V3(Map.Depot.x, 3, Map.Depot.z)
+local depot = lobby -- (10.5: the lobby; the runs on the lone house)
 local ann = E.player(71, "Ann", depot)
 local bob = E.player(72, "Bob", depot + V3(4, 0, 0))
 local function giveHand(player: any): any
@@ -90,6 +88,7 @@ end
 local annHand = giveHand(ann)
 giveHand(bob)
 Moving.useArt(E.art)
+Moving.parkVan = E.parkVan
 Moving.start()
 Clipboard.start()
 
@@ -147,12 +146,12 @@ end
 local noticeAt = #E.messages
 ask(ann, true)
 check("no move, no Danny: the clipboard stays away, a notice says why (your helper comes into a run)", away(ann) and told(ann, "your helper", noticeAt), E.lastNotice(ann))
-local started = Moving.admin(ann, "start")
+local started = E.startRun(ann, HOUSE)
 local truck = E.cars[ann]
 truck.model:SetAttribute("BackOpen", true)
 Moving.step()
 local danny = MoveHelper.find(ann)
-check("10.1 a move: Danny comes, free, Ann's from the start", string.find(started, "started", 1, true) ~= nil and danny ~= nil and danny.hirer == ann
+check("10.1 a run: Danny comes, free, Ann's from the start", started == nil and danny ~= nil and danny.hirer == ann
 	and ann:GetAttribute("MoveHelper") == "hired", started)
 ask(ann, true)
 check("…the clipboard out at once (ClipboardHeld, a model \"Clipboard\" in her character)", held(ann))
@@ -186,7 +185,7 @@ end)() == 1)
 
 -- ── Orders: the assign remote with and without it ───────────────────────────
 
-local site = workspace:FindFirstChild("Moves"):FindFirstChild("Move_marge")
+local site = workspace:FindFirstChild("Moves"):FindFirstChild(`Move_{HOUSE}`)
 E.place(ann, outside)
 promptIn(site, "Enter house").Triggered:Fire(ann)
 local lamp = itemModel(1)
@@ -256,11 +255,7 @@ humanoid.Sit = false
 humanoid:GetPropertyChangedSignal("SeatPart"):Fire()
 ask(ann, true)
 check("…out of the seat: out again", humanoid.SeatPart == nil and held(ann))
--- the phone, a gun up (the city's hands' other work)
-ann.Character:SetAttribute("PhoneHeld", true)
-check("the phone in her hand (PhoneHeld): the clipboard goes", away(ann))
-ann.Character:SetAttribute("PhoneHeld", nil)
-ask(ann, true)
+-- a weapon up (the run's bat: Aiming)
 ann.Character:SetAttribute("Aiming", true)
 check("a gun up (Aiming): the clipboard goes", away(ann))
 ann.Character:SetAttribute("Aiming", nil)
@@ -277,7 +272,7 @@ humanoid.Health = 100
 -- the move's end
 ask(ann, true)
 check("(alive again: out)", held(ann))
-Moving.admin(ann, "end")
+Moving.endRun(ann)
 run(0.5)
 check("8.5 the move's end: Danny gone, the clipboard with him", MoveHelper.find(ann) == nil and ann:GetAttribute("MoveHelper") == nil and away(ann))
 noticeAt = #E.messages
@@ -286,7 +281,7 @@ check("…no move: refused (your helper comes into a run)", away(ann) and told(a
 
 -- ── A crew mate: the clipboard theirs too; off the move, theirs goes ─────────
 
-Moving.admin(ann, "start")
+E.startRun(ann, HOUSE)
 truck = E.cars[ann]
 truck.model:SetAttribute("BackOpen", true)
 Moving.step()

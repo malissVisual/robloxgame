@@ -26,7 +26,7 @@ local E = require("./MovingRuntime")
 local Moving = require("./MovingServer")
 local MoveHelper = require("./MoveHelperServer")
 local Config = require("./Config")
-local Map = require("./Map")
+local SandboxMap = require("./SandboxMap")
 local Rules = require("./MovingRules")
 local FurnitureLooks = require("./FurnitureLooks")
 local HouseLayout = require("./HouseLayout")
@@ -144,15 +144,14 @@ E.Npcs.walkTo = function(_npc: any, point: any, _arrived: any, _timeout: any, op
 	table.insert(walks, { point = point, options = options })
 end
 
-local home = Map.home(T.Contracts[1].home) :: any
-local door = V3(home.door.x, 3, home.door.z)
-local facing = V3(home.facing.x, 0, home.facing.z)
-local outside = door + facing * 3
-E.truckAt = V3(home.park.x, 2, home.park.z)
+local HOUSE = "lone_house" -- (10.5: a run on the lone house, a family house's plan; the van at its curb)
+local door, facing, outside = E.doorOf(SandboxMap.house(HOUSE))
 E.Zombies.findSpot = function(center: any): any
 	return center + V3(900, 0, 0) -- (the roamers far off)
 end
 local ann = E.player(11, "Ann", outside)
+E.profiles[ann] = { sandboxHouse = HOUSE, sandboxHouseSeed = 1955 } -- (her card's house and seed: the plan this test knows)
+Moving.parkVan = E.parkVan
 Moving.start()
 
 local function promptIn(model: any, action: string): any
@@ -270,10 +269,10 @@ local function walk(to: any, look: (() -> ())?)
 	end
 end
 
--- A solo move into Marge's real house: Danny comes, his paths never jump ------------------------------------------------------
+-- A solo run into the real house: Danny comes, his paths never jump ------------------------------------------------------
 
-local started = Moving.admin(ann, "start")
-check("a solo move into Marge's real house starts", string.find(started, "started", 1, true) ~= nil and #built == 1, started)
+local started = E.startRun(ann, HOUSE)
+check("a solo run into the real house (seed 1955) starts", started == nil and #built == 1, started)
 Moving.step()
 danny = MoveHelper.find(ann)
 lead = E.leadClient(ann) -- 9.2 Ann's client/PairLead.luau
@@ -332,10 +331,10 @@ for _, s in plan.spots do
 		tableSpot = s
 	end
 end
-check("the real Dining Table stands in Marge's house: a pair piece, 3.3 studs tall (its middle 4.7 over the floor in Ann's arms)",
+check("the real Dining Table stands in the house: a pair piece, 3.3 studs tall (its middle 4.7 over the floor in Ann's arms)",
 	tableSpot ~= nil and FurnitureLooks.Items.dining_table.class == "pair" and math.abs(FurnitureLooks.Items.dining_table.size.Y - 3.3) < 1e-6)
 carried = built[1].pieces[tableSpot.id]
-local site = workspace:FindFirstChild("Moves"):FindFirstChild("Move_marge")
+local site = workspace:FindFirstChild("Moves"):FindFirstChild(`Move_{HOUSE}`)
 E.place(ann, outside)
 trigger(promptIn(site, "Enter house"), ann)
 local ground = origin.Position.Y

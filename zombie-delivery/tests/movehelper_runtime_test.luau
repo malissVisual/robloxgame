@@ -18,25 +18,20 @@
 -- (he opens it himself, or, not allowed, asks and sets the piece down after WaitShut s); he opens it for the player
 -- coming with a piece; a bite, his death (his piece back on his list) and comeback, running from a zombie; garbage
 -- requests, the rate limits, CLEAR QUEUE; his door trips (8.1 walk-in doors); the van parked far off; the crew growing
--- (Danny stays; the crew mate gives him a piece too). Riding with you: the player at the wheel, he walks out of
--- the house round the van (8.5: never over its footprint, though the straight way runs through it) to his spot by
--- the passenger door and gets in as a player does (the seat his, the door swung open, a step to the handle facing the
--- van, the slide in, ducking, posed every frame; BoardSeconds later Seat:Sit, massless, no hold, the door shut; no
--- fade), rides while the van goes, gets out the same way back when the player gets out and the van stands (the door,
--- the slide out to his spot) and goes on with his list; the van driven off without him: RideFar studs off, the last
--- resort fades him into the seat; the van driving off while he gets in: called off (at his spot, the door shut), he
--- goes after it, and in once it stops; the seat taken by a crew mate: he follows on foot; the van wrecked: out at once.
--- The end of the move: he goes. A second move (with you again) where the room goes while he carries his piece ("Van's
--- full, boss - drive it to the Wall?": set down beside the van), a third where nothing of his list fits, a fourth with
+-- (Danny stays; the crew mate gives him a piece too). The end of the move: he goes. A second run (with you again)
+-- where the room goes while he carries his piece ("Van's full", the sandbox's words: set down beside the van), a third
+-- where nothing of his list fits, a fourth with
 -- the marble slab (two people) on his list: he waits at it ("needs you", the toast, "Lift with Danny"), long, and the
 -- player lifts it with him through the grip's lift check; stuck (9.3: a new way, his ways out walked, a fade only at
 -- the end); his body taken away while he
 -- carries; 10.1 once with a move he stays when the crew grows and shrinks (nothing to end: no hire).
+-- 10.5 (only the sandbox is the game): every move a run (E.startRun: the van parked at the house's curb, Moving.startRun);
+-- nobody drives the van any more (a run's seats are shut: server/Runs.luau), so he never rides in it.
 local E = require("./MovingRuntime")
 local Moving = require("./MovingServer")
 local MoveHelper = require("./MoveHelperServer")
 local Config = require("./Config")
-local Map = require("./Map")
+local SandboxMap = require("./SandboxMap")
 local Rules = require("./MovingRules")
 local PairCarry = require("./PairCarry") -- 8.1 carrying in two: the leader's steering (client/PairSteer.luau's)
 local CarryGrip = require("./CarryGrip") -- 8.3: your lift check once Danny is in place
@@ -59,12 +54,9 @@ local M = E.Mock
 local V3 = M.Vector3.new
 local workspace = M.workspace
 
-local home = Map.home(T.Contracts[1].home) :: any
-local door = V3(home.door.x, 3, home.door.z)
-local facing = V3(home.facing.x, 0, home.facing.z)
-local outside = door + facing * 3
-E.truckAt = V3(home.door.x + 30, 2, home.door.z - 20) -- (placeNear's spot: the van is at the house at once, its back
--- 30 studs from the front door)
+local HOUSE = "lone_house" -- (10.5: a run on the lone house, the van at its curb)
+local door, facing, outside = E.doorOf(SandboxMap.house(HOUSE))
+local lobby = V3(SandboxMap.Lobby.spawn.x, 3, SandboxMap.Lobby.spawn.z)
 E.Zombies.findSpot = function(center: any): any
 	return center + V3(900, 0, 0) -- (the move's own roamers far off: this test brings its zombie itself)
 end
@@ -95,8 +87,9 @@ local walker = {
 }
 MoveHelper.useMover(walker)
 
-local sol = E.player(44, "Sol", V3(Map.Depot.x, 3, Map.Depot.z))
+local sol = E.player(44, "Sol", lobby)
 Moving.useArt(E.art)
+Moving.parkVan = E.parkVan
 Moving.start()
 
 local function promptIn(model: any, action: string?): any
@@ -298,8 +291,8 @@ end
 
 -- Danny comes: free, with you (10.1: no hire) ---------------------------------------------------------------------------
 
-local started = Moving.admin(sol, "start")
-check("a solo move starts", string.find(started, "started", 1, true) ~= nil, started)
+local started = E.startRun(sol, HOUSE)
+check("a solo run starts", started == nil, started)
 local truck = E.cars[sol]
 local cargoDoor = truck.chassis:FindFirstChild("CargoDoor")
 Moving.step()
@@ -311,7 +304,8 @@ local npc = body.model
 check("his body: Danny, Deliveros Moving, his id in the rules (no player's)", npc.Name == "Danny" and npc:GetAttribute("MoveHelper") == danny.id and danny.id < -1000000
 	and body.humanoid.MaxHealth == H.Health and body.humanoid.Health == H.Health and npc:GetAttribute("CrewKind") == "danny" and npc:GetAttribute("CrewSolo") == nil)
 check("…at the van's back", distance(body.root.Position, cargoDoor.WorldPosition) < 8, distance(body.root.Position, cargoDoor.WorldPosition))
-check("10.1 he says hello and asks for nothing (no \"Hire me!\")", E.saidSince(Brain.Lines.hello, 0) and string.find(Brain.Lines.hello, "Hire", 1, true) == nil)
+check("10.1 he says hello (the sandbox's words) and asks for nothing (no \"Hire me!\")", E.saidSince(Brain.line("hello", true) :: string, 0)
+	and string.find(Brain.line("hello", true) :: string, "Hire", 1, true) == nil)
 check("10.1 the player hears it: Danny is with you, no price", string.find(E.lastNotice(sol), "Danny is with you", 1, true) ~= nil
 	and string.find(E.lastNotice(sol), "$", 1, true) == nil, E.lastNotice(sol))
 check("10.1 the status line: MoveHelper = hired (with you: the 8.3 word), nothing to carry, no price, what he does; his id (his card finds his body by it), name and kind",
@@ -331,11 +325,11 @@ check("the zombies go after him too (Zombies.extraTargets)", hunted)
 
 -- 10.1 no hire: an old client's HIRE is nothing; far from the van he comes to it ------------------------------------------
 
-local site = workspace:FindFirstChild("Moves"):FindFirstChild("Move_marge")
+local site = workspace:FindFirstChild("Moves"):FindFirstChild(`Move_{HOUSE}`)
 local enter = promptIn(site, "Enter house")
 -- the owner took the Technician out: the front door is open from the start (no lock for Danny to wait at)
 E.place(sol, outside)
-check("the front door is open: in at once (8.1: walked through, Enter house off), no Pick lock", enter ~= nil and not enter.Enabled and promptIn(site, "Pick lock") == nil and sol:GetAttribute("MoveRole") == "driver")
+check("the front door is open: in at once (8.1: walked through, Enter house off), no Pick lock", enter ~= nil and not enter.Enabled and promptIn(site, "Pick lock") == nil)
 trigger(enter, sol)
 local origin = E.interiors[1]
 check("Sol is inside", (E.rootOf(sol).Position - origin.Position).Magnitude < 10)
@@ -965,18 +959,14 @@ body.humanoid.Health = 0
 body.humanoid.HealthChanged:Fire(0)
 run(0.3)
 check("killed: the lamp falls, knocked", stateNow(1) == "ground" and stateOf(1).condition < before - 0.1 and Rules.holding(danny.s.move, danny.id) == nil, stateOf(1).condition)
-check("…he is down (\"I'll be back!\"), the player hears it", danny.dead and E.saidSince("Ugh... I'll be back!", said)
-	and string.find(E.lastNotice(sol), "Danny is down", 1, true) ~= nil and sol:GetAttribute("MoveHelperDoing") == "Down: back at the van soon")
+check("…he is down in the run (10.1 the crew: the revive prompt on him; tests/crew_runtime_test.luau has the rest), the player hears it", danny.dead
+	and body.root:FindFirstChild("RevivePrompt") ~= nil and string.find(E.lastNotice(sol), "Danny is down", 1, true) ~= nil, E.lastNotice(sol))
 check("8.3 …the lamp back at the head of his list (he finishes it when he is back)", listIs({ 1 }) and markOf(lamp) == "🧑‍🔧 Danny · 1")
 run(3.2)
-check("…his body goes a moment later", npc.Parent == nil and danny.body == nil)
-local backUp = run(H.Respawn, function()
-	return danny.body ~= nil
-end)
-check("Respawn s later he is back at the van", backUp and not danny.dead and distance(danny.body.root.Position, cargoDoor.WorldPosition) < 8 and E.saidSince("Back on my feet!", said))
-body = danny.body
-npc = body.model
-check("8.3 …still hired: no sign over his head", danny.hirer == sol and body.root:FindFirstChild("HireSign") == nil)
+E.place(sol, body.root.Position + V3(2, 0, 0))
+trigger(body.root:FindFirstChild("RevivePrompt"), sol)
+check("…Sol gets him up: on his feet where he lay, his body the same", not danny.dead and danny.body == body and npc.Parent ~= nil
+	and body.root:FindFirstChild("RevivePrompt") == nil)
 local again = run(20, function()
 	return stateNow(1) == "truck"
 end)
@@ -1061,7 +1051,7 @@ end)
 -- The van parked far off (driven somewhere else), then back by the house -------------------------------------------------------
 
 local parked = truck.chassis.CFrame
-truck.chassis.CFrame = M.CFrame.new(Map.Depot.x - 60, 2, Map.Depot.z)
+truck.chassis.CFrame = M.CFrame.new(door.X + 600, 2, door.Z)
 local stayed = body.root.Position
 run(3)
 check("the van parked far off, not by the house: he stays where he is (no popping along its way)", distance(body.root.Position, stayed) < 1)
@@ -1084,268 +1074,19 @@ noticeAt = #E.messages
 give(slab, bob)
 check("8.3 …Bob, of the crew, gives him a piece too", listIs({ 6 }) and told(bob, "Danny will take the Marble slab.", noticeAt))
 
--- 8.3 riding with you (8.5: round the van to its door, in and out as a player gets in and out) ---------------------------
--- (a do-block: its locals end with it; the test's top level is at the 200-register limit)
-do
-	local seat = truck.passengers[1]
-	local halfX, halfZ = truck.size.X / 2, truck.size.Z / 2
-	local CARGO = Config.Cargo
-	local heartbeat = E.services.RunService.Heartbeat
-	-- 8.5 his root in the van's frame (+X the passenger's side, -Z its front) and his heading there; his body over the
-	-- van's footprint (a stud round his root; the house's interior is far off); at his spot by the passenger door
-	-- (RideStand studs out of the van's right side where its seat is, `aside` more); the passenger door's swings since
-	-- `from` (Vehicles.swingDoor); is a per-frame pose hooked (RunService.Heartbeat)?
-	local function inVan(): any
-		return truck.chassis.CFrame:PointToObjectSpace(body.root.Position)
-	end
-	local function lookInVan(): any
-		return truck.chassis.CFrame:ToObjectSpace(body.root.CFrame).LookVector
-	end
-	local function onVan(): boolean
-		local rel = inVan()
-		return math.abs(rel.X) < halfX + 1 and math.abs(rel.Z) < halfZ + 1 and math.abs(rel.Y) < 20
-	end
-	local function atSpot(aside: number?): boolean
-		local rel = inVan()
-		return math.abs(rel.X - (halfX + H.RideStand + (aside or 0))) < 0.3 and math.abs(rel.Z + 3) < 0.3
-	end
-	local function swingsSince(from: number): { any }
-		local list = {}
-		for index = from + 1, #E.doorSwings do
-			local swing = E.doorSwings[index]
-			if swing.car == truck and swing.door == 2 then
-				table.insert(list, swing)
-			end
-		end
-		return list
-	end
-	local function hooked(): boolean
-		for _, handler in heartbeat.handlers do
-			if handler.on then
-				return true
-			end
-		end
-		return false
-	end
-	local inHouse = run(20, function()
-		return (body.root.Position - origin.Position).Magnitude < 60 and danny.needs == 6 and danny.needsAt > 0
-	end)
-	check("8.3 (the slab: he is in the house, waiting at it for you)", inHouse and slab:GetAttribute("DannyNeeds") == true and markOf(slab) == "🙋 Danny needs you")
-	E.place(sol, truck.chassis.Position + V3(-5, 1, -3))
-	E.seated[sol] = truck
-	said = #E.said
-	local swingsAt, fadesAt = #E.doorSwings, fades
-	local walkedOut, longestRide, rideAt, overVan = 0, 0, body.root.Position, 0
-	local cameOut: any = nil
-	local started = run(40, function()
-		local now = body.root.Position
-		if (now - rideAt).Magnitude > 300 then
-			walkedOut += 1
-			cameOut = inVan()
-		else
-			longestRide = math.max(longestRide, distance(now, rideAt))
-		end
-		rideAt = now
-		if danny.board == nil and onVan() then
-			overVan += 1
-		end
-		return danny.board ~= nil or danny.seat ~= nil
-	end)
-	local b0 = danny.board
-	local startRel = inVan()
-	check("8.5 Sol at the van's wheel: Danny leaves the slab, walks out of the house to his spot by the passenger door (RideStand out of its side)",
-		started and b0 ~= nil and not b0.out and math.abs(startRel.X - (halfX + H.RideStand)) <= H.RideReach + 1e-6 and math.abs(startRel.Z + 3) <= H.RideReach + 1e-6
-		and E.saidSince(Brain.Lines.ride, said), `{startRel.X} {startRel.Z}`)
-	local straightOver = false -- (the straight way from where he came out of the house to his spot)
-	for k = 0, 200 do
-		local x = cameOut.X + (halfX + H.RideStand - cameOut.X) * k / 200
-		local z = cameOut.Z + (-3 - cameOut.Z) * k / 200
-		straightOver = straightOver or (math.abs(x) < halfX and math.abs(z) < halfZ)
-	end
-	check("…round the van, never over its footprint (the straight way from the house's door runs through it), each step his sprint's at most",
-		straightOver and overVan == 0 and walkedOut == 1 and longestRide <= WALK * H.Sprint * 0.1 + 1e-6, `{straightOver} {overVan} {walkedOut} {longestRide}`)
-	check("…no fade into the seat (it's his last resort only)", fades == fadesAt and danny.seat == nil and seat.Occupant == nil)
-	local doorIn = swingsSince(swingsAt)[1]
-	check("8.5 he gets in as a player does: the seat his meanwhile (Reserved: nobody else's boarding takes it), the passenger door swung for everybody: open as his hand reaches the handle, shut as he sits",
-		b0 ~= nil and seat:GetAttribute("Reserved") == danny.id and #swingsSince(swingsAt) == 1 and doorIn.openAt ~= nil
-		and math.abs(doorIn.openAt - doorIn.now - CARGO.BoardStepSeconds * 0.7) < 1e-6 and math.abs(doorIn.closeAt - doorIn.now - CARGO.BoardSeconds) < 1e-6
-		and sol:GetAttribute("MoveHelperDoing") == "Getting in the van", sol:GetAttribute("MoveHelperDoing"))
-	check("…his pose every frame meanwhile (Heartbeat hooked)", hooked())
-	-- (his frames: os.clock is the test's; the Heartbeat poses him where his move is now)
-	E.clock = b0.at + CARGO.BoardStepSeconds
-	heartbeat:Fire(1 / 60)
-	local handle, handleLook = inVan(), lookInVan()
-	check("…a step to the door's handle (DoorStandOut out of the van's side), facing the van", math.abs(handle.X - (halfX + CARGO.DoorStandOut)) < 0.01
-		and math.abs(handle.Z + 3) < 0.01 and handleLook.X < -0.99, `{handle.X} {handleLook.X}`)
-	E.clock = b0.at + (CARGO.BoardStepSeconds + CARGO.BoardSeconds) / 2
-	heartbeat:Fire(1 / 60)
-	local through, throughLook = inVan(), lookInVan()
-	check("…then the slide in through the door: halfway, between the handle and the seat, over the step's height, ducking", through.X < handle.X - 0.5
-		and through.X > 1.4 + 0.3 and through.Y > handle.Y and throughLook.Y < -0.05 and danny.seat == nil, `{through.X} {through.Y} {throughLook.Y}`)
-	local slideX, slid = through.X, true
-	local seated = run(2, function()
-		local x = inVan().X
-		if danny.seat == nil and x > slideX + 1e-6 then
-			slid = false -- (never back out on the way in)
-		end
-		slideX = x
-		return danny.seat ~= nil
-	end)
-	check("8.3 …and BoardSeconds after his move began he sits (Seat:Sit)", seated and danny.seat == seat and seat.Occupant == body.humanoid and body.humanoid.SeatPart == seat
-		and body.humanoid.Sit == true and seat:FindFirstChild("SeatWeld") ~= nil and E.clock - b0.at >= CARGO.BoardSeconds - 1e-6 and E.clock - b0.at <= CARGO.BoardSeconds + 0.1 + 1e-6
-		and slid, E.clock - b0.at)
-	local seatRel = inVan()
-	check("8.5 …the order: the door opened, he sat, the door shut (the slide ends at the seat; the seat's reservation gone, no frame hook left, no fade)",
-		doorIn.openAt - doorIn.now < E.clock - b0.at and doorIn.closeAt - doorIn.now >= CARGO.BoardSeconds - 1e-6 and math.abs(seatRel.X - 1.4) < 0.01
-		and math.abs(seatRel.Z + 3) < 0.01 and seat:GetAttribute("Reserved") == nil and not hooked() and danny.board == nil and fades == fadesAt, `{seatRel.X} {seatRel.Z}`)
-	run(0.3)
-	local massless = true
-	for _, d in npc:GetDescendants() do
-		if d.ClassName == "Part" and d.Massless ~= true then
-			massless = false
-		end
-	end
-	check("…seated: massless (the van drives as ever), no hold (no constraints, no Npcs.carried), the status line: Riding in the van",
-		massless and body.grip == nil and danny.gripped == nil and sol:GetAttribute("MoveHelperDoing") == "Riding in the van")
-	check("…the slab still his (the marker back to its number: he is not at it)", listIs({ 6 }) and slab:GetAttribute("DannyNeeds") == nil and markOf(slab) == "🧑‍🔧 Danny · 1")
-	truck.speed = 40
-	local rode = body.root.Position
-	run(3)
-	check("8.3 the van drives: he rides (nothing of his own: the van carries him)", danny.seat == seat and danny.action == "seat" and (body.root.Position - rode).Magnitude < 1e-6)
-	E.seated[sol] = nil
-	run(1)
-	check("…Sol out of the seat while the van still rolls: he stays in", danny.seat == seat)
-	truck.speed = 0
-	said = #E.said
-	swingsAt = #E.doorSwings
-	run(0.1)
-	local b1 = danny.board
-	local doorOut = swingsSince(swingsAt)[1]
-	check("8.5 the van stands, nobody at its wheel: he gets out as a player does (the seat free at once, the passenger door open now and shut AlightSeconds later)",
-		b1 ~= nil and b1.out and danny.seat == nil and seat.Occupant == nil and seat:FindFirstChild("SeatWeld") == nil and body.humanoid.Sit == false
-		and doorOut ~= nil and doorOut.openAt == doorOut.now and math.abs(doorOut.closeAt - doorOut.now - (CARGO.AlightSeconds + 0.05)) < 1e-6
-		and sol:GetAttribute("MoveHelperDoing") == "Getting out of the van" and hooked(), sol:GetAttribute("MoveHelperDoing"))
-	E.clock = b1.at + CARGO.AlightSeconds / 2
-	heartbeat:Fire(1 / 60)
-	local halfway = inVan()
-	check("…the slide out through the door (halfway: between the seat and his spot, over the seat's height)", halfway.X > 1.4 + 0.3
-		and halfway.X < halfX + H.RideStand - 0.3 and halfway.Y > seatRel.Y, `{halfway.X} {halfway.Y}`)
-	local outAt = b1.at
-	run(1, function()
-		return danny.board == nil
-	end)
-	local outLook = lookInVan()
-	check("8.3 …and on his feet at his spot by the door (where he got in), facing away from the van, his body as before (not massless), AlightSeconds after",
-		danny.board == nil and atSpot() and outLook.X > 0.5 and npc:FindFirstChild("HumanoidRootPart").Massless == false and body.weights == nil
-		and E.clock - outAt >= CARGO.AlightSeconds - 1e-6 and not hooked() and fades == fadesAt, `{inVan().X} {inVan().Z} {outLook.X}`)
-	local back2 = run(20, function()
-		return (body.root.Position - origin.Position).Magnitude < 60
-	end)
-	check("…and goes on with his list (the slab: back into the house)", back2 and E.saidSince(Brain.Lines.out, said) and listIs({ 6 }))
-	-- Sol drives off with him left behind (40 studs a second, faster than his sprint): he walks after the van, and once it
-	-- is RideFar studs or more off on foot (8.5: the last resort, not his patience) he fades into the seat
-	local parkedAt = truck.chassis.CFrame
-	E.seated[sol] = truck
-	truck.speed = 40
-	local fadeAt = E.clock
-	local walkedAfter = 0
-	fadesAt = fades
-	local faded = run(H.RideBlink + 3, function()
-		truck.chassis.CFrame = truck.chassis.CFrame * M.CFrame.new(4, 0, 0)
-		if danny.action == "ride" and danny.seat == nil then
-			walkedAfter += 1
-		end
-		return danny.seat ~= nil
-	end)
-	check("8.3 the van drives off with him left behind: he goes after it, and once it is RideFar studs off (the last resort) he fades into the seat",
-		faded and danny.seat == seat and walkedAfter > 10 and fades == fadesAt + 1 and E.clock - fadeAt < H.RideBlink, E.clock - fadeAt)
-	truck.chassis.CFrame = parkedAt
-	truck.speed = 0
-	E.seated[sol] = nil
-	run(1, function()
-		return danny.seat == nil and danny.board == nil
-	end)
-	check("…the van back and standing, Sol out: he gets out again (at his spot)", danny.seat == nil and danny.board == nil and atSpot())
-	-- 8.5 the van drives off while he gets in: his move is called off (on his feet at his spot, the seat free, the door
-	-- shut), he goes after it on foot; it stops, and in he gets
-	E.seated[sol] = truck
-	started = run(10, function()
-		return danny.board ~= nil
-	end)
-	run(0.2)
-	swingsAt, fadesAt = #E.doorSwings, fades
-	truck.speed = CARGO.BoardMaxSpeed + 4
-	run(0.1)
-	local shut = swingsSince(swingsAt)[1]
-	check("8.5 the van drives off while he gets in: called off at once (on his feet at his spot outside the van, the seat free and his no more, its door shut from then)",
-		started and danny.board == nil and danny.seat == nil and seat.Occupant == nil and seat:GetAttribute("Reserved") == nil and atSpot() and shut ~= nil
-		and shut.openAt == nil and shut.closeAt == shut.now and not hooked(), inVan())
-	local followed, overWhile = 0, 0
-	run(2, function()
-		truck.chassis.CFrame = truck.chassis.CFrame * M.CFrame.new(0, 0, -1.2)
-		if danny.action == "ride" and danny.seat == nil and danny.board == nil then
-			followed += 1
-		end
-		if onVan() then
-			overWhile += 1
-		end
-		return false
-	end)
-	check("…the van rolling on (12 studs a second, over BoardMaxSpeed): he goes after it on foot beside it, never in, never over it, no fade", followed >= 15
-		and danny.seat == nil and overWhile == 0 and fades == fadesAt and distance(body.root.Position, truck.chassis.Position) < halfZ + H.RideStand + 2, followed)
-	truck.speed = 0
-	seated = run(10, function()
-		return danny.seat ~= nil
-	end)
-	check("…it stops: in he gets (his move again: the door, the slide, the seat), no fade", seated and danny.seat == seat and #swingsSince(swingsAt) >= 2 and fades == fadesAt)
-	E.seated[sol] = nil
-	run(1, function()
-		return danny.seat == nil and danny.board == nil
-	end)
-	-- the passenger seat taken by a crew mate (Bob): he follows the van on foot
-	E.place(bob, truck.chassis.Position + V3(5, 1, -3))
-	seat:Sit(bob.Character:FindFirstChildOfClass("Humanoid"))
-	E.seated[sol] = truck
-	overVan = 0
-	run(25, function()
-		if onVan() then
-			overVan += 1
-		end
-		return danny.action == "ride" and distance(body.root.Position, cargoDoor.WorldPosition) < 8
-	end)
-	check("8.3 the seat taken by Bob: Danny never sits (he goes to the van's back on foot; 8.5 round it)", danny.seat == nil and danny.action == "ride" and seat.Occupant ~= body.humanoid
-		and distance(body.root.Position, cargoDoor.WorldPosition) < 8 and overVan == 0, distance(body.root.Position, cargoDoor.WorldPosition))
-	seat:FindFirstChild("SeatWeld"):Destroy()
-	seated = run(10, function()
-		return danny.seat ~= nil
-	end)
-	check("…Bob out of it: he gets in", seated and danny.seat == seat)
-	truck.wrecked = true
-	run(0.3)
-	check("8.3 the van wrecked: out at once", danny.seat == nil and seat.Occupant == nil and body.humanoid.Sit == false)
-	truck.wrecked = false
-	E.seated[sol] = nil
-	E.crew[sol] = {}
-	Moving.step()
-	danny = MoveHelper.find(sol)
-	check("Bob left: Danny stays for Sol, Bob's strip goes", danny ~= nil and bob:GetAttribute("MoveHelper") == nil and sol:GetAttribute("MoveHelper") == "hired"
-		and bob:GetAttribute("MoveHelperId") == nil)
-	npc = danny.body.model
-end
-
 -- The end ------------------------------------------------------------------------------------------------------------------
 
-Moving.admin(sol, "end")
+Moving.endRun(sol)
 run(0.2)
 check("the move ends: he goes, the strip goes, his marker off the slab", MoveHelper.find(sol) == nil and npc.Parent == nil and sol:GetAttribute("MoveHelper") == nil
 	and sol:GetAttribute("MoveHelperDoing") == nil and sol:GetAttribute("MoveHelperId") == nil and sol:GetAttribute("MoveHelperQueue") == nil and markOf(slab) == nil)
 
 -- A second move: no room for his piece ----------------------------------------------------------------------------------------
 
-E.place(sol, V3(Map.Depot.x, 3, Map.Depot.z))
+E.place(sol, lobby)
 local bedHeight = T.Beds[E.carId].Height
 T.Beds[E.carId].Height = 1.6 -- (a low bed: the box of memories fits, the lamp never does)
-Moving.admin(sol, "start")
+E.startRun(sol, HOUSE)
 T.Beds[E.carId].Height = bedHeight
 truck = E.cars[sol]
 cargoDoor = truck.chassis:FindFirstChild("CargoDoor")
@@ -1355,7 +1096,7 @@ danny = MoveHelper.find(sol)
 check("10.1 the next move: Danny again, with you from its start (free: nothing taken)", danny ~= nil and danny.body ~= nil and danny.hirer == sol
 	and sol:GetAttribute("MoveHelper") == "hired" and #E.spent == 0)
 E.place(sol, outside)
-trigger(promptIn(workspace:FindFirstChild("Moves"):FindFirstChild("Move_marge"), "Enter house"), sol)
+trigger(promptIn(workspace:FindFirstChild("Moves"):FindFirstChild(`Move_{HOUSE}`), "Enter house"), sol)
 give(itemModel(1))
 give(itemModel(5))
 E.place(sol, cargoDoor.WorldPosition + V3(30, 0, 0))
@@ -1366,9 +1107,9 @@ check("8.3 the lamp never fits the low bed: he skips it for the next of his list
 danny.s.move.packing.height = 0.7 -- (the room went while he walked: the box is 1.5 high)
 said = #E.said
 local refused = run(40, function()
-	return E.saidSince("Van's full, boss - drive it to the Wall?", said)
+	return E.saidSince(Brain.line("full", true) :: string, said)
 end)
-check("no room at the van: \"Van's full, boss - drive it to the Wall?\"", refused)
+check("no room at the van: \"Van's full\" (the sandbox's words)", refused)
 run(40, function()
 	return Rules.holding(danny.s.move, danny.id) == nil and danny.action == "wait"
 end)
@@ -1376,33 +1117,33 @@ box = itemModel(5)
 check("…the box set down beside the van, not in it", stateNow(5) == "ground" and distance(box.PrimaryPart.Position, cargoDoor.WorldPosition) < 14)
 check("…nothing of his list fits: he waits, the van full", Rules.holding(danny.s.move, danny.id) == nil and stateNow(1) == "home" and listIs({ 1 })
 	and sol:GetAttribute("MoveHelperDoing") == "Waiting: the van is full", sol:GetAttribute("MoveHelperDoing"))
-Moving.admin(sol, "end")
+Moving.endRun(sol)
 run(0.2)
 
 -- A third move: a van with no room for anything of his list ---------------------------------------------------------------------
 
 T.Beds[E.carId].Height = 0.7 -- (lower than any of his pieces, the TV on its side too: Pack.Lie)
-Moving.admin(sol, "start")
+E.startRun(sol, HOUSE)
 T.Beds[E.carId].Height = bedHeight
 Moving.step()
 danny = MoveHelper.find(sol)
 E.place(sol, outside)
-trigger(promptIn(workspace:FindFirstChild("Moves"):FindFirstChild("Move_marge"), "Enter house"), sol)
+trigger(promptIn(workspace:FindFirstChild("Moves"):FindFirstChild(`Move_{HOUSE}`), "Enter house"), sol)
 give(itemModel(1))
 give(itemModel(2))
 E.place(sol, outside)
 said = #E.said
 local full = run(8, function()
-	return E.saidSince("Van's full, boss - drive it to the Wall?", said)
+	return E.saidSince(Brain.line("full", true) :: string, said)
 end)
 check("nothing of his list fits: he says so and waits at the van", full and danny.action == "wait" and sol:GetAttribute("MoveHelperDoing") == "Waiting: the van is full"
 	and Rules.holding(danny.s.move, danny.id) == nil and listIs({ 1, 2 }))
-Moving.admin(sol, "end")
+Moving.endRun(sol)
 run(0.2)
 
 -- 8.3 a two-person piece on his list: the ★ marble slab; he waits at it for you, then Sol lifts it with him ---------------------
 
-Moving.admin(sol, "start")
+E.startRun(sol, HOUSE)
 truck = E.cars[sol]
 cargoDoor = truck.chassis:FindFirstChild("CargoDoor")
 truck.model:SetAttribute("BackOpen", true)
@@ -1410,7 +1151,7 @@ Moving.step()
 danny = MoveHelper.find(sol)
 body = danny.body
 npc = body.model
-site = workspace:FindFirstChild("Moves"):FindFirstChild("Move_marge")
+site = workspace:FindFirstChild("Moves"):FindFirstChild(`Move_{HOUSE}`)
 E.place(sol, outside)
 trigger(promptIn(site, "Enter house"), sol)
 slab = itemModel(6)
@@ -1521,7 +1262,7 @@ run(0.2)
 trigger(promptIn(truck.model, "Load"), sol)
 check("…Sol loads it: the slab in the van, both pairs of hands free", danny.s.move.things[6].state == "truck" and Rules.holding(danny.s.move, danny.id) == nil
 	and sol.Character:GetAttribute("MoveCarry") == nil, E.lastNotice(sol))
-Moving.admin(sol, "end")
+Moving.endRun(sol)
 run(0.2)
 
 -- 9.3 stuck (the owner: "he runs for 2 seconds and then on the spot he somehow teleports around"): an unseen wall across
@@ -1529,11 +1270,11 @@ run(0.2)
 -- Unstuck.Fade s without progress the last resort, a fade over onto his way (never 8.9's nudge after 4 s); Studio's
 -- Output lines say so ("[Danny] stuck …", "[Danny] teleport stuck …")
 do
-	Moving.admin(sol, "start")
+	E.startRun(sol, HOUSE)
 	Moving.step()
 	danny = MoveHelper.find(sol)
 	E.place(sol, outside)
-	trigger(promptIn(workspace:FindFirstChild("Moves"):FindFirstChild("Move_marge"), "Enter house"), sol)
+	trigger(promptIn(workspace:FindFirstChild("Moves"):FindFirstChild(`Move_{HOUSE}`), "Enter house"), sol)
 	give(itemModel(1))
 	E.place(sol, outside)
 	local routes: { any } = {}
@@ -1608,17 +1349,17 @@ do
 		stuckLine ~= nil and string.find(stuckLine, "s at (", 1, true) ~= nil and string.find(stuckLine, ", blocked by ", 1, true) ~= nil and #lines <= 8, stuckLine)
 	check("…and \"[Danny] teleport stuck <studs> studs at <where>\" for the rescue", teleportLine ~= nil and string.find(teleportLine, " studs at (", 1, true) ~= nil,
 		teleportLine)
-	Moving.admin(sol, "end")
+	Moving.endRun(sol)
 	run(0.2)
 end
 
 -- 7.0 review: his body taken away (by something else) while he carries a piece: it falls, nobody holds it -----------------
 
-Moving.admin(sol, "start")
+E.startRun(sol, HOUSE)
 Moving.step()
 danny = MoveHelper.find(sol)
 E.place(sol, outside)
-trigger(promptIn(workspace:FindFirstChild("Moves"):FindFirstChild("Move_marge"), "Enter house"), sol)
+trigger(promptIn(workspace:FindFirstChild("Moves"):FindFirstChild(`Move_{HOUSE}`), "Enter house"), sol)
 give(itemModel(5))
 E.place(sol, outside)
 local holds = run(40, function()
@@ -1630,13 +1371,13 @@ danny.body.model:Destroy()
 run(0.5)
 check("his body gone: what he held fell (never 'carried' by nobody)", Rules.holding(danny.s.move, danny.id) == nil and held ~= nil
 	and danny.s.move.things[held].state == "ground", held and danny.s.move.things[held].state)
-Moving.admin(sol, "end")
+Moving.endRun(sol)
 run(0.2)
 
 -- 10.1 free: once with a move he stays when the crew grows and when it shrinks again (the city's Solo: a crew that starts
 -- with two players has none; tests/moving_runtime_test.luau); nothing to end when a crew mate leaves (no hire) -----------
 
-Moving.admin(sol, "start")
+E.startRun(sol, HOUSE)
 Moving.step()
 danny = MoveHelper.find(sol)
 npc = danny.body.model

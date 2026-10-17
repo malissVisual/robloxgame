@@ -279,7 +279,7 @@ check("the van takes a hit whole with Ann at its wheel (no Driver's cut)", E.car
 
 -- The end ------------------------------------------------------------------------------------------------------------------
 
-check("the admin's end", string.find(Moving.admin(ann, "end"), "called off", 1, true) ~= nil)
+check("the run's end (the admin's END RUN: Moving.endRun)", Moving.endRun(ann, "Ended by the admin") == true and Moving.busy(ann) == nil)
 check("…nobody holds a role", ann:GetAttribute("MoveRole") == nil and bob:GetAttribute("MoveRole") == nil and moves:FindFirstChild("MoveBarricade") == nil)
 
 if failures == 0 then

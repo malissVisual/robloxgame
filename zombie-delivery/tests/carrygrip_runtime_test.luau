@@ -8,13 +8,13 @@
 -- 7 – 12 s of walking (seldom standing); a hit keeps it steady; a sturdy piece's first miss staggers it (a knock, the
 -- walk × 0.6 a moment, the next wobble sooner), the second in a row drops it; a fragile piece drops at once; no answer
 -- is a miss. A pair piece: each carrier their own checks (a Help lift too), a stagger's knock half each, either one's
--- drop drops it whole. Danny's GripSteady and the Mover: bigger zones. A door trip takes the check off (8.3: the move
+-- drop drops it whole. Danny's GripSteady: a bigger zone. A door trip takes the check off (8.3: the move
 -- FadeOut + Margin s after the fade out, its stream first). The CarryGrip
 -- attribute with the carry, gone with it.
 local E = require("./MovingRuntime")
 local Moving = require("./MovingServer")
 local Config = require("./Config")
-local Map = require("./Map")
+local SandboxMap = require("./SandboxMap")
 local CarryGrip = require("./CarryGrip")
 
 local failures = 0
@@ -37,9 +37,8 @@ local M = E.Mock
 local V3 = M.Vector3.new
 local workspace = M.workspace
 
-local depot = V3(Map.Depot.x, 3, Map.Depot.z)
-local home = Map.home(T.Contracts[1].home) :: any
-E.truckAt = V3(home.park.x, 2, home.park.z)
+Config.MoveHelper.WaitForHelper = false -- (the crew lifts its two-person pieces itself: nobody waits for Danny)
+local depot = V3(SandboxMap.Lobby.spawn.x, 3, SandboxMap.Lobby.spawn.z) -- (10.5: the lobby; the run on the lone house)
 local ann = E.player(11, "Ann", depot)
 local bob = E.player(22, "Bob", depot + V3(3, 0, 0))
 local cid = E.player(33, "Cid", depot + V3(-3, 0, 0))
@@ -50,11 +49,11 @@ local heardGrips: { { player: any, what: string, outcome: string, item: string, 
 Moving.onGrip(function(player: any, facts: any)
 	table.insert(heardGrips, { player = player, what = facts.what, outcome = facts.outcome, item = facts.item, fragile = facts.fragile })
 end)
+Moving.parkVan = E.parkVan
 Moving.start()
-local said = Moving.admin(ann, "start")
-check("the admin's START: a move with Ann and Bob", string.find(said, "started", 1, true) ~= nil, said)
+local said = E.startRun(ann, "lone_house")
+check("a run with Ann and Bob (Moving.startRun)", said == nil, said)
 Moving.step()
-check("the roles: Ann the Driver, Bob the Mover", ann:GetAttribute("MoveRole") == "driver" and bob:GetAttribute("MoveRole") == "mover")
 
 local function promptIn(model: any, action: string): any
 	for _, d in model:GetDescendants() do
@@ -322,8 +321,8 @@ local sofa = itemModel(3)
 E.place(bob, sofa.PrimaryPart.Position + V3(-1, 0, 0))
 promptIn(sofa, "Help lift").Triggered:Fire(bob)
 local helpLift = lastGrip(bob, "open")
-check("Bob's Help lift: his own lift check (\"pair\"), the Mover's bigger zone; not his end yet", helpLift ~= nil and helpLift.what == "lift" and helpLift.help == true
-	and carrying(bob) == nil and near(helpLift.zone, CarryGrip.profile("pair", 8, false, true).zone), helpLift and helpLift.zone)
+check("Bob's Help lift: his own lift check (\"pair\"); not his end yet", helpLift ~= nil and helpLift.what == "lift" and helpLift.help == true
+	and carrying(bob) == nil and near(helpLift.zone, CarryGrip.profile("pair", 8, false, false).zone), helpLift and helpLift.zone)
 local sofa2 = thingOf(3).condition
 answer(bob, helpLift, 0.01)
 check("…his miss: his end slips (the knock half: the other end is in Ann's hands), Ann still drags it", carrying(bob) == nil and carrying(ann) == 3
@@ -362,11 +361,11 @@ check("…her second miss in a row: the whole sofa goes down, both hands free, b
 state()
 check("…Bob's grip record goes with it (no wobble on nothing)", not Moving.gripCheck(bob))
 
--- Danny's steadying and the Mover ------------------------------------------------------------------------------------------
+-- Danny's steadying ----------------------------------------------------------------------------------------------------
 
-pick(bob, 6, "Lift") -- the marble slab: a pair thing, weight 10; Bob is a Mover: held up alone ("solo")
+pick(bob, 6, "Lift") -- the marble slab: a pair thing, weight 10; Bob alone drags it
 hit(bob, lastGrip(bob, "open"))
-check("a Mover lifts the slab alone: \"solo 10\"", carrying(bob) == 6 and grip(bob) == "solo 10", grip(bob))
+check("Bob lifts the slab alone: dragged, \"drag 10\" (8.8 no roles: no Mover)", carrying(bob) == 6 and grip(bob) == "drag 10", grip(bob))
 Moving.gripCheck(bob)
 local plain = lastGrip(bob, "open")
 answer(bob, plain, hitAt(plain))
@@ -375,8 +374,6 @@ Moving.gripCheck(bob)
 local steadied = lastGrip(bob, "open")
 answer(bob, steadied, hitAt(steadied))
 check("Danny steadies it (GripSteady): the wobble's zone × 1.3", near(steadied.zone, math.min(G.Zone.Max, plain.zone * G.Steadied), 1e-6), `{plain.zone} → {steadied.zone}`)
-check("…the Mover's zone: × 1.35 of a non-Mover's", near(plain.zone, CarryGrip.check(CarryGrip.profile("solo", 10, false, true), "wobble", 0).zone)
-	and plain.zone > CarryGrip.check(CarryGrip.profile("solo", 10, false, false), "wobble", 0).zone)
 bob.Character:SetAttribute("GripSteady", nil)
 putDown(bob)
 
@@ -471,7 +468,7 @@ check("Config.CarryGrip.On false: a Pick up lifts at once, no check, no CarryGri
 putDown(ann)
 G.On = true
 
-Moving.admin(ann, "end")
+Moving.endRun(ann)
 check("the move ends: nobody keeps a grip", grip(ann) == nil and grip(bob) == nil)
 
 -- 8.2: Moving.onGrip heard every outcome the clients heard, in their order, with what, the piece and fragile

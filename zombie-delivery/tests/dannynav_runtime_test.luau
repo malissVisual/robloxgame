@@ -355,10 +355,10 @@ local function moveInto(index: number, house: any, seed: number): (any, any, any
 	local p = E.player(100 + index, `Crew{index}`, V3(plot.spawn.x, 3, plot.spawn.z))
 	E.plots[p] = plot
 	E.profiles[p] = { money = 5000, sandboxHouse = house.id, sandboxHouseSeed = seed }
-	local started = Moving.admin(p, "start")
+	local started = E.startRun(p, house.id)
 	local b = built[#built]
-	check(`{house.name}: a move into it (its plan of kind "{house.kind}", seed {seed}{if b and b.plan.mirrored then ", mirrored" else ""})`,
-		string.find(started, "started", 1, true) ~= nil and b ~= nil and b.plan.kind == house.kind and b.plan.seed == seed, started)
+	check(`{house.name}: a run into it (its plan of kind "{house.kind}", seed {seed}{if b and b.plan.mirrored then ", mirrored" else ""})`,
+		started == nil and b ~= nil and b.plan.kind == house.kind and b.plan.seed == seed, started)
 	Moving.step()
 	local danny = MoveHelper.find(p)
 	local truck = E.cars[p]
@@ -448,7 +448,7 @@ for index, house in Houses do
 	local s, qx, qz = behindWall(plan, grid, danny.s.move)
 	if not s or not qx or not qz then
 		check(`{house.name}: a piece against an inside wall, a spot behind it`, false)
-		Moving.admin(p, "end")
+		Moving.endRun(p)
 		continue
 	end
 	local model = b.pieces[s.id]
@@ -610,7 +610,7 @@ for index, house in Houses do
 			#blockers == 4 and #danny.queue == before and boxed:GetAttribute("DannyQueue") == nil
 			and told(p, `Danny can't get to the {boxedName}: clear a way to it first.`, noticeAt), `{#blockers} {E.lastNotice(p)}`)
 	end
-	Moving.admin(p, "end")
+	Moving.endRun(p)
 	Moving.step()
 end
 

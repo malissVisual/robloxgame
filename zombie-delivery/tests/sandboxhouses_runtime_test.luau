@@ -366,8 +366,8 @@ do
 		return Moving.endRun(cy, nil) and Moving.busy(cy) == nil and #E.collected == before and not Moving.endRun(cy, nil)
 	end)())
 	check("…the seed still Cy's (nothing came home)", E.profiles[cy].sandboxHouse == Houses[4].id and E.profiles[cy].sandboxHouseSeed == 777)
-	Moving.admin(ann, "end")
-	Moving.admin(bob, "end")
+	Moving.endRun(ann)
+	Moving.endRun(bob)
 	E.leave(cy)
 end
 
@@ -394,33 +394,33 @@ do
 	parkAt(dee2, Houses[5])
 	check("back (another server, the same save): a run there plans the same seed (no reroll by leaving)", Moving.startRun(dee2, house, "easy") == nil
 		and built[#built].seed == seed)
-	Moving.admin(dee2, "end")
+	Moving.endRun(dee2)
 	E.leave(dee2)
 	local dee3 = join(44, nil) -- (no save read: Studio without a DataStore: this server's memory of her)
 	parkAt(dee3, Houses[5])
 	check("…back on this server without a save read: this server's memory, the same seed", Moving.startRun(dee3, house, "easy") == nil and built[#built].seed == seed)
-	Moving.admin(dee3, "end")
+	Moving.endRun(dee3)
 	E.leave(dee3)
 	-- a save whose seed a trip spent (none; its house the one emptied last): a run there plans a new seed
 	local dee4 = join(45, { money = 5000, sandboxHouse = house })
 	parkAt(dee4, Houses[5])
 	check("a save whose house was spent (its seed none): a run there plans a new seed, kept in the save", Moving.startRun(dee4, house, "easy") == nil
 		and E.profiles[dee4].sandboxHouseSeed == built[#built].seed and built[#built].seed ~= seed)
-	Moving.admin(dee4, "end")
+	Moving.endRun(dee4)
 	E.leave(dee4)
 	-- an 8.4 save (a seed, no house: PlayerData reads the farmstead's into it): a run on the farmstead plans that seed
 	local dee5 = join(46, { money = 5000, sandboxHouse = Farm.id, sandboxHouseSeed = 4242 })
 	parkAt(dee5, Farm)
 	check("an 8.4 save (its seed the farmstead's, server/PlayerData.luau's migration): a run on the farmstead plans that seed", Moving.startRun(dee5, Farm.id, "normal") == nil
 		and built[#built].seed == 4242 and built[#built].kind == "big")
-	Moving.admin(dee5, "end")
+	Moving.endRun(dee5)
 	E.leave(dee5)
 	-- a run on another house than the save's: a new seed, the save's house that one now
 	local dee6 = join(47, { money = 5000, sandboxHouse = Houses[2].id, sandboxHouseSeed = 999 })
 	parkAt(dee6, Houses[6])
 	check("a run on another house than the save's: a new seed, the save's house the run's now", Moving.startRun(dee6, Houses[6].id, "normal") == nil
 		and built[#built].seed ~= 999 and E.profiles[dee6].sandboxHouse == Houses[6].id and E.profiles[dee6].sandboxHouseSeed == built[#built].seed)
-	Moving.admin(dee6, "end")
+	Moving.endRun(dee6)
 	E.leave(dee6)
 	check("Moving.startRun refuses a house there is none of (an old save's village house)", Moving.startRun(ann, "Hlavní_n_5", "normal") ~= nil and Moving.busy(ann) == nil)
 end
