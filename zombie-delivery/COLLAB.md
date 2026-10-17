@@ -4,6 +4,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## In progress
 <!-- who · task · files · since -->
+- Claude · the start: a short intro and loading screen (ReplicatedFirst), save slots (continue a save, a new game, start over) and a character creator · `src/first/`, `default.project.json` (both), `server/PlayerData.luau`, `server/SaveSlots.luau`, `server/CourierAvatar.luau`, `server/SandboxBoot.luau`, `client/Menu.luau`, `client/CharacterCreator.luau`, `client/Main.client.luau`, `shared/CharacterLooks.luau`, `shared/SaveSlotRules.luau`, `shared/Config.luau`, `shared/Net.luau`, tests · 17. 10. 2026
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
