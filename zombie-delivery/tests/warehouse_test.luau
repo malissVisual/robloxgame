@@ -54,7 +54,9 @@ local function rectOf(s: WarehouseLayout.Stand): Rect
 	return { x0 = s.x - s.sx / 2, x1 = s.x + s.sx / 2, z0 = s.z - s.sz / 2, z1 = s.z + s.sz / 2 }
 end
 local function overlaps(a: Rect, b: Rect): boolean
-	return a.x0 < b.x1 and b.x0 < a.x1 and a.z0 < b.z1 and b.z0 < a.z1
+	-- (10.4: touching edges never count, within a float's rounding: the same layout at another plot's coordinates)
+	local e = 1e-6
+	return a.x0 < b.x1 - e and b.x0 < a.x1 - e and a.z0 < b.z1 - e and b.z0 < a.z1 - e
 end
 local function within(a: Rect, b: Rect, margin: number?): boolean
 	local m = margin or 0

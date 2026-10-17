@@ -2,8 +2,9 @@
 
 > **8.0 SANDBOX (the game the owner tests now).** With `Config.Sandbox.On = true` (the default) the server builds a
 > test world instead of the city (`shared/SandboxMap.luau`, `server/SandboxWorld.luau`). **Since 10.0 a small lobby
-> like Dungeon Quest** (`design/lobby/`, `server/LobbyWorld.luau`: the plaza, the four warehouses, the shops and six
-> portals) from which a party goes into a house to empty at a chosen difficulty (`server/Runs.luau`, see the 10.0 note
+> like Dungeon Quest** (`design/lobby/`, `server/LobbyWorld.luau`: the plaza, the four warehouses, the shops and, since
+> 10.5, one PLAY circle where you make a party lobby) from which a party goes into a house to empty at a chosen
+> difficulty (`server/Runs.luau`, see the 10.0 note
 > below; its pieces wear their rarity's outline and stars); the houses stand in their own fenced run zones of the
 > 9.0 countryside: since 9.0 **open countryside**
 > (`design/countryside/`; 8.9: the village of Jinočany, 8.0 – 8.8: an alpine meadow with one road) with **six places to
@@ -370,6 +371,29 @@
 > with the van moving along it. The engine pulls away and slows as it arrives (sfx6's van sounds); your controls are
 > off while it plays. **The start's sounds** (`art/audio/sfx6.ogg`, `art/audio/NAHRAT-SFX6.md`): the intro's van and
 > jingle, the start screen's and the character creator's; sfx5.ogg's asset id is in.
+>
+> **10.5** (the owner: "make the map smaller, and on it just one circle where you stand, like PLAY, and you create a
+> lobby"; "a really huge and nice, well thought-out upgrade tree … and split the warehouse: an exhibition for selling,
+> and something for making money"). **One PLAY circle, party lobbies.** The lobby is smaller (456 × 226 studs: the four
+> warehouses along the north edge, the plaza in front of them) and in its middle one big glowing **PLAY** circle in
+> place of the six portals. Step into it and the PLAY panel opens (`client/PlayUi.luau`, `server/Parties.luau`,
+> `shared/PartyRules.luau`, `Config.Runs.Play`): CREATE A LOBBY (a house, greyed out while it is in a run or another
+> lobby holds it; a difficulty you have opened; public or friends only) or JOIN one of the open lobbies (host, house,
+> difficulty, n/4). In a lobby everybody presses READY; the host can change the house or the difficulty, kick, and
+> press START: 5 seconds, then the run (and the ride) as before. You can walk around while you wait (a bar at the top
+> opens the panel again); only LEAVE takes you out, and the lobby closes when its host leaves. After a run the party
+> lands beside the circle. The big map shows the circle and its OPEN LOBBIES and IN A RUN lists, and the guide says
+> "Step into PLAY to start a run". **The warehouse in two.** Every level has a **SHOWROOM** by the door (blue carpet,
+> its plinths S1, S2 …): what stands there is for sale (visitors look and make offers, VIP buyers pay more for the rare
+> ones, players buy it or make an offer, a FOR SALE sign), and it sells for more (× 1.2) but earns nothing a minute.
+> Behind it the **COLLECTION HALL** earns every minute and nothing in it is for sale (`Config.Showroom`,
+> `CollectionRules`, `WarehouseLayout`, `Collection.place`). The STOCK list and the picker say 🏛 HALL or 🏷 FOR SALE;
+> pieces already on stands stay in the hall. **The upgrade tree** at the UPGRADES desk (`client/UpgradeUi.luau`,
+> `shared/UpgradeRules.luau`, `Config.SandboxUpgrades`): the warehouse's five tiers as its trunk and branches for LOOKS
+> (fresh paint, a gold sign), the HALL (spotlights, night watchman, Collector's corner, room sets), the SHOWROOM
+> (stands, shop window, sales pitch, VIP buyers), RUNS (engine, overtime, spare keys, lucky finds) and the CREW (Danny,
+> pads & helmets, first aid, running shoes, good doctors); each node needs its parents and a warehouse tier; drag,
+> zoom, tap a node for its details and BUY, on a phone too. Old saves keep their levels (`upgradeTreeKept`).
 
 The active Roblox game in this repository (Merge Blades is preserved in `../archive/merge-blades`). **You run a delivery company** in a world
 gone wrong: take a job, carry the cargo to your vehicle with your own hands (or lead the horses on a rope), drive it
