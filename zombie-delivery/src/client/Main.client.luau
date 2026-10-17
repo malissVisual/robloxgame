@@ -121,9 +121,7 @@ local Drive = require(Client.Drive)
 local CameraRig = require(Client.CameraRig)
 local AdminPanel = require(Client.AdminPanel)
 local Sounds = require(Client.Sounds)
-local CrewPanel = require(Client.CrewPanel)
 local MovingHud = require(Client.MovingHud)
-local MoveLobbyUi = require(Client.MoveLobbyUi)
 local QuickChat = require(Client.QuickChat)
 local KeyHints = require(Client.KeyHints)
 local PerfOverlay = require(Client.PerfOverlay)
@@ -171,7 +169,6 @@ safely("CameraRig", CameraRig.start)
 safely("ArmPose", require(Client.ArmPose).start)
 safely("AdminPanel", AdminPanel.start)
 safely("AdminFly", require(Client.AdminFly).start)
-safely("CrewPanel", CrewPanel.start)
 safely("Sounds", Sounds.start)
 safely("Stamina", require(Client.Stamina).start)
 safely("CarBoarding", require(Client.CarBoarding).start)
@@ -192,7 +189,6 @@ safely("CrashFx", require(Client.CrashFx).start)
 safely("MovingHud", MovingHud.start)
 safely("MoveHelperHud", require(Client.MoveHelperHud).start)
 safely("DannyBubble", require(Client.DannyBubble).start) -- 8.6: what Danny does, over his head (his move's crew only)
-safely("MoveLobbyUi", MoveLobbyUi.start)
 safely("QuickChat", QuickChat.start)
 safely("CarryGripUi", require(Client.CarryGripUi).start)
 safely("WalkDoors", require(Client.WalkDoors).start) -- 8.3: the doors' leaves swing, the trip's camera behind you
@@ -213,10 +209,8 @@ Drive.notify = Hud.toast
 Sounds.notify = Hud.toast
 AdminPanel.onPerformance = PerfOverlay.toggle
 AdminPanel.performanceOn = PerfOverlay.isOn
-MoveLobbyUi.onInvite = CrewPanel.open -- (the lobby's + INVITE; it comes back when the crew panel closes)
-MoveLobbyUi.crewOpen = CrewPanel.isOpen
 QuickChat.covered = function(): boolean
-	return MovingHud.isOpen() or MoveLobbyUi.isOpen() or require(Client.MoveStoryUi).isOpen()
+	return MovingHud.isOpen() or require(Client.MoveStoryUi).isOpen()
 end
 -- Is a sandbox window open (the warehouse's picker, 8.1's UPGRADES desk: module.isOpen, when it has one)?
 local function ownOpen(module: any): boolean
@@ -241,8 +235,6 @@ end
 -- the BOOK to compare prices …) only hides it (OfferCard.hide): it waits and comes back once nothing covers the screen.
 local keep: any = nil
 Hud.onCloseWindows = function()
-	CrewPanel.close()
-	MoveLobbyUi.minimize()
 	MovingHud.closeAll()
 	QuickChat.close(false)
 	for _, module in windows do
@@ -257,7 +249,6 @@ Hud.onCloseWindows = function()
 		end
 	end
 end
-CrewPanel.onOpen = Hud.closeWindows
 for _, module in windows do -- (8.1 review: opening one closes the others)
 	if type(module) == "table" then
 		module.onOpen = function()
@@ -268,7 +259,7 @@ for _, module in windows do -- (8.1 review: opening one closes the others)
 	end
 end
 CameraRig.windowOpen = function(): boolean
-	return Hud.anyWindowOpen() or AdminPanel.isOpen() or CrewPanel.isOpen() or MovingHud.isOpen() or MoveLobbyUi.isOpen()
+	return AdminPanel.isOpen() or MovingHud.isOpen()
 		or QuickChat.isOpen() or ownOpen(WarehouseUi) or ownOpen(UpgradeUi) or ownOpen(BookUi) or ownOpen(TasksUi) or ownOpen(DannyCard) or ownOpen(PaintUi)
 		or ownOpen(OfferCard) or ownOpen(TradeUi) or ownOpen(AuctionUi) or ownOpen(windows[10]) or ownOpen(MapUi) or ownOpen(windows[12])
 end
@@ -305,7 +296,7 @@ if type(ownModule("RunDangerUi")) == "table" then -- 10.x danger: the run's dang
 	ownModule("RunDangerUi").covered = CameraRig.windowOpen
 end
 KeyHints.covered = function(): boolean
-	return CameraRig.mouseNeeded() or Hud.resultOpen()
+	return CameraRig.mouseNeeded()
 end
 -- 9.1 the drive pedals step aside while a window, a menu or the result card covers the game; a visitor's offer card
 -- is no reason (they keep clear of each other: client/OfferCard.luau, client/DrivePedals.luau)
@@ -317,8 +308,7 @@ if type(Pedals) == "table" then
 				return true
 			end
 		end
-		return Hud.anyWindowOpen() or AdminPanel.isOpen() or CrewPanel.isOpen() or MovingHud.isOpen() or MoveLobbyUi.isOpen()
-			or QuickChat.isOpen() or Hud.resultOpen()
+		return AdminPanel.isOpen() or MovingHud.isOpen() or QuickChat.isOpen()
 	end
 end
 
@@ -326,7 +316,6 @@ end
 -- SandboxHud.setState when it has one.
 local SandboxHud = ownModule("SandboxHud")
 Net.get("State").OnClientEvent:Connect(function(state)
-	Hud.setState(state)
 	Menu.setState(state)
 	KeyHints.setState(state)
 	local setState = SandboxHud and SandboxHud.setState
