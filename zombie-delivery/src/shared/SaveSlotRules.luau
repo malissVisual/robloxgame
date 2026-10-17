@@ -1,10 +1,10 @@
 --!strict
--- 9.6, the save slots' rules (Config.SaveSlots): each slot's DataStore key, a slot asked for checked, and what the
+-- 10.1, the save slots' rules (Config.SaveSlots): each slot's DataStore key, a slot asked for checked, and what the
 -- start screen shows of a slot (its summary, read from the stored save as it is). Pure (tests/saveslots_test.luau):
 -- server/SaveSlots.luau reads the slots with it, server/PlayerData.luau takes the key of the slot picked, client/Menu.luau
 -- writes the cards' lines with it.
 --
---   SaveSlotRules.key(userId, slot) -> string     slot 1 "Player_<id>" (the save of before 9.6), slot n "Player_<id>_slot<n>"
+--   SaveSlotRules.key(userId, slot) -> string     slot 1 "Player_<id>" (the save of before 10.1), slot n "Player_<id>_slot<n>"
 --   SaveSlotRules.slot(raw) -> number?            a whole number 1 … Config.SaveSlots.Count, else nil
 --   SaveSlotRules.real(saved) -> boolean          a save with a game in it (its money; a lock-only record is not)
 --   SaveSlotRules.summary(slot, saved) -> Summary what the slot's card shows: empty, or its courier (look, name), the

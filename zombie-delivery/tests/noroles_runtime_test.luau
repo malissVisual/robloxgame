@@ -2,8 +2,8 @@
 -- MoveRoles.on: Config.MoveRoles.On, the city's only): the real server/Moving.luau and server/MoveLobby.luau (MoveHelper,
 -- MoveGreeters, MoveSites with them) on tests/runtime/MovingRuntime.luau's fakes in the sandbox (Config.Sandbox.On), a
 -- crew of two: Ann, the move's owner, and Bob, her crew mate (then Cid joins mid-move).
---   * The planning: no role for anybody in its view (nor doubles), Bob hears only to get READY, a role asked is refused
---     and changes nothing, his READY without a role lets Ann LAUNCH.
+--   * 9.7 runs: no contract kiosk on the plots and no planning (the lobby's portals start a run: server/Runs.luau);
+--     a START asked opens nothing; the run (Moving.startRun) takes Ann's party as it is, nobody asked for a role.
 --   * On the move: no MoveRole on anybody, nobody told one (a newcomer neither); the state's team says only whether the
 --     van was called; a role switch or a barricade asked does nothing.
 --   * The van's Load, Take out and the walk-in bay's Load hold no time (no MoveQuick): no wait for anybody; Bob, not
@@ -157,37 +157,22 @@ Moving.start()
 
 check("the switch: the city's roles on (Config.MoveRoles.On), none in the sandbox", R.On == true and Config.Sandbox.On == true and not MoveRoles.on())
 
--- The planning ------------------------------------------------------------------------------------------------------------
+-- The run (9.7: no kiosk, no planning: the lobby's portals start it) -----------------------------------------------------
 
 local moves = workspace:FindFirstChild("Moves")
-local kiosk1 = moves:FindFirstChild("MovingBoard1")
-local cork1 = kiosk1:FindFirstChild("Board")
-local board1 = promptIn(kiosk1, "Moving contracts")
+check("9.7: no Moving contracts kiosk on the plots (the lobby's portals start the runs)", moves ~= nil and moves:FindFirstChild("MovingBoard1") == nil
+	and promptIn(moves, "Moving contracts") == nil)
 E.truckAt = V3(plot1.vanSpot.x, 2, plot1.vanSpot.z)
 E.Vehicles.placeNear(ann, "sprinter") -- (PLAY: Ann's Sprinter at her plot)
 local truck = E.cars[ann]
 park(truck, plot1.vanSpot)
-E.place(ann, cork1.Position + V3(0, 0, 4))
-trigger(board1, ann)
-local openedAt = #E.messages
 E.request(ann, "start", House.id)
-local lobbyAnn = E.last(ann, "MoveLobby", "lobby")
-local lobbyBob = E.last(bob, "MoveLobby", "lobby")
-check("START opens the planning for Ann and her crew mate", lobbyAnn ~= nil and lobbyAnn.a ~= nil and lobbyBob ~= nil and lobbyBob.a ~= nil
-	and #lobbyAnn.a.members == 2 and bob:GetAttribute("MoveLobby") == 11, E.lastNotice(ann))
-check("…no role in it for anybody, no doubles", noRoleIn(lobbyAnn.a) and noRoleIn(lobbyBob.a))
-check("Bob hears to get READY, not to pick a role", heard(bob, "Get READY", openedAt) and not heard(bob, "role", openedAt))
-lobbyRequest(ann, "launch")
-check("LAUNCH waits for Bob's READY", E.built == 0 and string.find(E.lastNotice(ann), "READY", 1, true) ~= nil, E.lastNotice(ann))
+check("…a START asked opens no planning and starts nothing", E.last(ann, "MoveLobby", "lobby") == nil and E.last(bob, "MoveLobby", "lobby") == nil and E.built == 0)
 lobbyRequest(bob, "role", "driver")
-check("a role asked: refused in words, nothing changes", string.find(E.lastNotice(bob), "Everybody does everything", 1, true) ~= nil
-	and noRoleIn(E.last(bob, "MoveLobby", "lobby").a) and E.last(bob, "MoveLobby", "lobby").a.ready == false, E.lastNotice(bob))
-lobbyRequest(bob, "ready", true)
-check("Bob READY without a role: LAUNCH may go", E.last(bob, "MoveLobby", "lobby").a.ready == true and E.last(ann, "MoveLobby", "lobby").a.canLaunch == true
-	and noRoleIn(E.last(ann, "MoveLobby", "lobby").a))
+check("…a role asked: nothing", bob:GetAttribute("MoveRole") == nil and E.built == 0)
 local launchedAt = #E.messages
-lobbyRequest(ann, "launch")
-check("LAUNCH: the move, the crew hears it", E.built == 1 and heard(bob, "Move started", launchedAt), E.lastNotice(ann))
+check("the run (Moving.startRun: Ann the host, Bob in her party): the crew hears it", Moving.startRun(ann, House.id, "normal") == nil and E.built == 1
+	and heard(bob, "NORMAL", launchedAt), E.lastNotice(ann))
 
 -- On the move: nobody has a role ------------------------------------------------------------------------------------------
 

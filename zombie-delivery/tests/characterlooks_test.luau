@@ -1,4 +1,4 @@
--- 9.6, the courier you make (shared/CharacterLooks.luau, Config.Characters): every list sane (unique ids, names, colours
+-- 10.1, the courier you make (shared/CharacterLooks.luau, Config.Characters): every list sane (unique ids, names, colours
 -- in range; the hats and the jackets StyleLooks'), the default one of each list's ids; clean (junk, wrong types, a
 -- name trimmed, too short, too long, control characters), random (every id from its list, a made courier), the body's
 -- colours, and every combination of hair × hat × top × face built into pieces on real R15 parts, sized, painted with a

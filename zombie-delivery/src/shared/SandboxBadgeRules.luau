@@ -20,7 +20,8 @@
 --                                         counted), cleanMove
 --   SandboxBadgeRules.fromSale(kind, money, hot)   Collection.onPaid: a "sale" for money → firstSale, with a hot piece
 --                                         in it (paid.hot) → hotSale
---   SandboxBadgeRules.fromAdded(item)     Collection.onAdded: a legendary piece came home → legendary
+--   SandboxBadgeRules.fromAdded(item, rarity?)   Collection.onAdded: a legendary piece came home → legendary (9.x loot:
+--                                         its own roll `rarity`, else its item's)
 --   SandboxBadgeRules.fromBought(id, level)   8.3: Upgrades.onBought: a level bought at the UPGRADES desk → firstUpgrade
 --   (8.7: firstDeal is a moment's too, with no rule here: server/PlayerTrade.luau gives it to the seller and the buyer of
 --   a deal between players, SandboxBadges.give)
@@ -187,8 +188,8 @@ function SandboxBadgeRules.fromSale(kind: any, money: any, hot: any): { string }
 	return ordered({ firstSale = true, hotSale = finite(hot) and hot > 0 })
 end
 
-function SandboxBadgeRules.fromAdded(item: any): { string }
-	if type(item) == "string" and CollectionBookRules.rarityOf(item) == LEGENDARY then
+function SandboxBadgeRules.fromAdded(item: any, rarity: any?): { string }
+	if type(item) == "string" and (if type(rarity) == "string" then rarity else CollectionBookRules.rarityOf(item)) == LEGENDARY then
 		return { "legendary" }
 	end
 	return {}

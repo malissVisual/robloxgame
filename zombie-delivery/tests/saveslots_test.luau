@@ -1,4 +1,4 @@
--- 9.6, the save slots' rules (shared/SaveSlotRules.luau, Config.SaveSlots): the keys (slot 1 the save of before 9.6),
+-- 10.1, the save slots' rules (shared/SaveSlotRules.luau, Config.SaveSlots): the keys (slot 1 the save of before 10.1),
 -- a slot asked for (only a whole number in range), a real save against a lock-only record, the summary of an empty
 -- slot, of a save of today (its courier, the warehouse's level, the money, the pieces, the moves, the time played,
 -- when it was saved), of a save from before 8.3 (the Big Warehouse, level 4) and of junk; the slot saved last; the

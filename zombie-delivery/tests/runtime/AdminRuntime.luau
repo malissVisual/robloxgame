@@ -285,6 +285,15 @@ Runtime.Moving = {
 	end,
 }
 
+-- 9.7 server/Runs.luau's admin (the SANDBOX tab's Runs buttons: a difficulty, a run on a house, END RUN), recorded
+Runtime.runs = {} -- { { player, what, arg, admin } } Runs.admin
+Runtime.Runs = {
+	admin = function(player: any, what: string, arg: string?, admin: any): string
+		table.insert(Runtime.runs, { player = player, what = what, arg = arg, admin = admin })
+		return `ADMIN: runs {what} {arg or ""}.`
+	end,
+}
+
 -- server/Collection.luau (design/sandbox/KONTRAKT.md's API), a sale pays $100
 local C = Runtime.collection
 local serial = 0

@@ -1,5 +1,5 @@
 --!strict
--- 9.6, the intro and the loading screen (the owner: "když zapnu tu moji hru … intro takový jenom kratší a loading
+-- 10.1, the intro and the loading screen (the owner: "když zapnu tu moji hru … intro takový jenom kratší a loading
 -- screen"). ReplicatedFirst runs this before anything else of the game reaches the client, so it stands alone: it
 -- requires nothing, its few numbers live here (Shared and Config are not there yet), and Roblox's own loading screen
 -- is taken away at once.

@@ -20,14 +20,14 @@
 --   StyleBuild.decals(model, chassis, def?, anchored?) -> Folder?   the decal in a Folder "StyleDecals" (an old one
 --       goes first; nil def: none)
 --   StyleBuild.color(def, paint) -> (Color3, Enum.Material, reflectance)   a piece's paint ("main", "trim" …)
---   StyleBuild.character(character, look, anchored?) -> Model?   9.6: a made courier's pieces (shared/CharacterLooks.luau:
+--   StyleBuild.character(character, look, anchored?) -> Model?   10.1: a made courier's pieces (shared/CharacterLooks.luau:
 --       the hair, a hat, the top's sleeves or a jacket, the belt, the face's extra) in a Model "CourierLook" in the
 --       character (an old one goes first; a piece whose body part is missing is left out); nil for the player's own
 --       avatar (nothing to weld on)
 
 local Config = require(script.Parent.Config)
 local KitFit = require(script.Parent.KitFit)
-local CharacterLooks = require(script.Parent.CharacterLooks) -- 9.6: the courier you make
+local CharacterLooks = require(script.Parent.CharacterLooks) -- 10.1: the courier you make
 local StyleLooks = require(script.Parent.StyleLooks)
 
 local StyleBuild = {}
@@ -160,7 +160,7 @@ end
 
 StyleBuild.Look = "CourierLook"
 
--- 9.6: the made courier's pieces (see the header), each group in its own colours (its def), fitted to the real parts as
+-- 10.1: the made courier's pieces (see the header), each group in its own colours (its def), fitted to the real parts as
 -- the hats and the jackets are.
 function StyleBuild.character(character: Model, look: CharacterLooks.Look, anchored: boolean?): Model?
 	local old = character:FindFirstChild(StyleBuild.Look)

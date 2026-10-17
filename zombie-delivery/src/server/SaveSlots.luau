@@ -1,5 +1,5 @@
 --!strict
--- 9.6, the save slots on the server (Config.SaveSlots; the rules: shared/SaveSlotRules.luau; the start screen:
+-- 10.1, the save slots on the server (Config.SaveSlots; the rules: shared/SaveSlotRules.luau; the start screen:
 -- client/Menu.luau and client/CharacterCreator.luau). A player picks a slot before their save loads: CONTINUE a save
 -- (its courier changed or not), NEW GAME in an empty slot, START OVER a used one (a fresh game written over it). Until
 -- then PlayerData.load waits (PlayerData.chooseSlot, set here): nothing of the save is read or locked, and the game

@@ -64,6 +64,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local FurnitureLooks = require(Shared.FurnitureLooks)
 local CollectionRules = require(Shared.CollectionRules)
+local LootRules = require(Shared.LootRules) -- 9.x loot: a piece on show carries its rarity, stars and value
 local Net = require(Shared.Net)
 local SandboxMap = require(Shared.SandboxMap)
 local UpgradeRules = require(Shared.UpgradeRules) -- 8.3: the owner's warehouse level
@@ -450,7 +451,7 @@ end
 -- server pays (server/Collection.luau) and the picker shows (client/WarehouseUi.luau).
 
 local function rarityOf(entry: Collection.Entry): string?
-	return CollectionRules.rarityOf(CollectionRules.defOf(entry.item))
+	return CollectionRules.pieceRarity(entry :: any) -- (9.x loot: its own roll)
 end
 
 local function ratesOf(onStand: { [number]: Collection.Entry }, boost: number): { [number]: number }
@@ -481,6 +482,11 @@ local function place(state: PlotState, stand: Stand, entry: Collection.Entry): (
 	model.Name = `Shown{stand.index}`
 	model:SetAttribute("Stand", stand.index)
 	model:SetAttribute("Uid", entry.uid)
+	-- 9.x loot: its rarity, stars and value as a house's pieces carry them (client/LootOutline.luau, client/LootStars.luau)
+	for key, value in LootRules.attributes(CollectionRules.pieceRarity(entry :: any), CollectionRules.valueOf(entry :: any)) do
+		model:SetAttribute(key, value)
+	end
+	CollectionService:AddTag(model, Config.Loot.Tag)
 	model.Parent = state.pieces
 	return model, height
 end

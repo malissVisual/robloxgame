@@ -1,8 +1,8 @@
--- 9.6, the save slots on the server: the real server/SaveSlots.luau and server/PlayerData.luau (SaveSlotsServer.luau,
+-- 10.1, the save slots on the server: the real server/SaveSlots.luau and server/PlayerData.luau (SaveSlotsServer.luau,
 -- PlayerDataServer.luau through tests/run_tests.py) on tests/runtime/CollectionRuntime.luau's players, clock, DataStore
 -- and Net; CourierAvatar (the looks put on) and TextService (Roblox's filter) the test's stand-ins.
 --   * A join reads and locks nothing until the start screen picks: no profile, no DataStore call; the list reads each
---     slot (slot 1 the save of before 9.6: its summary), at most every Config.SaveSlots.Read s (sooner: the same).
+--     slot (slot 1 the save of before 10.1: its summary), at most every Config.SaveSlots.Read s (sooner: the same).
 --   * A bad slot and a second pick are refused; NEW GAME in slot 2: a fresh game there (written at once, with its
 --     courier, its name filtered), slot 1 untouched; READY once it is in, and the courier goes on the body.
 --   * Leaving writes the slot played: its time played and when; a rejoin lists slot 2 as the one played last.
@@ -49,7 +49,7 @@ E.TextService = {
 local PlayerData = require("./PlayerDataServer")
 local SaveSlots = require("./SaveSlotsServer")
 
--- An 8.3 save in slot 1 (the save of before 9.6): $2,000, the Workshop, a sofa.
+-- An 8.3 save in slot 1 (the save of before 10.1): $2,000, the Workshop, a sofa.
 local function save83(cash: number): any
 	return {
 		money = cash, xp = 0, deliveries = 3, tutorial = true, phone = true, starterKit = true, vestKit = true,

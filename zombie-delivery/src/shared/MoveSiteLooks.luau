@@ -340,13 +340,13 @@ local function photo(emoji: string, caption: string, sky: { number }): { Words }
 end
 
 -- 8.0 SANDBOX: the plots' corkboard (four columns, two rows as the depot's): the houses to empty, what to do with them.
--- One kiosk for every player, each card its own place of six (SandboxMap.Houses): out in the countryside, each alone.
+-- One kiosk for every player (9.7: the lobby's dispatch; its portals take you to the six places, SandboxMap.Houses).
 local function sandboxPins(p: { Piece }, top: number, low: number)
 	local count = #SandboxMap.Houses
 	pinned(p, "PhotoHouse", { 1.3, 1.15 }, -2.55, top, 3, PAPER, photo("🏡", `{count} PLACES TO EMPTY`, { 148, 196, 228 }), RED)
 	pinned(p, "FlyerHouse", { 1.3, 1.5 }, -0.85, top, -2, PAPER, { { face = "Front", lines = {
 		line("THE COUNTRYSIDE", RED, 0.16, "Black"),
-		line("A HOUSE ON YOUR CARD", CHARCOAL, 0.12, "Bold"),
+		line("WALK TO A PORTAL", CHARCOAL, 0.12, "Bold"),
 		line("Bring it home to your warehouse.", CHARCOAL, 0.1),
 	} } }, YELLOW)
 	pinned(p, "PhotoStand", { 1.3, 1.15 }, 0.85, top, -4, PAPER, photo("🏺", "PUT IT ON SHOW", { 170, 206, 140 }), { 60, 110, 200 })
@@ -374,7 +374,7 @@ function MoveSiteLooks.board(sandbox: boolean?): { Piece }
 	add(p, "Backing", { 7.4, 5.4, 0.3 }, { 0, 4.9, 0.8 }, { 44, 52, 50 }, "Metal", { solid = true })
 	add(p, "Board", { 6.8, 3.6, 0.2 }, { 0, 4.9, 0.55 }, CORK, "Fabric", { solid = true })
 	add(p, "Header", { 7.4, 1.1, 0.3 }, { 0, 8.15, 0.8 }, ORANGE, "Metal", { words = {
-		{ face = "Front", lit = true, lines = { line("MOVING CONTRACTS", CHARCOAL, 0.54, "Black"), line(if sandbox then "DELIVEROS MOVING" else "DELIVEROS MOVING & EVACUATION", CHARCOAL, 0.28, "Bold") } },
+		{ face = "Front", lit = true, lines = { line(if sandbox then "DELIVEROS DISPATCH" else "MOVING CONTRACTS", CHARCOAL, 0.54, "Black"), line(if sandbox then "DELIVEROS MOVING" else "DELIVEROS MOVING & EVACUATION", CHARCOAL, 0.28, "Bold") } },
 	} })
 	add(p, "Canopy", { 8.4, 0.25, 2.4 }, { 0, 9.0, 0.4 }, CHARCOAL, "Metal", { rotation = { -6, 0, 0 } })
 	add(p, "LampArm", { 0.12, 0.12, 1.4 }, { 0, 8.82, -0.95 }, CHARCOAL, "Metal")

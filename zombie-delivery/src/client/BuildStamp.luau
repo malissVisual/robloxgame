@@ -4,4 +4,4 @@
 -- after 8.4 and 8.5): server/SandboxBoot.luau and client/Main.client.luau compare this with Config.Version and with
 -- the other side's stamp (workspace attribute "ServerBuild") and, when they differ, say so loudly (in Studio: a red
 -- banner with what to delete and sync again).
-return "9.0.1"
+return "10.0"

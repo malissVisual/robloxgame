@@ -88,7 +88,7 @@
 -- (sandboxHouseKept) and only an id SandboxMap knows (9.4: a village house's id of 8.9's map is none now: its card takes
 -- the next free place from the farmstead on, its seed kept); a real save from before it with a house's seed has the
 -- farmstead's (sandbox_house: the one house there was); else none.
--- 9.6, the save slots (Config.SaveSlots, shared/SaveSlotRules.luau): a player has Count saves, each its own game. With
+-- 10.1, the save slots (Config.SaveSlots, shared/SaveSlotRules.luau): a player has Count saves, each its own game. With
 -- PlayerData.chooseSlot set (server/SaveSlots.luau, on the sandbox) a join's load waits for the start screen's pick: the
 -- slot (its key: slot 1 the save of before, "Player_<id>"), a fresh game in it (START OVER, NEW GAME: the stored save is
 -- not read, a new one is written at once) and the courier made for it (profile.character: shared/CharacterLooks.luau's
@@ -128,8 +128,8 @@ local AnalyticsPlan = require(Shared.AnalyticsPlan) -- 6.13: the onboarding funn
 local SkillRules = require(Shared.Skills) -- 6.20: the skills' ranks (profile.skills)
 local MoveStory = require(Shared.MoveStory) -- 7.0: the moves' story cards seen (profile.story)
 local CollectionRules = require(Shared.CollectionRules) -- 8.0: the collection (profile.collection, server/Collection.luau)
-local CharacterLooks = require(Shared.CharacterLooks) -- 9.6: the courier made for a slot
-local SaveSlotRules = require(Shared.SaveSlotRules) -- 9.6: the slots' keys
+local CharacterLooks = require(Shared.CharacterLooks) -- 10.1: the courier made for a slot
+local SaveSlotRules = require(Shared.SaveSlotRules) -- 10.1: the slots' keys
 local CollectionBookRules = require(Shared.CollectionBookRules) -- 8.2: the collection book (profile.collectionBook)
 local UpgradeRules = require(Shared.UpgradeRules) -- 8.1: the sandbox's upgrades (profile.sandboxUpgrades, server/Upgrades.luau)
 local SandboxTaskRules = require(Shared.SandboxTasks) -- 8.2: the sandbox's daily tasks (profile.sandboxTasks)
@@ -235,10 +235,13 @@ export type Profile = {
 	-- 8.9: the house of that card (a SandboxMap.Houses id; the seed nil: the house emptied last), read only from a
 	-- real save written with its flag (sandboxHouseKept); an older real save with a seed: the farmstead's; nil: none yet
 	sandboxHouse: string?,
-	-- 9.6: the courier made for this slot (a look and its name, shared/CharacterLooks.luau), read from a real save only;
-	-- nil: the player's own Roblox avatar, as before 9.6
+	-- 10.1: the courier made for this slot (a look and its name, shared/CharacterLooks.luau), read from a real save only;
+	-- nil: the player's own Roblox avatar, as before 10.1
 	character: CharacterLooks.Look?,
-	playTime: number, -- 9.6: s played in this slot (the start screen's card)
+	playTime: number, -- 10.1: s played in this slot (the start screen's card)
+	-- 9.7 RUNS: how many of the runs' difficulties are open (shared/RunRules.luau: Config.Runs.Open at first, one more
+	-- for a run finished at the hardest open one): read only from a real save written with its flag (runUnlockedKept)
+	runUnlocked: number,
 	deliveries: number,
 	kills: number,
 	earned: number,
@@ -259,7 +262,7 @@ local wrote: { [Player]: number } = {}
 local serial: { [Player]: number } = {}
 local soon: { [Player]: boolean } = {}
 local leaving: { [number]: number } = {}
--- 9.6: the slot each player plays (no entry: slot 1) and when their time played was last added (os.clock)
+-- 10.1: the slot each player plays (no entry: slot 1) and when their time played was last added (os.clock)
 local slots: { [Player]: { slot: number, ticked: number? } } = {}
 local known: { [string]: boolean }? = nil
 local build: (profile: Profile, lock: any) -> { [string]: any }
@@ -362,8 +365,9 @@ local function newProfile(): Profile
 		vanPaint = VanPaintRules.empty(), -- 8.3: nothing bought, the factory's look
 		sandboxHouseSeed = nil, -- 8.4: no house rolled yet
 		sandboxHouse = nil, -- none of the six yet
-		character = nil, -- 9.6: the player's own avatar until a courier is made
-		playTime = 0, -- 9.6
+		character = nil, -- 10.1: the player's own avatar until a courier is made
+		playTime = 0, -- 10.1
+		runUnlocked = Config.Runs.Open, -- 9.7: Easy and Normal
 		deliveries = 0,
 		kills = 0,
 		earned = 0,
@@ -727,10 +731,13 @@ local function applySaved(profile: Profile, saved: any)
 	else
 		profile.sandboxHouse = if profile.sandboxHouseSeed ~= nil then require(Shared.SandboxMap).House.id else nil
 	end
-	-- 9.6: the slot's courier and its time played, from a real save only
+	-- 10.1: the slot's courier and its time played, from a real save only
 	profile.character = if saved.money ~= nil and type(saved.character) == "table" then CharacterLooks.clean(saved.character) else nil
 	local played = saved.playTime
 	profile.playTime = if saved.money ~= nil and type(played) == "number" and played == played and played >= 0 and played < math.huge then math.floor(played) else 0
+	-- 9.7 RUNS: the difficulties open, only from a real save written with its flag (runUnlockedKept: Config.Runs.Flag);
+	-- a save from before 9.7 (or a lock-only record) starts with Easy and Normal (RunRules.fromSave)
+	profile.runUnlocked = require(Shared.RunRules).fromSave(saved)
 	-- (6.4: the bag chosen was read here; 6.23: it is per game, never saved: a game starts with the best bag you have)
 	if saved.xpCurve ~= Config.Levels.Curve then
 		profile.xp = Levels.fromLegacy(profile.xp) -- 3.2: a 3.1 save, the old XP curve: it keeps its level
@@ -906,7 +913,7 @@ end
 
 local function key(player: Player): string
 	local playing = slots[player]
-	return SaveSlotRules.key(player.UserId, if playing then playing.slot else 1) -- (9.6: slot 1 is the save of before)
+	return SaveSlotRules.key(player.UserId, if playing then playing.slot else 1) -- (10.1: slot 1 is the save of before)
 end
 
 -- 4.2: is the save held by another live server (a lock it refreshed lately)?
@@ -940,11 +947,11 @@ local function readAndLock(dataStore: DataStore, player: Player, force: boolean)
 	return success, saved, locked
 end
 
--- 9.6: what the start screen picked (server/SaveSlots.luau): the slot, a fresh game in it, the courier made (nil: the
+-- 10.1: what the start screen picked (server/SaveSlots.luau): the slot, a fresh game in it, the courier made (nil: the
 -- slot's own, or none).
 export type Choice = { slot: number, fresh: boolean, character: CharacterLooks.Look? }
 
--- 9.6, set by server/SaveSlots.luau: waits for the player's pick on the start screen (nil: they left). Unset: slot 1.
+-- 10.1, set by server/SaveSlots.luau: waits for the player's pick on the start screen (nil: they left). Unset: slot 1.
 PlayerData.chooseSlot = nil :: ((player: Player) -> Choice?)?
 
 function PlayerData.load(player: Player)
@@ -996,7 +1003,7 @@ function PlayerData.load(player: Player)
 		-- fresh profile (nor saved over): as a failed load. The top-level keys it has that this version does not know
 		-- are kept to be written back (known: PlayerData.start).
 		if ok and choice and choice.fresh then
-			saved = nil -- 9.6: a fresh game in this slot (START OVER, NEW GAME): what it held is written over
+			saved = nil -- 10.1: a fresh game in this slot (START OVER, NEW GAME): what it held is written over
 		end
 		local applied, err = pcall(function()
 			applySaved(profile, saved)
@@ -1028,12 +1035,12 @@ function PlayerData.load(player: Player)
 		profile.money = if Config.Sandbox.On then Config.Sandbox.StartMoney else Config.StudioStartMoney
 	end
 	if choice and choice.character then
-		profile.character = CharacterLooks.clean(choice.character) -- 9.6: the courier made (or changed) for this slot
+		profile.character = CharacterLooks.clean(choice.character) -- 10.1: the courier made (or changed) for this slot
 	end
 	if player.Parent then
 		profiles[player] = profile
 		local playing: { slot: number, ticked: number? } = slots[player] or { slot = 1, ticked = nil }
-		playing.ticked = os.clock() -- 9.6: the time played counts from here
+		playing.ticked = os.clock() -- 10.1: the time played counts from here
 		slots[player] = playing
 		local stats = Instance.new("Folder")
 		stats.Name = "leaderstats"
@@ -1057,7 +1064,7 @@ function PlayerData.load(player: Player)
 		tellMoney(player, profile.bagRefund or 0, "BagRefund", "Bags") -- 6.23: the bags owned for good, paid back
 		tellMoney(player, profile.carRefund or 0, "CarRefund", "Cars") -- 7.x: the cars that are gone, paid back
 		if choice and (choice.fresh or choice.character) and canSave[player] then
-			task.spawn(PlayerData.save, player) -- 9.6: a fresh game (or a new look) is the slot's at once
+			task.spawn(PlayerData.save, player) -- 10.1: a fresh game (or a new look) is the slot's at once
 		end
 	end
 end
@@ -1189,9 +1196,11 @@ build = function(profile: Profile, lock: any): { [string]: any }
 		sandboxHouseSeedKept = true, -- 8.4 (applySaved reads the house's seed only with it)
 		sandboxHouse = profile.sandboxHouse, -- 8.9 (nil: none)
 		sandboxHouseKept = true, -- 8.9 (applySaved reads which house only with it)
-		character = profile.character, -- 9.6 (nil: the player's own avatar)
-		playTime = profile.playTime, -- 9.6
-		savedAt = os.time(), -- 9.6 (the start screen's "saved 5 min ago")
+		character = profile.character, -- 10.1 (nil: the player's own avatar)
+		playTime = profile.playTime, -- 10.1
+		savedAt = os.time(), -- 10.1 (the start screen's "saved 5 min ago")
+		runUnlocked = profile.runUnlocked, -- 9.7
+		runUnlockedKept = true, -- 9.7: Config.Runs.Flag (applySaved reads the difficulties open only with it)
 		deliveries = profile.deliveries,
 		kills = profile.kills,
 		earned = profile.earned,
@@ -1228,7 +1237,7 @@ function PlayerData.save(player: Player, final: boolean?): boolean
 	if final then
 		finished[player] = true
 	end
-	-- 9.6: this session's time played since the last save
+	-- 10.1: this session's time played since the last save
 	local playing = slots[player]
 	if playing and playing.ticked then
 		local now = os.clock()
@@ -1363,7 +1372,7 @@ function PlayerData.resetSave(player: Player)
 	if RunService:IsStudio() and not canSave[player] then
 		fresh.money = if Config.Sandbox.On then Config.Sandbox.StartMoney else Config.StudioStartMoney
 	end
-	fresh.character = profiles[player].character -- (9.6: the slot's courier stays)
+	fresh.character = profiles[player].character -- (10.1: the slot's courier stays)
 	profiles[player] = fresh
 	extras[player] = nil -- (8.3: a fresh start keeps no newer server's keys either)
 	PlayerData.save(player)
@@ -1384,7 +1393,7 @@ function PlayerData.release(player: Player)
 		canSave[player] = nil
 		finished[player] = nil -- (with the profile gone, a late autosave's transform still writes nothing)
 		sessions[player], extras[player], wrote[player], serial[player], soon[player] = nil, nil, nil, nil, nil
-		slots[player] = nil -- (9.6)
+		slots[player] = nil -- (10.1)
 		local left = (leaving[userId] or 1) - 1
 		if left > 0 then
 			leaving[userId] = left
@@ -1404,13 +1413,13 @@ function PlayerData.get(player: Player): Profile?
 	return profiles[player]
 end
 
--- 9.6: the save slot this player plays (1 before a pick, and without slots)
+-- 10.1: the save slot this player plays (1 before a pick, and without slots)
 function PlayerData.slot(player: Player): number
 	local playing = slots[player]
 	return if playing then playing.slot else 1
 end
 
--- 9.6: reads one of this player's slots as it is stored, without taking it (the start screen's summaries,
+-- 10.1: reads one of this player's slots as it is stored, without taking it (the start screen's summaries,
 -- server/SaveSlots.luau): ok (false: the DataStore failed or there is none: Studio without API access) and the save.
 function PlayerData.peek(player: Player, slot: number): (boolean, any)
 	local dataStore = store

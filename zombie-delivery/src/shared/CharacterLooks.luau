@@ -1,5 +1,5 @@
 --!strict
--- 9.6, the courier you make (Config.Characters; the start screen's character creator, client/CharacterCreator.luau):
+-- 10.1, the courier you make (Config.Characters; the start screen's character creator, client/CharacterCreator.luau):
 -- a look checked, rolled and turned into what the body wears, pure data. server/CourierAvatar.luau puts a look on the
 -- player's body (its colours through a HumanoidDescription, its pieces through shared/StyleBuild.luau's
 -- StyleBuild.character); the creator's preview builds the same pieces on its mannequin, so what you pick is what

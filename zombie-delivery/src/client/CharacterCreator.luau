@@ -1,5 +1,5 @@
 --!strict
--- 9.6, the character creator (the owner: "každý hráč … si dělá charaktera"): the start screen's window where you make
+-- 10.1, the character creator (the owner: "každý hráč … si dělá charaktera"): the start screen's window where you make
 -- the courier of a save slot (client/Menu.luau opens it for NEW GAME, START OVER and a slot's LOOK). On the left your
 -- courier turns slowly in a 3D preview (drag it to turn it yourself); on the right its name and every choice of
 -- Config.Characters (shared/CharacterLooks.luau): your own Roblox avatar or a made courier, the skin, the hair and its

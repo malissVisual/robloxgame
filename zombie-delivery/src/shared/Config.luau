@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "9.0.1"
+Config.Version = "10.0"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -1976,15 +1976,9 @@ Config.Cosmetics = {
 	},
 }
 
--- Supply crates lying around the world: drive or walk into one.
-Config.Loot = {
-	Count = 16,
-	Respawn = 40,
-	MoneyMin = 25,
-	MoneyMax = 90,
-	ItemChance = 0.4,
-	Reach = 9,
-}
+-- Supply crates lying around the world: drive or walk into one. Their numbers (Count, Respawn, MoneyMin, MoneyMax,
+-- ItemChance, Reach: server/Items.luau) are Config.Loot's first six; 9.x: Config.Loot is defined further down, with the
+-- houses' loot (its rarities by the difficulty) beside them.
 
 -- The bandits' pickup: chases you along the roads, two gunners in the bed shoot at your car.
 Config.BanditCar = {
@@ -5712,7 +5706,8 @@ Config.Robust = {
 		Visitors = 2, -- 8.3: the Visitors remote's ACCEPT / DECLINE of a visitor's offer (server/VisitorOffers.luau)
 		PlayerTrade = 4, -- 8.7: the PlayerTrade remote's offer / answer / price / buy (server/PlayerTrade.luau)
 		TradeOffer = 0.2, -- 8.7: and a new offer to a player on top: one every 5 s at most (no offer spam)
-		Slots = 4, -- 9.6: the Slots remote's list / play / new (the start screen's save slots: server/SaveSlots.luau)
+		Slots = 4, -- 10.1: the Slots remote's list / play / new (the start screen's save slots: server/SaveSlots.luau)
+		Runs = 4, -- 9.7: the Runs remote's state / difficulty / vote / leave (a run's pad and the run: server/Runs.luau)
 	},
 }
 
@@ -6456,7 +6451,7 @@ Config.Moving = {
 			hordeAt = 3.5 * 60,
 			pay = 1.25,
 		},
-	} :: { { id: string, name: string, client: string, icon: string, home: string?, place: string?, seed: number, kind: string, blurb: string, time: number?, hordeAt: number?, pay: number? } },
+	} :: { { id: string, name: string, client: string, icon: string, home: string?, place: string?, seed: number, kind: string, blurb: string, time: number?, hordeAt: number?, pay: number?, difficulty: string? } },
 	Sites = {
 		farm = {
 			House = { At = { 45, -84 } :: { number }, Size = { 26, 10, 16 } :: { number } },
@@ -7483,10 +7478,166 @@ Config.Collection = {
 	IdleRemotes = { "Collection", "Moving", "Upgrades", "SandboxTasks", "Visitors", "VanPaint", "PlayerTrade" } :: { string }, -- (8.7: PlayerTrade)
 }
 
+-- 9.7 RUNS (the owner: "like Dungeon Quest: from the lobby you go into a house, alone, with friends or with Danny. In
+-- the house you carry loot into the truck standing right at the house. When you leave, the loot is taken to your
+-- warehouse in the lobby on its own"): the lobby's portals (shared/SandboxMap.luau Lobby.portals, design/lobby/plan.py),
+-- the runs (server/Runs.luau; their rules shared/RunRules.luau, tests/runrules_test.luau; client/RunUi.luau). A run is
+-- a sandbox move (server/Moving.luau) of one house by a party, its truck parked at the house's curb, no driving.
+--   Difficulties   in order: id (the run's contract.difficulty, the house's RunDifficulty attribute), name, time (× the
+--                  house's clock, Config.Moving.Sandbox.Houses' Time), color (the pad panel's and the results card's).
+--                  The difficulty does nothing else yet: traps and zombies (harder ones) and the loot's rarity read it
+--   Default        a run's difficulty when nobody picked one
+--   Open           the difficulties open from the start (Easy, Normal); each next one opens for a player who finished
+--                  a run at the one before it (any house: a run ended done or late, with something home)
+--   Flag           the save's mark: profile.runUnlocked (how many are open) is read only from a real save written with it
+--   Countdown      s from the first player on a portal's pad to the run (everybody on the pad then goes)
+--   MaxParty       the players a run takes at most (the first on the pad first)
+--   PadHeight      studs over the pad a body's root may be and still stand on it
+--   Every          s between two looks at the pads (the server's loop)
+--   Apart          studs between the party's arrival spots in the house's front yard (across the way they look)
+--   Fade           s: the screen's fade out before a jump (the run's start, its end, leaving), its fade in after
+--   EndHold        s from a run's end (its results card) to the fade back to the lobby (the house's own door trips of
+--                  whoever was inside, Config.Moving.Doors' FadeOut + Margin + Stream, are over by then)
+--   LeaveHold      s from LEAVE RUN to the fade back (the same door trip out of the house first)
+--   Truck          Attribute: the truck's model attribute while it stands at a run's house (client/CarVisuals.luau: no
+--                  Drive or Ride along prompt; its driver's seat is Disabled); Reach: its FINISH / VOTE prompts' reach;
+--                  At: their place on its chassis (x across, y up, z along: the driver's side behind the cab)
+--   Zone           a run zone's edge (SandboxMap.Zones): Screen (CountryLooks' "screen" hedge: Height, Width, its colour),
+--                  Wall (the invisible walls' height on it), View (studs: the forest's and the orchard's trees, the
+--                  stream's pieces kept within this of a zone, the rest of them never built)
+--   Portal         the lobby's gates (server/LobbyWorld.luau): Gate { width, height }, the pad's glow by its state (Free,
+--                  Waiting: a countdown, InUse: a run in that house), Styles: each house's colours for its gate and
+--                  facade (wall, trim, roof, accent: RGB), SignRange (its words' MaxDistance)
+--   Panel          the pad panel (client/RunUi.luau): Width (px at scale 1), TouchScale (its least scale on a phone)
+--   Result         the results card: Width, Rows (pieces listed at most; the rest summed up), TouchScale
+-- The Runs remote (Config.Robust.Limits.Runs): client → server { kind = "state" } | { kind = "difficulty", id } (the
+-- host on the pad) | { kind = "vote" } (to finish) | { kind = "leave" } (out of your run alone); server → client
+-- { kind = "pad", ... } | { kind = "pad" } (off a pad), { kind = "run", ... } | { kind = "run" } (not in a run),
+-- { kind = "result", ... } (the results card), { kind = "unlocked", id } (a difficulty opened).
+export type RunDifficulty = { id: string, name: string, time: number, color: { number } }
+Config.Runs = {
+	Difficulties = {
+		{ id = "easy", name = "Easy", time = 1.3, color = { 120, 214, 120 } },
+		{ id = "normal", name = "Normal", time = 1, color = { 120, 190, 255 } },
+		{ id = "hard", name = "Hard", time = 0.85, color = { 255, 196, 70 } },
+		{ id = "insane", name = "Insane", time = 0.72, color = { 255, 120, 60 } },
+		{ id = "nightmare", name = "Nightmare", time = 0.6, color = { 220, 70, 90 } },
+	} :: { RunDifficulty },
+	Default = "normal",
+	Open = 2,
+	Flag = "runUnlockedKept",
+	Countdown = 10,
+	MaxParty = 4,
+	PadHeight = 8,
+	Every = 0.2,
+	Apart = 3.5,
+	Fade = { Out = 0.45, In = 0.6 },
+	EndHold = 3.5,
+	LeaveHold = 3,
+	Truck = { Attribute = "RunParked", Reach = 9, At = { -4.6, 3.4, -1.5 } :: { number } },
+	Zone = { Screen = { Height = 14, Width = 4, Color = { 44, 82, 38 } :: { number } }, Wall = 80, View = 110 },
+	Portal = {
+		Gate = { 16, 15 } :: { number },
+		Free = { 90, 210, 255 } :: { number },
+		Waiting = { 255, 190, 70 } :: { number },
+		InUse = { 220, 64, 64 } :: { number },
+		SignRange = 180,
+		Styles = {
+			sandbox_house = { wall = { 226, 214, 186 }, trim = { 120, 58, 44 }, roof = { 150, 62, 44 }, accent = { 196, 160, 96 } },
+			pond_cabin = { wall = { 132, 94, 60 }, trim = { 60, 96, 120 }, roof = { 72, 76, 82 }, accent = { 176, 72, 52 } },
+			lone_house = { wall = { 236, 226, 200 }, trim = { 110, 80, 56 }, roof = { 172, 72, 52 }, accent = { 90, 130, 70 } },
+			forest_lodge = { wall = { 112, 76, 46 }, trim = { 60, 42, 28 }, roof = { 74, 92, 60 }, accent = { 226, 214, 186 } },
+			old_mill = { wall = { 150, 148, 142 }, trim = { 96, 70, 48 }, roof = { 92, 88, 86 }, accent = { 120, 90, 60 } },
+			orchard_cottage = { wall = { 244, 240, 230 }, trim = { 80, 112, 60 }, roof = { 198, 166, 98 }, accent = { 200, 60, 60 } },
+		} :: { [string]: { wall: { number }, trim: { number }, roof: { number }, accent: { number } } },
+	},
+	Panel = { Width = 380, TouchScale = 0.8 },
+	Result = { Width = 420, Rows = 8, TouchScale = 0.8 },
+}
+
+-- 9.x LOOT (the owner: "like Dungeon Quest: you go into a house and you get loot there ... outlines with their own colour
+-- by how rare it is, and stars by rarity, so it has value"). Every carryable piece of a house has a rarity, one of
+-- Config.Collection's tiers (common … legendary), decided by the server as the house's pieces are made (server/Loot.luau;
+-- its pure rules shared/LootRules.luau, tests/loot_test.luau). A piece's own rarity is where it starts (CollectionRules
+-- .rarityOf: a collectible's own, uncommon … legendary; the furniture's by its value), and the contract's difficulty
+-- (contract.difficulty; nil or unknown: Default) rolls on it. The house's seed and the difficulty decide the dice: the
+-- same house at the same difficulty always holds the same loot (giving up and taking it again rolls nothing new).
+--   Order        the difficulties, the easiest first (the lobby's portals: "easy" … "nightmare")
+--   Default      a contract without one (and the city's moves): Normal, the rarities as before 9.x
+--   Difficulty   per difficulty: Down, the chance a piece comes a tier under its own (never under Common; a collectible
+--                never under Least); Up, the chance a roll lifts it a tier, Again the chance of each tier more, Most tiers
+--                a roll lifts at most (and never past Legendary); Rolls, the rolls a piece gets (the best kept: the extra
+--                rolls); Floor (a tier's id), the least the house's best piece comes as (its best lifted to it when the
+--                dice gave none that rare). Over the six places' layouts (48 houses × 8 seeds of dice), a haul's income
+--                on show against Normal: Easy × 0.95, Hard × 1.1 (an Epic or better in a third of the houses), Insane
+--                × 1.36 (85 %), Nightmare × 1.5 (every house; a Legendary in about one house of three);
+--                tests/loot_test.luau checks the order and the floor
+--   Lift / Drop  × its catalogue value a tier over (Lift) or under (Drop) its own, a whole number of $ (a tier is worth
+--                more on show and sold too: Config.Collection's income and sell); its own tier: its value as before
+--   Least        the least a collectible comes as
+--   Salt         the dice's own salt (with the house's seed and the difficulty)
+--   Tag          the CollectionService tag on every piece's model with a rarity (a house's pieces, server/Loot.luau;
+--                the pieces on the warehouse's stands, server/Warehouse.luau); the model's attributes: Rarity (the tier's
+--                id), Stars (1 … 5: its rank) and Value ($ it is worth in the warehouse)
+-- The stock keeps a piece's rarity (shared/CollectionRules.luau Entry.rarity: a piece without one is its own rarity, as
+-- every piece was before 9.x), so the stands, selling, the book, the trades and the auction all see the same rarity
+-- and value (CollectionRules.pieceRarity / valueOf).
+-- The client only shows them (client/LootOutline.luau, client/LootStars.luau):
+--   Outline      a Roblox Highlight on the pieces within Range studs of the camera in the tier's colour (FillTransparency
+--                Fill, OutlineTransparency Edge, DepthMode Occluded: never through a wall), the rarest first, then the
+--                nearest (shared/OutlinePick.luau loot); Count at most, and never past Roblox's 31 less
+--                Config.Outline.Spare less the enemies outlined now (one budget with client/EnemyOutline.luau: the
+--                enemies first). One outlined keeps it out to HoldRange × Range and counts HoldRange times nearer (no
+--                blinking); picked every Every s; a phone: DeviceBudget's share. Common false: a Common wears none
+--                (most of a house is Common: their outlines would spend the budget and drown the colours that mean
+--                something; its ★ still shows near); true: Faint, a pale grey-white edge
+--   Stars        a small BillboardGui over each of the Count nearest pieces within Range studs: ★ × Stars in the tier's
+--                colour (Text px) on the HUD's charcoal pill (Tall px high, Pad px round the words), fading out from Fade
+--                to Range studs, AlwaysOnTop false (never through a wall); within Near studs also the tier's name and its
+--                value ("★★★ RARE · $450", Detail px); Lift studs over the piece's top; looked at every Every s; none
+--                while a window is open
+--   Toast        your own pick-up or load of a piece of From's tier or better: "+ RARE Grandma's Clock ★★★ $450" in the
+--                tier's colour under the HUD's toasts (client/Hud.luau's column), once a piece, Gap s apart at least,
+--                Seconds on screen, Most at once; Width px at most (the name shortened), Text px
+--   Sparkle      an Epic or Legendary piece in a house, first seen within See studs (a ray from the camera: not
+--                through a wall): a sparkle in its colour for Seconds s and a sound of the sheets (Sounds: { name,
+--                volume, pitch } by tier: no new audio)
+-- (Config.Loot's first six are the city's supply crates' numbers, as they were before 9.x: see "Supply crates" above.)
+Config.Loot = {
+	Count = 16,
+	Respawn = 40,
+	MoneyMin = 25,
+	MoneyMax = 90,
+	ItemChance = 0.4,
+	Reach = 9,
+	-- 9.x the houses' loot
+	Order = { "easy", "normal", "hard", "insane", "nightmare" } :: { string },
+	Default = "normal",
+	Difficulty = {
+		easy = { Down = 0.15, Up = 0, Again = 0, Most = 1, Rolls = 1 },
+		normal = { Down = 0, Up = 0, Again = 0, Most = 1, Rolls = 1 },
+		hard = { Down = 0, Up = 0.12, Again = 0, Most = 1, Rolls = 1 },
+		insane = { Down = 0, Up = 0.14, Again = 0.3, Most = 2, Rolls = 2 },
+		nightmare = { Down = 0, Up = 0.2, Again = 0.35, Most = 2, Rolls = 2, Floor = "epic" },
+	} :: { [string]: { Down: number, Up: number, Again: number, Most: number, Rolls: number, Floor: string? } },
+	Lift = 1.5,
+	Drop = 0.8,
+	Least = "uncommon",
+	Salt = 9817,
+	Tag = "LootPiece",
+	Outline = { Count = 20, Range = 60, HoldRange = 1.15, Every = 0.25, Fill = 0.88, Edge = 0.1, Common = false, Faint = { 232, 234, 238 } :: { number } },
+	Stars = { Count = 8, Range = 40, Fade = 24, Near = 10, Text = 13, Detail = 12, Tall = 22, Pad = 8, Lift = 0.8, Every = 0.2 },
+	Toast = { From = "uncommon", Gap = 0.6, Seconds = 2.6, Most = 2, Width = 340, Text = 14 },
+	Sparkle = {
+		See = 30,
+		Seconds = 1.6,
+		Sounds = { epic = { "ding", 0.5, 1.3 }, legendary = { "stored_fanfare", 0.6, 1.1 } } :: { [string]: { any } },
+	},
+}
+
 -- 8.0 SANDBOX, the guide (client/SandboxGuide.luau, its steps shared/SandboxSteps.luau): a thin hint line at the top in
--- the middle and a 3D guide (a soft glowing path on the ground along the roads, a floating chevron over the target with
--- its distance) to what to do next. Each step goes quiet once done (per session); the arrow to the house and home
--- stays while you drive. Hold G (or press the hint's ✕) to hide it; hold G again (a touch screen: tap the 💡 chip) to bring
+-- the middle and a 3D guide (a soft glowing path on the ground, 9.7 a straight one: the lobby has no roads; a floating
+-- chevron over the target with its distance) to what to do next. Each step goes quiet once done (per session). Hold G (or press the hint's ✕) to hide it; hold G again (a touch screen: tap the 💡 chip) to bring
 -- it back.
 --   Every         s between two looks: the step, the path, the distance (nothing is done frame by frame)
 --   Fade          s the hint line takes to fade in or out
@@ -7830,7 +7981,8 @@ Config.CollectionBook = {
 --   rare      … of them RareRank or rarer (Config.Collection's tiers: 3 is rare)
 --   clean     a move finished with pieces home and nothing broken (everybody in its crew)
 --   moves     a move finished with pieces home (everybody in its crew)
---   trips     the trips home of one move (`best`: the most in one move counts, not a sum)
+--   trips     the truckloads home (9.7 runs: a run's truck going home at its end is one; a sum: was the most trips of
+--             one move, which a run never has more than one of)
 --   shown     pieces on show at once (`best`)
 --   sell      $ your pieces sold for
 --   income    $ your display stands paid
@@ -7880,7 +8032,7 @@ Config.SandboxTasks = {
 		{ id = "home", group = "home", event = "home", icon = "📦", text = "Bring {n} pieces home", target = { 8, 14 }, money = 120 },
 		{ id = "rare", group = "home", event = "rare", icon = "💎", text = "Bring home {n} rare or better pieces", one = "Bring home a rare or better piece", target = { 1, 2 }, money = 150 },
 		{ id = "clean", group = "move", event = "clean", icon = "✨", text = "Finish {n} moves with nothing broken", one = "Finish a move with nothing broken", target = { 1, 1 }, money = 200 },
-		{ id = "trips", group = "move", event = "trips", best = true, icon = "🚐", text = "Make {n} trips home in one move", target = { 2, 3 }, money = 150 },
+		{ id = "trips", group = "move", event = "trips", icon = "🚐", text = "Bring {n} truckloads home", target = { 2, 3 }, money = 150 }, -- (9.7: a run's truck home at its end is one)
 		{ id = "shown", event = "shown", best = true, icon = "🏛️", text = "Have {n} pieces on show at once", target = { 6, 10 }, money = 120 },
 		{ id = "sell", group = "money", event = "sell", icon = "💰", text = "Sell pieces worth ${n}", target = { 150, 400 }, step = 50, money = 120 },
 		{ id = "income", group = "money", event = "income", icon = "📈", text = "Earn ${n} from your stands", target = { 300, 800 }, step = 50, money = 150 },
@@ -7911,9 +8063,8 @@ Config.SandboxTasks = {
 --   Legendary    the collection tier (Config.Collection.Tiers) the board's LEGENDARY column counts
 --   Stats        the player list's columns, in their order (the first sorts the list): the money (an IntValue), $ a
 --                minute (a NumberValue, to a tenth), the collection's worth (an IntValue)
---   Board        the signboard: Corner studs east of Pražská's east edge and south of Depot Row's south edge (the
---                crossroads' south-east corner, off the shoulders, the lamps and the trees), its face Yaw (degrees,
---                SandboxMap's: 45 looks north-west, to the crossroads); the painted panel Width × Height studs, Lift
+--   Board        the signboard: 9.7 in the lobby (SandboxMap.Lobby.shops.leaders: its spot and its face's yaw; Corner
+--                and Yaw were its place by the old crossroads, unused now); the painted panel Width × Height studs, Lift
 --                over the ground, Thick; the gable roof Over past the panel each side, Run deep each way from the
 --                ridge, Rise high; PixelsPerStud and Range (studs) of its SurfaceGuis (one on each face)
 --   AllTime      the best collection worth each player ever had, kept in the OrderedDataStore Store (key: the user
@@ -8364,8 +8515,8 @@ Config.SandboxLight = {
 --   Grand       the Grand Auction (later; hooks only): On, its daily start (Hour, UTC), Lots of the house's own (Items:
 --               the exclusive legendaries' ids, none yet), Reserve × their worth
 --   House       the building (shared/AuctionHouseLayout.luau): Spot, the middle of its front wall on the ground, looking
---               out (yaw as SandboxMap's spots; the one place to move it when the Jinočany village is built:
---               design/jinocany/plan.json keeps x 40 – 120 here for the Corner Drugstore); Width × Depth, Wall (the walls'
+--               out (yaw as SandboxMap's spots; 9.7: the lobby's south edge, SandboxMap.Lobby.shops.auction's spot from
+--               design/lobby/plan.py: tests/lobby_test.luau holds them together); Width × Depth, Wall (the walls'
 --               height over the floor), Roof (the ridge's rise), Door ({ width, height }), Budget (its parts at most),
 --               Range (studs its signs are drawn from), Lamp (its hanging lamps' light)
 --   Window      the window (client/AuctionUi.luau): Width × Height at most (unscaled px), Tile a consign tile's
@@ -8403,7 +8554,7 @@ Config.Auction = {
 	Salt = 8808,
 	Grand = { On = false, Hour = 19, Lots = 3, Reserve = 1.5, Items = {} :: { string } },
 	House = {
-		Spot = { x = 158, y = 0, z = -22, yaw = 0 } :: AuctionSpot,
+		Spot = { x = 1800, y = 0, z = 156, yaw = 0 } :: AuctionSpot, -- (9.7: the lobby's, SandboxMap.Lobby.shops.auction)
 		Width = 48,
 		Depth = 32,
 		Wall = 16,
@@ -8762,12 +8913,12 @@ Config.Saving = {
 	MaxBytes = 4_000_000,
 }
 
--- 9.6, the start (the owner: "každý hráč … si dělá charaktera … má svůj save, … má nahraný level 15, pak může jít od
+-- 10.1, the start (the owner: "každý hráč … si dělá charaktera … má svůj save, … má nahraný level 15, pak může jít od
 -- znova"): every player has Count save slots, each its own game (money, warehouse, collection, upgrades, its courier).
 -- The start screen lists them (client/Menu.luau): CONTINUE a save, NEW GAME in an empty slot, START OVER a used one (a
 -- fresh game in it), LOOK (the courier changed, the save kept). server/SaveSlots.luau answers the Slots remote; the save
 -- loads only once a slot is picked (server/PlayerData.luau: PlayerData.chooseSlot); the pure rules (the slots' keys,
--- their summaries) are shared/SaveSlotRules.luau. Slot 1 is the save of before 9.6 (its key unchanged: "Player_<id>");
+-- their summaries) are shared/SaveSlotRules.luau. Slot 1 is the save of before 10.1 (its key unchanged: "Player_<id>");
 -- slot n is "Player_<id>_slot<n>". The summaries read each slot once (GetAsync) when the start screen asks.
 --   On        the start screen picks a slot (off, or a server without server/SaveSlots.luau: slot 1 at once, as before)
 --   Count     the slots a player has
@@ -8781,7 +8932,7 @@ Config.SaveSlots = {
 	NameMax = 16,
 }
 
--- 9.6, the courier you make (the start screen's character creator, client/CharacterCreator.luau): your own Roblox avatar
+-- 10.1, the courier you make (the start screen's character creator, client/CharacterCreator.luau): your own Roblox avatar
 -- (base "own", the look of 6.9: server/CourierAvatar.luau) or a courier made here (base "custom"): Roblox's classic
 -- blocky R15 in these colours (its HumanoidDescription: the head and the arms the skin, the torso the top's colour, the
 -- legs the trousers'; no clothes, no accessories, the classic face) and parts welded on (shared/CharacterLooks.luau's

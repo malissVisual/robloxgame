@@ -14,7 +14,7 @@
 -- city's does.
 -- 8.3 (design/warehouse-levels/KONTRAKT.md): the two shots of your warehouse look at the building of its level
 -- (WarehouseLayout.site: 1 the Garage … 5 the Logistics Center).
--- 9.6 (Config.SaveSlots): the sandbox's card lists your save slots (CONTINUE, NEW GAME, LOOK, START OVER; the Slots
+-- 10.1 (Config.SaveSlots): the sandbox's card lists your save slots (CONTINUE, NEW GAME, LOOK, START OVER; the Slots
 -- remote, server/SaveSlots.luau) and opens the character creator (client/CharacterCreator.luau); the game starts once
 -- the server says the save is in. Up, it sets the player attribute StartScreen (the loading screen's cue to go).
 
@@ -26,11 +26,11 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
 local SandboxMap = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("SandboxMap")) -- 8.0 SANDBOX
 local WarehouseLayout = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("WarehouseLayout")) -- 8.3: its level's building
-local Net = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Net")) -- 9.6: the Slots remote
-local CharacterLooks = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("CharacterLooks")) -- 9.6: the slots' busts
-local SaveSlotRules = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("SaveSlotRules")) -- 9.6: the slots' lines
+local Net = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Net")) -- 10.1: the Slots remote
+local CharacterLooks = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("CharacterLooks")) -- 10.1: the slots' busts
+local SaveSlotRules = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("SaveSlotRules")) -- 10.1: the slots' lines
 local Ui = require(script.Parent.Ui)
-local CharacterCreator = require(script.Parent.CharacterCreator) -- 9.6: NEW GAME, LOOK, START OVER
+local CharacterCreator = require(script.Parent.CharacterCreator) -- 10.1: NEW GAME, LOOK, START OVER
 local Theme = require(script.Parent.Theme)
 
 local Menu = {}
@@ -70,30 +70,25 @@ local function warehouseLevel(id: number, mine: boolean): number
 	return if type(level) == "number" then level else 4
 end
 
--- 8.0 SANDBOX: the slow drift over the sandbox (shared/SandboxMap.luau), looped: the chalet from the turnaround, then
--- from its other side, up Pražská toward the plots, your plot's warehouse (the player's Plot attribute; the first
--- plot before the server gave you one; 8.3: the building of its level), your van's spot at its roller door, back down
--- the street. 8.3: every level's front wall is on the door's line; the shot at it pulls back with the building's
--- footprint (far 1: the Big Warehouse's 80 × 60, the 8.0 shot: 60 east, 40 up, 87 in front of the door; the Garage
--- close, the Logistics Center from further off).
+-- 8.0 SANDBOX: the slow drift over the sandbox (shared/SandboxMap.luau), looped. 9.7 runs: over the lobby (its
+-- plaza from the south, its portals from the west, your plot's warehouse (the player's Plot attribute; the first plot
+-- before the server gave you one; 8.3: the building of its level, the shot pulling back with its footprint), its bay
+-- and the plaza from high up).
 local function sandboxShots(): { { Vector3 } }
-	local house = SandboxMap.House.house
-	local door = SandboxMap.House.door
-	local turn = SandboxMap.Turnaround
+	local L = SandboxMap.Lobby
+	local b = L.bounds
+	local cx, cz = (b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2
+	local plaza = Vector3.new(cx, 3, (L.plaza.z0 + L.plaza.z1) / 2)
 	local mine = SandboxMap.Plots[tonumber(player:GetAttribute("Plot")) or 0]
 	local plot = mine or SandboxMap.Plots[1]
-	local w, van = (WarehouseLayout.site(plot, warehouseLevel(plot.id, mine ~= nil)) or plot).warehouse, plot.vanSpot
+	local w = (WarehouseLayout.site(plot, warehouseLevel(plot.id, mine ~= nil)) or plot).warehouse
 	local front, far = w.z + w.sz / 2, math.sqrt(w.sx * w.sx + w.sz * w.sz) / 100
-	-- (8.1: the house is the owner's Blender house's box, its roof over house.sy; 8.2.1: the big one again, 44 wide:
-	-- the two shots as far out as before 8.1)
-	local chalet = Vector3.new(house.x, house.y + house.sy * 0.8, house.z)
 	return {
-		{ Vector3.new(house.x + 64, 30, door.z - 70), chalet },
-		{ Vector3.new(house.x - 70, 44, door.z - 110), chalet },
-		{ Vector3.new(turn.x + 40, 70, turn.z - 30), Vector3.new(turn.x, 0, (turn.z + van.z) / 2) },
+		{ Vector3.new(cx + 150, 60, b.z1 + 40), plaza },
+		{ Vector3.new(b.x0 - 30, 45, cz + 60), Vector3.new(b.x0 + 60, 6, cz + 40) },
 		{ Vector3.new(w.x + 60 * far, 40 * far, front + 87 * far), Vector3.new(w.x, w.sy * 0.4, front) },
-		{ Vector3.new(w.x - 50, 26, van.z + 40), Vector3.new(van.x, van.y + 4, van.z) },
-		{ Vector3.new(turn.x - 30, 60, van.z + 90), Vector3.new(turn.x, 0, (turn.z + van.z) / 2) },
+		{ Vector3.new(w.x - 50, 26, front + 50), Vector3.new(w.x, 6, front + 10) },
+		{ Vector3.new(cx - 40, 110, b.z1 + 110), Vector3.new(cx, 0, cz) },
 	}
 end
 
@@ -150,7 +145,7 @@ function Menu.setState(state: any)
 	end
 end
 
--- 9.6: a slot card's little bust: a made courier in flat blocks (its hat, hair, skin and top), your own avatar's head
+-- 10.1: a slot card's little bust: a made courier in flat blocks (its hat, hair, skin and top), your own avatar's head
 -- shot (Roblox's thumbnail) for base "own" or a save without a courier, a "+" on an empty slot.
 local function bust(parent: Instance, summary: any): any
 	local K = Theme.Contract
@@ -195,7 +190,7 @@ local function bust(parent: Instance, summary: any): any
 	return frame
 end
 
--- 9.6: one slot's card (shared/SaveSlotRules.luau's summary): its bust, its courier's name, the warehouse's level, the
+-- 10.1: one slot's card (shared/SaveSlotRules.luau's summary): its bust, its courier's name, the warehouse's level, the
 -- money, the collection, the moves, the time played, when it was saved; CONTINUE (red on the save played last), LOOK
 -- and START OVER, or NEW GAME on an empty slot.
 local function slotCard(parent: Instance, summary: any, y: number, latest: boolean, act: (string, number) -> ()): any
@@ -255,7 +250,7 @@ end
 
 -- 8.0 SANDBOX: the sandbox's start screen. The city's charcoal card, smaller: the mark (8.9: DELIVEROS), its slogan and
 -- the version; PLAY fades out the same way and runs onPlay (the server's Play).
--- 9.6 (Config.SaveSlots.On): the card lists your save slots (slotCard) in place of PLAY. CONTINUE asks the server for
+-- 10.1 (Config.SaveSlots.On): the card lists your save slots (slotCard) in place of PLAY. CONTINUE asks the server for
 -- that save (the Slots remote), NEW GAME and LOOK open the character creator (client/CharacterCreator.luau), START OVER
 -- asks first, then the creator: a fresh game in the slot. While the save loads the card says so; once the server says
 -- it is in ("ready") the fade runs as PLAY's did. ENTER (a gamepad's A) continues the save played last (none: a new
@@ -383,7 +378,7 @@ local function showSandbox(onPlay: () -> ())
 		gui = nil
 	end
 
-	-- 9.6: the slots (or PLAY without them)
+	-- 10.1: the slots (or PLAY without them)
 	local enter: () -> () = function()
 		task.spawn(start)
 	end
@@ -587,7 +582,7 @@ local function showSandbox(onPlay: () -> ())
 	task.spawn(controls, false)
 	shots, shotSeconds = sandboxShots(), 12
 	fly()
-	player:SetAttribute("StartScreen", true) -- 9.6: the loading screen (ReplicatedFirst) may go: the start screen is up
+	player:SetAttribute("StartScreen", true) -- 10.1: the loading screen (ReplicatedFirst) may go: the start screen is up
 end
 
 function Menu.show(onPlay: () -> ())
@@ -865,7 +860,7 @@ function Menu.show(onPlay: () -> ())
 
 	task.spawn(controls, false)
 	fly()
-	player:SetAttribute("StartScreen", true) -- 9.6: the loading screen (ReplicatedFirst) may go
+	player:SetAttribute("StartScreen", true) -- 10.1: the loading screen (ReplicatedFirst) may go
 end
 
 return Menu

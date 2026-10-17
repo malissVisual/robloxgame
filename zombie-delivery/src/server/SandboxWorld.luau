@@ -9,10 +9,9 @@
 --             passes this model, Config.SpawnSpot.Pass); 8.9 the fields and lawns (server/VillageWorld.luau);
 --             a Persistent model (8.9: the map is 1,600 studs across: every client always has the ground it drives
 --             on); the Alps' mounds are gone
---   Roads     the asphalt of SandboxMap.Roads (9.4: the country lanes and their yards too, SandboxScenery.asphalt's) and the
---             turnaround (its top a hair under Pražská's where they overlap), the gravel shoulders down to the meadow
---             on every edge (the cars roll off and on anywhere; none across a junction), the markings; a Persistent
---             model as the ground
+--   Roads     the asphalt of SandboxMap.Roads (9.7 runs: only the run zones' yards, where the trucks stand; Pražská,
+--             Depot Row, the lanes, the turnaround and the markings are gone), the gravel shoulders down to the meadow
+--             on every edge; a Persistent model as the ground
 --   House     "TheOldFarmstead" (a Model, attribute SandboxHouse): shared/ChaletLooks.luau's chalet (the stand-in look)
 --             on SandboxMap.House.house,
 --             facing north to the road, its front door the part "FrontDoor" (attribute SandboxDoor = true, no collision:
@@ -42,16 +41,18 @@
 --             farmstead's (SandboxWorld.walkIn: SandboxDoor, unseen, no collision; its two leaves; the walls less a dark
 --             hall behind it; the plinth, where it has one, no longer solid), its name on its mailbox.
 --             server/Moving.luau finds each house's FrontDoor by its model's SandboxHouse.
---   Scenery   the street lamps along Pražská, the signpost at the crossroads (8.9: white Czech direction boards; the
---             Alps' spruces, wildflowers and rail fence are gone)
+--   Lobby     9.7 runs (server/LobbyWorld.luau): the lobby's plaza, fountain, hedge, lamps, trees, the six house
+--             portals and their pads, the ZDC dispatch kiosk and the PAINT shop (9.7: the street lamps and the signpost
+--             are gone with Pražská)
 --   Village   9.4 the countryside (server/VillageWorld.luau): the places' surroundings, the trees, hedges, fences and
 --             the stream in Atomic chunks; the D5 in the Persistent model "Motorway", the railway in "Railway"; the far
 --             view in "Far" (below)
 --   Auction   8.8 (only while Config.Auction.On: the auction's groundwork shows nothing before the server's step): the
---             Auction House on Depot Row, east of the crossroads (shared/AuctionHouseLayout.luau's parts, its place
---             Config.Auction.House.Spot) in the Atomic model "AuctionHouse": its sign and lot display (SurfaceGuis the
+--             Auction House (9.7: at the lobby's south edge, SandboxMap.Lobby.shops.auction; shared/AuctionHouseLayout
+--             .luau's parts, its place Config.Auction.House.Spot) in the Atomic model "AuctionHouse": its sign and lot display (SurfaceGuis the
 --             client paints), the consignment desk's prompt (AuctionDesk), the lot's pedestal (AuctionLotStand), two lamps
---   Boundary  the invisible walls on the Bounds
+--   Boundary  the invisible walls on the Bounds; 9.7 each run zone's on its edge (SandboxMap.Zones: "ZoneWall",
+--             Config.Runs.Zone.Wall high; its screen hedge is server/VillageWorld.luau's, SandboxMap.TreeLines')
 --   Far       (a Persistent model: every client always has it) outside the Bounds: 8.9 the flat horizon
 --             (server/VillageWorld.luau: far fields, tree lines, pylons, the D5 and the railway going on, far roofs); no collision but
 --             the far fields', no shadows (the Alps' green hills and snowy peaks are gone)
@@ -91,6 +92,7 @@ local SandboxScenery = require(Shared.SandboxScenery)
 local VillageScenery = require(Shared.VillageScenery) -- 9.4: the places to empty in their looks
 
 local HouseMesh = require(script.Parent.HouseMesh) -- 8.1: the owner's Blender house (design/blender-house)
+local LobbyWorld = require(script.Parent.LobbyWorld) -- 9.7: the lobby's plaza, portals, dispatch and PAINT shop
 local VillageWorld = require(script.Parent.VillageWorld) -- 9.4: the countryside, the D5, the railway and the far view
 
 local SandboxWorld = {}
@@ -98,10 +100,6 @@ local SandboxWorld = {}
 local S = SandboxScenery
 local MAP = SandboxMap
 local C = SandboxScenery.Colors
-local UPRIGHT = CFrame.Angles(0, 0, math.rad(90)) -- a cylinder standing up
-local POLE = Color3.fromRGB(50, 50, 54)
-local LAMP_DIM = Color3.fromRGB(196, 194, 182)
-local SIGN = Color3.fromRGB(C.Sign[1], C.Sign[2], C.Sign[3]) -- the signpost's boards (8.9: Czech white, not the Alps' yellow)
 local INK = Color3.fromRGB(C.Ink[1], C.Ink[2], C.Ink[3])
 
 local function rgb(c: { number }): Color3
@@ -261,15 +259,11 @@ local function roads(world: Instance)
 	local holder = persistent(world, "Roads")
 	local asphalt = rgb(C.Asphalt)
 	local depth = S.RoadDepth
-	-- (8.9: every street's slab; Pražská's from Depot Row's south edge: the junction is Depot Row's asphalt)
+	-- (9.7: the yards' slabs, where the trucks stand)
 	for _, r in S.asphalt() do
 		local road = slab(holder, "Road", r, MAP.RoadTop, depth, asphalt, Enum.Material.Asphalt)
 		road:SetAttribute("Road", r.name)
 	end
-	local T = MAP.Turnaround
-	local disc = block(holder, "Turnaround", Vector3.new(depth, 2 * T.r, 2 * T.r), CFrame.new(T.x, S.TurnaroundTop - depth / 2, T.z) * UPRIGHT, asphalt, Enum.Material.Asphalt)
-	disc.Shape = Enum.PartType.Cylinder
-	disc.CastShadow = false
 	local gravel = rgb(C.Shoulder)
 	for _, r in S.ramps() do
 		local frame = CFrame.fromMatrix(Vector3.new(r.x, r.y, r.z), Vector3.new(r.rx, 0, r.rz), Vector3.yAxis)
@@ -278,12 +272,6 @@ local function roads(world: Instance)
 			then cornerWedge(holder, "Shoulder", size, frame, gravel, Enum.Material.Pebble)
 			else wedge(holder, "Shoulder", size, frame, gravel, Enum.Material.Pebble)
 		p.CastShadow = false
-	end
-	local white = rgb(C.Line)
-	for _, m in S.markings() do
-		local at = Vector3.new(m.x, m.top + 0.025, m.z)
-		local line = deco(block(holder, m.name, Vector3.new(m.width, 0.05, m.length), CFrame.lookAt(at, at + Vector3.new(m.dx, 0, m.dz)), white, Enum.Material.SmoothPlastic))
-		line.CastShadow = false
 	end
 end
 
@@ -719,38 +707,6 @@ local function auctionHouse(world: Instance): Model
 	return model
 end
 
--- ── The scenery ────────────────────────────────────────────────────────────
-
-local function scenery(world: Instance)
-	local holder = folder(world, "Scenery")
-	-- the street lamps (a fixed afternoon: their heads stay dim, no lights)
-	local lamps = folder(holder, "Lamps")
-	local up = Vector3.new(0, 0.3, 0)
-	for _, l in S.lamps() do
-		local y = MAP.GroundTop
-		local out = Vector3.new(l.rx, 0, l.rz)
-		block(lamps, "LampPole", Vector3.new(0.6, 16, 0.6), CFrame.new(l.x, y + 8, l.z), POLE, Enum.Material.Metal)
-		local foot = Vector3.new(l.x, y + 15.8, l.z)
-		deco(block(lamps, "LampArm", Vector3.new(0.35, 0.35, 4.4), CFrame.lookAt(foot + out * 2.2, foot + out * 4.4), POLE, Enum.Material.Metal))
-		local at = foot + out * 4.2 - up
-		deco(block(lamps, "LampHood", Vector3.new(2, 0.3, 1.4), CFrame.lookAt(at + up, at + up + out), POLE, Enum.Material.Metal))
-		deco(block(lamps, "Lamp", Vector3.new(1.7, 0.3, 1.1), CFrame.lookAt(at, at + out), LAMP_DIM, Enum.Material.Glass))
-	end
-	-- the signpost at the crossroads: a post, three white boards (to the warehouses either way, to the farmstead)
-	local sign = folder(holder, "Signpost")
-	local s = S.Signpost
-	block(sign, "SignPost", Vector3.new(0.7, 12, 0.7), CFrame.new(s.x, 6, s.z), Color3.fromRGB(96, 70, 48), Enum.Material.Wood)
-	deco(block(sign, "SignCap", Vector3.new(1.1, 0.4, 1.1), CFrame.new(s.x, 12.2, s.z), POLE, Enum.Material.Metal))
-	for _, b in S.signpost() do
-		local reach = 4.4
-		local at = Vector3.new(s.x + b.dx * reach, b.y, s.z + b.dz * reach)
-		local face = if b.dz == 0 then Vector3.new(0, 0, -1) else Vector3.new(-1, 0, 0) -- (its front to the north, or the west)
-		local board = deco(block(sign, "SignBoard", Vector3.new(8, 1.5, 0.25), CFrame.lookAt(at, at + face), SIGN, Enum.Material.SmoothPlastic))
-		label(board, Enum.NormalId.Front, b.text, INK)
-		label(board, Enum.NormalId.Back, b.back, INK)
-	end
-end
-
 -- ── The edge and far away ──────────────────────────────────────────────────
 
 local function boundary(world: Instance)
@@ -766,6 +722,22 @@ local function boundary(world: Instance)
 		local wall = slab(holder, "InvisibleWall", r, MAP.GroundTop + h - 10, h, black, Enum.Material.SmoothPlastic)
 		wall.Transparency = 1
 		wall.CanQuery = false
+	end
+	-- 9.7: each run zone's walls on its edge (its screen hedge stands on the same line): nobody wanders off
+	local high = Config.Runs.Zone.Wall
+	for _, zone in MAP.Zones do
+		local q = zone.rect
+		for _, r in {
+			{ x0 = q.x0 - t, x1 = q.x1 + t, z0 = q.z0 - t, z1 = q.z0 },
+			{ x0 = q.x0 - t, x1 = q.x1 + t, z0 = q.z1, z1 = q.z1 + t },
+			{ x0 = q.x0 - t, x1 = q.x0, z0 = q.z0, z1 = q.z1 },
+			{ x0 = q.x1, x1 = q.x1 + t, z0 = q.z0, z1 = q.z1 },
+		} do
+			local wall = slab(holder, "ZoneWall", r, MAP.GroundTop + high, high, black, Enum.Material.SmoothPlastic)
+			wall.Transparency = 1
+			wall.CanQuery = false
+			wall:SetAttribute("RunZone", zone.id)
+		end
 	end
 end
 
@@ -835,7 +807,7 @@ function SandboxWorld.build(): Folder
 	ground(world)
 	roads(world)
 	house(world)
-	scenery(world)
+	LobbyWorld.build(world) -- 9.7: the lobby (its plaza, portals, dispatch and PAINT shop)
 	local village = VillageWorld.build(world) -- 9.4: the countryside, its fields and lawns, the D5, the railway, the far view
 	for _, placed in VillageScenery.houses() do -- (the five other places to empty, each in its look)
 		if SandboxWorld.villageHouse(world, placed) then

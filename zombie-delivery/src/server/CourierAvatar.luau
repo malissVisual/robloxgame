@@ -12,7 +12,7 @@
 -- the torso, the arms, the legs, the proportions and the animations reset (AvatarLook.Body), the head, the face, the
 -- clothes, the skin colours and the accessories kept (Humanoid:ApplyDescriptionAsync; KitWear dresses the kit again when a
 -- part is replaced). The 6.7 native courier (CharacterArt) only if Roblox's body cannot be made at the start.
--- 9.6, the courier you make (the start screen's character creator; Config.Characters, shared/CharacterLooks.luau): once
+-- 10.1, the courier you make (the start screen's character creator; Config.Characters, shared/CharacterLooks.luau): once
 -- a save slot is loaded, server/SaveSlots.luau calls Avatar.setLook with the slot's courier. A made one (base
 -- "custom") is worn instead of the player's own look: the classic body in its colours (a HumanoidDescription: the skin,
 -- the top, the trousers; no clothes, no accessories, the classic head and face) and its pieces welded on
@@ -25,8 +25,8 @@ local StarterPlayer = game:GetService("StarterPlayer")
 local Geometry = require(script.Parent.CharacterArt.Geometry)
 local Rig = require(script.Parent.CharacterArt.Rig)
 local AvatarLook = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("AvatarLook"))
-local CharacterLooks = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("CharacterLooks")) -- 9.6
-local StyleBuild = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("StyleBuild")) -- 9.6: a made courier's pieces
+local CharacterLooks = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("CharacterLooks")) -- 10.1
+local StyleBuild = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("StyleBuild")) -- 10.1: a made courier's pieces
 local Avatar = {}
 
 local watches: { [Player]: { RBXScriptConnection } } = {}
@@ -35,7 +35,7 @@ local replacing: { [Player]: boolean } = {}
 local looks: { [Player]: HumanoidDescription | false } = {}
 local loading: { [Player]: boolean } = {}
 local dressed: { [Model]: boolean } = setmetatable({}, { __mode = "k" }) :: any
--- 9.6: the courier made for the slot played (base "custom"); a body being dressed, and one to dress again after it
+-- 10.1: the courier made for the slot played (base "custom"); a body being dressed, and one to dress again after it
 local made: { [Player]: CharacterLooks.Look } = {}
 local busy: { [Model]: boolean } = setmetatable({}, { __mode = "k" }) :: any
 local again: { [Model]: boolean } = setmetatable({}, { __mode = "k" }) :: any
@@ -97,7 +97,7 @@ local function templateBody(): (Model, boolean)
 	return Rig.build(Geometry.spec("courier")), false
 end
 
--- 9.6: a made courier's body: the classic one in its colours (no clothes, no accessories, the classic head and face).
+-- 10.1: a made courier's body: the classic one in its colours (no clothes, no accessories, the classic head and face).
 local function madeDescription(look: CharacterLooks.Look): HumanoidDescription
 	local description = classic(Instance.new("HumanoidDescription"))
 	for field, c in CharacterLooks.colors(look) do
@@ -106,7 +106,7 @@ local function madeDescription(look: CharacterLooks.Look): HumanoidDescription
 	return description
 end
 
--- What the player wears now: their made courier (9.6), else their own look (nil: not loaded yet).
+-- What the player wears now: their made courier (10.1), else their own look (nil: not loaded yet).
 local function wanted(player: Player): (HumanoidDescription?, CharacterLooks.Look?)
 	local look = made[player]
 	if look then
@@ -116,7 +116,7 @@ local function wanted(player: Player): (HumanoidDescription?, CharacterLooks.Loo
 	return if own then own :: HumanoidDescription else nil, nil
 end
 
--- The player's look on a courier body, once the body is in the world and the look has loaded. 9.6: again (the same
+-- The player's look on a courier body, once the body is in the world and the look has loaded. 10.1: again (the same
 -- thread) when the look changed while it went on.
 local function dress(player: Player, model: Model)
 	if not classicBody or dressed[model] or not wanted(player) then
@@ -145,7 +145,7 @@ local function dress(player: Player, model: Model)
 			if model.Parent then
 				local built, why = pcall(function()
 					if look then
-						StyleBuild.character(model, look) -- (9.6: the hair, the hat, the top, the belt, the extra)
+						StyleBuild.character(model, look) -- (10.1: the hair, the hat, the top, the belt, the extra)
 					else
 						local old = model:FindFirstChild(StyleBuild.Look)
 						if old then

@@ -195,13 +195,15 @@ local plot = SandboxMap.Plots[1]
 local sol = E.player(201, "Sol", V3(plot.spawn.x, 3, plot.spawn.z))
 E.plots[sol] = plot
 E.profiles[sol] = { money = 5000, sandboxHouse = house.id, sandboxHouseSeed = 1 }
-local started = Moving.admin(sol, "start")
-local b = built[#built]
-check(`{house.name}: a move into it`, string.find(started, "started", 1, true) ~= nil and b ~= nil and b.plan.kind == "big", started)
-Moving.step()
-danny = MoveHelper.find(sol)
+-- (9.7 runs: the truck parked at the house's curb first, as server/Runs.luau's Runs.begin does, then the run)
+Moving.parkVan(sol, house.curb, false)
 local truck = E.cars[sol]
 truck.chassis.CFrame = CF(house.curb.x, 2, house.curb.z) * M.CFrame.Angles(0, math.rad(house.curb.yaw), 0)
+local started = Moving.startRun(sol, house.id, "normal")
+local b = built[#built]
+check(`{house.name}: a run into it`, started == nil and b ~= nil and b.plan.kind == "big", started)
+Moving.step()
+danny = MoveHelper.find(sol)
 E.request(sol, "helper", "hire")
 run(0.6)
 local lead = E.leadClient(sol) -- 9.2 Sol's client/PairLead.luau

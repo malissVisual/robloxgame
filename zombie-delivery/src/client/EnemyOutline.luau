@@ -21,6 +21,10 @@
 --     sets Config.MoveRoles.Guard.XRay for the role): an outlined zombie within that of the camera is drawn
 --     AlwaysOnTop; 0 (everybody else) keeps the rule above. 8.8: no roles (shared/MoveRoles.luau MoveRoles.on: the
 --     sandbox never has them): always 0.
+--   * 9.x loot: one budget with the loot's outlines (client/LootOutline.luau, shared/OutlinePick.luau BUDGET): the
+--     enemies come first. EnemyOutline.drawn() says how many enemies wear one now (the loot takes what is left), and
+--     before a pick outlines more of them EnemyOutline.onSqueeze(count) (LootOutline.squeeze) takes loot outlines off
+--     first, so the two together never pass Roblox's 31 less Config.Outline.Spare.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -56,6 +60,9 @@ local on = true
 local started = false
 local nextPick = 0
 local xray = 0 -- 7.0 planning: the Guard's sight through walls (studs; 0: none)
+
+-- 9.x loot: the loot's outlines make room before more enemies are outlined (client/LootOutline.luau sets it).
+EnemyOutline.onSqueeze = nil :: ((number) -> ())?
 
 local function rgb(c: { number }): Color3
 	return Color3.fromRGB(c[1], c[2], c[3])
@@ -209,6 +216,15 @@ local function pick()
 			release(slot)
 		end
 	end
+	-- 9.x loot: the loot's outlines make room for these first (one budget, the enemies before the loot)
+	local squeeze = EnemyOutline.onSqueeze
+	if squeeze then
+		local count = 0
+		for _ in chosen do
+			count += 1
+		end
+		pcall(squeeze, count)
+	end
 	for index in chosen do
 		local enemy = order[index]
 		if not enemy.slot then
@@ -310,6 +326,17 @@ end
 
 function EnemyOutline.isOn(): boolean
 	return on
+end
+
+-- 9.x loot: the enemies wearing an outline now (the shared budget: the loot takes what is left).
+function EnemyOutline.drawn(): number
+	local count = 0
+	for _, slot in slots do
+		if slot.enemy then
+			count += 1
+		end
+	end
+	return count
 end
 
 -- On or off on this client (the phone's SETTINGS); off takes every outline off at once.

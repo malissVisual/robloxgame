@@ -391,8 +391,8 @@ check("the bonus's CLAIM sends slot \"bonus\"", #sent == before + 1 and sent[#se
 press(named(named(panel, "Task_weekly"), "Claim"))
 sent = sentOn("SandboxTasks")
 check("the weekly's CLAIM sends slot \"weekly\"", sent[#sent][1].slot == "weekly")
-remote.OnClientEvent:Fire({ kind = "done", title = "Make 3 trips home in one move", money = 380, weekly = false })
-check("\"done\": a toast (claim it in TASKS; 8.3: its sound is SandboxSounds')", M.toasts[#M.toasts] == "✅ Task done: Make 3 trips home in one move · claim $380 in TASKS" and #M.played == playedAt, M.toasts[#M.toasts])
+remote.OnClientEvent:Fire({ kind = "done", title = "Bring 3 truckloads home", money = 380, weekly = false })
+check("\"done\": a toast (claim it in TASKS; 8.3: its sound is SandboxSounds')", M.toasts[#M.toasts] == "✅ Task done: Bring 3 truckloads home · claim $380 in TASKS" and #M.played == playedAt, M.toasts[#M.toasts])
 remote.OnClientEvent:Fire({ kind = "done", title = "Earn $4,500 from your stands", money = 2630, weekly = true })
 check("… a weekly one says so", string.find(M.toasts[#M.toasts], "Weekly task done", 1, true) ~= nil)
 

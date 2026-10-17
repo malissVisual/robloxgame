@@ -52,13 +52,25 @@ do
 			table.insert(cases, { kind = l.kind, box = rect(l), yaw = (l.yaw + 180) % 360, seed = 7, name = `{l.id} turned` })
 		end
 	end
+	-- (9.7 runs: the railway and its halt are off the map, nobody in a run zone would see them: their kit still drawn,
+	-- in their old boxes)
+	local OFF = {
+		railway = { x0 = -1180, x1 = 330, z0 = 716, z1 = 728, yaw = 90 },
+		halt = { x0 = 140, x1 = 220, z0 = 700, z1 = 716, yaw = 0 },
+	}
+	for kind, r in OFF do
+		if kinds[kind] == 0 then
+			table.insert(cases, { kind = kind, box = rect(r), yaw = r.yaw, seed = 7, name = `{kind} (off the map)` })
+			table.insert(cases, { kind = kind, box = rect(r), yaw = (r.yaw + 180) % 360, seed = 7, name = `{kind} (off the map) turned` })
+		end
+	end
 	local missing: { string } = {}
 	for kind, n in kinds do
-		if n == 0 then
+		if n == 0 and not OFF[kind] then
 			table.insert(missing, kind)
 		end
 	end
-	check("every kind of the kit stands on the map (SandboxMap.Landmarks)", #missing == 0, table.concat(missing, ", "))
+	check("every kind of the kit stands on the map (SandboxMap.Landmarks; 9.7 but the railway and its halt)", #missing == 0, table.concat(missing, ", "))
 	local bad: string? = nil
 	for _, c in cases do
 		local pieces = CountryLooks.landmark(c.kind, c.box, c.yaw, c.seed)

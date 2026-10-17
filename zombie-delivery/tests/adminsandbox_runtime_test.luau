@@ -1,9 +1,10 @@
 -- 8.0 SANDBOX: the real server/Admin.luau's "sandbox" command (the admin panel's SANDBOX tab), built by
 -- tests/run_tests.py as AdminServer.luau on tests/runtime/AdminRuntime.luau's fakes: a non-admin is refused (nothing
 -- happens, nothing is said), outside the sandbox world it is refused and says why, anything but a button's id is refused,
--- the clicks go through Net.limit (Config.Robust.Limits.AdminSandbox), every button's server side (the money, the
--- house's move through Moving.admin, the stock through the Collection API, the van and the teleports to
--- shared/SandboxMap.luau's spots) and the TARGET (another player, the notices to both). Run with tests/run_tests.py.
+-- the clicks go through Net.limit (Config.Robust.Limits.AdminSandbox), every button's server side (the money, 9.7 the
+-- runs through server/Runs.luau's admin and the clock and horde through Moving.admin, the stock through the Collection
+-- API, the teleports to shared/SandboxMap.luau's spots: the lobby, the house, the warehouse) and the TARGET (another
+-- player, the notices to both). Run with tests/run_tests.py.
 local E = require("./AdminRuntime")
 local Config = require("./Config")
 local SandboxMap = require("./SandboxMap")
@@ -57,8 +58,8 @@ check("…and is told nothing", #E.notices == mark)
 click(guest, "money", owner.UserId)
 click(guest, "broke", owner.UserId)
 click(guest, "fill")
-click(guest, "van")
-check("a non-admin can't aim it at the owner either, nor fill, nor bring a van", #E.money == 0 and E.profiles[owner].money == 500 and #E.collection.added == 0 and #E.spawned == 0)
+click(guest, "run_sandbox_house")
+check("a non-admin can't aim it at the owner either, nor fill, nor start a run", #E.money == 0 and E.profiles[owner].money == 500 and #E.collection.added == 0 and #E.runs == 0)
 
 mark = click(owner, "money")
 check("the owner's 💰 +$10K: $10 000 more, the Admin reason", #E.money == 1 and E.money[1].amount == SandboxAdmin.Money and E.money[1].reason == "Admin" and E.profiles[owner].money == 10_500)
@@ -109,28 +110,55 @@ check("every SANDBOX button runs and answers", #unanswered == 0, table.concat(un
 click(owner, "broke")
 check("💸 MONEY 0: the money is $0, the client told", E.profiles[owner].money == 0 and E.notified > 0)
 
--- ── Moves (Moving.admin) ──────────────────────────────────────────────────────
+-- ── Runs (9.7: server/Runs.luau's admin; the clock and the horde Moving.admin's) ─────────────────────
 
 local function lastMove(): string?
 	local last = E.moving[#E.moving]
 	return if last then last.arg else nil
 end
+table.clear(E.runs)
+click(owner, "rundiff_hard")
+local r = E.runs[#E.runs]
+check("🎚 HARD: Runs.admin difficulty hard (the admin's pick for the next run)", r ~= nil and r.what == "difficulty" and r.arg == "hard" and r.player == owner and r.admin == owner)
+click(owner, "run_pond_cabin")
+r = E.runs[#E.runs]
+check("▶ POND CABIN: Runs.admin start pond_cabin for the TARGET (the owner)", r ~= nil and r.what == "start" and r.arg == "pond_cabin" and r.player == owner and r.admin == owner)
+mark = click(owner, "run_lone_house", guest.UserId)
+r = E.runs[#E.runs]
+check("▶ LONE HOUSE aimed at the guest: a run for the guest, the owner's pick", r ~= nil and r.what == "start" and r.arg == "lone_house" and r.player == guest and r.admin == owner)
+check("…the answer to the owner", string.find(E.said(owner, mark), "runs start lone_house", 1, true) ~= nil, E.said(owner, mark))
+click(owner, "runend")
+r = E.runs[#E.runs]
+check("⏹ END RUN: Runs.admin end (the TARGET's run)", r ~= nil and r.what == "end" and r.player == owner)
+check("every ▶ a house of SandboxMap's, every 🎚 a difficulty of Config.Runs'", (function(): boolean
+	table.clear(E.runs)
+	for _, h in SandboxMap.Houses do
+		click(owner, `run_{h.id}`)
+	end
+	for _, d in Config.Runs.Difficulties do
+		click(owner, `rundiff_{d.id}`)
+	end
+	local n = 0
+	for _, entry in E.runs do
+		n += if (entry.what == "start" and SandboxMap.house(entry.arg) ~= nil) or (entry.what == "difficulty" and entry.arg ~= nil) then 1 else 0
+	end
+	return n == #SandboxMap.Houses + #Config.Runs.Difficulties
+end)())
+local runsAdmin = E.Runs.admin
+E.Runs.admin = function()
+	error("the runs are mid-change")
+end
+mark = click(owner, "run_old_mill")
+check("a Runs that errors: the command says so instead of failing", string.find(E.said(owner, mark), "not ready", 1, true) ~= nil, E.said(owner, mark))
+E.Runs.admin = runsAdmin
 table.clear(E.moving)
-click(owner, "start")
-check("▶ START MOVE: Moving.admin start", lastMove() == "start")
 click(owner, "clock")
 check("⏩ SKIP CLOCK: Moving.admin time (one minute left)", lastMove() == "time")
 click(owner, "horde")
 check("🧟 HORDE NOW: Moving.admin horde", lastMove() == "horde")
-table.clear(E.moving)
-mark = click(owner, "refill")
-check("🏠 REFILL HOUSE with no move: nothing ended; 8.0.1: Moving.admin refill (the card's seed forgotten): the next START gets a new seed", #E.moving == 1
-	and E.moving[1].arg == "refill" and E.moving[1].player == owner and string.find(E.said(owner, mark), "new seed", 1, true) ~= nil, E.said(owner, mark))
-table.clear(E.moving)
-E.onMove[owner] = true
-mark = click(owner, "refill")
-check("🏠 REFILL HOUSE on a move: the move ends cleanly (Moving.admin end), then Moving.admin refill", #E.moving == 2 and E.moving[1].arg == "end"
-	and lastMove() == "refill" and E.onMove[owner] == nil and string.find(E.said(owner, mark), "called off", 1, true) ~= nil, E.said(owner, mark))
+mark = click(owner, "start")
+check("9.7: no START MOVE, REFILL HOUSE or BRING VAN (a run is the move): unknown", string.find(E.said(owner, mark), "unknown", 1, true) ~= nil
+	and string.find(E.said(owner, click(owner, "refill")), "unknown", 1, true) ~= nil and string.find(E.said(owner, click(owner, "van")), "unknown", 1, true) ~= nil)
 
 -- ── Collection ───────────────────────────────────────────────────────────────
 
@@ -258,26 +286,16 @@ E.VanPaint.admin = paintAdmin
 click(guest, "paintall")
 check("8.3: a non-admin's UNLOCK PAINTS does nothing", #E.paints == 2)
 
--- ── Travel and the van ───────────────────────────────────────────────────────
+-- ── Travel ───────────────────────────────────────────────────────────────────
 
 local plot = SandboxMap.Plots[1]
 local spot = plot.vanSpot
-E.cars[owner] = nil
-table.clear(E.spawned)
-click(owner, "van")
-local made = E.spawned[1]
-local south = E.Mock.Vector3.new(0, 0, 1)
-check("🚐 BRING VAN with no van: the sandbox van built at the plot's vanSpot", #E.spawned == 1 and made.player == owner and near(made.ground.Position, E.Mock.Vector3.new(spot.x, spot.y, spot.z)))
-check("…its nose to the street (south), so its back doors face the roller door", near(made.ground.LookVector, south))
-local van = E.cars[owner]
-van.model:PivotTo(E.Mock.CFrame.new(300, 5, 300))
-click(owner, "van")
-check("🚐 BRING VAN with the van far away: the same van moved (its load with it), not a new one", #E.spawned == 1 and near(van.chassis.Position, E.Mock.Vector3.new(spot.x, spot.y + 3 + 0.5, spot.z), 0.1) and near(van.chassis.CFrame.LookVector, south), van.chassis.Position)
-E.plots[owner] = nil
-mark = click(owner, "van")
-check("no plot: says so", #E.spawned == 1 and string.find(E.said(owner, mark), "no plot", 1, true) ~= nil)
-E.plots[owner] = 1
-
+local van = E.newCar(owner, "sprinter", E.Mock.CFrame.new(300, 0, 300))
+E.cars[owner] = van
+click(owner, "lobby")
+local lobbySpawn = SandboxMap.Lobby.spawn
+check("📍 TO LOBBY (9.7): on foot at the lobby's plaza (its spawn)", near(owner.Character:FindFirstChild("HumanoidRootPart").Position, E.Mock.Vector3.new(lobbySpawn.x, lobbySpawn.y + 0.5, lobbySpawn.z)),
+	owner.Character:FindFirstChild("HumanoidRootPart").Position)
 local door = SandboxMap.House.door
 click(owner, "house")
 local root = owner.Character:FindFirstChild("HumanoidRootPart")

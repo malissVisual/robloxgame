@@ -135,7 +135,7 @@ function VisitorOffers.make(player: Player, uid: string, kindId: string, roll: n
 	local market = Collection.market(player)
 	local base = CollectionRules.sell(entry, market) -- (the market's price now: the hot and cold kinds, the demand)
 	local kind = Rules.kind(kindId)
-	local rarity = CollectionRules.rarityOf(CollectionRules.defOf(entry.item))
+	local rarity = CollectionRules.pieceRarity(entry) -- (9.x loot: its own roll)
 	local tag = Market.tag(market, entry.item)
 	local price = Rules.offerPrice(base, CollectionRules.tier(rarity).rank, tag == "hot", if kind then kind.pay else 0, roll or math.random())
 	counter += 1
