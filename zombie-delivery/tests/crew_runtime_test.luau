@@ -467,12 +467,16 @@ do
 	end
 	check("… Ann has him already: the bonus instead (CrewRescue, the difficulty's)", bonus ~= nil and bonus.amount == C.Rescue.Bonus.hard and bonus.sku == "bruno"
 		and heard(ann, "in your crew already", since))
-	-- he follows the party: put by them in the other world
+	-- 10.3 (the owner: "let him stay home, not bother me"): he never follows the party; Rescue.Leave s later he fades
+	-- away home (his body gone)
+	check("… Bob told he waits at the warehouse", heard(bob, "wait at your warehouse", since))
+	local at = model.PrimaryPart.Position
 	E.place(ann, V3(House.door.x + 2, 3, House.door.z + 10))
 	E.place(bob, V3(House.door.x + 4, 3, House.door.z + 10))
 	run(1)
-	local near = (model.PrimaryPart.Position - E.rootOf(ann).Position).Magnitude
-	check("… he follows the party (out of the house: put by them)", near < 8, near)
+	check("10.3 … he never walks after the party (where he was untied)", model.Parent == nil or (model.PrimaryPart.Position - at).Magnitude < 3)
+	run(C.Rescue.Leave + C.Rescue.Fade + 0.5)
+	check("10.3 … Rescue.Leave + Fade s later he is gone home (his body gone)", model.destroyed == true or model.Parent == nil)
 	endRun()
 	check("the run over: he goes (his body, the chair)", model.destroyed == true or model.Parent == nil)
 end

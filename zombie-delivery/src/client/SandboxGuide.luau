@@ -12,6 +12,11 @@
 --     straight one: the lobby and a run's front yard have no roads to follow), a floating orange chevron over the
 --     target and its distance tag ("THE OLD FARMSTEAD · 42 m": 9.7 the nearest portal's pad, named for its house).
 --     Inside the house only the hint (no target there). 9.7 runs: nobody drives (the run's truck stands at the curb).
+--     10.3 (the owner: "I don't want that line on the ground all the time, I know what to do … and if it shows, let it
+--     show smoothly, not jump after every step"): the path on the ground only while it helps (Config.SandboxGuide.Path:
+--     "new", a player with nothing home yet, i.e. no piece in stock or on show this session; "always"; "never"), and
+--     always for a place picked on the big map (SandboxGuide.goTo); the chevron and the hint as before. Its first point
+--     follows your feet every frame, eased (PathFollow), so it slides along as you walk instead of jumping each look.
 --   * The steps come from shared/SandboxSteps.luau (pure, tested) on a state read from what the client sees: the player
 --     attribute Plot (server/SandboxPlots.luau); the Moving remote's "state" (as client/MovingHud.luau reads it: a move
 --     runs, `inside` the house, the van's load counts.out, counts.delivered, your piece in your hands: an item `mine` and
@@ -72,6 +77,7 @@ local CollectionService = game:GetService("CollectionService") -- 8.4: the move'
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService") -- 10.3 the path's first point eased after your feet
 local StarterGui = game:GetService("StarterGui")
 local TextService = game:GetService("TextService")
 local TweenService = game:GetService("TweenService")
@@ -1016,7 +1022,7 @@ local function hideWorld()
 end
 
 -- The chevron over `at` with its tag, the path from the player (px, pz) to it along the roads.
-local function showWorld(at: Vector3, label: string, px: number, pz: number)
+local function showWorld(at: Vector3, label: string, px: number, pz: number, withPath: boolean)
 	if at ~= world.targetAt then -- (8.2 perf: the marker moved only when its target did)
 		world.targetAt = at
 		world.target.WorldPosition = at
@@ -1033,13 +1039,14 @@ local function showWorld(at: Vector3, label: string, px: number, pz: number)
 		world.tag.Text = `{label} · {metres} m`
 	end
 	local count = 0
-	if metres > G.Near then
+	if metres > G.Near and withPath then -- (10.3: only while the path helps)
 		count = SandboxSteps.route(px, pz, at.X, at.Z, path, G.Direct)
 	end
 	local y = SandboxMap.RoadTop + G.PathLift
 	for i = 1, count do
 		local point = Vector3.new(path[i * 2 - 1], y, path[i * 2])
-		if point ~= world.pointAt[i] then
+		-- (10.3: the first point, your feet, is eased every frame by follow(); written here only when the path lights)
+		if point ~= world.pointAt[i] and (i > 1 or (world.pathOn or 0) == 0) then
 			world.pointAt[i] = point
 			world.points[i].WorldPosition = point
 		end
@@ -1173,7 +1180,14 @@ local function look()
 		end
 	end
 	if at and label then
-		showWorld(at, label, px, pz)
+		-- 10.3 the path on the ground only while it helps: a place picked on the map, else Config.SandboxGuide.Path
+		-- ("new": nothing of yours home yet this session; "always"; "never")
+		if summary.stock + summary.shown > 0 then
+			ui.homeOnce = true
+		end
+		local mode = G.Path
+		local withPath = SandboxGuide.picked ~= nil or mode == "always" or (mode == "new" and not ui.homeOnce)
+		showWorld(at, label, px, pz, withPath)
 	else
 		hideWorld()
 	end
@@ -1234,6 +1248,27 @@ function SandboxGuide.hint(): GuiObject?
 	return ui.holder
 end
 
+-- 10.3 the path's first point after your feet every frame, eased (PathFollow a second): it slides along as you walk
+-- (the look every Every s draws the rest). Nothing while no path is lit.
+local function follow(dt: number)
+	if (world.pathOn or 0) == 0 or not world.points then
+		return
+	end
+	local root = rootPart()
+	if not root then
+		return
+	end
+	local feet = root.Position
+	local point = world.points[1]
+	local want = Vector3.new(feet.X, SandboxMap.RoadTop + G.PathLift, feet.Z)
+	local now = point.WorldPosition
+	local step = now:Lerp(want, math.min(1, dt * G.PathFollow))
+	if (step - now).Magnitude > 1e-3 then
+		point.WorldPosition = step
+		world.pointAt[1] = step
+	end
+end
+
 function SandboxGuide.start()
 	if started or not Config.Sandbox.On then
 		return
@@ -1241,6 +1276,10 @@ function SandboxGuide.start()
 	started = true
 	build()
 	buildWorld()
+	local stepped = (RunService :: any).RenderStepped -- 10.3 the path's first point after your feet, eased
+	if stepped then
+		stepped:Connect(follow)
+	end
 	-- the move (client/MovingHud.luau reads the same remote), its planning, the collection (when it is there)
 	local moving = Net.get("Moving")
 	moving.OnClientEvent:Connect(function(kind: any, view: any)

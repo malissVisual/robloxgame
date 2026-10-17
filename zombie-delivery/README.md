@@ -350,6 +350,15 @@
 > health, else he is out of the run and **in hospital** for 4 minutes (CREW shows the time left and can discharge him
 > early for money). Nobody is ever lost for good; the crew is saved with its flag (`crewKept`). Previews: `design/map/`,
 > `design/crew/`.
+>
+> **10.3** (the owner: "it annoys me that the line on the ground is always there, I know what to do … if it shows,
+> let it show smoothly, not jump after every step"; "why does the yellow one I freed walk after me? Let him stay home,
+> not bother me"): **the guide's path** shows only while it helps (`Config.SandboxGuide.Path`: "new", a player with
+> nothing home yet this session; "always"; "never"), and always for a place picked on the big map; the chevron and the
+> hint as before. When it shows, its first point eases after your feet every frame (`PathFollow`), so it slides along as
+> you walk instead of jumping each look. **A rescued helper goes home**: after his thanks he says he'll wait at your
+> warehouse and fades away (`Config.Crew.Rescue.Leave`, `Fade`; `server/HelperCrew.luau`), never walking after the
+> party; pick him in the CREW window to bring him into runs.
 
 The active Roblox game in this repository (Merge Blades is preserved in `../archive/merge-blades`). **You run a delivery company** in a world
 gone wrong: take a job, carry the cargo to your vehicle with your own hands (or lead the horses on a rope), drive it
