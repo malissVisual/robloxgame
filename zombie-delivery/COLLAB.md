@@ -4,6 +4,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## In progress
 <!-- who · task · files · since -->
+- Claude · 10.5 no zombies in the runs (the owner: "zombies I don't want in the game at all") and rival movers instead (a rival company's crew on Hard and up takes the best pieces to their own van; take them back) · `server/RunDanger.luau`, `shared/DangerRules.luau`, `client/RunDangerUi.luau`, `server/Runs.luau`, `server/Moving.luau`, `server/MoveHelper.luau`, `server/HelperCrew.luau`, a new `server/Rivals.luau`, `shared/RivalRules.luau`, `shared/Config.luau`, tests · 17. 10. 2026
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
