@@ -1,9 +1,9 @@
 --!strict
 -- 8.0 SANDBOX: the few services and server modules the real server/Admin.luau needs in the Luau CLI
 -- (tests/adminsandbox_runtime_test.luau through tests/run_tests.py, which builds AdminServer.luau from
--- src/server/Admin.luau with these in place of its requires; Config, Economy, Levels, Map, Missions, SandboxMap,
--- SandboxAdmin and FurnitureLooks are the real ones). The instances and the CFrame maths are
--- tools/fixtures/item-mock.luau's recorder; the players, their bodies and cars are made here. The other 8.0 workers'
+-- src/server/Admin.luau with these in place of its requires; Config, SandboxMap, SandboxAdmin and FurnitureLooks are the
+-- real ones). The instances and the CFrame maths are
+-- tools/fixtures/item-mock.luau's recorder; the players and their bodies are made here. The other 8.0 workers'
 -- modules (Collection, Moving, SandboxPlots) are fakes shaped like design/sandbox/KONTRAKT.md's API that record every
 -- call. os.clock is the test's (Runtime.clock); task.wait only yields inside task.spawn's threads (Admin.start's loop
 -- waits there for good); Net.limit answers Runtime.limitOpen and records the call.
@@ -19,9 +19,6 @@ local Runtime: any = {
 	plots = {}, -- player → plot id (SandboxPlots.of)
 	onMove = {}, -- player → true: Moving.busy says so
 	moving = {}, -- { { player, arg } } Moving.admin
-	cars = {}, -- player → the fake car (Vehicles.get)
-	seated = {}, -- player → the car they drive (Vehicles.seatedIn)
-	spawned = {}, -- { { player, id, ground, seat } } Vehicles.spawnAt
 	limits = {}, -- { { player, name, rate } } Net.limit
 	limitOpen = true,
 	collection = { added = {}, shown = {}, sold = {}, cleared = 0, stock = {} },
@@ -182,7 +179,7 @@ function Runtime.said(player: any, from: number?): string
 	return table.concat(lines, " | ")
 end
 
--- ── Players, bodies, cars ───────────────────────────────────────────────────
+-- ── Players, bodies ─────────────────────────────────────────────────────────
 
 local function part(name: string, parent: any, at: any): any
 	local made = Mock.Instance.new("Part")
@@ -215,15 +212,6 @@ function Runtime.player(id: number, name: string): any
 	return player
 end
 
-function Runtime.newCar(player: any, id: string, ground: any): any
-	local model = Mock.Instance.new("Model")
-	model.Name = `{player.Name}'s {id}`
-	local chassis = part("Chassis", model, ground * Mock.CFrame.new(0, 3, 0))
-	model.PrimaryPart = chassis
-	model.Parent = workspace
-	return { owner = player, id = id, model = model, chassis = chassis, wrecked = false, health = 100, stats = { health = 100 } }
-end
-
 -- ── The server modules ──────────────────────────────────────────────────────
 
 Runtime.PlayerData = {
@@ -240,25 +228,6 @@ Runtime.PlayerData = {
 	end,
 	notify = function()
 		Runtime.notified += 1
-	end,
-}
-
-Runtime.Vehicles = {
-	get = function(player: any)
-		return Runtime.cars[player]
-	end,
-	seatedIn = function(player: any)
-		local car = Runtime.seated[player]
-		return car, car ~= nil
-	end,
-	spawnAt = function(player: any, id: string, ground: any, seat: boolean)
-		table.insert(Runtime.spawned, { player = player, id = id, ground = ground, seat = seat })
-		local car = Runtime.newCar(player, id, ground)
-		Runtime.cars[player] = car
-		return car
-	end,
-	isBike = function()
-		return false
 	end,
 }
 
@@ -365,17 +334,5 @@ Runtime.VanPaint = {
 		return if what == "all" then "ADMIN: every paint and livery of the PAINT shop is yours (16 items): wear them at your van." else "ADMIN: the paints reset: nothing bought, your van in Deliveros cream with the Deliveros classic stripe."
 	end,
 }
-
--- The rest of Admin's requires: only what Admin.start touches (the others error with their name when a test calls them).
-Runtime.World = { RoadTop = 0.4 }
-Runtime.Zombies = { hunts = function()
-	return false
-end, frozen = false }
-Runtime.BanditCars = { wanted = function()
-	return false
-end, frozen = false }
-for _, name in { "Jobs", "DayNight", "Estate", "Missions", "Challenges", "Traffic", "Buddy" } do
-	Runtime[name] = {}
-end
 
 return Runtime
