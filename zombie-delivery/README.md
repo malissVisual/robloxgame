@@ -1,13 +1,17 @@
 # Zombie Delivery
 
 > **8.0 SANDBOX (the game the owner tests now).** With `Config.Sandbox.On = true` (the default) the server builds a
-> test world instead of the city (`shared/SandboxMap.luau`, `server/SandboxWorld.luau`): since 8.9 the owner's village
-> **Jinočany** (8.0 – 8.8: an alpine meadow with one road), at first **one house to empty** (The Old Farmstead on Pražská, called The Old Chalet on Main Street before the Jinočany
-> plan, `design/jinocany/NAVRH.md`; refilled with a new random layout every move, with 2 – 4 **collectibles** from
-> uncommon to legendary), and **four player plots** with a **ZDC warehouse** each. **Jinočany step 1:** six houses to
-> empty (`SandboxMap.Houses`, a contract each in `Config.Moving.Sandbox.Houses`): The Old Farmstead (the big house, The
-> Nováks) and five family houses in the village on Hlavní, Školní, Lidická and Smetanova (a smaller plan, 15 minutes;
-> the village's own look, a rich one, their front doors walked in as the farmstead's). The kiosk offers one at a time: your card keeps its house and seed (in your
+> test world instead of the city (`shared/SandboxMap.luau`, `server/SandboxWorld.luau`). **Since 10.0 a small lobby
+> like Dungeon Quest** (`design/lobby/`, `server/LobbyWorld.luau`: the plaza, the four warehouses, the shops and six
+> portals) from which a party goes into a house to empty at a chosen difficulty (`server/Runs.luau`, see the 10.0 note
+> below; its pieces wear their rarity's outline and stars); the houses stand in their own fenced run zones of the
+> 9.0 countryside: since 9.0 **open countryside**
+> (`design/countryside/`; 8.9: the village of Jinočany, 8.0 – 8.8: an alpine meadow with one road) with **six places to
+> empty**, each on its own country lane (`SandboxMap.Houses`, a contract each in `Config.Moving.Sandbox.Houses`; every
+> move a new random layout with 2 – 4 **collectibles** from uncommon to legendary): **The Old Farmstead** (the big
+> house on Pražská, The Nováks, now a farm with a barn, a tractor and bales), **The Pond Cabin**, **The Lone House**,
+> **The Forest Lodge**, **The Old Mill** and **The Orchard Cottage** (their own looks, interiors and pieces:
+> `shared/Layouts/Countryside.luau`), and **four player plots** with a **ZDC warehouse** each. The kiosk offers one at a time: your card keeps its house and seed (in your
 > save too) until a trip brings something home, then the next free house; two players never get the same one. Every player drives a
 > **walk-in ZDC Sprinter** (`Config.Cars` sprinter, `shared/SprinterLooks.luau`; the owner's Blender look
 > `design/blender-sprinter/` dresses it once imported): open its back or its sliding door, walk up the step and load
@@ -196,6 +200,176 @@
 > setdown; PUT IT DOWN the same down); a piece nobody can get to is refused at assignment. Players can't pick through
 > walls either (the pieces' prompts need line of sight, `Moving.walled` checks it on the server), and his list's
 > markers no longer show through walls.
+>
+> **8.9.4** (the owner: "Danny carries better, but only when I walk backwards … when I walk forwards he can't walk
+> backwards", "and he still teleports", a screenshot of Danny standing in the Sofa and one of the owner lying across
+> it): carrying in two no longer ties Danny's body to yours. The hold's AlignPosition and AlignOrientation have one
+> attachment each, the holder's own, and the server sets their goals from the piece every Heartbeat
+> (`server/PairHold.luau`), so the two machines no longer fight over one mechanism (the side-to-side teleports, your
+> body tipped over the piece). Danny stays at the piece's far end and never stands in it (`MoveHelperBrain.endLead`:
+> no lead into the piece, his hands reach for the edge instead), walks backwards when you walk forwards, and inside a
+> house slides along the walls instead of through them (`HouseRoute.slide`). Your walk eases in and is held back so the
+> piece never runs into him on your screen, also at a wall (`PairCarry`, `client/PairSteer.luau`: PairStart,
+> PairKeep, PairWall). One put-down: while you carry in two only the piece's own G Put down prompt shows (no PUT IT
+> DOWN pill), and Danny's card reads "Carrying: Sofa with you" like his bubble. A crew mate holding the far end gets
+> the same hold.
+>
+> **8.9.5** (the owner: "add a drive pedal to the game … just visible pedals on PC, and on mobile as driving buttons"):
+> while you drive your own van, **GAS** (tall and narrow, on the floor) and **BRAKE** (wider and shorter, hanging from
+> its arm) stand at the lower right in the contract look, rubber ribs and all (`client/DrivePedals.luau`,
+> `shared/PedalRules.luau`, `Config.DrivePedals`). On a **phone or tablet** they are the driving buttons: hold GAS to
+> drive, BRAKE to brake and then back up (as S does), both to stop; the thumbstick still steers and each thumb is its
+> own touch (`Drive.setPedal`). They sit at the bottom just left of EXIT, a finger's size or more, clear of the jump
+> button, the thumbstick, EXIT, the speed and a visitor's offer card, and never jump from under a finger. On a
+> **computer** they are small, over the speed, and show your feet: W / S, a gamepad's R2 / L2 part way (R2 / L2 under
+> them); a mouse can hold them too. Pressed, a pedal tips down, darkens and its red line lights; let go, it springs
+> back. Only in your own driver's seat, with the HUD up and no window open (`tests/drivepedals_test.luau`,
+> `tools/phone-ui/drivepedals.luau`).
+>
+> **8.9.6** (the owner, 8.9.5: "Danny still annoys me. He takes it completely like a robot … he runs for 2 seconds and
+> then on the spot he somehow teleports around … the carrying is better, but it feels harder to control … fix it so
+> it's playable"). **His walk:** the cause, measured on the six houses as built (`tests/movehelper_stuck_runtime_test.luau`):
+> he turned to his way's next corner a stud early, cut it into the wall's end (his body 0.35 studs off it, 1,130 swept
+> steps in the walls), got pressed there, and 4 s later the stuck nudge popped him on. Now he aims a few studs ahead
+> along his way at a point whose straight line stays clear of every wall, fixture and piece (`HouseRoute.ahead`,
+> `Config.MoveHelper.Walk`); his grid knows the built parts the plan doesn't (the garage door); he slows into his goal,
+> turns to it in a quarter second, and his legs walk only while he really moves (`Npcs.walkTo`'s `legs`). Stuck, he
+> tries a new way, steps back and aside; only after 10 s does he fade over (`Config.MoveHelper.Unstuck`). Through the
+> front door he walks into the doorway fading out (the piece in his hands with him) and comes out the other side fading
+> in; the long jump to the van happens only where nobody can see it. In Studio the Output reports every jump and every
+> stuck spell (`[Danny] teleport …`, `[Danny] stuck … blocked by …`). **Carrying in two:** while Danny holds the far end
+> of a piece you lead, your own client drives his end: the server hands his body's physics to you (`SetNetworkOwner`;
+> his model's `PairLead`, `PairLeadAt`, `PairLeadPiece`) and every frame before the physics `client/PairLead.luau` aims
+> his hold at your piece, so on your screen he is at his end with no lag, backs away as you walk forwards, follows as
+> you back up, legs and all. Your walk is no longer held back (no PairStart, PairKeep or PairWall for him), the heading
+> turns at 120° a second (`Config.MoveHelper.PairLead`), and the house's walls at his end are your own rays: walking or
+> turning his end into a wall stops, sliding along it still works. The server only checks (`MoveHelperBrain.leadKept`):
+> his body more than 8 studs off his end for 1.5 s and it takes him back for that carry, never a teleport. A crew mate
+> at the far end is unchanged.
+>
+> **9.0** (the owner: "make all the family houses go, and instead of the houses rather six different spots: by the
+> pond, on the farm, one house, somewhere else … but no towns, no villages"): **the countryside in place of the
+> village.** The village is gone (its 102 houses and streets, the chapel green, the school, the pitch, the shops, the
+> hardware store, the building site and the station); the sandbox is open fields, tree lines, a forest, a pond and a
+> stream, with six places to empty, each at the end of its own country lane (22 wide) in a yard where the van turns
+> round (`design/countryside/plan.py` → `plan.json`, `plan.png`; `tools/countryside/sandboxmap.py` writes SandboxMap's
+> section; `shared/CountryLooks.luau` the surroundings). **The Old Farmstead** stays where it was, now a farm (a barn, a
+> red tractor and trailer, round bales and a haystack, a paddock, a muck heap and a woodpile). **The Pond Cabin** (the
+> Vodičkas): a timber fishing cabin with a veranda on the pond's shore, its jetty, reeds and a rowing boat; inside a
+> bunk room and a store of rods, nets, oars and an outboard motor (two people). **The Lone House** (the Kopeckýs): one
+> family house alone among the fields on Hill Road. **The Forest Lodge** (the Lesáks): a log lodge on a stone plinth in
+> a clearing of a dense forest, antlers over the door; inside a hall straight through, a kitchen, a gun room (its
+> cabinet empty), a stuffed owl. **The Old Mill** (the Mlynářs): a stone watermill whose wheel turns in its millrace on
+> the right-hand side, a weir and a footbridge; inside the millstones in the workroom, flour sacks and a spare
+> millstone (two people). **The Orchard Cottage** (the Sadíleks): whitewashed under thatch or clay tiles among 54 fruit
+> trees and beehives; jam jars, a beehive box, an apple press and Grandma's sewing machine. Each place plans a fresh
+> layout every visit (`shared/Layouts/Countryside.luau`, HouseLayout's kinds cabin, lodge, mill and cottage; its own
+> walls and floors, `server/HouseInterior.luau`), 29 new pieces join the Collection book (97 in all), the clocks run
+> 12 – 16 minutes by size. Danny walks all six (his way's first leg checked off the walls too: `HouseRoute.path`; the
+> stuck audit over every place on the real map). A woodpecker drums in the forest where the chapel bell rang. The map is
+> lighter: 1,909 parts (was 2,253). A save with a village house loads with none and the next card gives a free place.
+>
+> **9.0.1** (the owner: "on the Mac you can't turn with the touchpad at all"): the sandbox's free camera turned only
+> with the right mouse held, which a trackpad hardly gives. Now, as Roblox's own camera does, a **two-finger swipe** on a
+> trackpad turns it (`UserInputService.PointerAction`'s pan) and a **pinch** zooms; **, / .** anywhere and the **arrow
+> keys Left / Right** on foot (in a car they steer) turn it too (`Config.CameraTurn`: Pan, PanPitch, Pinch, Keys). A
+> window or a list under the cursor keeps its scroll, and typing in a text box turns nothing (`tests/camerarig_test.luau`).
+>
+> **10.0** (the owner: "make the map small, one little lobby, like Dungeon Quest: you go into a house … and you get
+> loot there. For the loot outlines with their own colour by how rare it is, and stars, so it has value"; asked, no
+> driving, and on the easier difficulties a timer and traps, on the harder ones zombies too). **The lobby and the
+> runs.** The sandbox's world is now a small lobby (480 × 400 studs, `design/lobby/plan.py` → `plan.json`, `plan.png`;
+> `tools/lobby/sandboxmap.py` writes SandboxMap's LOBBY section; built by `server/LobbyWorld.luau`): a plaza with the
+> spawn, a fountain and the ZDC dispatch, your four plots with their warehouses along the north edge, the UPGRADES
+> desks, the PAINT shop's booth, the TOP MOVERS board, the Auction House's place and six portals, one for each house (a
+> gate, a facade in the house's colours, its sign, a glowing pad: blue free, amber counting down, red IN USE). Step
+> onto a pad and a 10 s countdown starts; up to four go together, and the first on the pad picks the difficulty: Easy,
+> Normal, Hard, Insane, Nightmare (Easy and Normal open; each next one opens when you finish a run at the one before,
+> saved as `runUnlocked` with its flag; `shared/RunRules.luau`, `Config.Runs`). The party fades over to the house's
+> fenced run zone, the truck parked at the curb (no driving): carry the loot out and into it before the clock (the
+> house's time × the difficulty: 1.3, 1, 0.85, 0.72, 0.6) runs out. The host's FINISH at the truck, everybody else's
+> vote or the clock ends the run; what you loaded goes to your own warehouse stock, a results card shows the haul, and
+> everybody fades back next to the portal. LEAVE THE RUN takes you back alone; the host leaving ends it for all
+> (`server/Runs.luau`, `client/RunUi.luau`). The guide speaks of the lobby, and the admin panel's Runs group starts a run
+> on any house at any difficulty. The map is 1,313 parts. **Loot.** Every piece of a house gets a rarity from the
+> server as the house is made (`server/Loot.luau`, `shared/LootRules.luau`, `Config.Loot`; Moving's hook in
+> `setupItem`): its own (the furniture's by its value, a collectible's own) rolled by the run's difficulty: Easy now
+> and then a tier lower, Normal as before, Hard, Insane and Nightmare lift pieces (more rolls, the best kept; Nightmare
+> always at least one Epic, a Legendary in about one house of three), the same house and difficulty always the same
+> loot; a tier up is worth × 1.5, a tier down × 0.8. The model carries `Rarity`, `Stars` and `Value` and the tag
+> `LootPiece`; the stock keeps the rarity (an older piece reads as its own), so the stands, selling, the book (its page
+> keeps the rarest found), the trades and the auction show the same rarity and value. On your screen
+> (`client/LootOutline.luau`, `client/LootStars.luau`): an outline in the tier's colour (green, blue, purple, gold;
+> Commons none) on the pieces near you, in your hands, in the truck and on the stands (the rarest first, never through
+> walls; one budget with the zombies' outlines within Roblox's 31, `OutlinePick.loot`), ★ × its stars over the nearest
+> few ("★★★ RARE · $450" up close; none under a window), a toast when you pick one up or load it, and an Epic or
+> Legendary piece sparkles with a sound the first time you see it. Previews: `design/lobby/`, `design/loot/`.
+>
+> **10.1** (the owner: "when I start my game, a short intro and a loading screen, and every player makes their own
+> character and has their own save that loads, e.g. level 15, and can start over"): **a short intro and a loading
+> screen** (`src/first/Loading.client.luau` in ReplicatedFirst, both project files map it): a sunrise, the Deliveros van
+> drives in, the DELIVEROS wordmark pops up over MOVE · FIND · GROW, a bar and a tip while the game loads; it goes once
+> the start screen is up (about 3 s; any key skips the intro). **Three save slots** for every player
+> (`Config.SaveSlots`, `server/SaveSlots.luau`, `shared/SaveSlotRules.luau`): the start screen lists them (the courier,
+> the warehouse's level, the money, the pieces, the moves, the time played, when it was saved) with **CONTINUE**,
+> **NEW GAME**, **LOOK** and **START OVER**; the save loads only once a slot is picked. Slot 1 is the save of before.
+> **The character creator** (`client/CharacterCreator.luau`, `Config.Characters`, `shared/CharacterLooks.luau`): your
+> own Roblox avatar or a courier made here (the skin, eight hair styles and ten colours, five hats, seven tops, the
+> trousers, glasses or a beard, a name Roblox filters, 🎲 RANDOM) in a turning 3D preview; everybody sees it on your
+> body (`server/CourierAvatar.luau` setLook). See **The start: intro, save slots, your courier (10.1)**.
+>
+> **10.2** (the owner: "both: on the easier difficulties only a timer and traps, on the harder ones zombies too … it
+> has to be designed to be fun"; "add a way to look at the map"; "different employees who can do something different
+> … Danny will be the base, so cancel having to buy him … and when one dies, something"). **The danger in a run**
+> (`shared/DangerRules.luau`, `server/RunDanger.luau`, `client/RunDangerUi.luau`, `Config.Runs.Danger` by difficulty):
+> **locked rooms** from Easy (two from Hard), their keys ("Bedroom key") hidden in searchable furniture of a room you
+> can already reach (hold **F** · Search; found for the whole party), a locked room's pieces a tier up, its doorway a
+> wall for Danny and the zombies until it opens; **the vault** from Normal (the best piece or two in a steel and glass
+> case, Epic or better, Legendary at a chance on Nightmare; its own gold key, hidden deeper); **hazards** on open floor,
+> never in a doorway or on a way out (creaky boards: carry over them and you stumble and drop the piece; puddles: you
+> slide; a cracked ceiling that shakes and sheds dust before the plaster falls); **zombies** from Hard (the game's own,
+> in the house and the yard; faster on Insane with a horde at half time; on Nightmare THE LANDLORD by the vault; a bite
+> drops what you carry; the truck is nobody's target), from Hard everybody's **bat** (the city's strike; picking a piece
+> up puts it away), a death drops the piece and you are back by the truck; the danger strip and the results card's
+> "Vault opened ✓/✗ · Zombies stopped". **The map** (M; a gamepad's L2; the 🗺 MAP chip; on a phone the minimap too):
+> in the lobby the plaza, your warehouse in gold, the shops and the six portals with their live state (FREE, STARTING IN
+> 7 with who is on the pad, IN USE with the difficulty and the party; click one and the guide leads there); in a run the
+> house's floor plan (`MapPlan`, published once by `server/HouseInterior.luau`), the yard and the truck, you, the party,
+> the helpers, the zombies near you, the dangers (🔒 🔑 🏦 ⚠ 🆘) and the loot you have seen in its tier's colour (the
+> rest in the fog; an Epic or Legendary nobody carries pulses), the clock and the truck's load; a corner minimap in a
+> run (`client/SandboxMapUi.luau`, `SandboxMiniMap`, `SandboxMapDraw`, `SandboxMapData`, `shared/SandboxMapRules.luau`,
+> `Config.SandboxMapUi`). **The helpers' crew** (`Config.Crew`, `shared/CrewRules.luau`, `server/HelperCrew.luau`,
+> `client/CrewUi.luau`): Danny is free and every player's from the start (no hire, no price; he waits by your warehouse,
+> his Crew prompt opens the CREW window, and he comes into every run); four more can join your crew, each with his own
+> look and way of working: **Bruno** carries a two-person piece alone, slowly; **Zip** runs one-hand and small pieces
+> out fast; **Gus** carries nothing but walks with you and fights the zombies; **Lucy** carries small pieces and shows
+> the party the Epic and Legendary loot through walls. You get them by **rescuing** them: some run houses hold one tied
+> to a chair (more often on the harder difficulties; hold E to untie him), and he joins the crew of everybody in the
+> party who lacks him (the others get a money bonus). One helper comes into a run: the host's pick in CREW. A helper at
+> 0 health in a run goes **down** (a ring and a countdown); any party player holds E within 15 s to revive him at half
+> health, else he is out of the run and **in hospital** for 4 minutes (CREW shows the time left and can discharge him
+> early for money). Nobody is ever lost for good; the crew is saved with its flag (`crewKept`). Previews: `design/map/`,
+> `design/crew/`.
+>
+> **10.3** (the owner: "it annoys me that the line on the ground is always there, I know what to do … if it shows,
+> let it show smoothly, not jump after every step"; "why does the yellow one I freed walk after me? Let him stay home,
+> not bother me"): **the guide's path** shows only while it helps (`Config.SandboxGuide.Path`: "new", a player with
+> nothing home yet this session; "always"; "never"), and always for a place picked on the big map; the chevron and the
+> hint as before. When it shows, its first point eases after your feet every frame (`PathFollow`), so it slides along as
+> you walk instead of jumping each look. **A rescued helper goes home**: after his thanks he says he'll wait at your
+> warehouse and fades away (`Config.Crew.Rescue.Leave`, `Fade`; `server/HelperCrew.luau`), never walking after the
+> party; pick him in the CREW window to bring him into runs.
+>
+> **10.4** (the owner: "there is no driving the car any more, so every time you go to a place, an animation of you
+> driving there"): **the ride.** When a run takes you to its house, and when it takes you back to the lobby, the
+> Deliveros van drives across the screen over the jump's fade (`client/RideUi.luau`; `server/Runs.luau` sends
+> `{ kind = "ride" }` just before; `Config.Runs.Ride`: 3.4 s there, 2.4 s back): the sky of the run's difficulty (a fresh
+> morning for Easy … a night with the moon, the stars and the van's lamps for Nightmare; a warm evening on the way back),
+> hills, trees and fence posts going by, the road's dashes, the van bouncing along; at the top ON THE WAY TO and the
+> house's name in the logo's gold, its difficulty in its colour and who rides along, under it the route from the depot
+> with the van moving along it. The engine pulls away and slows as it arrives (sfx6's van sounds); your controls are
+> off while it plays. **The start's sounds** (`art/audio/sfx6.ogg`, `art/audio/NAHRAT-SFX6.md`): the intro's van and
+> jingle, the start screen's and the character creator's; sfx5.ogg's asset id is in.
 
 The active Roblox game in this repository (Merge Blades is preserved in `../archive/merge-blades`). **You run a delivery company** in a world
 gone wrong: take a job, carry the cargo to your vehicle with your own hands (or lead the horses on a rope), drive it
@@ -2201,6 +2375,55 @@ nothing errors. The owner's guide to creating them and pasting the ids is `desig
 
 **Tests:** `sandboxbadges_test`, `sandboxbadges_runtime_test` (a fake BadgeService: ids of 0 never call, each badge
 once, errors swallowed, Studio off, the save).
+
+## The start: intro, save slots, your courier (10.1)
+
+The owner: "když zapnu tu moji hru … intro takový jenom kratší a loading screen … každý hráč měl svoji UI, že si dělá
+charaktera … má nějaký svůj save, … loadne třeba level 15, pak může jít od znova".
+
+- **The intro and the loading screen** (`src/first/Loading.client.luau`, a LocalScript in **ReplicatedFirst**: both
+  `default.project.json` files map it, `node tools/rojo-sync.js zombie-delivery` syncs it). It runs before the rest of
+  the game reaches the client, so it stands alone (it requires nothing; its timings are at its top) and takes Roblox's
+  own loading screen away. A sunrise over green hills, the Deliveros van drives in along the road, **DELIVEROS** pops up
+  in Luckiest Guy with the store logo's gold and red edge, **MOVE · FIND · GROW** under it, then a bar ("Loading the
+  countryside…", "Opening your saves…") and a tip. It goes once the intro has run (2.6 s), the game has loaded and the
+  start screen is up (the player attribute `StartScreen`, set by `client/Menu.luau`), or after 25 s whatever happens:
+  the van drives off and it fades into the start screen. Any key, a click or a tap skips the rest of the intro (never the
+  loading). Reduced Motion: nothing bounces.
+- **Save slots** (`Config.SaveSlots`: 3; `server/SaveSlots.luau`, `shared/SaveSlotRules.luau`, the `Slots` remote).
+  Every slot is its own game: money, warehouse, collection, book, upgrades, tasks, paint and its courier. Slot 1 is the
+  save of before 10.1 (its key unchanged, `Player_<id>`); slot n is `Player_<id>_slot<n>`. A join reads and locks
+  nothing until the start screen picks a slot (`PlayerData.chooseSlot`): the start screen asks for the list (each slot
+  read with GetAsync, at most every `Read` s), and every card shows the courier (a little bust), its name, **LEVEL n · the
+  warehouse's name** (the sandbox has no driver level: the warehouse's 1 – 5 is its progress), the money, the pieces in
+  the collection, the moves finished, the time played and "saved … ago". The save played last is red and ENTER
+  continues it.
+  - **CONTINUE**: that save loads (the lock, the migrations, everything as before), then the game starts.
+  - **NEW GAME** (an empty slot) and **START OVER** (a used one, after a question that says what is lost): the
+    character creator, then a fresh game in that slot, written at once (what it held is gone).
+  - **LOOK**: the creator with the slot's courier, then CONTINUE with the courier changed (written at once).
+  - Every save also writes `playTime` (s) and `savedAt` (os.time) for the cards. The admin's RESET MY SAVE resets the
+    slot played and keeps its courier. An old client (or a start screen that failed) that sends PLAY without a pick gets
+    the slot saved last (`SaveSlots.fallback`). Studio without API access: the cards say saving is off; a game still
+    plays (not kept).
+- **The character creator** (`client/CharacterCreator.luau`; the options `Config.Characters`, the rules and the pieces
+  `shared/CharacterLooks.luau`). Left: your courier in a 3D preview that turns by itself (drag to turn it). Right: the
+  name (Roblox's TextService filters it on the server; one it cannot filter is dropped), **Who you play** (MAKE A
+  COURIER or MY ROBLOX AVATAR), the skin (9), the hair (8 styles) and its colour (10), a hat (StyleLooks' 5 or none) and
+  its colour (12), the top (a T-shirt, long sleeves or StyleLooks' 5 jackets) and its colour, the trousers (8), the face
+  (glasses, sunglasses, a moustache, a beard); 🎲 RANDOM rolls one. A made courier is Roblox's classic blocky R15 in those
+  colours (a HumanoidDescription: the head and the arms the skin, the torso the top, the legs the trousers; no clothes,
+  no accessories, the classic head and face) with its pieces welded on (`StyleBuild.character`: plain decorative parts,
+  massless, never colliding), built the same way in the preview, so what you pick is what everybody sees.
+  `server/CourierAvatar.luau` puts it on once the slot is in (`setLook`) and at every spawn; base "own" (or a save without
+  a courier) wears your own Roblox avatar as since 6.9.
+- Tests: `tests/characterlooks_test.luau` (every list, clean, random, the colours, all 1,680 combinations of the pieces),
+  `tests/saveslots_test.luau` (the keys, the summaries, the cards' words), `tests/saveslots_runtime_test.luau` (the real
+  SaveSlots and PlayerData: nothing read before the pick, the list, NEW GAME, the leave save, CONTINUE with a new look,
+  START OVER, the filter down, the fallback, leaving on the start screen); the e2e test's players CONTINUE slot 1.
+- In Studio: Play; the intro runs, the start screen lists three slots (slot 1 your old save). Try NEW GAME in slot 2
+  (make a courier, START THE GAME), play a moment, Stop, Play again: slot 2 shows its courier, level and time. Try
+  LOOK and START OVER. In a live server two players see each other's made couriers.
 
 ## Saving (8.4)
 

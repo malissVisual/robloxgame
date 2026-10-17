@@ -8,7 +8,7 @@
 -- that know nothing of the van, the worst a path can do), his body a 2-stud-wide column over the floor.
 --   * the van as built: its front -Z, the passenger seat on the right (+X: Door 2, its cab door hinged there), its
 --     Door2 attachment (where a player stands to get in) DoorStandOut out of the body's side at the seat;
---   * Danny hired, Ann at the wheel at the house's curb: from his spot by the van's back he walks round the van to his
+--   * Danny with Ann (10.1 free), Ann at the wheel at the house's curb: from his spot by the van's back he walks round the van to his
 --     spot at the REAL passenger door (RideStand out of its side, level with its seat), never with his body over any
 --     colliding part of the van, no fade, no teleport; there a step to the real handle (the Door2 attachment) facing the
 --     van, the passenger door (2) swung, the slide in to the real passenger seat;
@@ -157,7 +157,7 @@ local function flat(a: any, b: any): number
 	return V3(a.X - b.X, 0, a.Z - b.Z).Magnitude
 end
 
--- ── The move, Danny hired ──────────────────────────────────────────────────
+-- ── The move, Danny with Ann (10.1 free) ──────────────────────────────────────────────────
 
 local started = Moving.admin(ann, "start")
 check("a solo move in the sandbox starts, Ann's van the real Sprinter (the game's factory)", string.find(started, "started", 1, true) ~= nil
@@ -167,8 +167,7 @@ local danny = MoveHelper.find(ann)
 local truck = E.cars[ann]
 local body = danny and danny.body
 check("Danny comes with it", danny ~= nil and body ~= nil)
-E.request(ann, "helper", "hire")
-check("Ann hires him", danny.hirer == ann)
+check("Danny is Ann's from the start (10.1 free)", danny.hirer == ann)
 
 -- ── The van as built ───────────────────────────────────────────────────────
 
@@ -277,10 +276,10 @@ local heartbeat = E.services.RunService.Heartbeat
 
 local CURB = CF(House.curb.x, 1.8, House.curb.z) * M.CFrame.Angles(0, math.rad(House.curb.yaw), 0)
 truck.model:PivotTo(CURB) -- (the Driver's call's spot: its nose to the road, its back to the house's door)
-E.place(ann, V3(House.curb.x - 60, 3, House.curb.z - 30))
+E.place(ann, V3(House.curb.x - 200, 3, House.curb.z - 30)) -- (9.3 out of sight: Danny far off is put at the van only unseen, faded in)
 run(6)
 local waiting = rel(body.root.Position)
-check("hired with nothing to carry, he waits by the van's back (behind it: byTruck), clear of it", danny.action == "wait" and waiting.Z > halfZ
+check("with nothing to carry, he waits by the van's back (behind it: byTruck), clear of it", danny.action == "wait" and waiting.Z > halfZ
 	and over(body.root.Position) == nil, f(waiting))
 
 E.seated[ann] = truck
@@ -322,7 +321,7 @@ end)
 local inSeat = rel(body.root.Position)
 check("…and in the real passenger seat (Seat:Sit), his hand off the handle (the attributes gone), no fade", seated and danny.seat == seat
 	and seat.Occupant == body.humanoid and math.abs(inSeat.X - seatAt.X) < 0.01 and math.abs(inSeat.Z - seatAt.Z) < 0.01
-	and body.model:GetAttribute("BoardAt") == nil and body.model:GetAttribute("BoardReach") == nil and fades == 0, f(inSeat))
+	and body.model:GetAttribute("BoardAt") == nil and body.model:GetAttribute("BoardReach") == nil and fades == (danny.teleports.far or 0), f(inSeat)) -- (9.3 his far jump to the van at the start: faded in)
 
 -- out again: Ann off the wheel, the van standing
 E.seated[ann] = nil

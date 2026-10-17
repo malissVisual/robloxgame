@@ -220,7 +220,7 @@ local shows = M.paintShows
 local function lastShow()
 	return shows[#shows]
 end
-check("… the picture: your van in what you wear (Fire red, ZDC classic) in the Picture frame", #shows >= 1 and lastShow().look.paint == "red" and lastShow().look.livery == "zdc"
+check("… the picture: your van in what you wear (Fire red, Deliveros classic) in the Picture frame", #shows >= 1 and lastShow().look.paint == "red" and lastShow().look.livery == "zdc"
 	and lastShow().holder == named(window, "Picture"))
 
 local function swatches()
@@ -345,7 +345,7 @@ end
 for _, item in Rules.Liveries do
 	table.insert(expected, item.id)
 end
-check("LIVERY: its swatches in Config's order, the one you wear looked at (ZDC classic)", table.concat(order, ",") == table.concat(expected, ",") and PaintUi.view().tab == "livery"
+check("LIVERY: its swatches in Config's order, the one you wear looked at (Deliveros classic)", table.concat(order, ",") == table.concat(expected, ",") and PaintUi.view().tab == "livery"
 	and PaintUi.view().selected == "zdc" and named(window, "Action").Text == "✓ ON YOUR VAN", table.concat(order, ","))
 check("… a livery's chip: your body's red with its band (racing: the light contrast)", isRgb(named(swatch("racing"), "Chip").BackgroundColor3, { 176, 32, 32 })
 	and isRgb(named(named(swatch("racing"), "Chip"), "Band").BackgroundColor3, Config.VanPaint.Contrast.Light))

@@ -434,7 +434,7 @@ draw = function(keepScroll: boolean)
 	-- the header: the title, your money, the ✕
 	local state = current
 	local wide = layout.w - (layout.pad * 2 + layout.close + 8)
-	Ui.label(frame, "⬆ ZDC UPGRADES", UDim2.fromOffset(wide, 24), { Name = "Title", Position = UDim2.fromOffset(layout.pad, 10), Font = Theme.HeadingFont, TextSize = 18, TextColor3 = K.text, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
+	Ui.label(frame, "⬆ DELIVEROS UPGRADES", UDim2.fromOffset(wide, 24), { Name = "Title", Position = UDim2.fromOffset(layout.pad, 10), Font = Theme.HeadingFont, TextSize = 18, TextColor3 = K.text, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
 	local subtitle = subtitleOf(state)
 	Ui.label(frame, subtitle, UDim2.fromOffset(wide, 16), { Name = "Subtitle", Position = UDim2.fromOffset(layout.pad, 33), TextSize = 12, TextColor3 = K.secondary, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
 	local close = Ui.closeButton(frame, UpgradeUi.close)

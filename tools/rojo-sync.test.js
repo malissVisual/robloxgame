@@ -392,7 +392,7 @@ for (const length of [0, 1, 14, 15, 16, 254, 255, 269, 270, 271, 524, 525, 65535
 		check(typeof sync.diskVersion(tree) === "string", "zombie-delivery: verze na disku");
 		check(
 			JSON.stringify(tree.pathRoots.map((id) => sync.fullName(tree, id))) ===
-				JSON.stringify(["ReplicatedStorage.Shared", "ServerScriptService.Server", "StarterPlayer.StarterPlayerScripts.Client"]),
+				JSON.stringify(["ReplicatedFirst.Loading", "ReplicatedStorage.Shared", "ServerScriptService.Server", "StarterPlayer.StarterPlayerScripts.Client"]), // (10.1: the loading screen)
 			"zombie-delivery: kořeny ze $path"
 		);
 		const model = modelById(sync.writeRbxm(sync.serializeIds(tree, sync.probeIds(tree, fresh.map((piece) => piece.updated[0].id)))));
@@ -607,7 +607,7 @@ async function serverTest() {
 		// Malá změna bez potvrzení → varování s radou.
 		write("src/shared/Small.luau", "return 2\n");
 		check(await run.waitFor(/! Studio nepotvrdilo změnu \(~1\)/, 12000), "server: varuje, když Studio nepotvrdí");
-		check(/smaž ReplicatedStorage\.Shared, ServerScriptService\.Server/.test(run.output()), "server: rada, co smazat");
+		check(await run.waitFor(/smaž ReplicatedStorage\.Shared, ServerScriptService\.Server/, 3000), "server: rada, co smazat");
 		const late = ws.packets[ws.packets.length - 1].body.messages[0].updated[0];
 		await request(port, "POST", "/api/serialize", sync.encode({ sessionId, ids: [late.id] }));
 		check(await run.waitFor(/✓ Studio převzalo změnu \(~1\) \(za [\d.]+ s, pozdě\)/), "server: pozdní potvrzení");

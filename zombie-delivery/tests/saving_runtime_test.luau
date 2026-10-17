@@ -21,8 +21,13 @@
 --   * 8.4: the house the moving card shows (sandboxHouseSeed): written with its flag, read back on another server's
 --     join (the same house), dropped once a trip spent it; only a whole number in Config.Moving.Sandbox.Seeds' range,
 --     only from a real save written with its flag (junk, an older save, a lock-only record, a new player: none).
---     Jinočany: which house it is (sandboxHouse) the same way, only an id shared/SandboxMap.luau knows; a real 8.4 save
+--     8.9: which house it is (sandboxHouse) the same way, only an id shared/SandboxMap.luau knows; a real 8.4 save
 --     with a seed and no house's flag: the farmstead's (its seed was rolled for the one house there was).
+--   * 9.7 runs: the difficulties open (runUnlocked) the same way: written with its flag, read back on another server;
+--     a real save from before 9.7 (no flag), junk, a lock-only record, a new player: Easy and Normal (Config.Runs.Open).
+--   * 10.1 the helpers' crew (crew: who you have, your pick, who is in hospital until when) the same way: written with
+--     its flag (crewKept), read back on another server, junk cleaned (Danny always first); a real save from before 10.1
+--     (no flag: nothing of the 8.3 – 10.0 hire was ever saved), a lock-only record, a new player: Danny alone, picked.
 --   * Size: the biggest realistic sandbox save, measured.
 --   * The shutdown (BindToClose): every player saved at once, in parallel, waited for (a failed try too); a store that
 --     never answers is given up on at CloseWait.
@@ -644,7 +649,7 @@ do
 	check("… a new player's save: the flag, no seed", E.saves.Player_221.sandboxHouseSeedKept == true and E.saves.Player_221.sandboxHouseSeed == nil)
 end
 
--- ── Jinočany: which house it is (sandboxHouse) ────────────────────────────
+-- ── 8.9: which house it is (sandboxHouse) ────────────────────────────
 -- (server/Moving.luau keeps it with the seed in SB.houses: tests/sandboxhouses_runtime_test.luau)
 do
 	local SandboxMap = require("./SandboxMap")
@@ -655,7 +660,7 @@ do
 	E.saves.Player_232 = houseSave
 	local H1 = E.join(232, "Hana")
 	local p1 = PlayerData.get(H1) :: any
-	check("Jinočany: a save with its house and the flag: read into the profile with its seed", p1.sandboxHouse == linden and p1.sandboxHouseSeed == 424242)
+	check("8.9: a save with its house and the flag: read into the profile with its seed", p1.sandboxHouse == linden and p1.sandboxHouseSeed == 424242)
 	E.leave(H1)
 	check("… the leave save writes it back with its flag", E.saves.Player_232.sandboxHouse == linden and E.saves.Player_232.sandboxHouseKept == true)
 	local H2 = E.join(232, "Hana")
@@ -670,7 +675,7 @@ do
 	E.leave(H3)
 	-- only an id SandboxMap knows, only from a real save written with its flag
 	local kept = {}
-	for index, value in { "nowhere", "", 5, true, { linden }, string.upper(linden) } :: { any } do
+	for index, value in { "nowhere", "", 5, true, { linden }, string.upper(linden), "Hlavní_n_5", "Školní_e_20" } :: { any } do
 		local junkSave = save83(100)
 		junkSave.sandboxHouseSeed, junkSave.sandboxHouseSeedKept = 424242, true
 		junkSave.sandboxHouse, junkSave.sandboxHouseKept = value, true
@@ -682,8 +687,19 @@ do
 		end
 		E.leave(J)
 	end
-	check("Jinočany: a house that is no SandboxMap.Houses id (unknown, empty, a number, a boolean, a table, another spelling): none, loaded and not kicked",
+	check("8.9: a house that is no SandboxMap.Houses id (unknown, empty, a number, a boolean, a table, another spelling, 9.4: an old village house's): none, loaded and not kicked",
 		#kept == 0, table.concat(kept, "; "))
+	-- 9.4: an 8.9 save of a village house (gone with the countryside): no house, its seed kept (the next card takes the
+	-- next free place from the farmstead on: server/Moving.luau's SB.pick)
+	local village = save83(100)
+	village.sandboxHouseSeed, village.sandboxHouseSeedKept = 4343, true
+	village.sandboxHouse, village.sandboxHouseKept = "Hlavní_n_5", true
+	E.saves.Player_233 = village
+	local JV = E.join(233, "Jan")
+	local pv = PlayerData.get(JV) :: any
+	check("9.4: an 8.9 save of a village house (Hlavní_n_5, gone): no house, its seed kept, loaded and not kicked", pv ~= nil and pv.sandboxHouse == nil
+		and pv.sandboxHouseSeed == 4343)
+	E.leave(JV)
 	-- the migration: a real 8.4 save (a seed with its flag, no house's flag): the farmstead's, the one house there was
 	local old = save83(100)
 	old.sandboxHouseSeed, old.sandboxHouseSeedKept = 4242, true
@@ -691,7 +707,7 @@ do
 	E.saves.Player_233 = old
 	local J2 = E.join(233, "Jan")
 	local pj2 = PlayerData.get(J2) :: any
-	check("Jinočany: an 8.4 save (a seed, no house's flag): the farmstead with that seed (its seed was rolled for it)", pj2.sandboxHouse == SandboxMap.House.id
+	check("8.9: an 8.4 save (a seed, no house's flag): the farmstead with that seed (its seed was rolled for it)", pj2.sandboxHouse == SandboxMap.House.id
 		and pj2.sandboxHouseSeed == 4242)
 	E.leave(J2)
 	local older = save83(100) -- (no seed either: none)
@@ -707,6 +723,127 @@ do
 	check("… a new player: none; the save the flag, no house", (PlayerData.get(fresh) :: any).sandboxHouse == nil)
 	E.leave(fresh)
 	check("… a new player's save: the flag, no house", E.saves.Player_234.sandboxHouseKept == true and E.saves.Player_234.sandboxHouse == nil)
+end
+
+-- ── 9.7 RUNS: the difficulties open (runUnlocked) ─────────────────────────
+-- (shared/RunRules.luau fromSave: tests/runrules_test.luau; the unlocks themselves: tests/sandbox_e2e_runtime_test.luau)
+do
+	local R = Config.Runs
+	local unlocked = save83(900)
+	unlocked.runUnlocked, unlocked[R.Flag] = 4, true
+	E.saves.Player_235 = unlocked
+	local U1 = E.join(235, "Una")
+	check("9.7: a save with its runs' count and the flag: read (Insane open)", (PlayerData.get(U1) :: any).runUnlocked == 4)
+	;(PlayerData.get(U1) :: any).runUnlocked = 5 -- (a run finished at Insane: Nightmare open)
+	E.leave(U1)
+	check("… the leave save writes it back with its flag", E.saves.Player_235.runUnlocked == 5 and E.saves.Player_235[R.Flag] == true)
+	local U2 = E.join(235, "Una")
+	check("… joining another server: the same count", (PlayerData.get(U2) :: any).runUnlocked == 5)
+	E.leave(U2)
+	local before = save83(900) -- (a real save from before 9.7: no flag; a stray count in it is not read)
+	before.runUnlocked = 5
+	E.saves.Player_236 = before
+	local U3 = E.join(236, "Uli")
+	check("9.7 the migration: a real save from before the runs (no flag): Easy and Normal open (Open), loaded and not kicked", (PlayerData.get(U3) :: any) ~= nil
+		and (PlayerData.get(U3) :: any).runUnlocked == R.Open)
+	E.leave(U3)
+	check("… written back with the flag (read from now on)", E.saves.Player_236[R.Flag] == true and E.saves.Player_236.runUnlocked == R.Open)
+	local kept = {}
+	for index, value in { 2.5, -1, 99, "4", true, { 4 } } :: { any } do -- (no NaN: a DataStore keeps none)
+		local junkSave = save83(100)
+		junkSave.runUnlocked, junkSave[R.Flag] = value, true
+		E.saves.Player_237 = junkSave
+		local J = E.join(237, "Jo")
+		local pj = PlayerData.get(J) :: any
+		local want = if value == 99 then #R.Difficulties else R.Open
+		if pj == nil or pj.runUnlocked ~= want then
+			table.insert(kept, `{index}: {tostring(value)} → {pj and pj.runUnlocked}`)
+		end
+		E.leave(J)
+	end
+	check("9.7: junk counts (not whole, negative, a string, a boolean, a table): Open; too many: all five; loaded and not kicked", #kept == 0, table.concat(kept, "; "))
+	E.saves.Player_238 = { runUnlocked = 5, [R.Flag] = true, lock = { job = "another-server", at = 0 } }
+	local L1 = E.join(238, "Lu")
+	check("… a lock-only record (no money: a new player's): Open", (PlayerData.get(L1) :: any).runUnlocked == R.Open)
+	E.leave(L1)
+	local fresh = E.join(239, "Max")
+	check("… a new player: Open; the save the flag", (PlayerData.get(fresh) :: any).runUnlocked == R.Open)
+	E.leave(fresh)
+	check("… a new player's save: the flag, Open", E.saves.Player_239[R.Flag] == true and E.saves.Player_239.runUnlocked == R.Open)
+end
+
+-- ── 10.1: the helpers' crew (crew) ─────────────────────────────────────────
+-- (shared/CrewRules.luau fromSave, clean: tests/crewrules_test.luau; the crew in a run: tests/crew_runtime_test.luau)
+do
+	local Flag = Config.Crew.Flag
+	local function crewOf(player: any): any
+		return (PlayerData.get(player) :: any).crew
+	end
+	local function same2(a: any, b: any): boolean
+		return type(a) == "table" and type(b) == "table" and table.concat(a, ",") == table.concat(b, ",")
+	end
+	local until_ = 1900000000
+	local kept = save83(900)
+	kept.crew, kept[Flag] = { have = { "danny", "bruno", "lucy" }, pick = "lucy", hospital = { bruno = until_ } }, true
+	E.saves.Player_240 = kept
+	local C1 = E.join(240, "Cora")
+	local c1 = crewOf(C1)
+	check("10.1: a save with its crew and the flag: read (Danny, Bruno, Lucy; Lucy picked; Bruno in hospital)", c1 ~= nil and same2(c1.have, { "danny", "bruno", "lucy" })
+		and c1.pick == "lucy" and c1.hospital.bruno == until_)
+	table.insert(c1.have, "gus") -- (Gus rescued in a run)
+	c1.pick, c1.hospital = "gus", {}
+	E.leave(C1)
+	local w = E.saves.Player_240
+	check("… the leave save writes it back with its flag", w[Flag] == true and type(w.crew) == "table" and same2(w.crew.have, { "danny", "bruno", "lucy", "gus" })
+		and w.crew.pick == "gus" and next(w.crew.hospital) == nil)
+	local C2 = E.join(240, "Cora")
+	check("… joining another server: the same crew (Gus kept, picked; in Config.Crew.Order)", same2(crewOf(C2).have, { "danny", "bruno", "gus", "lucy" }) and crewOf(C2).pick == "gus")
+	E.leave(C2)
+	local before = save83(900) -- (a real save from before 10.1: no flag; nothing of the hire was ever saved)
+	before.crew = { have = { "danny", "bruno" }, pick = "bruno" } -- (a stray crew without the flag: not read)
+	E.saves.Player_241 = before
+	local C3 = E.join(241, "Cyd")
+	check("10.1 the migration: a real save from before the crew (no flag): Danny alone, free, picked; loaded and not kicked", PlayerData.get(C3) ~= nil
+		and same2(crewOf(C3).have, { "danny" }) and crewOf(C3).pick == "danny" and next(crewOf(C3).hospital) == nil)
+	E.leave(C3)
+	check("… written back with the flag (read from now on), its money as it was", E.saves.Player_241[Flag] == true and same2(E.saves.Player_241.crew.have, { "danny" })
+		and E.saves.Player_241.money == 900)
+	local bad = {}
+	for index, value in {
+		{ have = { "zed", "bruno", "bruno", 5 }, pick = "zed", hospital = { bruno = -4, zed = 10 } },
+		{ have = "danny", pick = 3 },
+		"crew",
+		true,
+		{ have = { "lucy" }, pick = "lucy", hospital = { lucy = 1.5, danny = until_ } },
+	} :: { any } do
+		local junkSave = save83(100)
+		junkSave.crew, junkSave[Flag] = value, true
+		E.saves.Player_242 = junkSave
+		local J = E.join(242, "Jax")
+		local cj = PlayerData.get(J) and crewOf(J)
+		local ok = cj ~= nil and cj.have[1] == "danny" and table.find(cj.have, cj.pick) ~= nil
+		if index == 1 then
+			ok = ok and same2(cj.have, { "danny", "bruno" }) and cj.pick == "danny" and next(cj.hospital) == nil
+		elseif index == 5 then
+			ok = ok and same2(cj.have, { "danny", "lucy" }) and cj.pick == "lucy" and cj.hospital.lucy == nil and cj.hospital.danny == until_
+		else
+			ok = ok and same2(cj.have, { "danny" })
+		end
+		if not ok then
+			table.insert(bad, `{index}`)
+		end
+		E.leave(J)
+	end
+	check("10.1: junk crews cleaned (unknown kinds, twice, a string, a boolean; Danny always first, a pick of the crew, whole hospital times of its own): loaded and not kicked",
+		#bad == 0, table.concat(bad, "; "))
+	E.saves.Player_243 = { crew = { have = { "danny", "gus" }, pick = "gus" }, [Flag] = true, lock = { job = "another-server", at = 0 } }
+	local L1 = E.join(243, "Lev")
+	check("… a lock-only record (no money: a new player's): Danny alone", same2(crewOf(L1).have, { "danny" }) and crewOf(L1).pick == "danny")
+	E.leave(L1)
+	local fresh = E.join(244, "Mia")
+	check("… a new player: Danny alone, free, picked", same2(crewOf(fresh).have, { "danny" }) and crewOf(fresh).pick == "danny")
+	E.leave(fresh)
+	check("… a new player's save: the flag, Danny", E.saves.Player_244[Flag] == true and same2(E.saves.Player_244.crew.have, { "danny" }))
 end
 
 -- ── Size: the biggest realistic sandbox save ───────────────────────────────

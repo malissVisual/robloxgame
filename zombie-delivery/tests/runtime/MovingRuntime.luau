@@ -13,12 +13,16 @@
 -- before Moving.start (tests/sandboxmove_runtime_test.luau). Its fakes: SandboxPlots (Runtime.plots: player → a
 -- SandboxMap plot) and Collection (Runtime.collected: every Collection.add, its uid back unless Runtime.refuse); the
 -- test sets server/SandboxBoot.luau's hook Moving.parkVan itself (Runtime.makeCar: a fake car).
--- 8.3 Danny for hire: PlayerData.spend takes from Runtime.wallet (player → money; Runtime.startMoney when not set) and
--- records it (Runtime.spent); a car (not a bike) has its driver's seat and one passenger seat (Seat:Sit puts a humanoid
+-- 8.3: PlayerData.spend takes from Runtime.wallet (player → money; Runtime.startMoney when not set) and records it
+-- (Runtime.spent; 10.1 the crew's discharge, no hire any more), saveSoon records the player (Runtime.savedSoon); a car (not a bike) has its driver's seat and one passenger seat (Seat:Sit puts a humanoid
 -- in it: its Occupant, SeatPart, Sit and a SeatWeld), its doors (the driver's on the left, the passenger's on the
 -- right) and its size; Vehicles.speed is the car's `speed` (0 unless the test sets it). 8.5 Danny getting in and out
 -- like a player: Vehicles.swingDoor records each door swing (Runtime.doorSwings); RunService's Heartbeat (his pose every
 -- frame meanwhile) fires only when a test fires it.
+-- 9.2 (you drive Danny's end): his fake body's humanoid has a state (GetState / ChangeState: Npcs.carried puts it in
+-- Physics and back to Running, as the game's does while the server owns him), and Runtime.leadClient(player) is that
+-- player's own client/PairLead.luau (PairLeadClient.luau) on this world's workspace, recorder and clock: a test plays the
+-- leader's client with it (tests/movehelper_backwards_runtime_test.luau).
 local Mock = require("./ItemMock") :: any
 local CityConfig = require("./Config") :: any
 CityConfig.Sandbox.On = false
@@ -113,7 +117,7 @@ O.__newindex = function(self: any, key: string, value: any)
 		end
 	end
 end
-local SIGNALS = { "Triggered", "AncestryChanged", "Died", "HealthChanged", "StateChanged", "AttributeChanged", "CharacterAdded", "Destroying" }
+local SIGNALS = { "Triggered", "AncestryChanged", "Died", "HealthChanged", "StateChanged", "AttributeChanged", "CharacterAdded", "Destroying", "Activated", "Equipped" } -- (10.x danger: a Tool's too)
 local create = Mock.Instance.new
 Mock.Instance.new = function(class: string): any
 	local obj = create(class)
@@ -258,7 +262,8 @@ workspace.GetServerTimeNow = function()
 end
 -- 9.0 a ray that is not straight down (a sight line: server/Moving.luau's walled, server/MoveHelper.luau's wallBetween):
 -- the parts of params' Include list (and their descendants, CanQuery on) it meets, each its box in its own frame (the
--- slab test); the nearest hit ({ Instance, Position, Distance }) or nil. Runtime.sights counts them.
+-- slab test); the nearest hit ({ Instance, Position, Distance, Normal: 9.2 the face it came in by }) or nil.
+-- Runtime.sights counts them.
 Runtime.sights = 0
 local function sightRay(origin: any, direction: any, params: any): any
 	Runtime.sights += 1
@@ -267,6 +272,7 @@ local function sightRay(origin: any, direction: any, params: any): any
 	end
 	local best: any = nil
 	local bestT = math.huge
+	local bestNormal: any = nil -- (9.2 the face it came in by, in the world: RaycastResult.Normal)
 	local function test(part: any)
 		if not part:IsA("BasePart") or part.CanQuery == false then
 			return
@@ -276,6 +282,7 @@ local function sightRay(origin: any, direction: any, params: any): any
 		local d = e - o
 		local half = part.Size * 0.5
 		local t0, t1 = 0, 1
+		local face: any = nil
 		for _, axis in { "X", "Y", "Z" } do
 			local oa, da, ha = o[axis], d[axis], half[axis]
 			if math.abs(da) < 1e-12 then
@@ -287,6 +294,10 @@ local function sightRay(origin: any, direction: any, params: any): any
 				if a > b then
 					a, b = b, a
 				end
+				if a > t0 then
+					face = Mock.Vector3.new(if axis == "X" then -math.sign(da) else 0, if axis == "Y" then -math.sign(da) else 0,
+						if axis == "Z" then -math.sign(da) else 0)
+				end
 				t0, t1 = math.max(t0, a), math.min(t1, b)
 				if t0 > t1 then
 					return
@@ -295,6 +306,7 @@ local function sightRay(origin: any, direction: any, params: any): any
 		end
 		if t0 > 1e-9 and t0 < bestT then -- (a ray that starts inside a part never hits it: Roblox's own rule)
 			bestT, best = t0, part
+			bestNormal = if face then part.CFrame.Rotation * face else Mock.Vector3.new(0, 1, 0)
 		end
 	end
 	for _, top in params.FilterDescendantsInstances or {} do
@@ -306,7 +318,7 @@ local function sightRay(origin: any, direction: any, params: any): any
 	if not best then
 		return nil
 	end
-	return { Instance = best, Position = origin + direction * bestT, Distance = direction.Magnitude * bestT }
+	return { Instance = best, Position = origin + direction * bestT, Distance = direction.Magnitude * bestT, Normal = bestNormal }
 end
 Runtime.sightRay = sightRay
 
@@ -522,9 +534,13 @@ local function moneyOf(player: any): number
 	local money = Runtime.wallet[player]
 	return if type(money) == "number" then money else Runtime.startMoney
 end
+Runtime.savedSoon = {} -- 10.1: { player } every PlayerData.saveSoon (the crew's rescue, the hospital)
 Runtime.PlayerData = stub("PlayerData", {
-	addMoney = function(player: any, amount: number, reason: string)
-		table.insert(Runtime.money, { player = player, amount = amount, reason = reason })
+	addMoney = function(player: any, amount: number, reason: string, sku: string?)
+		table.insert(Runtime.money, { player = player, amount = amount, reason = reason, sku = sku })
+	end,
+	saveSoon = function(player: any)
+		table.insert(Runtime.savedSoon, player)
 	end,
 	spend = function(player: any, amount: number, reason: string?, sku: string?): boolean
 		local money = moneyOf(player)
@@ -823,6 +839,13 @@ Runtime.Npcs = stub("Npcs", {
 		humanoid.HipHeight = 2
 		humanoid.MaxHealth = 1e6
 		humanoid.Health = 1e6
+		humanoid.State = "Running" -- (9.2 its state: the owner's)
+		humanoid.GetState = function(self: any): string
+			return self.State
+		end
+		humanoid.ChangeState = function(self: any, to: string)
+			self.State = to
+		end
 		humanoid.Parent = model
 		model.Parent = workspace
 		return model
@@ -859,9 +882,34 @@ Runtime.Npcs = stub("Npcs", {
 	stride = function(npc: any, speed: number)
 		table.insert(Runtime.strides, { npc = npc, speed = speed })
 	end,
-	carried = noop,
+	-- 9.2 his humanoid's state while the server owns him (the Physics state carried, Running let go)
+	carried = function(npc: any, on: boolean)
+		local humanoid = npc:FindFirstChild("Humanoid")
+		if humanoid and humanoid.GetState then
+			humanoid:ChangeState(if on then "Physics" else "Running")
+		end
+	end,
 })
 Runtime.strides = {} -- { { npc, speed } } every Npcs.stride
+-- 9.2 `player`'s own client/PairLead.luau (a fresh one each call): their Players (LocalPlayer), this world's workspace,
+-- the recorder's frames and vectors, the test's clock.
+function Runtime.leadClient(player: any): any
+	local game = { GetService = function(_: any, name: string): any
+		if name == "Players" then
+			return { LocalPlayer = player, GetPlayers = function(): any
+				return Players:GetPlayers()
+			end }
+		end
+		return { WaitForChild = function(self: any, child: string): any
+			return { Name = child, WaitForChild = self.WaitForChild }
+		end }
+	end }
+	local function requireOf(module: any): any
+		return require(`./{module.Name}`) :: any
+	end
+	return (require("./PairLeadClient") :: any)(game, requireOf, Mock.CFrame, Mock.typeof, Mock.Vector3, workspace, Runtime.os, Mock.Enum,
+		Mock.RaycastParams)
+end
 -- Did he say `text` (since message `from`)?
 function Runtime.saidSince(text: string, from: number?): boolean
 	for index = (from or 0) + 1, #Runtime.said do

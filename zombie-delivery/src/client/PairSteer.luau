@@ -18,8 +18,23 @@
 -- any other script); carrying it in two (the attribute CarryPair, server/Moving.luau setHands: the leader and a crew mate
 -- at the far end alike) the run key or button does nothing and says Config.MoveHelper.RunHint once a carry
 -- (PairSteer.refuseRun, client/CameraRig.luau: Shift, a gamepad's stick click, the touch SPRINT).
---   PairSteer.start()      its step before every physics step (client/CameraRig.luau's start, on a computer and on a
---                          touch screen)
+-- 9.0 (the owner, 8.9.3: "Danny carries better now, but only when I walk backwards. When I want to walk forwards,
+-- Danny can't walk backwards"): your partner at the far end is the server's, so this screen shows them a moment late,
+-- while the piece in your hands moves at once; walking forwards the piece ran into them before they stepped back here.
+-- Now, every step: the walk eases in from standing (PairCarry.started, PairStart s), and that start waits while this
+-- screen shows the partner nearer than their place (PairCarry.waits: their place the server's character attribute
+-- PairFar, in your root's frame; they are PairWith: Danny's MoveHelperId, else a crew mate's UserId); your walk toward
+-- them goes once this screen shows the piece reaching them (PairCarry.keep, Config.MoveHelper.PairKeep); and the far
+-- end against a wall of the house (the server's PairWall) your walk into that wall goes (PairCarry.wall). The walk
+-- changed so is this step's Humanoid:Move (the control script's own comes next frame).
+-- 9.2 (the owner, 8.9.5: "the carrying is better, but it feels like it's harder to control … fix it so it's playable";
+-- that start took 0.85 s in Studio, 2 s online): Danny at the far end of the piece you lead is YOURS to drive (his model's
+-- PairLead your UserId: client/PairLead.luau, server/PairHold.luau lead). Nothing on your screen is late any more, so
+-- none of 9.0's start, waits or keep holds your walk: it is the pair's carry speed at once, and the heading turns at
+-- Config.MoveHelper.PairLead.Turn (120 degrees a second; the PairTurn attribute's 60 stays a crew mate's), the walk only
+-- to PairLead.TurnWalk while it turns. The house's walls at his end are your own rays (PairLead.walk / turn: the part of
+-- your walk or turn pushing his end further into a wall goes, along it stays), and after the turn this step sets his
+-- goals from your piece (PairLead.step). A crew mate at the far end (the server holds their body) keeps 9.0's way.
 --   PairSteer.steering()   does your body carry a piece in two now (CameraRig leaves AutoRotate off)
 --   PairSteer.holding()    8.3 does your body hold a piece in two now (the leader or the far end: no run)
 --   PairSteer.walk()       × the carry's walk now (1 when it does not steer)
@@ -34,6 +49,7 @@ local RunService = game:GetService("RunService")
 
 local PairCarry = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("PairCarry"))
 local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
+local PairLead = require(script.Parent:WaitForChild("PairLead")) -- 9.2 you drive Danny's end
 
 local PairSteer = {}
 
@@ -45,6 +61,49 @@ local steered: Humanoid? = nil -- the humanoid it steers (its AutoRotate off)
 local factor = 1
 local started = false
 local hinted = false -- 8.3 RunHint said for this carry in two
+local partner: Model? = nil -- 9.0 the far end's holder (PairWith), found once
+local partnerId: number? = nil
+local partnerLookAt = 0 -- 9.0 os.clock() of the last look for a holder not found (again PARTNER_AGAIN s later)
+local PARTNER_AGAIN = 0.5
+
+-- 9.0 the far end's holder as this screen shows it (PairWith: Danny's body in workspace.Npcs by its MoveHelper id, else
+-- that player's character); nil: none, not streamed in (looked for again PARTNER_AGAIN s later).
+local function partnerOf(id: any): Model?
+	if type(id) ~= "number" then
+		partner, partnerId = nil, nil
+		return nil
+	end
+	local model = partner
+	if not model or partnerId ~= id or not model.Parent then
+		local now = os.clock()
+		if partnerId == id and now - partnerLookAt < PARTNER_AGAIN then
+			return nil
+		end
+		partnerLookAt = now
+		model = nil
+		local other = Players:GetPlayerByUserId(id)
+		if other then
+			model = other.Character
+		else
+			local folder = workspace:FindFirstChild("Npcs")
+			for _, child in (if folder then folder:GetChildren() else {}) :: { Instance } do
+				if child:IsA("Model") and child:GetAttribute("MoveHelper") == id then
+					model = child
+					break
+				end
+			end
+		end
+		partner, partnerId = model, id
+	end
+	return model
+end
+
+-- …its root (nil: none)
+local function partnerRoot(id: any): BasePart?
+	local model = partnerOf(id)
+	local root = if model then model:FindFirstChild("HumanoidRootPart") else nil
+	return if root and root:IsA("BasePart") then root else nil
+end
 
 -- The most degrees a second the heading of what this body carries turns (nil: it carries nothing in two).
 local function rateOf(character: Model?): number?
@@ -161,9 +220,51 @@ function PairSteer.step(dt: number)
 	local facing = PairCarry.yawOf(look.X, look.Z)
 	state.heading = facing
 	local move = humanoid.MoveDirection
-	factor = PairCarry.steer(state, move.X, move.Z, dt, math.rad(rate))
+	local x, z = move.X, move.Z
+	-- 9.2 Danny's end yours to drive (client/PairLead.luau): nothing late, the walk at once, the walls your own rays
+	local drive = PairLead.of(partnerOf(character:GetAttribute("PairWith")))
+	local wait = false
+	if drive then
+		x, z = PairLead.walk(drive, x, z)
+	else
+		-- 9.0 the far end against a wall of the house (PairWall): that part of the walk into the wall goes
+		local wall = character:GetAttribute("PairWall")
+		if typeof(wall) == "Vector3" then
+			x, z = PairCarry.wall(x, z, wall.X, wall.Z)
+		end
+		-- 9.0 never the piece pushed into your partner as this screen shows them (PairFar: their place, PairWith: them),
+		-- the start waiting for them
+		local far = character:GetAttribute("PairFar")
+		local other = if typeof(far) == "Vector3" then partnerRoot(character:GetAttribute("PairWith")) else nil
+		if other and typeof(far) == "Vector3" then
+			local place = root.CFrame * far
+			local ox, oz = place.X - root.Position.X, place.Z - root.Position.Z
+			local length = math.sqrt(ox * ox + oz * oz)
+			if length > 0.5 then
+				ox, oz = ox / length, oz / length
+				local gap = (other.Position.X - place.X) * ox + (other.Position.Z - place.Z) * oz
+				wait = PairCarry.waits(x, z, ox, oz, gap)
+				x, z = PairCarry.keep(x, z, ox, oz, gap)
+			end
+		end
+	end
+	if math.abs(x - move.X) + math.abs(z - move.Z) > 1e-4 then
+		humanoid:Move(Vector3.new(x, 0, z), false) -- (this physics step's: the control script's own Move comes next frame)
+	end
+	if drive then
+		-- 9.2 the pair's walk at once, the heading at PairLead.Turn, the part of its turn into a wall at his end gone
+		local lead = Config.MoveHelper.PairLead
+		factor = PairCarry.steer(state, x, z, dt, math.rad(lead.Turn), false, lead.TurnWalk)
+		state.heading = PairLead.turn(drive, facing, state.heading)
+	else
+		-- 9.0 the walk eases in from standing (PairCarry.started: your screen shows your partner late)
+		factor = PairCarry.steer(state, x, z, dt, math.rad(rate), wait) * PairCarry.started(state)
+	end
 	if math.abs(PairCarry.wrap(state.heading - facing)) > 1e-4 then
 		root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, state.heading, 0)
+	end
+	if drive then
+		PairLead.step(drive, dt, root, humanoid) -- 9.2 his goals from your piece, turned already (before the physics)
 	end
 end
 

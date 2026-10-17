@@ -64,6 +64,7 @@ function render(scene, fonts) {
       el.style.transformOrigin = '0 0';
     }
     if (n.vis === false) el.style.display = 'none';
+    if (n.rot) el.style.rotate = `${n.rot}deg`; // 10.x the map: a GuiObject's Rotation (about its middle, as Roblox turns it)
     el.style.zIndex = String(n.z ?? 1);
     const bg = n.bg || d.bg;
     const bgT = n.bgT ?? d.bgT ?? 1;
@@ -101,6 +102,10 @@ function render(scene, fonts) {
       const justify = n.xa === 'Left' ? 'flex-start' : n.xa === 'Right' ? 'flex-end' : 'center';
       box.style.cssText = `position:absolute;left:${padL}px;right:${padR}px;top:0;bottom:0;display:flex;align-items:center;justify-content:${justify};` +
         `font-family:${FONTS};font-weight:${weight(n.font)};font-size:${ts}px;line-height:1.15;color:${rgba(tc, n.tt || 0)};`;
+      if (n.stroke && (n.tst ?? 1) < 1) { // 10.x the map: a TextStroke (a dark edge round the words)
+        const s = rgba(n.stroke, n.tst);
+        box.style.textShadow = `-1px -1px 0 ${s}, 1px -1px 0 ${s}, -1px 1px 0 ${s}, 1px 1px 0 ${s}, 0 0 2px ${s}`;
+      }
       const span = document.createElement('span');
       span.textContent = n.text;
       span.style.cssText = n.wrap ? `white-space:normal;text-align:${n.xa === 'Left' ? 'left' : n.xa === 'Right' ? 'right' : 'center'};` :
@@ -149,6 +154,12 @@ function render(scene, fonts) {
       el.title = 'health';
     } else if (o.kind === 'text') {
       el.style.justifyContent = 'flex-end';
+      el.textContent = o.label || '';
+    } else if (o.kind === 'piece') {
+      // 9.x loot (loot.luau): a piece of furniture as a box, outlined in its tier's colour with a soft fill (its Highlight)
+      const c = o.color || [178, 182, 188];
+      el.style.cssText += `border-radius:4px;background:linear-gradient(180deg,#9a7b5c,#6e5640);align-items:flex-end;font-weight:500;font-size:10px;` +
+        `box-shadow:0 0 0 2px rgba(${c[0]},${c[1]},${c[2]},0.95),inset 0 0 0 999px rgba(${c[0]},${c[1]},${c[2]},0.12);`;
       el.textContent = o.label || '';
     } else if (o.kind === 'chat') {
       el.style.cssText += 'background:rgba(25,27,29,0.6);border-radius:6px;align-items:flex-start;justify-content:flex-start;padding:10px;font-weight:500;flex-direction:column;';

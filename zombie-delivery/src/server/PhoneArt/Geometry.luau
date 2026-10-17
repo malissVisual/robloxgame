@@ -6,7 +6,7 @@ function Geometry.pieces(id: string): any
 	assert(id == "phone", "Unknown phone model")
 	return {
 		{ name = "Case", size = { .68, 1.18, .11 }, at = { 0, -.12, -.3 }, attach = "RightHand", finish = "charcoal", shadow = true },
-		{ name = "Screen", size = { .57, .9, .025 }, at = { 0, -.11, -.37 }, attach = "RightHand", finish = "screen", text = "ZDC", textSlot = "PhoneScreen" },
+		{ name = "Screen", size = { .57, .9, .025 }, at = { 0, -.11, -.37 }, attach = "RightHand", finish = "screen", text = "DELIVEROS", textSlot = "PhoneScreen" },
 		{ name = "Speaker", size = { .19, .025, .025 }, at = { 0, .41, -.37 }, attach = "RightHand", finish = "sole" },
 		{ name = "CameraLens", size = { .035, .12, .12 }, at = { -.22, .34, -.225 }, attach = "RightHand", finish = "glass", shape = "Cylinder", turn = { 0, 90, 0 } },
 		{ name = "SideKey", size = { .035, .18, .07 }, at = { .35, .16, -.3 }, attach = "RightHand", finish = "red" },

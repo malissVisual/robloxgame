@@ -127,7 +127,7 @@ local function stateNow(spot: number): string
 	return danny.s.move.things[spot].state
 end
 
--- The move; Danny hired; Bob joins Sol's crew --------------------------------------------------------------------------------
+-- The move; Danny Sol's (10.1 free); Bob joins Sol's crew --------------------------------------------------------------------------------
 
 local started = Moving.admin(sol, "start")
 check("a solo move starts", string.find(started, "started", 1, true) ~= nil, started)
@@ -135,11 +135,10 @@ local truck = E.cars[sol]
 truck.model:SetAttribute("BackOpen", true)
 Moving.step()
 danny = MoveHelper.find(sol)
-E.request(sol, "helper", "hire")
 run(0.3)
 E.crew[sol] = { bob }
 Moving.step()
-check("Danny hired by Sol; Bob of her crew (far off at the depot): the same Danny, hired", danny ~= nil and danny.hirer == sol
+check("Danny Sol's (10.1 free); Bob of her crew (far off at the depot): the same Danny, with him too", danny ~= nil and danny.hirer == sol
 	and MoveHelper.find(bob) == danny and bob:GetAttribute("MoveHelper") == "hired", bob:GetAttribute("MoveHelper"))
 
 -- His move into the van called off: his sit pose stopped (boardEnd) ---------------------------------------------------------
@@ -244,9 +243,9 @@ do
 	run(0.6) -- (9.0 his setting down: the Lamp glides down to the floor first)
 	check("Bob (far off) has Danny put down the Lamp in his arms: on the ground, out of his hands, off his list", holds and stateNow(1) == "ground"
 		and Rules.holding(danny.s.move, danny.id) == nil and #danny.queue == 0, stateNow(1))
-	check("8.6 review: …Sol told who asked: \"Bob had Danny set the Lamp down: off his list.\"", told(sol, "🧑‍🔧 Bob had Danny set the Lamp down: off his list.", noticeAt)
+	check("8.6 review: …Sol told who asked: \"Bob had Danny set the Lamp down: off the list.\"", told(sol, "🧑‍🔧 Bob had Danny set the Lamp down: off the list.", noticeAt)
 		and not told(sol, "Danny set the Lamp down here", noticeAt), E.lastNotice(sol))
-	check("…Bob, who asked: \"Danny set the Lamp down here: off his list.\"", told(bob, "🧑‍🔧 Danny set the Lamp down here: off his list.", noticeAt), E.lastNotice(bob))
+	check("…Bob, who asked: \"Danny set the Lamp down here: off the list.\"", told(bob, "🧑‍🔧 Danny set the Lamp down here: off the list.", noticeAt), E.lastNotice(bob))
 end
 
 do

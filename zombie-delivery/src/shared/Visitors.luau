@@ -561,7 +561,7 @@ end
 -- ── The words ───────────────────────────────────────────────────────────────
 
 local LINES: { [string]: { string } } = {
-	greet = { "What a place!", "So this is the ZDC showroom!", "Let's have a look around." },
+	greet = { "What a place!", "So this is the Deliveros showroom!", "Let's have a look around." },
 	look = { "Ooh, {a} {name}!", "Look at this {name}!", "Now that's a fine {name}.", "My gran had {a} {name} just like this.", "Is that a real {name}?", "What a lovely {name}…" },
 	offer = { "I'll give you {price} for that {name}!", "{price} for the {name}? Deal?", "I must have it. {price} for the {name}?" },
 	sold = { "Pleasure doing business!", "It's mine! Thank you!", "Wonderful, thank you!" },

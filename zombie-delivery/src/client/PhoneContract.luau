@@ -60,7 +60,7 @@ function Contract.brand(parent: Instance, order: number): any
 		Ui.make("Frame", { Name = "Skyline", Size = UDim2.new(1/11,0,0,height), Position = UDim2.new((n-1)/11,0,1,-height), BackgroundColor3 = Color3.fromRGB(28,32,39), BorderSizePixel = 0 }, header)
 	end
 	P.marker(header, 16, { Position = UDim2.fromOffset(12,16) })
-	P.text(header, "ZDC", UDim2.new(1,-48,0,32), { Position = UDim2.fromOffset(40,8), Font = Theme.DisplayFont, TextSize = 30, TextStrokeTransparency = 1 })
+	P.text(header, "DELIVEROS", UDim2.new(1,-48,0,32), { Position = UDim2.fromOffset(40,8), Font = Theme.DisplayFont, TextSize = 30, TextStrokeTransparency = 1 })
 	P.caps(header, "COURIER TERMINAL", UDim2.new(1,-24,0,18), { Position = UDim2.fromOffset(12,46), TextSize = 12, TextStrokeTransparency = 1 })
 	return header
 end

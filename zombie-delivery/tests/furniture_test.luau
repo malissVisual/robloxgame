@@ -51,6 +51,9 @@ do
 	for _, room in FurnitureLooks.FarmRooms do -- 7.x farm pieces: the farm's own rooms
 		rooms[room] = 0
 	end
+	for _, room in FurnitureLooks.CountryRooms do -- 9.5 the countryside's: the cabin's store, the mill's workroom
+		rooms[room] = 0
+	end
 	local classes: { [string]: number } = { hand = 0, both = 0, pair = 0 }
 	local sentimental: { string } = {}
 	for _, id in Order do

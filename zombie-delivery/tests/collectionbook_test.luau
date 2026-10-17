@@ -13,6 +13,7 @@
 local Config = require("./Config")
 local FurnitureLooks = require("./FurnitureLooks")
 local HouseLayout = require("./HouseLayout")
+local Countryside = require("./Countryside") -- (9.5 the countryside's spots)
 local CollectionRules = require("./CollectionRules")
 local Rules = require("./CollectionBookRules")
 
@@ -70,9 +71,9 @@ for _, id in FurnitureLooks.FarmPieces do
 	farm[id] = true
 end
 local expected = #FurnitureLooks.Order - #FurnitureLooks.FarmPieces
-check(`the book: the catalogue without the farm's {#FurnitureLooks.FarmPieces} pieces ({expected})`, #Rules.Pieces == expected and expected == 68, #Rules.Pieces) -- (8.3: 56 + 12 collectibles)
+check(`the book: the catalogue without the farm's {#FurnitureLooks.FarmPieces} pieces ({expected})`, #Rules.Pieces == expected and expected == 97, #Rules.Pieces) -- (8.3: 56 + 12 collectibles; 9.5: the countryside's 29 pieces)
 check("… the 24 collectibles (FurnitureLooks.Collectibles, in their order)", #Rules.Collectibles == 24 and same(Rules.Collectibles, FurnitureLooks.Collectibles))
-check("… and 44 pieces of furniture (no rarity of their own)", #Rules.Furniture == 44 and #Rules.Furniture + #Rules.Collectibles == #Rules.Pieces)
+check("… and 73 pieces of furniture (no rarity of their own; 9.5: the countryside's 29 among them)", #Rules.Furniture == 73 and #Rules.Furniture + #Rules.Collectibles == #Rules.Pieces)
 local inOrder, noFarm, unique = true, true, true
 local seen: { [string]: boolean } = {}
 for index, id in Rules.Pieces do
@@ -97,6 +98,13 @@ for _, entries in HouseLayout.Recipes do
 		inRecipes[entry.item] = true
 	end
 end
+for _, rooms in Countryside.Recipes do -- (9.5 the countryside's spots: their rooms' recipes too)
+	for _, entries in rooms do
+		for _, entry in entries do
+			inRecipes[entry.item] = true
+		end
+	end
+end
 for _, entry in HouseLayout.Collectibles do
 	inRecipes[entry.item] = true
 end
@@ -114,13 +122,15 @@ end
 check("the book is exactly what the sandbox house can hold (its recipes and its collectibles)", #missing == 0 and #extra == 0, table.concat(missing, ",") .. " / " .. table.concat(extra, ","))
 local spotsIn = true
 for seed = 1, 12 do
-	for _, spot in HouseLayout.plan(seed, "house").spots do
-		if not Rules.inBook(spot.item) then
-			spotsIn = false
+	for _, kind in { "house", "cabin", "lodge", "mill", "cottage" } do
+		for _, spot in HouseLayout.plan(seed, kind).spots do
+			if not Rules.inBook(spot.item) then
+				spotsIn = false
+			end
 		end
 	end
 end
-check("… every piece of 12 houses' plans is in the book", spotsIn)
+check("… every piece of 12 houses' plans is in the book (9.5: and of 12 of each countryside spot's)", spotsIn)
 check("rarityOf / valueOf: CollectionRules' (a collectible's own, else by value)", Rules.rarityOf("knight_armour") == "legendary" and Rules.rarityOf("piano") == CollectionRules.rarityOf(FurnitureLooks.Items.piano)
 	and Rules.valueOf("oil_painting") == 6000 and Rules.valueOf("sofa") == 350)
 
@@ -132,7 +142,7 @@ check("… a worse one: n 3, best stays 0.9", Rules.record(book, "sofa", 0.2) ==
 check("… a condition out of range or garbage: 0 … 1", Rules.record(book, "tv", 7) and book.tv.best == 1 and Rules.record(book, "piano", 0 / 0) and book.piano.best == 0 and Rules.record(book, "radio", "x") and book.radio.best == 0)
 check("… a piece not in the book (a farm piece, junk): nothing", Rules.record(book, "hay_wagon", 1) == false and Rules.record(book, "nope", 1) == false and Rules.record(book, nil, 1) == false and book.hay_wagon == nil and book.nope == nil)
 local counts = Rules.counts(book)
-check("counts: 4 found of 68 (4 furniture of 44, 0 collectibles of 24, no legendary)", counts.found == 4 and counts.total == 68 and counts.furniture == 4 and counts.furnitureTotal == 44 and counts.collectibles == 0 and counts.collectiblesTotal == 24 and counts.legendary == 0)
+check("counts: 4 found of 97 (4 furniture of 73, 0 collectibles of 24, no legendary)", counts.found == 4 and counts.total == 97 and counts.furniture == 4 and counts.furnitureTotal == 73 and counts.collectibles == 0 and counts.collectiblesTotal == 24 and counts.legendary == 0)
 Rules.record(book, "oil_painting", 0.8)
 counts = Rules.counts(book)
 check("… a legendary collectible counts as a collectible and a legendary", counts.found == 5 and counts.collectibles == 1 and counts.legendary == 1)
@@ -207,7 +217,7 @@ local part = Rules.empty()
 Rules.record(part, "sofa", 0.3)
 Rules.record(part, "sofa", 0.3)
 local added = Rules.fill(part)
-check("fill: every piece not found yet once (67 added, in order), the found ones kept", #added == 67 and added[1] == Rules.Pieces[2] and same(part.sofa, { n = 2, best = 0.3 }) and Rules.counts(part).found == 68 and same(part.jukebox, { n = 1, best = 1 }))
+check("fill: every piece not found yet once (96 added, in order), the found ones kept", #added == 96 and added[1] == Rules.Pieces[2] and same(part.sofa, { n = 2, best = 0.3 }) and Rules.counts(part).found == 97 and same(part.jukebox, { n = 1, best = 1 }))
 check("… a full book: fill adds nothing", #Rules.fill(part) == 0)
 
 -- ── 8.7 review: a piece bought from another player ───────────────────────

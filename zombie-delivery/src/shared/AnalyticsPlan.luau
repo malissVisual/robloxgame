@@ -291,6 +291,7 @@ AnalyticsPlan.Sources = {
 	CollectionSale = "Sale", -- 8.0: a piece of your collection sold (server/Collection.luau; the item SKU its furniture id)
 	VisitorOffer = "Sale", -- 8.3: a showroom visitor's offer accepted: the piece sold at it (server/VisitorOffers.luau → Collection.sellAt; the SKU its furniture id)
 	PlayerSale = "Sale", -- 8.7: a piece sold to another player: the whole price (server/PlayerTrade.luau → Collection.transfer; the SKU its furniture id; the fee goes out as TradeFee)
+	CrewRescue = "Gameplay", -- 10.1: a run's trapped helper freed who is in your crew already: the bonus instead (server/HelperCrew.luau; the SKU his kind)
 	BookMilestone = "Gameplay", -- 8.2: a collection book milestone, paid once (server/CollectionBook.luau; the SKU its id)
 	AuctionSale = "Sale", -- 8.8: your piece sold at the Auction House, the whole price (shared/AuctionRules.luau payments; the fee goes out as AuctionFee; the SKU its furniture id)
 	TutorialReward = "Onboarding", -- Marge's first-delivery reward
@@ -326,7 +327,8 @@ AnalyticsPlan.Sinks = {
 	Repair = "ContextualPurchase",
 	Reroll = "ContextualPurchase",
 	Rental = "ContextualPurchase",
-	HelperHire = "ContextualPurchase", -- 8.3: Danny hired for a move (server/MoveHelper.luau; the SKU the move's contract id)
+	HelperHire = "ContextualPurchase", -- 8.3: Danny hired for a move (10.1: no hire any more, Danny is free; kept for the dashboard's history)
+	CrewDischarge = "ContextualPurchase", -- 10.1: a helper of your crew discharged from hospital early (server/HelperCrew.luau; the SKU his kind)
 	PlayerBuy = "Shop", -- 8.7: a piece bought from another player (server/PlayerTrade.luau → Collection.transfer; the SKU its furniture id)
 	TradeFee = "ContextualPurchase", -- 8.7: the ZDC fee on a sale between players, from the seller's side (Config.PlayerTrade.Fee: it disappears, a money sink)
 }

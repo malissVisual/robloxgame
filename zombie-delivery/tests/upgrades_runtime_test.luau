@@ -368,7 +368,7 @@ local function buyWarehouse(k: number, stands: number)
 	local level = k + 1
 	local state = kinds(E.received(B, "Collection", at), "state")
 	local spent = money[moneyAt + 1]
-	check(`8.3: the ZDC Warehouse level {level} bought ({Rules.money(prices[k])}, the reason Upgrade): {stands} stands, WarehouseLevel {level}, the listeners heard, "bought"; the sofa and the TV still on 1 and 2`,
+	check(`8.3: the Deliveros Warehouse level {level} bought ({Rules.money(prices[k])}, the reason Upgrade): {stands} stands, WarehouseLevel {level}, the listeners heard, "bought"; the sofa and the TV still on 1 and 2`,
 		Rules.level(profileB.sandboxUpgrades, "warehouse") == k and profileB.money == before - prices[k] and spent ~= nil and spent.reason == "Upgrade" and spent.sku == "warehouse"
 			and Collection.stands(B) == stands and B:GetAttribute(U.WarehouseAttribute) == level and #heard == heardAt + 1 and heard[#heard] == B
 			and #kinds(E.received(B, "Upgrades", at), "bought") == 1 and state[#state] ~= nil and state[#state].stands == stands
@@ -385,7 +385,7 @@ check("8.3: … the Logistics Center: 24 big stands + More stands' 2; the radio 
 	standOf(B, radioB) == 13 and Collection.stands(B) == 26)
 local cashTop = profileB.money
 local okTop, whyTop = Upgrades.buy(B, "warehouse")
-check("8.3: the ZDC Warehouse at its top (level 5): refused, says so, nothing taken", okTop == false and whyTop == "ZDC Warehouse is at its top level." and profileB.money == cashTop, whyTop)
+check("8.3: the Deliveros Warehouse at its top (level 5): refused, says so, nothing taken", okTop == false and whyTop == "Deliveros Warehouse is at its top level." and profileB.money == cashTop, whyTop)
 local levelsB = table.clone(profileB.sandboxUpgrades)
 E.leave(B)
 check("8.3: Ben leaves: his levels saved with warehouseLevelKept", E.saves.Player_202.warehouseLevelKept == true and same(E.saves.Player_202.sandboxUpgrades, levelsB))

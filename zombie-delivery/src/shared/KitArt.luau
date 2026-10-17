@@ -46,7 +46,7 @@ function Geometry.pieces(id: string): { Piece }
 		add(out, "CourierStripe", { 1.2, .1, .035 }, { 0, -.06, 1.455 }, "UpperTorso", "red")
 		add(out, "Zip", { 1.05, .035, .04 }, { 0, .01, 1.45 }, "UpperTorso", "steel")
 		add(out, "ZipPull", { .07, .12, .045 }, { .46, -.03, 1.465 }, "UpperTorso", "steel")
-		add(out, "BackLabel", { .52, .18, .03 }, { 0, .33, 1.285 }, "UpperTorso", "charcoal", nil, { 0, 180, 0 }, "ZDC")
+		add(out, "BackLabel", { .52, .18, .03 }, { 0, .33, 1.285 }, "UpperTorso", "charcoal", nil, { 0, 180, 0 }, "DELIVEROS")
 		for _, x in { -.47, .47 } do
 			local side = if x < 0 then "L" else "R"
 			add(out, "ShoulderStrap" .. side, { .15, 1.35, .07 }, { x, -.04, -.69 }, "UpperTorso", "sole")
@@ -60,7 +60,7 @@ function Geometry.pieces(id: string): { Piece }
 		add(out, "ThermalBase", { 1.9, .12, .86 }, { 0, -1.05, 1.04 }, "UpperTorso", "sole")
 		add(out, "Flap", { 1.64, .4, .06 }, { 0, .65, 1.485 }, "UpperTorso", "cloth")
 		add(out, "RedBand", { 1.8, .12, .04 }, { 0, .1, 1.48 }, "UpperTorso", "red")
-		add(out, "LogoPanel", { .88, .33, .035 }, { 0, -.38, 1.48 }, "UpperTorso", "charcoal", nil, { 0, 180, 0 }, "ZDC / FOOD")
+		add(out, "LogoPanel", { .88, .33, .035 }, { 0, -.38, 1.48 }, "UpperTorso", "charcoal", nil, { 0, 180, 0 }, "DELIVEROS / FOOD")
 		add(out, "ReflectiveBand", { 1.72, .045, .04 }, { 0, -.77, 1.48 }, "UpperTorso", "reflector")
 		for _, x in { -.87, .87 } do
 			local side = if x < 0 then "L" else "R"
@@ -120,7 +120,7 @@ function Geometry.pieces(id: string): { Piece }
 			add(out, if z < 0 then "BagGussetF" else "BagGussetB", { .3, 1.04, .025 }, { 0, -.96, z * .555 }, "BagPivot", "reflector")
 		end
 		for _, x in { -.29, .29 } do
-			add(out, if x < 0 then "BagPrintL" else "BagPrintR", { .52, .34, .02 }, { x, -.98, 0 }, "BagPivot", "red", nil, { 0, if x < 0 then 90 else -90, 0 }, "ZDC")
+			add(out, if x < 0 then "BagPrintL" else "BagPrintR", { .52, .34, .02 }, { x, -.98, 0 }, "BagPivot", "red", nil, { 0, if x < 0 then 90 else -90, 0 }, "DELIVEROS")
 		end
 	elseif id == "tote" then
 		-- 6.7: a real canvas tote, 40 × 40 × 13 cm, on two long handles over the shoulder (a hand's drop of 22 cm: the
@@ -135,7 +135,7 @@ function Geometry.pieces(id: string): { Piece }
 				-- each end of a handle runs from the shoulder down to its stitch at (x .19, y -.64, z .3)
 				add(out, `ToteStrap{if x < 0 then "O" else "I"}{if z < 0 then "F" else "B"}`, { .05, .73, .1 }, { x * .095, -.32, z * .15 }, "BagPivot", "parcel", nil, { -z * 25, 0, x * 15 })
 			end
-			add(out, if x < 0 then "TotePrintO" else "TotePrintI", { .6, .38, .02 }, { x * .195, -1.16, 0 }, "BagPivot", "red", nil, { 0, if x < 0 then 90 else -90, 0 }, "ZDC")
+			add(out, if x < 0 then "TotePrintO" else "TotePrintI", { .6, .38, .02 }, { x * .195, -1.16, 0 }, "BagPivot", "red", nil, { 0, if x < 0 then 90 else -90, 0 }, "DELIVEROS")
 			add(out, if x < 0 then "ToteSeamF" else "ToteSeamB", { .4, 1.08, .03 }, { 0, -1.2, x * .565 }, "BagPivot", "parcel")
 		end
 		add(out, "ToteGrip", { .2, .08, .3 }, { 0, -.03, 0 }, "BagPivot", "parcel")
@@ -151,7 +151,7 @@ function Geometry.pieces(id: string): { Piece }
 		add(out, "ThermInside", { 1.04, .02, 1.2 }, { 0, -.51, 0 }, "BagPivot", "sole") -- (under the lid: seen when it is open)
 		for _, x in { -1, 1 } do
 			local side = if x < 0 then "O" else "I"
-			add(out, "ThermPatch" .. side, { .62, .34, .03 }, { x * .56, -.9, 0 }, "BagPivot", "sole", nil, { 0, if x < 0 then 90 else -90, 0 }, "ZDC")
+			add(out, "ThermPatch" .. side, { .62, .34, .03 }, { x * .56, -.9, 0 }, "BagPivot", "sole", nil, { 0, if x < 0 then 90 else -90, 0 }, "DELIVEROS")
 			add(out, "ThermReflector" .. side, { .02, .06, 1.2 }, { x * .556, -1.22, 0 }, "BagPivot", "reflector")
 			add(out, "ThermHandle" .. side, { .06, .56, .18 }, { x * .255, -.235, 0 }, "BagPivot", "sole", nil, { 0, 0, x * 46 })
 		end
@@ -169,7 +169,7 @@ function Geometry.pieces(id: string): { Piece }
 		add(out, "MessReflector", { .02, .05, .9 }, { -.262, -.68, 0 }, "BagPivot", "reflector")
 		add(out, "MessPadSeam", { .02, .05, 1.1 }, { .215, -1.0, 0 }, "BagPivot", "worn")
 		add(out, "MessBottom", { .44, .05, 1.17 }, { 0, -1.43, 0 }, "BagPivot", "cloth")
-		add(out, "MessLabel", { .44, .16, .02 }, { -.262, -.92, .22 }, "BagPivot", "sole", nil, { 0, 90, 0 }, "ZDC")
+		add(out, "MessLabel", { .44, .16, .02 }, { -.262, -.92, .22 }, "BagPivot", "sole", nil, { 0, 90, 0 }, "DELIVEROS")
 		for _, z in { -1, 1 } do
 			local tip = if z < 0 then "F" else "B"
 			add(out, "MessBuckle" .. tip, { .04, .14, .1 }, { -.265, -1.18, z * .34 }, "BagPivot", "steel")
@@ -195,7 +195,7 @@ function Geometry.pieces(id: string): { Piece }
 		add(out, "DuffZipPull", { .06, .14, .05 }, { 0, -.43, -.86 }, "BagPivot", "steel")
 		add(out, "DuffStrap", { .04, .06, 1.76 }, { -.47, -.66, 0 }, "BagPivot", "sole")
 		add(out, "DuffPocket", { .06, .42, .7 }, { -.5, -.95, 0 }, "BagPivot", "olive")
-		add(out, "DuffLabel", { .5, .18, .02 }, { -.535, -.95, 0 }, "BagPivot", "sole", nil, { 0, 90, 0 }, "ZDC")
+		add(out, "DuffLabel", { .5, .18, .02 }, { -.535, -.95, 0 }, "BagPivot", "sole", nil, { 0, 90, 0 }, "DELIVEROS")
 		add(out, "DuffGrip", { .16, .12, .2 }, { 0, -.05, 0 }, "BagPivot", "sole")
 	elseif id == "kevlar" or id == "heavy" then
 		local heavy = id == "heavy"

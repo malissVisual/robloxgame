@@ -6,13 +6,12 @@
 --
 --   Ground    the meadow's tiles (Grass, their top at GroundTop), a concrete pad on every plot (the warehouse worker's
 --             building stands on it; its top flush with the meadow), the house's lawn (a vehicle's free-room box query
---             passes this model, Config.SpawnSpot.Pass); 8.9 the village's fields and lawns (server/VillageWorld.luau);
+--             passes this model, Config.SpawnSpot.Pass); 8.9 the fields and lawns (server/VillageWorld.luau);
 --             a Persistent model (8.9: the map is 1,600 studs across: every client always has the ground it drives
 --             on); the Alps' mounds are gone
---   Roads     the asphalt of SandboxMap.Roads (8.9: Jinočany's streets too, SandboxScenery.asphalt's slabs) and the
---             turnaround (its top a hair under Pražská's where they overlap), the gravel shoulders down to the meadow
---             on every edge (the cars roll off and on anywhere; none across a junction), the markings; a Persistent
---             model as the ground
+--   Roads     the asphalt of SandboxMap.Roads (9.7 runs: only the run zones' yards, where the trucks stand; Pražská,
+--             Depot Row, the lanes, the turnaround and the markings are gone), the gravel shoulders down to the meadow
+--             on every edge; a Persistent model as the ground
 --   House     "TheOldFarmstead" (a Model, attribute SandboxHouse): shared/ChaletLooks.luau's chalet (the stand-in look)
 --             on SandboxMap.House.house,
 --             facing north to the road, its front door the part "FrontDoor" (attribute SandboxDoor = true, no collision:
@@ -32,40 +31,43 @@
 --             the box less a hall behind each doorway (Config.Moving.Doors.Hall Depth deep, the opening's width and
 --             height), each hall lined dark ("DoorHalls": the house is a shell behind its walls, a camera that follows
 --             you in sees a dark hall)
---   Houses    Jinočany step 1 (design/jinocany/NAVRH.md §3): the village's five other houses to empty (SandboxMap.Houses
---             after the farmstead) in the village's own look (shared/VillageLooks.luau, rich: VillageScenery.houses with
---             VillageScenery.enter(); the terraced one its row's whole group, one body), built here, not by
---             server/VillageWorld.luau, with its model and chunk (SandboxWorld.villageHouse): a Model named after the
---             house (attribute SandboxHouse = its id; VillageHouse, Street as the village's) in its Atomic chunk
---             (world.Village's Village_<chunk>), its pieces in "House_<id>" (attribute Home, its walls' part "House",
---             a row's "Row", the PrimaryPart), its door "FrontDoor" walked through as the farmstead's
---             (SandboxWorld.walkIn: SandboxDoor, unseen, no collision; its two leaves; the walls less a dark hall
---             behind it; the plinth no longer solid), its name on its mailbox. server/Moving.luau finds each house's
---             FrontDoor by its model's SandboxHouse.
---   Scenery   the street lamps along Pražská, the signpost at the crossroads (8.9: a Czech village's white boards; the
---             Alps' spruces, wildflowers and rail fence are gone)
---   Village   8.9 Jinočany step 1 (server/VillageWorld.luau): the village's houses, landmarks and trees in Atomic
---             chunks; the D5 in the Persistent model "Motorway"; the far view in "Far" (below)
+--   Houses    9.4 the countryside (design/countryside/plan.py): the five other places to empty (SandboxMap.Houses
+--             after the farmstead: the pond cabin, the lone house, the forest lodge, the old mill, the orchard cottage)
+--             in their own looks (shared/VillageLooks.luau, rich: VillageScenery.houses; 9.5 the cabin, the old family
+--             house, the lodge, the mill, the cottage), built here, not by server/VillageWorld.luau, with its model
+--             and chunk (SandboxWorld.villageHouse): a Model named after the house (attribute SandboxHouse = its id;
+--             VillageHouse, Street) in its Atomic chunk (world.Village's Village_<chunk>), its pieces in "House_<id>"
+--             (attribute Home, its walls' part "House", the PrimaryPart), its door "FrontDoor" walked through as the
+--             farmstead's (SandboxWorld.walkIn: SandboxDoor, unseen, no collision; its two leaves; the walls less a dark
+--             hall behind it; the plinth, where it has one, no longer solid), its name on its mailbox.
+--             server/Moving.luau finds each house's FrontDoor by its model's SandboxHouse.
+--   Lobby     9.7 runs (server/LobbyWorld.luau): the lobby's plaza, fountain, hedge, lamps, trees, the six house
+--             portals and their pads, the ZDC dispatch kiosk and the PAINT shop (9.7: the street lamps and the signpost
+--             are gone with Pražská)
+--   Village   9.4 the countryside (server/VillageWorld.luau): the places' surroundings, the trees, hedges, fences and
+--             the stream in Atomic chunks; the D5 in the Persistent model "Motorway", the railway in "Railway"; the far
+--             view in "Far" (below)
 --   Auction   8.8 (only while Config.Auction.On: the auction's groundwork shows nothing before the server's step): the
---             Auction House on Depot Row, east of the crossroads (shared/AuctionHouseLayout.luau's parts, its place
---             Config.Auction.House.Spot) in the Atomic model "AuctionHouse": its sign and lot display (SurfaceGuis the
+--             Auction House (9.7: at the lobby's south edge, SandboxMap.Lobby.shops.auction; shared/AuctionHouseLayout
+--             .luau's parts, its place Config.Auction.House.Spot) in the Atomic model "AuctionHouse": its sign and lot display (SurfaceGuis the
 --             client paints), the consignment desk's prompt (AuctionDesk), the lot's pedestal (AuctionLotStand), two lamps
---   Boundary  the invisible walls on the Bounds
---   Far       (a Persistent model: every client always has it) outside the Bounds: 8.9 Jinočany's flat horizon
---             (server/VillageWorld.luau: far fields, tree lines, pylons, the D5 going on, far roofs); no collision but
+--   Boundary  the invisible walls on the Bounds; 9.7 each run zone's on its edge (SandboxMap.Zones: "ZoneWall",
+--             Config.Runs.Zone.Wall high; its screen hedge is server/VillageWorld.luau's, SandboxMap.TreeLines')
+--   Far       (a Persistent model: every client always has it) outside the Bounds: 8.9 the flat horizon
+--             (server/VillageWorld.luau: far fields, tree lines, pylons, the D5 and the railway going on, far roofs); no collision but
 --             the far fields', no shadows (the Alps' green hills and snowy peaks are gone)
 --
 --   SandboxWorld.build()      builds it once (server/Main.server.luau at the server's start, sandbox mode) and lights
 --                             it; returns workspace.Sandbox (a second call returns it as it is)
---   SandboxWorld.lighting()   the fixed warm afternoon at Jinočany's latitude, 50° north (Config.SandboxLight.Sky; the
---                             Alps' 47° before the Jinočany plan; in sandbox mode the city's DayNight and Weather do not
+--   SandboxWorld.lighting()   the fixed warm afternoon at central Bohemia's latitude, 50° north (Config.SandboxLight.Sky;
+--                             the Alps' 47° before 8.9; in sandbox mode the city's DayNight and Weather do not
 --                             run): the clock, the sun, the ambient light, the Atmosphere's soft far haze, the sky, the
 --                             clouds and the colour grade; the workspace's clock attributes for whatever reads them
 --   SandboxWorld.doorLeaves(house)   8.3 walk-in doors: the house's doors' leaves that swing (house's build does it;
---                             Jinočany: any house to empty, found by the model's SandboxHouse, the farmstead's without)
---   Jinočany, a house to empty's own look:
---   SandboxWorld.villageHouse(world, placed)    the house to empty a VillageScenery.Placed holds (VillageScenery.emptied;
---                                               nil: none) built in the village's look into its chunk, its door walked
+--                             any place to empty, found by the model's SandboxHouse, the farmstead's without)
+--   A place to empty's own look:
+--   SandboxWorld.villageHouse(world, placed)    the place to empty a VillageScenery.Placed holds (VillageScenery.emptied;
+--                                               nil: none) built in its look into its chunk, its door walked
 --                                               in, its leaves made; SandboxWorld.build calls it for each
 --   SandboxWorld.walkIn(model, body, house, frame, floor?)   a house's doors walked through: `body` (its Model
 --                                               "House_<id>") holds its walls' part (its PrimaryPart) and its
@@ -87,20 +89,17 @@ local Config = require(Shared.Config) -- 8.5 walk-in doors: the doors' halls (Co
 local RenderBudget = require(Shared.RenderBudget)
 local SandboxMap = require(Shared.SandboxMap)
 local SandboxScenery = require(Shared.SandboxScenery)
-local VillageScenery = require(Shared.VillageScenery) -- Jinočany: the houses to empty in the village's look
+local VillageScenery = require(Shared.VillageScenery) -- 9.4: the places to empty in their looks
 
 local HouseMesh = require(script.Parent.HouseMesh) -- 8.1: the owner's Blender house (design/blender-house)
-local VillageWorld = require(script.Parent.VillageWorld) -- 8.9: Jinočany's village, the D5 and the far view
+local LobbyWorld = require(script.Parent.LobbyWorld) -- 9.7: the lobby's plaza, portals, dispatch and PAINT shop
+local VillageWorld = require(script.Parent.VillageWorld) -- 9.4: the countryside, the D5, the railway and the far view
 
 local SandboxWorld = {}
 
 local S = SandboxScenery
 local MAP = SandboxMap
 local C = SandboxScenery.Colors
-local UPRIGHT = CFrame.Angles(0, 0, math.rad(90)) -- a cylinder standing up
-local POLE = Color3.fromRGB(50, 50, 54)
-local LAMP_DIM = Color3.fromRGB(196, 194, 182)
-local SIGN = Color3.fromRGB(C.Sign[1], C.Sign[2], C.Sign[3]) -- the signpost's boards (8.9: a Czech village's white, not the Alps' yellow)
 local INK = Color3.fromRGB(C.Ink[1], C.Ink[2], C.Ink[3])
 
 local function rgb(c: { number }): Color3
@@ -260,15 +259,11 @@ local function roads(world: Instance)
 	local holder = persistent(world, "Roads")
 	local asphalt = rgb(C.Asphalt)
 	local depth = S.RoadDepth
-	-- (8.9: every street's slab; Pražská's from Depot Row's south edge: the junction is Depot Row's asphalt)
+	-- (9.7: the yards' slabs, where the trucks stand)
 	for _, r in S.asphalt() do
 		local road = slab(holder, "Road", r, MAP.RoadTop, depth, asphalt, Enum.Material.Asphalt)
 		road:SetAttribute("Road", r.name)
 	end
-	local T = MAP.Turnaround
-	local disc = block(holder, "Turnaround", Vector3.new(depth, 2 * T.r, 2 * T.r), CFrame.new(T.x, S.TurnaroundTop - depth / 2, T.z) * UPRIGHT, asphalt, Enum.Material.Asphalt)
-	disc.Shape = Enum.PartType.Cylinder
-	disc.CastShadow = false
 	local gravel = rgb(C.Shoulder)
 	for _, r in S.ramps() do
 		local frame = CFrame.fromMatrix(Vector3.new(r.x, r.y, r.z), Vector3.new(r.rx, 0, r.rz), Vector3.yAxis)
@@ -277,12 +272,6 @@ local function roads(world: Instance)
 			then cornerWedge(holder, "Shoulder", size, frame, gravel, Enum.Material.Pebble)
 			else wedge(holder, "Shoulder", size, frame, gravel, Enum.Material.Pebble)
 		p.CastShadow = false
-	end
-	local white = rgb(C.Line)
-	for _, m in S.markings() do
-		local at = Vector3.new(m.x, m.top + 0.025, m.z)
-		local line = deco(block(holder, m.name, Vector3.new(m.width, 0.05, m.length), CFrame.lookAt(at, at + Vector3.new(m.dx, 0, m.dz)), white, Enum.Material.SmoothPlastic))
-		line.CastShadow = false
 	end
 end
 
@@ -316,7 +305,7 @@ end
 -- HouseMesh.Looks), the chalet's own leaves hidden with it, swinging no more; else the chalet's own leaves (house's
 -- build: FrontLeafWest, FrontLeafEast, BackLeaf). Never colliding, never in a ray's way. 8.5.1 (the owner: "the doors
 -- just disappear"): they open Config.Moving.Doors.Wide degrees (DoorAngle), past square: square to the wall they were
--- edge-on to a camera walking up, two slivers by a black doorway. Returns the leaves. Jinočany: any house to empty
+-- edge-on to a camera walking up, two slivers by a black doorway. Returns the leaves. Any place to empty
 -- (its model's SandboxHouse: SandboxMap.Houses' id; none: the farmstead), its back door's only where it has one.
 function SandboxWorld.doorLeaves(house: Model): { Instance }
 	local H = MAP.house(house:GetAttribute("SandboxHouse")) or MAP.House
@@ -380,10 +369,10 @@ end
 -- (server/Moving.luau's WalkIn), the walls either side as solid as ever. Each hall lined dark in "DoorHalls" (its back,
 -- sides, ceiling and floor, from just behind the model's own door: the house is a shell behind its walls, and a camera
 -- that follows you in sees a dark hall, never the hollow model); decoration, never colliding. `frame`: the front door's
--- (its foot on the front wall, -Z out); `top`: the doorways' height. Jinočany: house `H` (SandboxMap.Houses'), its walls
--- the body's PrimaryPart (the farmstead's chalet "House", a village look's "House" or "Row"), their box read off it in
+-- (its foot on the front wall, -Z out); `top`: the doorways' height. House `H` (SandboxMap.Houses'), its walls
+-- the body's PrimaryPart (the farmstead's chalet "House", a VillageLooks look's "House" or "Row"), their box read off it in
 -- the door's frame (its front door looking any way); a back door's hall only where it has one (else the solid behind
--- the front hall reaches the back wall); `floor`: the halls' dark floor's top (0.04 on the lawn; over a village look's
+-- the front hall reaches the back wall); `floor`: the halls' dark floor's top (0.04 on the lawn; over a VillageLooks look's
 -- plinth, no longer solid, its top).
 local function doorHalls(model: Model, body: Model, H: SandboxMap.House, frame: CFrame, top: number, floor: number)
 	local hall = Config.Moving.Doors.Hall
@@ -443,7 +432,7 @@ local function doorHalls(model: Model, body: Model, H: SandboxMap.House, frame: 
 	end
 end
 
--- 8.3 the big move, 8.5 walk-in doors (the farmstead's build did it; Jinočany: every house to empty's): the house's
+-- 8.3 the big move, 8.5 walk-in doors (the farmstead's build did it; every place to empty's): the house's
 -- doors walked through. Its FrontDoor (in `body`, at H.door: `frame`) is the doorway, the moves' front door, unseen
 -- (SandboxDoor, no collision: server/Moving.luau puts its "Enter house" prompt there), behind its two leaves (each
 -- half of it, a part of their own, each its doorway's side: SandboxWorld.doorLeaves makes them door leaves, the doors'
@@ -479,11 +468,11 @@ function SandboxWorld.walkIn(model: Model, body: Model, H: SandboxMap.House, fra
 	doorHalls(model, body, H, frame, size.Y, floor or 0.04) -- 8.5 walk-in doors: the doorways walkable, a dark hall behind each
 end
 
--- Jinočany step 1: the house to empty a VillageScenery.Placed holds (VillageScenery.emptied: one of the village's five
--- after the farmstead; nil: none, nothing built) in the village's look (VillageScenery.pieces: rich; a terraced one its
--- row's whole group, one body, its own house the group's richUnit), as server/VillageWorld.luau builds a house
+-- 9.4: the place to empty a VillageScenery.Placed holds (VillageScenery.emptied: one of the five after the farmstead;
+-- nil: none, nothing built) in its look (VillageScenery.pieces: VillageLooks.house's, rich; a terraced row's look its
+-- whole group, one body, its own house the group's richUnit), as server/VillageWorld.luau builds a landmark
 -- (VillageWorld.model) but with its own model, in its chunk (VillageWorld.chunk): the Model named after it (attribute
--- SandboxHouse = its id; VillageHouse, Street and a group's VillageHouses as the village's), its pieces in
+-- SandboxHouse = its id; VillageHouse, Street, a group's VillageHouses), its pieces in
 -- "House_<id>" (attribute Home; its walls "House", a row's "Row", the PrimaryPart). Its door (the piece tagged "door";
 -- a row's, its unit's) is the FrontDoor, turned round to the farmstead's frame (-Z out of it; VillageLooks' +Z out),
 -- walked through as the farmstead's (SandboxWorld.walkIn: its frame the door's foot on the front wall); the plinth
@@ -594,7 +583,7 @@ local function house(world: Instance): Model
 	-- SandboxBackDoor, unseen, no collision: server/Moving.luau's second way in) as the FrontDoor is to the front,
 	-- S.BackDoor.Width wide, and its leaf. All of them the house's own parts: dressed in the owner's model they are hidden
 	-- with the chalet (copies of the model's doors swing instead: doorLeaves).
-	SandboxWorld.walkIn(model, body, H, frame) -- (Jinočany: every house to empty's, the village's own too)
+	SandboxWorld.walkIn(model, body, H, frame) -- (every place to empty's, the other five's too)
 	-- the owner's Blender house over it once imported (the chalet's parts hidden, the FrontDoor too: still the prompt's
 	-- part, where the model's door is); else the chalet as it is
 	if HouseMesh.dress(body, H.id) then
@@ -718,38 +707,6 @@ local function auctionHouse(world: Instance): Model
 	return model
 end
 
--- ── The scenery ────────────────────────────────────────────────────────────
-
-local function scenery(world: Instance)
-	local holder = folder(world, "Scenery")
-	-- the street lamps (a fixed afternoon: their heads stay dim, no lights)
-	local lamps = folder(holder, "Lamps")
-	local up = Vector3.new(0, 0.3, 0)
-	for _, l in S.lamps() do
-		local y = MAP.GroundTop
-		local out = Vector3.new(l.rx, 0, l.rz)
-		block(lamps, "LampPole", Vector3.new(0.6, 16, 0.6), CFrame.new(l.x, y + 8, l.z), POLE, Enum.Material.Metal)
-		local foot = Vector3.new(l.x, y + 15.8, l.z)
-		deco(block(lamps, "LampArm", Vector3.new(0.35, 0.35, 4.4), CFrame.lookAt(foot + out * 2.2, foot + out * 4.4), POLE, Enum.Material.Metal))
-		local at = foot + out * 4.2 - up
-		deco(block(lamps, "LampHood", Vector3.new(2, 0.3, 1.4), CFrame.lookAt(at + up, at + up + out), POLE, Enum.Material.Metal))
-		deco(block(lamps, "Lamp", Vector3.new(1.7, 0.3, 1.1), CFrame.lookAt(at, at + out), LAMP_DIM, Enum.Material.Glass))
-	end
-	-- the signpost at the crossroads: a post, three white boards (to the warehouses either way, to the farmstead)
-	local sign = folder(holder, "Signpost")
-	local s = S.Signpost
-	block(sign, "SignPost", Vector3.new(0.7, 12, 0.7), CFrame.new(s.x, 6, s.z), Color3.fromRGB(96, 70, 48), Enum.Material.Wood)
-	deco(block(sign, "SignCap", Vector3.new(1.1, 0.4, 1.1), CFrame.new(s.x, 12.2, s.z), POLE, Enum.Material.Metal))
-	for _, b in S.signpost() do
-		local reach = 4.4
-		local at = Vector3.new(s.x + b.dx * reach, b.y, s.z + b.dz * reach)
-		local face = if b.dz == 0 then Vector3.new(0, 0, -1) else Vector3.new(-1, 0, 0) -- (its front to the north, or the west)
-		local board = deco(block(sign, "SignBoard", Vector3.new(8, 1.5, 0.25), CFrame.lookAt(at, at + face), SIGN, Enum.Material.SmoothPlastic))
-		label(board, Enum.NormalId.Front, b.text, INK)
-		label(board, Enum.NormalId.Back, b.back, INK)
-	end
-end
-
 -- ── The edge and far away ──────────────────────────────────────────────────
 
 local function boundary(world: Instance)
@@ -765,6 +722,22 @@ local function boundary(world: Instance)
 		local wall = slab(holder, "InvisibleWall", r, MAP.GroundTop + h - 10, h, black, Enum.Material.SmoothPlastic)
 		wall.Transparency = 1
 		wall.CanQuery = false
+	end
+	-- 9.7: each run zone's walls on its edge (its screen hedge stands on the same line): nobody wanders off
+	local high = Config.Runs.Zone.Wall
+	for _, zone in MAP.Zones do
+		local q = zone.rect
+		for _, r in {
+			{ x0 = q.x0 - t, x1 = q.x1 + t, z0 = q.z0 - t, z1 = q.z0 },
+			{ x0 = q.x0 - t, x1 = q.x1 + t, z0 = q.z1, z1 = q.z1 + t },
+			{ x0 = q.x0 - t, x1 = q.x0, z0 = q.z0, z1 = q.z1 },
+			{ x0 = q.x1, x1 = q.x1 + t, z0 = q.z0, z1 = q.z1 },
+		} do
+			local wall = slab(holder, "ZoneWall", r, MAP.GroundTop + high, high, black, Enum.Material.SmoothPlastic)
+			wall.Transparency = 1
+			wall.CanQuery = false
+			wall:SetAttribute("RunZone", zone.id)
+		end
 	end
 end
 
@@ -834,9 +807,9 @@ function SandboxWorld.build(): Folder
 	ground(world)
 	roads(world)
 	house(world)
-	scenery(world)
-	local village = VillageWorld.build(world) -- 8.9: Jinočany's village, its fields and lawns, the D5, the far view
-	for _, placed in VillageScenery.houses(VillageScenery.enter()) do -- (Jinočany: the houses to empty in its look)
+	LobbyWorld.build(world) -- 9.7: the lobby (its plaza, portals, dispatch and PAINT shop)
+	local village = VillageWorld.build(world) -- 9.4: the countryside, its fields and lawns, the D5, the railway, the far view
+	for _, placed in VillageScenery.houses() do -- (the five other places to empty, each in its look)
 		if SandboxWorld.villageHouse(world, placed) then
 			village.houses += 1
 		end

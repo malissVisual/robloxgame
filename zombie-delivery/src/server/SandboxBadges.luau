@@ -297,7 +297,7 @@ local function hookCollection()
 		topSoon()
 	end)
 	api.onAdded(function(player: Player, entry: any)
-		for _, key in Rules.fromAdded(if type(entry) == "table" then entry.item else nil) do
+		for _, key in Rules.fromAdded(if type(entry) == "table" then entry.item else nil, if type(entry) == "table" then entry.rarity else nil) do -- (9.x loot: its rarity)
 			SandboxBadges.give(player, key)
 		end
 		look(player)

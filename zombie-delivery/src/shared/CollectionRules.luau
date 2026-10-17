@@ -12,10 +12,18 @@
 --
 --   CollectionRules.defOf(item)          the piece's furniture def (FurnitureLooks.Items) or nil (an id that left the
 --                                        catalogue: worth $0)
---   CollectionRules.valueOf(entry)       its def's value ($), 0 without one
+--   CollectionRules.valueOf(entry)       its def's value ($), 0 without one; 9.x loot: × lift for its rarity (a whole
+--                                        number of $; its item's own rarity: the def's value as before)
 --   CollectionRules.rarityOf(def)        the tier's id: the def's own `rarity` when it is a tier (the collectibles), else
 --                                        the rarest tier whose `min` its value reaches; tier(id) the tier (Config's),
---                                        tierOf(entry) the piece's
+--                                        tierOf(entry) the piece's (9.x loot: its own rarity, pieceRarity)
+--   9.x loot (Config.Loot, shared/LootRules.luau, server/Loot.luau): a piece's rarity is the server's roll when its house
+--   was made, kept with the piece (Entry.rarity); a piece without one (every piece before 9.x) is its item's own:
+--   CollectionRules.pieceRarity(entry)   the piece's rarity: its `rarity` when that is a tier, else its item's own
+--   CollectionRules.lift(own, rarity)    × the catalogue value of a piece of rarity `rarity` whose item's own is `own`:
+--                                        Config.Loot.Lift a tier over, Drop a tier under (1: the same)
+--   CollectionRules.keepRarity(item, r)  what the save keeps of a rarity: a tier's id other than the item's own, else nil
+--                                        (the item's own needs nothing kept: it reads so without one)
 --   CollectionRules.broken(entry)        its condition is at or under BrokenAt
 --   CollectionRules.income(entry, boost?, market?)   $ a minute while it is on show: value × its tier's income ×
 --                                        condition (0 broken) × boost (8.1: the owner's Showroom lights,
@@ -39,13 +47,16 @@
 --   CollectionRules.clean(raw)           a saved one checked, never trusted: entries with a uid (unique), a short item
 --                                        id, variant, condition, name, a stand (a whole number, one piece a stand) and
 --                                        got; MaxStock at most; nextUid past every uid's number; 8.7: a sale (a whole
---                                        number 1 … 2^40, only on a piece on a stand: else none)
+--                                        number 1 … 2^40, only on a piece on a stand: else none); 9.x loot: its rarity
+--                                        (keepRarity: a tier's id other than its item's own, else none)
 --   CollectionRules.fromSave(saved)      the migration (server/PlayerData.luau applySaved): only a real save (money in
 --                                        it) written with the flag (SaveFlag) has a collection; an older one, a new
 --                                        player or a lock-only record start with the empty one. 8.7: a piece's `sale` needs
 --                                        no migration of its own: a piece without one is simply not for sale (a save from
 --                                        before 8.7, or written again by an 8.2 – 8.6 server, whose clean drops the field it
---                                        does not know: the sign is lost there, nothing breaks)
+--                                        does not know: the sign is lost there, nothing breaks). 9.x loot: a piece's
+--                                        `rarity` the same way: none is its item's own (a save from before 9.x, or
+--                                        written again by an older server: the piece reads as its own rarity there)
 --   CollectionRules.fitStands(collection, stands, fits?)   pieces on a stand past `stands` back to the stock (how
 --                                        many); 8.3: with fits(stand, item), a piece that no longer fits its stand too
 --                                        (a warehouse level down: a small stand where a big one stood); 8.7: their FOR
@@ -69,6 +80,7 @@ export type Entry = {
 	stand: number?, -- on show on this display stand of your warehouse (nil: in the stock)
 	got: number, -- os.time() it came home
 	sale: number?, -- 8.7: its FOR SALE sign's price ($; only while it is on show: server/PlayerTrade.luau)
+	rarity: string?, -- 9.x loot: the server's roll when its house was made, when not its item's own (nil: its own)
 }
 export type Saved = { entries: { Entry }, nextUid: number }
 export type View = {
@@ -113,11 +125,6 @@ function CollectionRules.defOf(item: string): FurnitureLooks.ItemDef?
 	return FurnitureLooks.Items[item]
 end
 
-function CollectionRules.valueOf(entry: { item: string }): number
-	local def = CollectionRules.defOf(entry.item)
-	return if def and finite(def.value) then math.max(0, def.value) else 0
-end
-
 function CollectionRules.tier(id: string): Config.CollectionTier
 	return tune().Tiers[id] or tune().Tiers[tune().Order[1]]
 end
@@ -142,8 +149,59 @@ function CollectionRules.rarityOf(def: { value: number }?): string
 	return best
 end
 
+-- ── 9.x loot: a piece's own rarity ─────────────────────────────────────────
+
+local function isTier(id: any): boolean
+	return type(id) == "string" and tune().Tiers[id] ~= nil
+end
+
+-- The piece's rarity: the server's roll kept with it (Entry.rarity) when it is a tier, else its item's own.
+function CollectionRules.pieceRarity(entry: { item: string }): string
+	local own = (entry :: any).rarity
+	if isTier(own) then
+		return own
+	end
+	return CollectionRules.rarityOf(CollectionRules.defOf(entry.item))
+end
+
+-- × the catalogue value of a piece of rarity `rarity` whose item's own rarity is `own`: Lift for every tier over it,
+-- Drop for every tier under it (1: the same tier, or one that is no tier).
+function CollectionRules.lift(own: string, rarity: string): number
+	if not isTier(own) or not isTier(rarity) then
+		return 1
+	end
+	local steps = CollectionRules.tier(rarity).rank - CollectionRules.tier(own).rank
+	local loot = (Config :: any).Loot
+	if steps == 0 or type(loot) ~= "table" then
+		return 1
+	end
+	local per = if steps > 0 then loot.Lift else loot.Drop
+	return if finite(per) and per > 0 then per ^ math.abs(steps) else 1
+end
+
+-- What a save keeps of a piece's rarity: a tier's id that is not its item's own (nil: it reads as its own).
+function CollectionRules.keepRarity(item: string, rarity: any): string?
+	if not isTier(rarity) or rarity == CollectionRules.rarityOf(CollectionRules.defOf(item)) then
+		return nil
+	end
+	return rarity
+end
+
+-- Its def's value ($), 0 without one; 9.x loot: × lift for the piece's rarity (a whole number of $; its item's own
+-- rarity: the def's value as before).
+function CollectionRules.valueOf(entry: { item: string }): number
+	local def = CollectionRules.defOf(entry.item)
+	local value = if def and finite(def.value) then math.max(0, def.value) else 0
+	local own = (entry :: any).rarity
+	if not def or not isTier(own) then
+		return value
+	end
+	local lift = CollectionRules.lift(CollectionRules.rarityOf(def), own)
+	return if lift == 1 then value else math.floor(value * lift + 0.5)
+end
+
 function CollectionRules.tierOf(entry: { item: string }): Config.CollectionTier
-	return CollectionRules.tier(CollectionRules.rarityOf(CollectionRules.defOf(entry.item)))
+	return CollectionRules.tier(CollectionRules.pieceRarity(entry))
 end
 
 local function condition(entry: { condition: number }): number
@@ -191,7 +249,7 @@ function CollectionRules.view(entry: Entry, boost: number?, market: Market.View?
 		name = entry.name,
 		stand = entry.stand,
 		got = entry.got,
-		rarity = CollectionRules.rarityOf(CollectionRules.defOf(entry.item)),
+		rarity = CollectionRules.pieceRarity(entry), -- (9.x loot: its own roll)
 		value = CollectionRules.valueOf(entry),
 		income = math.floor(CollectionRules.income(entry, boost, market) * 100 + 0.5) / 100,
 		price = if market then Market.price(base, market, entry.item) else base,
@@ -313,6 +371,7 @@ function CollectionRules.clean(raw: any): Saved
 				stand = stand,
 				got = if finite(e.got) then math.clamp(math.floor(e.got), 0, 2 ^ 40) else 0,
 				sale = if stand ~= nil then CollectionRules.saleOf(e.sale) else nil, -- (8.7: a sign only on a stand)
+				rarity = CollectionRules.keepRarity(e.item, e.rarity), -- (9.x loot: none reads as its item's own)
 			})
 		end
 	end

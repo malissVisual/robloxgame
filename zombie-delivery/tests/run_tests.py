@@ -29,8 +29,16 @@ PURE += ("SaveGuard",)  # 8.3 saves: what a save writes, checked; the unknown ke
 PURE += ("ClipboardRules",)  # 8.5 Danny's clipboard, orders mode (tests/clipboard_test.luau, tests/clipboard_runtime_test.luau)
 PURE += ("PlayerTradeRules",)  # 8.7 sandbox, trading between players (tests/playertrade_test.luau, tests/playertrade_runtime_test.luau)
 PURE += ("VillageLooks",)  # 8.9 sandbox, Jinočany: the village's art kit (tests/villagelooks_test.luau)
-PURE += ("VillageScenery",)  # 8.9 sandbox, Jinočany step 1 on the map: where the village stands (tests/villageworld_test.luau)
-PURE += ("HouseRoute",)  # 9.0 Danny's way inside a house, on its plan's grid (tests/houseroute_test.luau, tests/dannynav_runtime_test.luau)
+PURE += ("VillageScenery",)  # 8.9 sandbox on the map, 9.4 the countryside: where everything stands (tests/villageworld_test.luau)
+PURE += ("CountryLooks",)  # 9.4 sandbox, the countryside's art kit (tests/countrylooks_test.luau)
+PURE += ("HouseRoute",)  # 9.0 Danny's way inside a house, on its plan's grid (tests/houseroute_test.luau, tests/dannynav_runtime_test.luau; 9.3 his walk along it, audited against the built parts: tests/movehelper_stuck_runtime_test.luau)
+PURE += ("PedalRules",)  # 9.1 the drive pedals: the input, the press, where they go (tests/drivepedals_test.luau)
+PURE += ("CharacterLooks", "SaveSlotRules")  # 10.1 the start: the courier you make, the save slots (tests/characterlooks_test.luau, tests/saveslots_test.luau, tests/saveslots_runtime_test.luau)
+PURE += ("RunRules",)  # 9.7 runs: the difficulties and their unlocks, the pads, the votes, whose stock (tests/runrules_test.luau)
+PURE += ("LootRules",)  # 9.x loot: a house's pieces' rarities by the difficulty, the stars, the toasts (tests/loot_test.luau)
+PURE += ("SandboxMapRules",)  # 10.x the map: the plan's code, the frames, the yard, the fog, the words, the layout (tests/sandboxmaprules_test.luau)
+PURE += ("DangerRules",)  # 10.x danger: a run's locks, keys, vault and hazards on the real plans (tests/danger_test.luau; it requires FurnitureLooks, the recorder's copy below)
+PURE += ("CrewRules",)  # 10.1 the helpers' crew: the kinds, what they carry, the save, the hospital, the rescue, who comes (tests/crewrules_test.luau)
 luau = sys.argv[1] if len(sys.argv) > 1 else shutil.which("luau") or "luau"
 
 ok = True
@@ -137,8 +145,14 @@ with tempfile.TemporaryDirectory() as tmp:
     # soldier at the Wall, Marge at the kiosk; Moving requires it; tests/movegreeters_runtime_test.luau drives it).
     # 8.1 carrying in two: the real server/PairHold.luau as PairHoldServer.luau the same way (Danny's hold and a crew
     # mate's at a piece's far end; MoveHelper and Moving require it).
-    built_as = {"MoveHelper": "MoveHelperServer", "MoveLobby": "MoveLobbyServer", "MoveGreeters": "MoveGreetersServer", "PairHold": "PairHoldServer"}
-    for module, built in (("Moving", "MovingServer"), ("MoveHelper", "MoveHelperServer"), ("MoveLobby", "MoveLobbyServer"), ("MoveGreeters", "MoveGreetersServer"), ("PairHold", "PairHoldServer")):
+    # 9.x loot: the real server/Loot.luau as LootServer.luau the same way (Moving tags every piece with it: its rarity,
+    # stars and value; tests/loot_runtime_test.luau).
+    # 10.x danger: the real server/RunDanger.luau as RunDangerServer.luau the same way (a run's locks, vault, hazards and
+    # zombies; Moving's run start listener; tests/danger_runtime_test.luau). 10.1 the crew: the real server/HelperCrew.luau
+    # as HelperCrewServer.luau the same way (MoveHelper requires it: each kind's hooks, down in a run, the rescue;
+    # tests/crew_runtime_test.luau).
+    built_as = {"MoveHelper": "MoveHelperServer", "MoveLobby": "MoveLobbyServer", "MoveGreeters": "MoveGreetersServer", "PairHold": "PairHoldServer", "Loot": "LootServer", "RunDanger": "RunDangerServer", "HelperCrew": "HelperCrewServer"}
+    for module, built in (("Moving", "MovingServer"), ("MoveHelper", "MoveHelperServer"), ("MoveLobby", "MoveLobbyServer"), ("MoveGreeters", "MoveGreetersServer"), ("PairHold", "PairHoldServer"), ("Loot", "LootServer"), ("RunDanger", "RunDangerServer"), ("HelperCrew", "HelperCrewServer")):
         source = open(os.path.join(os.path.dirname(SHARED), "server", module + ".luau"), encoding="utf-8").read()
         source = re.sub(r"require\(Shared\.(\w+)\)", lambda m: "E.Net" if m[1] == "Net" else f'require("./{m[1]}")', source)
         source = source.replace("require(script.Parent.MoveSites)", 'require("./MoveSitesServer")')  # 7.0: the real one (below)
@@ -190,10 +204,19 @@ with tempfile.TemporaryDirectory() as tmp:
     open(os.path.join(tmp, "NpcsServer.luau"), "w", encoding="utf-8").write('setfenv(1, require("./NpcsRuntime").env)\n' + source)
     # 8.3: the real client/PairSteer.luau (the leader's side of carrying in two) as PairSteerClient.luau for
     # tests/pairsteer_test.luau: a function of the globals it reads (the test's game, a require that gives the PairCarry
-    # copy above, the recorder's CFrame).
+    # copy above, the recorder's CFrame; 9.0 its typeof, Vector3 and workspace: PairWall, PairFar, the partner's body).
+    # 9.2 (you drive Danny's end): its script too (the test's: script.Parent's PairLead, a require of its own), and the
+    # real client/PairLead.luau as PairLeadClient.luau, a function of the globals it reads (the test's game, require,
+    # workspace and os; the recorder's CFrame, Vector3, typeof, Enum and RaycastParams) for tests/pairsteer_test.luau and
+    # the moves' runtime tests that play the leader's client (tests/movehelper_backwards_runtime_test.luau).
     source = open(os.path.join(os.path.dirname(SHARED), "client", "PairSteer.luau"), encoding="utf-8").read()
     open(os.path.join(tmp, "PairSteerClient.luau"), "w", encoding="utf-8").write(
-        "return function(game: any, require: any, CFrame: any)\n" + source + "\nend\n")
+        "return function(game: any, require: any, CFrame: any, typeof: any, Vector3: any, workspace: any, script: any)\n" + source + "\nend\n")
+    source = open(os.path.join(os.path.dirname(SHARED), "client", "PairLead.luau"), encoding="utf-8").read()
+    source = re.sub(r"^export type ", "type ", source, flags=re.M)  # (only at a module's top level)
+    open(os.path.join(tmp, "PairLeadClient.luau"), "w", encoding="utf-8").write(
+        "return function(game: any, require: any, CFrame: any, typeof: any, Vector3: any, workspace: any, os: any, Enum: any, RaycastParams: any)\n"
+        + source + "\nend\n")
     # 9.0 (the sandbox's free mouse): the real client/CameraRig.luau as CameraRigClient.luau for tests/camerarig_test.luau:
     # a function of the globals it reads (the test's services, workspace, script, require, Instance, RaycastParams, task
     # and clock; ClientRuntime.luau's frames, vectors and colours), made afresh for each world (the sandbox, the city).
@@ -267,6 +290,16 @@ with tempfile.TemporaryDirectory() as tmp:
         source = re.sub(r"require\(Shared\.(\w+)\)", lambda m: "E.Net" if m[1] == "Net" else f'require("./{m[1]}")', source)
         source = source.replace("require(script.Parent.PlayerData)", 'require("./PlayerDataServer")')
         open(os.path.join(tmp, module + "Server.luau"), "w", encoding="utf-8").write(head + source)
+    # 10.1, the save slots: the real server/SaveSlots.luau as SaveSlotsServer.luau for tests/saveslots_runtime_test.luau on
+    # the same runtime (its PlayerData the real one above); CourierAvatar and TextService the test's stand-ins
+    # (E.CourierAvatar: the looks put on; E.TextService: Roblox's filter), set before it is required.
+    source = open(os.path.join(os.path.dirname(SHARED), "server", "SaveSlots.luau"), encoding="utf-8").read()
+    source = re.sub(r"require\(Shared\.(\w+)\)", lambda m: "E.Net" if m[1] == "Net" else f'require("./{m[1]}")', source)
+    source = source.replace("require(script.Parent.PlayerData)", 'require("./PlayerDataServer")')
+    source = source.replace("require(script.Parent.CourierAvatar)", "E.CourierAvatar")
+    source = source.replace('game:GetService("TextService")', "E.TextService")
+    assert "script.Parent" not in source, "server/SaveSlots.luau requires a module tests/run_tests.py does not give it"
+    open(os.path.join(tmp, "SaveSlotsServer.luau"), "w", encoding="utf-8").write(head + source)
     # 8.1 SANDBOX, the upgrades: the real server/Upgrades.luau as UpgradesServer.luau for tests/upgrades_runtime_test.luau
     # on the same runtime: its PlayerData and Collection the real ones above, SandboxPlots the runtime's fake (its plotOf),
     # `workspace` the runtime's (a Cars folder whose vans come with Runtime.addCar).
@@ -295,7 +328,8 @@ with tempfile.TemporaryDirectory() as tmp:
     assert "script.Parent" not in source, "server/VanPaint.luau requires a module tests/run_tests.py does not give it"
     paint_head = ('local P = require("./VanPaintRuntime")\nlocal E, M = P.E, P.Mock\n'
                   'local game, task, os, warn, Instance = P.game, E.task, E.os, E.warn, P.Instance\n'
-                  'local Vector3, CFrame, Color3, Enum, typeof = M.Vector3, M.CFrame, M.Color3, M.Enum, M.typeof\n')
+                  'local Vector3, CFrame, Color3, Enum, typeof = M.Vector3, M.CFrame, M.Color3, M.Enum, M.typeof\n'
+                  'local workspace = E.workspace -- (9.7: the lobby\'s PAINT shop booth is looked for in workspace.Sandbox)\n')
     open(os.path.join(tmp, "VanPaintServer.luau"), "w", encoding="utf-8").write(paint_head + source)
     # 8.2 SANDBOX, analytics: the real server/Analytics.luau and server/SandboxAnalytics.luau as AnalyticsServer.luau and
     # SandboxAnalyticsServer.luau for tests/sandboxanalytics_runtime_test.luau on the same runtime: PlayerData and
@@ -371,7 +405,21 @@ with tempfile.TemporaryDirectory() as tmp:
     source = re.sub(r"require\(Shared\.(\w+)\)", r'require("./\1")', source)
     source = source.replace("require(script.Parent.HouseMesh)", 'require("./HouseMeshServer")')
     source = source.replace("require(script.Parent.VillageWorld)", 'require("./VillageWorldServer")')
+    source = source.replace("require(script.Parent.LobbyWorld)", 'require("./LobbyWorldServer")')  # 9.7: the lobby
     open(os.path.join(tmp, "SandboxWorldServer.luau"), "w", encoding="utf-8").write('setfenv(1, require("./WorldMock").env)\n' + source)
+    # 9.7 runs: its server/LobbyWorld.luau (the lobby: the plaza, the portals, the dispatch, the PAINT shop) on the same
+    # mock as LobbyWorldServer.luau, its server/MoveSites.luau (the dispatch kiosk's art) as MoveSitesWorld.luau there
+    # (DayNight a stand-in), its shared modules the copies above.
+    source = open(os.path.join(os.path.dirname(SHARED), "server", "MoveSites.luau"), encoding="utf-8").read()
+    source = re.sub(r"require\(Shared\.(\w+)\)", r'require("./\1")', source)
+    source = source.replace("require(script.Parent.DayNight)", "{ nightLight = function() end }")
+    open(os.path.join(tmp, "MoveSitesWorld.luau"), "w", encoding="utf-8").write('setfenv(1, require("./WorldMock").env)\n' + source)
+    source = open(os.path.join(os.path.dirname(SHARED), "server", "LobbyWorld.luau"), encoding="utf-8").read()
+    source = re.sub(r"require\(Shared\.(\w+)\)", r'require("./\1")', source)
+    source = source.replace("require(script.Parent.MoveSites)", 'require("./MoveSitesWorld")')
+    source = source.replace("require(script.Parent.VillageWorld)", 'require("./VillageWorldServer")')
+    assert "script.Parent" not in source, "server/LobbyWorld.luau requires a module tests/run_tests.py does not give it"
+    open(os.path.join(tmp, "LobbyWorldServer.luau"), "w", encoding="utf-8").write('setfenv(1, require("./WorldMock").env)\n' + source)
     # 8.9 Jinočany: its server/VillageWorld.luau (the village, the D5, the far view) on the same mock as
     # VillageWorldServer.luau (tests/villageworld_test.luau), its shared modules the copies above.
     source = open(os.path.join(os.path.dirname(SHARED), "server", "VillageWorld.luau"), encoding="utf-8").read()
@@ -399,8 +447,8 @@ with tempfile.TemporaryDirectory() as tmp:
         "return { box = { %r, %r, %r }, door = { x0 = %r, x1 = %r, y0 = %r, y1 = %r, z0 = %r, z1 = %r }, top = %r, "
         "back = { x0 = %r, x1 = %r, y0 = %r, y1 = %r, z0 = %r, z1 = %r }, backKnob = %r }\n"
         % (*art["box"], lo[0], hi[0], lo[1], hi[1], lo[2], hi[2], top, b_lo[0], b_hi[0], b_lo[1], b_hi[1], b_lo[2], b_hi[2], sum(knobs) / len(knobs)))
-    # 8.8: the Jinočany plan (design/jinocany/plan.json: the village the sandbox becomes) as JinocanyPlan.luau for
-    # tests/auctionhouse_test.luau: the Auction House stands on none of its roads, landmarks, fields, houses or tree lines.
+    # 8.8: the Jinočany plan (design/jinocany/plan.json: the village the sandbox was, 8.9) as JinocanyPlan.luau for
+    # tests/villagelooks_test.luau (shared/VillageLooks.luau's art kit, its village kinds built from it).
     plan = json.load(open(os.path.join(os.path.dirname(HERE), "design", "jinocany", "plan.json"), encoding="utf-8"))
     def rect(r):
         return "{ x0 = %r, x1 = %r, z0 = %r, z1 = %r }" % (r["x0"], r["x1"], r["z0"], r["z1"])
@@ -432,6 +480,48 @@ with tempfile.TemporaryDirectory() as tmp:
         "enter = {\n%s\n},\nvillage = {\n%s\n},\nturnaround = { x = %r, z = %r, r = %r },\n}\n"
         % (rect(plan["bounds"]), "\n".join(lines), "\n".join(trees), "\n".join(houses), "\n".join(marks), "\n".join(roads), "\n".join(fields), "\n".join(paths),
            "\n".join(enter), "\n".join(village), plan["turnaround"]["x"], plan["turnaround"]["z"], plan["turnaround"]["r"]))
+    # 9.4 the countryside (design/countryside/plan.json, design/countryside/plan.py writes it) as CountryPlan.luau for
+    # tests/sandboxhouses_test.luau, tests/villageworld_test.luau, tests/auctionhouse_test.luau and tests/soundplan_test.luau:
+    # its bounds, roads (yards marked), spots (the six places to empty: box, yaw, door, curb, lot), landmarks, fields,
+    # lawns, woods, orchard, streams and tree lines, and every area it keeps (areas: a road's, a landmark's, a field's, a
+    # spot's box and lot) for the Auction House's check.
+    country = json.load(open(os.path.join(os.path.dirname(HERE), "design", "countryside", "plan.json"), encoding="utf-8"))
+    def spot_text(s):
+        return "{ x = %r, z = %r, yaw = %r }" % (s["x"], s["z"], s["yaw"])
+    def points_text(points):
+        return "{ " + ", ".join("{ x = %r, z = %r }" % (p["x"], p["z"]) for p in points) + " }"
+    c_areas = [("road " + r["name"], r["rect"]) for r in country["roads"]] + [(l["id"], l["rect"]) for l in country["landmarks"]]
+    c_areas += [("field " + f["kind"], f["rect"]) for f in country["fields"]] + [("spot " + h["id"], h["box"]) for h in country["spots"]]
+    c_areas += [("lot " + h["id"], h["lot"]) for h in country["spots"]]
+    c_roads = ["\t{ name = %s, rect = %s, yard = %s }," % (q(r["name"]), rect(r["rect"]), "true" if r["yard"] else "false") for r in country["roads"]]
+    c_spots = ["\t{ id = %s, name = %s, street = %s, look = %s, kind = %s, box = %s, yaw = %r, door = %s, curb = %s, lot = %s%s }," % (
+        q(h["id"]), q(h["name"]), q(h["street"]), q(h["look"]), q(h["kind"]), rect(h["box"]), h["yaw"], spot_text(h["door"]), spot_text(h["curb"]),
+        rect(h["lot"]), (", back = " + spot_text(h["back"])) if h.get("back") else "") for h in country["spots"]]
+    c_marks = ["\t{ id = %s, name = %s, kind = %s, rect = %s, yaw = %r, spot = %s }," % (q(l["id"]), q(l["name"]), q(l["kind"]), rect(l["rect"]), l["yaw"],
+               q(l["spot"]) if l["spot"] else "nil") for l in country["landmarks"]]
+    c_fields = ["\t{ kind = %s, rect = %s }," % (q(f["kind"]), rect(f["rect"])) for f in country["fields"]]
+    c_lawns = ["\t{ kind = %s, rect = %s }," % (q(l["kind"]), rect(l["rect"])) for l in country["lawns"]]
+    c_woods = ["\t{ id = %s, rect = %s, clearings = { %s } }," % (q(w["id"]), rect(w["rect"]), ", ".join(rect(c) for c in w["clearings"])) for w in country["woods"]]
+    c_streams = ["\t{ id = %s, width = %r, points = %s }," % (q(st["id"]), st["width"], points_text(st["points"])) for st in country["streams"]]
+    c_lines = ["\t{ kind = %s, points = %s }," % (q(t["kind"]), points_text(t["points"])) for t in country["treeLines"]]
+    c_area_lines = ["\t{ name = %s, rect = %s }," % (q(name), rect(r)) for name, r in c_areas]
+    # 9.7 runs: the run zones (each spot's zone and its party's arrival spot); no turnaround any more
+    c_zones = ["\t{ id = %s, rect = %s, arrive = { x = %r, y = %r, z = %r, yaw = %r } }," % (q(z["id"]), rect(z["rect"]), z["arrive"]["x"], z["arrive"]["y"],
+               z["arrive"]["z"], z["arrive"]["yaw"]) for z in country["zones"]]
+    open(os.path.join(tmp, "CountryPlan.luau"), "w", encoding="utf-8").write(
+        "return {\nbounds = %s,\nroads = {\n%s\n},\nspots = {\n%s\n},\nlandmarks = {\n%s\n},\n"
+        "fields = {\n%s\n},\nlawns = {\n%s\n},\nwoods = {\n%s\n},\norchard = %s,\nstreams = {\n%s\n},\nlines = {\n%s\n},\nareas = {\n%s\n},\nzones = {\n%s\n},\n}\n"
+        % (rect(country["bounds"]), "\n".join(c_roads),
+           "\n".join(c_spots), "\n".join(c_marks), "\n".join(c_fields), "\n".join(c_lawns), "\n".join(c_woods), rect(country["orchard"]),
+           "\n".join(c_streams), "\n".join(c_lines), "\n".join(c_area_lines), "\n".join(c_zones)))
+    # 9.7 runs: the lobby's plan (design/lobby/plan.json, design/lobby/plan.py writes it) as LobbyPlan.luau for
+    # tests/lobby_test.luau (SandboxMap.Lobby against it, the Auction House and the TOP MOVERS board in it)
+    lobby_plan = json.load(open(os.path.join(os.path.dirname(HERE), "design", "lobby", "plan.json"), encoding="utf-8"))
+    open(os.path.join(tmp, "LobbyPlan.luau"), "w", encoding="utf-8").write(
+        "return {\nbounds = %s,\nfar = %r,\nportals = {\n%s\n},\nauction = %s,\nleaders = %s,\npaint = %s,\n}\n"
+        % (rect(lobby_plan["bounds"]), lobby_plan["far"],
+           "\n".join("\t{ house = %s, x = %r, z = %r, yaw = %r, pad = %s }," % (q(p["house"]), p["x"], p["z"], p["yaw"], rect(p["pad"])) for p in lobby_plan["portals"]),
+           spot_text(lobby_plan["shops"]["auction"]["spot"]), spot_text(lobby_plan["shops"]["leaders"]["spot"]), rect(lobby_plan["shops"]["paint"]["rect"])))
     # 8.0.1 review: the real server/SandboxPlots.luau as SandboxPlotsServer.luau for tests/sandboxplots_runtime_test.luau:
     # a function of the globals it reads (the test's own Players, ReplicatedStorage and task, and a `require` that gives
     # the real SandboxMap copy above).
@@ -904,11 +994,16 @@ def audio_length_check():
 if not audio_length_check():
     ok = False
 
-# 8.9 Jinočany: shared/SandboxMap.luau's village section is design/jinocany/plan.json's (tools/village/sandboxmap.py
+# 9.4 the countryside: shared/SandboxMap.luau's map section is design/countryside/plan.json's (tools/countryside/sandboxmap.py
 # writes it; a plan changed but not written again shows here).
-village = subprocess.run([sys.executable, os.path.join(os.path.dirname(HERE), "tools", "village", "sandboxmap.py"), "--check"], capture_output=True, text=True)
-print("== village data: " + (village.stdout.strip() or village.stderr.strip())[:200])
+village = subprocess.run([sys.executable, os.path.join(os.path.dirname(HERE), "tools", "countryside", "sandboxmap.py"), "--check"], capture_output=True, text=True)
+print("== map data: " + (village.stdout.strip() or village.stderr.strip())[:200])
 if village.returncode != 0:
+    ok = False
+# 9.7 runs: shared/SandboxMap.luau's lobby section is design/lobby/plan.json's (tools/lobby/sandboxmap.py --check)
+lobby = subprocess.run([sys.executable, os.path.join(os.path.dirname(HERE), "tools", "lobby", "sandboxmap.py"), "--check"], capture_output=True, text=True)
+print("== lobby data: " + (lobby.stdout.strip() or lobby.stderr.strip())[:200])
+if lobby.returncode != 0:
     ok = False
 
 # 6.24: every require in src resolves to a ModuleScript where Rojo puts it (tools/check-requires.py: a module that

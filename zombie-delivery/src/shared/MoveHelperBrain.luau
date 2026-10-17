@@ -9,32 +9,28 @@
 -- end); your two-person lift (8.3: your call, he walks over); the piece in his arms to the van; the van's back for
 -- whoever comes with a piece; the next piece of his list.
 --
--- 8.3 Danny for hire (the owner: "make it so I click on the helper, but I have to PAY for him when I want help. It
--- doesn't work well when he does 4 things. Instead: you go into the house, click on something, and that assigns it to
--- him, and the rest you carry yourself"; and "he must sit in my car with me"): at a move's start he waits by the van,
--- not working; a crew player hires him for that move (hireCheck, hirePrice: Config.MoveHelper.Hire, the money's
--- PlayerData.spend on the server); then the crew clicks pieces into his list (assignCheck: a click again takes one
--- back; Config.MoveHelper.Queue at most) and he carries them in order (nextQueued): a light one to the van alone, a
--- two-person one he waits at for you ("needs"); everything else is yours. A two-person Lift calls him while he is hired
--- (decide's "come"; inPlace; approach: a fade-over only as the last resort). When you sit at the van's wheel he walks
+-- 8.3 Danny's list (the owner: "It doesn't work well when he does 4 things. Instead: you go into the house, click on
+-- something, and that assigns it to him, and the rest you carry yourself"; and "he must sit in my car with me"): the crew
+-- clicks pieces into his list (assignCheck: a click again takes one back; Config.MoveHelper.Queue at most) and he carries
+-- them in order (nextQueued): a light one to the van alone, a two-person one he waits at for you ("needs"); everything
+-- else is yours. A two-person Lift calls him (decide's "come"; inPlace; approach: a fade-over only as the last resort).
+-- (8.3 - 10.0 he was for hire first, $100 - 400 a move; 10.1, Config.Crew: free and every player's from the start, and a
+-- run's host may bring another helper of their crew instead: shared/CrewRules.luau, each kind his own carry.) When you sit at the van's wheel he walks
 -- to its passenger door and rides with you (pickSeat, "ride", "seat"), out again when you get out (getOut). 8.5 his
 -- way to that door goes round the van, never through it (roundVan), and he fades into the seat only when the van is
 -- far off or out of his reach a long while (rideBlink). 8.5.1 (the owner: "Danny STILL goes through it"): every way of
 -- his outside keeps off the van's outline (crossesVan: round it with roundVan), and he is never left inside it
 -- (outOfVan).
 --
---   MoveHelperBrain.wanted(players, hired)     does a crew of this many players have him (Solo, Duo; a hired Danny stays
---                                              with any crew of one or more)
---   MoveHelperBrain.hirePrice(pieces)          8.3 the hire for a move of a house with this many pieces: Hire.Base +
---                                              Hire.PerPiece each, to Hire.Round dollars, Hire.Min … Hire.Max
---   MoveHelperBrain.hireCheck(crew, hired, money, price)   8.3 a HIRE checked: (true, nil) or (false, why: "crew" not
---                                              the move's crew, "hired" he works for this move already, "money" not enough)
---   MoveHelperBrain.assignCheck(a)             8.3 a click on a piece checked (an Assign: crew, hired, mine, state, held,
---                                              his, queued, count, near): "add" | "remove" | why: "crew" | "hire" |
---                                              "piece" (not this move's) | "far" | "van" (in the van) | "gone" (home
---                                              already, lost) | "held" (somebody holds it) | "his" (in his arms) | "full";
---                                              8.5 "clipboard": hired, but the player's clipboard is not out (orders
---                                              mode: shared/ClipboardRules.luau; a click on his list's piece too);
+--   MoveHelperBrain.wanted(players, every?)    does a crew of this many players have him (Solo, Duo: the city's; 10.1
+--                                              `every`, the sandbox's runs: every crew of one or more; 8.3 - 10.0 a
+--                                              hired one stayed with any crew)
+--   MoveHelperBrain.assignCheck(a)             8.3 a click on a piece checked (an Assign: crew, mine, state, held, his,
+--                                              queued, count, near): "add" | "remove" | why: "crew" | "piece" (not this
+--                                              move's) | "far" | "van" (in the van) | "gone" (home already, lost) |
+--                                              "held" (somebody holds it) | "his" (in his arms) | "full"; 8.5
+--                                              "clipboard": the player's clipboard is not out (orders mode:
+--                                              shared/ClipboardRules.luau; a click on his list's piece too);
 --                                              9.0 "reach": no spot beside it he can walk to (shared/HouseRoute.luau)
 --   MoveHelperBrain.keepQueued(state, held)    8.3 is a piece of his list still his to carry (home or on the ground,
 --                                              nobody holding it)?
@@ -42,10 +38,21 @@
 --                                              first that still fits the van; a two-person one too: he waits at it for
 --                                              you): (spot?, pair, full: some left, none fits)
 --   MoveHelperBrain.queueText(count)           8.3 "Nothing to carry" | "1 piece to carry" | "3 pieces to carry"
---   MoveHelperBrain.status(hired, price, count, doing)   8.3 his status in a line: "For hire · $170 this move", or "2
---                                              pieces to carry · Carrying the Lamp to the van"
---   MoveHelperBrain.money(n)                   8.3 "$1,234" (shared/UpgradeRules.luau's: the hire's words)
---   MoveHelperBrain.markText(index, needs)     8.3 the marker over a piece of his list: "🧑‍🔧 Danny · 2", "🙋 Danny needs you"
+--   MoveHelperBrain.idle(text)                 9.0 is he idle by his MoveHelperDoing line or MoveHelperBubble (waiting by
+--                                              the van, the van full, staying out, 10.1 Gus walking with you; nothing)
+--   MoveHelperBrain.title(count, bubble)       9.0 his status line's title words: his list's, or while it is empty and
+--                                              he is busy, his bubble's ("Carrying: Sofa with you": never "Nothing to
+--                                              carry" over a carry in two)
+--   MoveHelperBrain.status(count, doing)       8.3 his status in a line: "2 pieces to carry · Carrying the Lamp to the van"
+--                                              (9.0 his list empty and he busy: what he does alone, "Carrying the Sofa
+--                                              with you")
+--   MoveHelperBrain.money(n)                   8.3 "$1,234" (shared/UpgradeRules.luau's)
+--   MoveHelperBrain.markText(index, needs, name?)   8.3 the marker over a piece of his list: "🧑‍🔧 Danny · 2", "🙋 Danny
+--                                              needs you" (10.1 `name`: the helper's, Bruno's …)
+--   MoveHelperBrain.nameOf(raw)                10.1 the helper's name from the crew's attribute MoveHelperName (Danny's
+--                                              without one): the clients' words for him
+--   MoveHelperBrain.iconOf(raw)                10.1 his kind's icon from the crew's attribute MoveHelperKind ("💪" Bruno's;
+--                                              Danny's "🧑‍🔧" without one)
 --   MoveHelperBrain.pickSeat(taken)            8.3 the van's passenger seat he takes: the first one nobody sits in (nil:
 --                                              all taken, he follows the van on foot)
 --   MoveHelperBrain.getOut(driving, still, carOk)   8.3 seated in the van: out when nobody drives it and it stands, or at
@@ -77,7 +84,7 @@
 --                                              they are in different worlds
 --   MoveHelperBrain.routeVia(..., list, allowed?)   7.x farm move: the same through the best of several doors (a farm's
 --                                              front door, its barn doors; only the `allowed` indexes): (studs, index)
---   MoveHelperBrain.pickLift(list)             the crew's two-person lift he comes to (hired): a pair piece a crew
+--   MoveHelperBrain.pickLift(list)             the crew's two-person lift he comes to: a pair piece a crew
 --                                              player drags alone, the nearest within HelpFar, not one he gave up on
 --   MoveHelperBrain.shouldFlee(threat, fleeing, holding)   a zombie near: run (never while holding the other end of
 --                                              your piece: the player leads); on until none is within SafeRange
@@ -93,9 +100,21 @@
 --   MoveHelperBrain.trained(owner)             8.1 SANDBOX: his walk x this for the move's owner (Danny's training,
 --                                              the level in their player attribute Config.SandboxUpgrades.Danny,
 --                                              shared/UpgradeRules.luau dannySpeed; 1 without one)
---   MoveHelperBrain.stuck(stuckFor, moved, dt, speed)    seconds without progress (under a fifth of his walk)
---   MoveHelperBrain.unstuck(stuckFor)          what a stuck walk does: "walk" | "repath" (StuckRepath s) | "nudge"
---                                              (StuckSnap s: he appears at his way's next point)
+--   9.3 (the owner, 8.9.5: "he runs for 2 seconds and then on the spot he somehow teleports around"):
+--   MoveHelperBrain.newProgress() / progress(p, left, dt, stuckFor)   seconds without progress along his way (`left`:
+--                                              studs of it to his goal; progress: Unstuck.Progress studs nearer than its
+--                                              best of this spell; a walk back or aside is none); rebase(p, left,
+--                                              spell): a new way's own length is its best (within a stuck spell never a
+--                                              longer one)
+--   MoveHelperBrain.unstuck(stuckFor)          what a stuck walk does now and which time round: "walk" (under
+--                                              Unstuck.Repath s), then each Unstuck.Cycle s "repath" (a new way from where
+--                                              he stands), "back" (he walks back off what blocks him), "side" (a sidestep
+--                                              onto open ground); "rescue" from Unstuck.Fade s (the last resort: a fade
+--                                              over, never a pop)
+--   MoveHelperBrain.ease(left)                 × his walk with `left` studs to his goal (slowing over Walk.Ease studs to
+--                                              Walk.EaseMin)
+--   MoveHelperBrain.arrived(gap, near, stuckFor)   at his goal: within `near`, or standing still Walk.Settle s within
+--                                              Walk.Arrive more (the humanoid stops a hair short of it)
 --   MoveHelperBrain.endRise(floorRise, carrierRise)   his root's height at your piece's far end over its middle: the
 --                                              floor's there (stairs, steps) when within HoldStep of the floor under
 --                                              the carrier (8.3: else the carrier's floor: never a roof, never a pop)
@@ -121,10 +140,12 @@
 --   MoveHelperBrain.leadTime(ping)             8.3 the seconds Danny is aimed ahead: HoldLead.Base + ping × Ping, 0 … Most
 --   MoveHelperBrain.holdLead(trail, seconds)   8.3 how far ahead (x, z studs): the leader's smoothed velocity × seconds,
 --                                              HoldLead.Far at most (8.6: Danny's hold uses endLead instead)
---   MoveHelperBrain.endLead(trail, x, z, dt, seconds, reset)   8.6 Danny's lead now: one look at his END's place (x,
---                                              z: the piece's turn moves it too), its velocity smoothed over
+--   MoveHelperBrain.endLead(trail, x, z, dt, seconds, reset, ax?, az?)   8.6 Danny's lead now: one look at his END's
+--                                              place (x, z: the piece's turn moves it too), its velocity smoothed over
 --                                              HoldLead.Smooth s × `seconds` (Far at most), reached at HoldLead.Rate
---                                              studs a second at most (never a jump of his aim); reset: none
+--                                              studs a second at most (never a jump of his aim); reset: none. 9.0 (ax,
+--                                              az: his end's way out of the piece) toward the piece's middle HoldLead.In
+--                                              studs at most (his body never in the piece; trail.reach: the rest)
 --   MoveHelperBrain.holdTurn()                 his body's top turn (radians a second: HoldTurn × PairTurn)
 --   MoveHelperBrain.newTrail()                 a holder's record of how long he has been behind
 --   MoveHelperBrain.holdTrack(trail, gap, crossed, speed, dt)   one look: `gap` studs off his place, the piece in the
@@ -132,10 +153,15 @@
 --                                              only when crossed; more than HoldBehind studs off for HoldStuck s, an
 --                                              ease of HoldEase s (the gap / HoldEase a second; 8.6: HoldCap at most,
 --                                              unless `speed` is more); else `speed`
+--   MoveHelperBrain.leadKept(away, off, crossed, dt)   9.2 the server's look at Danny's end driven by the leader's client
+--                                              (server/PairHold.luau lead, client/PairLead.luau): his body `off` studs
+--                                              from his end in the server's own view, `dt` s since the last look (a
+--                                              door's trip, `crossed`, is no fault) → (s he has been more than
+--                                              PairLead.Sane studs off, does the drive stay: false once that is Grace s)
 --   8.3 (the owner: "he just jumps weirdly … make him walk like me, backwards too"):
 --   MoveHelperBrain.holdClimb(trail, height, dt, snap)   his root's height now: toward `height` at HoldClimb studs a
 --                                              second at most (a step stepped, never popped; at once on a new hold or a
---                                              door's fade)
+--                                              door's fade; 9.2 or a change of more than HoldPace.Jump studs: no step's)
 --   MoveHelperBrain.holdLegs(trail, forward, side, dt)   the speed his legs step at (negative: backwards, 0: standing)
 --                                              from his root's own velocity in his frame: his whole speed along the
 --                                              ground, from HoldLegs.From, under HoldLegs.To standing, backwards past
@@ -145,12 +171,13 @@
 --   MoveHelperBrain.doing(action, name, full)  what he does, in words (client/MoveHelperHud.luau's line)
 -- 8.6 (the owner: "Somewhere I'd like to see an indicator of what Danny is doing right now, and to be able to tell
 -- him, for example, put it down on the ground, or get out of the car"):
---   MoveHelperBrain.bubble(action, name, full, price)   the same action's words over his head (client/DannyBubble.luau):
---                                              (an icon and short words, "📦 Carrying: Sofa → van", "🧑‍🔧 For hire ·
---                                              $100"; alert: the movers' orange, he needs you or is in trouble). One
---                                              table (Doing) holds both: the bubble and the status line never disagree
+--   MoveHelperBrain.bubble(action, name, full)   the same action's words over his head (client/DannyBubble.luau):
+--                                              (an icon and short words, "📦 Carrying: Sofa → van"; alert: the movers'
+--                                              orange, he needs you or is in trouble). One table (Doing) holds both: the
+--                                              bubble and the status line never disagree. 10.1: "revive" (down in a run:
+--                                              hold E by him), "out" (out of the run: in hospital), "guard" / "fight" (Gus)
 --   MoveHelperBrain.listChip(count)            the bubble's counter: "list: 3" (nil: his list is empty)
---   MoveHelperBrain.orderCheck(kind, o)        an order of the crew checked (an Order): "ok" | why: "hire" | "down" |
+--   MoveHelperBrain.orderCheck(kind, o)        an order of the crew checked (an Order): "ok" | why: "down" |
 --                                              "empty" (PUT IT DOWN with nothing in his hands) | "notin" (GET OUT, him
 --                                              not in the van, not getting in, not on his way to it) | "leaving"
 --                                              (getting out already) | "moving" (the van rolls) | "unknown"
@@ -158,7 +185,8 @@
 --                                              none): his card's buttons, the orders menu, the status line's GET OUT
 --   MoveHelperBrain.orderList(text)            that text as a list (unknown kinds dropped)
 --   MoveHelperBrain.orderWords(kind)           a button's words: "⬇ PUT IT DOWN", "🚪 GET OUT"
---   MoveHelperBrain.orderWhy(why)              a refusal's notice ("Danny isn't carrying anything."), nil: none
+--   MoveHelperBrain.orderWhy(why, name?)       a refusal's notice ("Danny isn't carrying anything."), nil: none (10.1
+--                                              `name`: the helper's)
 --   MoveHelperBrain.Lines                      what he says (a speech bubble over his head; plain text)
 --   MoveHelperBrain.line(key, sandbox)         his line for `key` (8.0 SANDBOX: SandboxLines' where the test world has
 --                                              no Wall and no depot)
@@ -188,7 +216,6 @@ export type Queued = { spot: number, class: string, fits: boolean }
 -- 8.3 a click on a piece, as the server sees it (assignCheck).
 export type Assign = {
 	crew: boolean, -- the player is of the move's crew
-	hired: boolean, -- Danny works for this move
 	mine: boolean, -- the piece is this move's (its model is the move's own)
 	state: string, -- the piece's: home | carried | ground | truck | delivered | lost
 	held: boolean, -- somebody holds it (a player, or Danny)
@@ -207,7 +234,6 @@ export type Doors = { outX: number, outZ: number, inX: number, inZ: number } -- 
 export type Doorway = { x: number, z: number, half: number, dirX: number, dirZ: number, depth: number }
 
 export type Input = {
-	hired: boolean, -- 8.3 somebody of the crew hired him for this move
 	dead: boolean,
 	holding: string?, -- nil, "hand" (a piece in his arms alone: one-hand or two-hands) or "pair" (the other end of yours)
 	seated: boolean, -- 8.3 he sits in the van (a passenger)
@@ -237,33 +263,12 @@ end
 
 -- ── Who has him ────────────────────────────────────────────────────────────
 
-function MoveHelperBrain.wanted(players: number, hired: boolean?): boolean
+function MoveHelperBrain.wanted(players: number, every: boolean?): boolean
+	if every then
+		return players >= 1 -- (10.1 the sandbox's runs: the host's helper with every party; 8.3 - 10.0 a hired one)
+	end
 	local c = cfg()
-	if hired then
-		return players >= 1 -- (8.3 paid for the move: he stays whoever joins)
-	end
 	return (players == 1 and c.Solo == true) or (players == 2 and c.Duo == true)
-end
-
--- ── 8.3 the hire ───────────────────────────────────────────────────────────
-
-function MoveHelperBrain.hirePrice(pieces: any): number
-	local h = cfg().Hire
-	local n = if finite(pieces) then math.max(0, math.floor(pieces)) else 0
-	local raw = h.Base + h.PerPiece * n
-	local step = math.max(1, h.Round)
-	return math.clamp(math.floor(raw / step + 0.5) * step, h.Min, h.Max)
-end
-
-function MoveHelperBrain.hireCheck(crew: boolean, hired: boolean, money: any, price: number): (boolean, string?)
-	if not crew then
-		return false, "crew"
-	elseif hired then
-		return false, "hired"
-	elseif not finite(money) or money < price then
-		return false, "money"
-	end
-	return true, nil
 end
 
 -- ── 8.3 his list ───────────────────────────────────────────────────────────
@@ -277,8 +282,6 @@ function MoveHelperBrain.assignCheck(a: Assign): string
 		return "crew"
 	elseif not a.mine then
 		return "piece"
-	elseif not a.hired then
-		return "hire"
 	elseif not a.clipboard then
 		return "clipboard" -- (8.5: orders only with the clipboard out: never a piece given by a stray click)
 	elseif a.queued then
@@ -318,19 +321,60 @@ function MoveHelperBrain.queueText(count: any): string
 	return if n == 1 then "1 piece to carry" else `{n} pieces to carry`
 end
 
-function MoveHelperBrain.status(hired: boolean, price: any, count: any, doing: string?): string
-	if not hired then
-		return `For hire · {UpgradeRules.money(price)} this move`
-	end
+function MoveHelperBrain.status(count: any, doing: string?): string
 	local list = MoveHelperBrain.queueText(count)
 	if type(doing) ~= "string" or doing == "" then
 		return list
 	end
+	local empty = not finite(count) or count < 1
+	if empty and not MoveHelperBrain.idle(doing) then
+		return doing -- (9.0 his list empty, busy with you: never "Nothing to carry" over a carry in two)
+	end
 	return `{list} · {doing}`
 end
 
-function MoveHelperBrain.markText(index: number, needs: boolean?): string
-	local name = cfg().Name
+-- 9.0 (the owner's screenshot: his status line "DANNY · Nothing to carry" over "Take out your clipboard (Q) to give him
+-- pieces" while his bubble said "🤝 Carrying: Sofa with you"): is he idle by what the crew's attributes say (his
+-- MoveHelperDoing line or his MoveHelperBubble: waiting by the van, the van full, staying out of the van, 10.1 Gus
+-- walking with you; nothing at all)?
+local IDLE = { "wait", "full", "stay", "guard" }
+function MoveHelperBrain.idle(text: any): boolean
+	if type(text) ~= "string" or text == "" then
+		return true
+	end
+	local doing = MoveHelperBrain.Doing :: { [string]: Doing } -- (the words' table, further down)
+	for _, action in IDLE do
+		local w = doing[action]
+		local bubble = `{w.icon} {w.short}`
+		if text == w.line or string.sub(text, 1, #bubble) == bubble then
+			return true
+		end
+	end
+	return false
+end
+
+-- 9.0 his status line's title words: his list ("2 pieces to carry"); his list empty while he is busy (his
+-- bubble, MoveHelperBubble: anything but idle), the bubble's own words without its icon ("Carrying: Sofa with you").
+function MoveHelperBrain.title(count: any, bubble: any): string
+	local empty = not finite(count) or count < 1
+	if not empty or MoveHelperBrain.idle(bubble) then
+		return MoveHelperBrain.queueText(count)
+	end
+	return string.match(bubble :: string, "^%S+%s+(.+)$") or bubble :: string
+end
+
+-- 10.1 the helper's name as the crew's attribute MoveHelperName says it (the clients' words), Danny's without one.
+function MoveHelperBrain.nameOf(raw: any): string
+	return if type(raw) == "string" and raw ~= "" then raw else cfg().Name
+end
+
+function MoveHelperBrain.iconOf(raw: any): string
+	local kind = if type(raw) == "string" then (Config.Crew.Kinds :: any)[raw] else nil
+	return if kind then kind.Icon else "🧑‍🔧"
+end
+
+function MoveHelperBrain.markText(index: number, needs: boolean?, who: string?): string
+	local name = who or cfg().Name
 	if needs then
 		return `🙋 {name} needs you`
 	end
@@ -502,23 +546,66 @@ function MoveHelperBrain.routeVia(fromInside: boolean, fx: number, fz: number, t
 	return best, which
 end
 
--- Seconds without progress: `moved` studs in the last dt s at `speed` (under a fifth of it is no progress).
-function MoveHelperBrain.stuck(stuckFor: number, moved: number, dt: number, speed: number): number
-	if moved < speed * dt * 0.2 then
-		return stuckFor + dt
-	end
-	return 0
+-- 9.3 his walk's progress (the owner: "he runs for 2 seconds and then on the spot he somehow teleports around": 8.9's
+-- clock counted only how far he moved, so pressed against a wall's end it ran out and the nudge put him on): seconds
+-- since his way to his goal (`left` studs of it) came Unstuck.Progress studs nearer than its best; a walk back or aside
+-- (his ways out) is no progress.
+export type Progress = { best: number }
+
+function MoveHelperBrain.newProgress(): Progress
+	return { best = math.huge }
 end
 
--- A stuck walk: a new path after StuckRepath s, a nudge to the way's next point after StuckSnap s.
-function MoveHelperBrain.unstuck(stuckFor: number): string
-	local c = cfg()
-	if stuckFor >= c.StuckSnap then
-		return "nudge"
-	elseif stuckFor >= c.StuckRepath then
-		return "repath"
+function MoveHelperBrain.progress(p: Progress, left: number, dt: number, stuckFor: number): number
+	if left < p.best - cfg().Unstuck.Progress then
+		p.best = left
+		return 0
 	end
-	return "walk"
+	return stuckFor + dt
+end
+
+-- (a new way: its own length is the best from now on, the clock as it was; within a stuck spell, `spell`, never a
+-- longer best: walked back or aside, then forward to the same block again is no progress)
+function MoveHelperBrain.rebase(p: Progress, left: number, spell: boolean?)
+	p.best = if spell then math.min(p.best, left) else left
+end
+
+-- 9.3 a stuck walk: "walk" under Unstuck.Repath s; then each Unstuck.Cycle s "repath" (a new way from where he stands),
+-- "back" from Unstuck.Back s into the cycle (he walks back off what blocks him), "side" from Unstuck.Side s (a sidestep
+-- onto open ground, the other side each time round); "rescue" from Unstuck.Fade s on (the last resort: faded over onto
+-- his way, never a pop). Also which time round (0 first).
+function MoveHelperBrain.unstuck(stuckFor: number): (string, number)
+	local u = cfg().Unstuck
+	if stuckFor >= u.Fade then
+		return "rescue", 0
+	elseif stuckFor < u.Repath then
+		return "walk", 0
+	end
+	local t = stuckFor - u.Repath
+	local round = math.floor(t / u.Cycle)
+	local into = t - round * u.Cycle
+	if into < u.Back then
+		return "repath", round
+	elseif into < u.Side then
+		return "back", round
+	end
+	return "side", round
+end
+
+-- 9.3 × his walk with `left` studs to his goal: 1 until Walk.Ease studs, then eased down to Walk.EaseMin at it.
+function MoveHelperBrain.ease(left: number): number
+	local w = cfg().Walk
+	if left >= w.Ease then
+		return 1
+	end
+	local x = math.clamp(left / math.max(w.Ease, 1e-3), 0, 1)
+	return w.EaseMin + (1 - w.EaseMin) * x * x * (3 - 2 * x)
+end
+
+-- 9.3 at his goal: within `near` of it, or no progress Walk.Settle s within Walk.Arrive studs more.
+function MoveHelperBrain.arrived(gap: number, near: number, stuckFor: number): boolean
+	local w = cfg().Walk
+	return gap <= near or (gap <= near + w.Arrive and stuckFor >= w.Settle)
 end
 
 -- A place inside a doorway's zone (along the wall within its half width + Margin, through it within its depth) moved
@@ -601,7 +688,8 @@ end
 
 -- (8.3: also the height his root follows (nil: none yet) and his legs: walking, backwards; the leader's root at the last
 -- look (fromX, fromZ; nil: none yet), their real speed (pace) and their smoothed velocity (vx, vz); 8.6: his end's place
--- at the last look (endX, endZ; nil: none yet), its smoothed velocity (evx, evz) and his lead now (leadX, leadZ))
+-- at the last look (endX, endZ; nil: none yet), its smoothed velocity (evx, evz) and his lead now (leadX, leadZ); 9.0
+-- the lead toward the piece it did not take (reach: his hands reach on by it))
 export type Trail = {
 	behind: number,
 	ease: number,
@@ -620,11 +708,12 @@ export type Trail = {
 	evz: number,
 	leadX: number,
 	leadZ: number,
+	reach: number,
 }
 
 function MoveHelperBrain.newTrail(): Trail
 	return { behind = 0, ease = 0, easeSpeed = 0, height = nil, walking = false, back = false, fromX = nil, fromZ = nil, pace = 0, vx = 0, vz = 0,
-		endX = nil, endZ = nil, evx = 0, evz = 0, leadX = 0, leadZ = 0 }
+		endX = nil, endZ = nil, evx = 0, evz = 0, leadX = 0, leadZ = 0, reach = 0 }
 end
 
 -- 8.3 keeping up: one look at the leader's root (`x`, `z`), `dt` s after the last: their real speed along the ground
@@ -690,7 +779,14 @@ end
 -- studs at most) at HoldLead.Rate studs a second at most: his aim moves with his end, never faster than Rate on top.
 -- `reset` (a new hold, a door's fade: the other world), no place (NaN), or his end more than HoldPace.Jump studs off
 -- its last look (put there at once): nothing measured, no lead.
-function MoveHelperBrain.endLead(trail: Trail, x: number, z: number, dt: number, seconds: number, reset: boolean): (number, number)
+-- 9.0 (the owner's screenshot: Danny standing inside the Sofa; tests/movehelper_backwards_runtime_test.luau: following
+-- you at the pair's walk with a ping of 0.15 s his lead took his root 2.26 studs toward the piece's middle, his chest 2
+-- studs into the Sofa, where everybody else saw him and where your own screen showed him once you stopped): `ax`, `az`
+-- (his end's way out of the piece's middle, flat, a unit; nil: as before) and the lead toward the middle (against it)
+-- is HoldLead.In studs at most; trail.reach is how much more it wanted (his hands reach on toward the piece by that:
+-- server/MoveHelper.luau's poseHands, Config.MoveHelper.Edge.Reach at most). His lead away from it (he walks
+-- backwards) HoldLead.Back s longer (and his hands reach on by that too), across it as before.
+function MoveHelperBrain.endLead(trail: Trail, x: number, z: number, dt: number, seconds: number, reset: boolean, ax: number?, az: number?): (number, number)
 	local c = cfg()
 	local lead = c.HoldLead
 	local lastX, lastZ = trail.endX, trail.endZ
@@ -702,6 +798,7 @@ function MoveHelperBrain.endLead(trail: Trail, x: number, z: number, dt: number,
 		vx, vz = (x - lastX) / dt, (z - lastZ) / dt
 	end
 	local speed = math.sqrt(vx * vx + vz * vz)
+	trail.reach = 0
 	if reset or not known or lastX == nil or dt ~= dt or dt <= 1e-4 or speed * dt > c.HoldPace.Jump then
 		trail.evx, trail.evz, trail.leadX, trail.leadZ = 0, 0, 0, 0
 		return 0, 0
@@ -714,27 +811,47 @@ function MoveHelperBrain.endLead(trail: Trail, x: number, z: number, dt: number,
 	trail.evz = vz + (trail.evz - vz) * keep
 	local s = if seconds == seconds then math.max(seconds, 0) else 0
 	local wantX, wantZ = trail.evx * s, trail.evz * s
+	-- 9.0 walking backwards himself (his end away from the piece's middle): HoldLead.Back s more of it, along his end's
+	-- way (your screen may show him later than leadTime's guess: clear of the piece all the same, his hands reach on)
+	local axisX, axisZ = ax or 0, az or 0
+	local backing = trail.evx * axisX + trail.evz * axisZ
+	local extra = if backing > 0 and s > 0 then backing * math.max(lead.Back or 0, 0) else 0 -- (no lead: none of it)
+	wantX, wantZ = wantX + axisX * extra, wantZ + axisZ * extra
 	local far = math.sqrt(wantX * wantX + wantZ * wantZ)
 	if far > lead.Far and far > 0 then
 		wantX, wantZ = wantX / far * lead.Far, wantZ / far * lead.Far
+		extra = math.min(extra, lead.Far)
 	end
+	-- 9.0 never into the piece: toward its middle In studs at most (the rest his hands' reach)
+	local inward = math.max(lead.In or 0, 0)
+	local function clampIn(lx: number, lz: number): (number, number, number)
+		local along = lx * axisX + lz * axisZ
+		if along >= -inward then
+			return lx, lz, 0
+		end
+		local over = -inward - along
+		return lx + axisX * over, lz + axisZ * over, over
+	end
+	local wantedIn: number
+	wantX, wantZ, wantedIn = clampIn(wantX, wantZ)
 	local dx, dz = wantX - trail.leadX, wantZ - trail.leadZ
 	local gap = math.sqrt(dx * dx + dz * dz)
 	local most = math.max(lead.Rate, 0) * dt
 	if gap > most and gap > 0 then
 		dx, dz = dx / gap * most, dz / gap * most
 	end
-	trail.leadX += dx
-	trail.leadZ += dz
+	trail.leadX, trail.leadZ = clampIn(trail.leadX + dx, trail.leadZ + dz)
+	trail.reach = wantedIn + extra
 	return trail.leadX, trail.leadZ
 end
 
 -- 8.3 his root's height now, toward `height` (where the floor under his end puts it) at HoldClimb studs a second at
 -- most: a step or a kerb stepped up or down, never popped. At once on a new hold (none yet) and through a door's fade
--- (`snap`: the piece in the other world).
+-- (`snap`: the piece in the other world). 9.2: also when it changes more than HoldPace.Jump studs at once (no step is
+-- that tall: a door's trip the server did not see, the leader's client having put him there first).
 function MoveHelperBrain.holdClimb(trail: Trail, height: number, dt: number, snap: boolean): number
 	local was = trail.height
-	if snap or was == nil or height ~= height then
+	if snap or was == nil or height ~= height or math.abs(height - was) > cfg().HoldPace.Jump then
 		trail.height = height
 		return height
 	end
@@ -793,6 +910,20 @@ function MoveHelperBrain.holdTrack(trail: Trail, gap: number, crossed: boolean, 
 	trail.ease = c.HoldEase
 	trail.easeSpeed = math.min(gap / math.max(c.HoldEase, 0.05), math.max(speed, c.HoldCap)) -- (8.6: HoldCap at most)
 	return math.max(speed, trail.easeSpeed), false
+end
+
+-- 9.2 (the owner, 8.9.5: "it feels like it's harder to control … fix it so it's playable"): the leader's client drives
+-- Danny's end, so the server only looks: an exploit flinging him away from the piece, a client that stopped driving
+-- (his body left where the piece was) is more than PairLead.Sane studs off his end for PairLead.Grace s, and the server
+-- takes him back (server/MoveHelper.luau actHold). A door's trip moves the piece far at once: no fault (the server puts
+-- him there itself). NaN (no place known): a fault.
+function MoveHelperBrain.leadKept(away: number, off: number, crossed: boolean, dt: number): (number, boolean)
+	local lead = cfg().PairLead
+	if crossed or (off == off and off <= lead.Sane) then
+		return 0, true
+	end
+	local now = (if away == away then math.max(away, 0) else 0) + (if dt == dt then math.max(dt, 0) else 0)
+	return now, now < lead.Grace
 end
 
 -- ── 8.3 your call ──────────────────────────────────────────────────────────
@@ -869,10 +1000,10 @@ function MoveHelperBrain.fleeTo(x: number, z: number, zx: number, zz: number): (
 end
 
 -- The priorities, in order: down; the other end of your piece (zombies or not: you lead); 8.3 in the van's seat (he
--- rides; out when you get out); running from a zombie; hired: your call (a two-person Lift; his own piece set down or
--- loaded first), your two-person piece dragged alone; the piece in his arms to the van; hired: into the van when you
--- sit at its wheel; not hired: waiting by the van (for hire); the van's back for whoever comes with a piece; the next
--- piece of his list (a two-person one: he waits at it for you) while the van stands by the house; waiting at the van.
+-- rides; out when you get out); running from a zombie; your call (a two-person Lift; his own piece set down or loaded
+-- first), your two-person piece dragged alone; the piece in his arms to the van; into the van when you sit at its wheel;
+-- the van's back for whoever comes with a piece; the next piece of his list (a two-person one: he waits at it for you)
+-- while the van stands by the house; waiting at the van. (10.1: no hire any more, nothing waits for one.)
 function MoveHelperBrain.decide(i: Input): (string, number?)
 	if i.dead then
 		return "down", nil
@@ -882,16 +1013,14 @@ function MoveHelperBrain.decide(i: Input): (string, number?)
 		return "seat", nil
 	elseif MoveHelperBrain.shouldFlee(i.threat, i.fleeing, i.holding) then
 		return "flee", nil
-	elseif i.hired and i.call ~= nil then
+	elseif i.call ~= nil then
 		return "come", i.call
-	elseif i.hired and i.lift ~= nil then
+	elseif i.lift ~= nil then
 		return "help", i.lift
 	elseif i.holding == "hand" then
 		return "deliver", nil
-	elseif i.hired and i.ride then
+	elseif i.ride then
 		return "ride", nil
-	elseif not i.hired then
-		return "wait", nil
 	elseif i.open then
 		return "open", nil
 	elseif i.queued ~= nil and i.atHouse then
@@ -939,7 +1068,6 @@ end
 
 -- 8.6 what the server knows of him when an order comes (server/MoveHelper.luau fills it).
 export type Order = {
-	hired: boolean, -- somebody of the crew hired him for this move
 	down: boolean, -- down (or no body yet)
 	holding: string?, -- nil, "hand" (a piece in his arms alone) or "pair" (the other end of a piece a player carries)
 	seated: boolean, -- in the van's passenger seat
@@ -955,8 +1083,6 @@ local ORDERS = { "putdown", "getout" }
 function MoveHelperBrain.orderCheck(kind: string, o: Order): string
 	if kind ~= "putdown" and kind ~= "getout" then
 		return "unknown"
-	elseif not o.hired then
-		return "hire"
 	elseif o.down then
 		return "down"
 	elseif kind == "putdown" then
@@ -1006,17 +1132,16 @@ function MoveHelperBrain.orderWords(kind: string): string
 end
 
 local ORDER_WHY: { [string]: string } = {
-	hire = "Hire %s first: then he takes your orders.",
-	down = "%s is down: he is back at the van soon.",
+	down = "%s is down: get them up, or wait a moment.",
 	empty = "%s isn't carrying anything.",
 	notin = "%s isn't in the van.",
 	leaving = "%s is getting out already.",
 	moving = "Stop the van first: then %s can get out.",
 }
 
-function MoveHelperBrain.orderWhy(why: string): string?
+function MoveHelperBrain.orderWhy(why: string, name: string?): string?
 	local text = ORDER_WHY[why]
-	return if text then string.format(text, cfg().Name) else nil
+	return if text then string.format(text, name or cfg().Name) else nil
 end
 
 -- ── Words ──────────────────────────────────────────────────────────────────
@@ -1038,11 +1163,15 @@ local DOING: { [string]: Doing } = {
 	come = { line = "Coming to lift the %s with you", icon = "🏃", short = "Coming to lift: %s" }, -- 8.3 your call
 	ready = { line = "At the %s: on three!", icon = "💪", short = "At the %s: on three!", alert = true },
 	needs = { line = "Waiting for you at the %s", icon = "⏳", short = "Needs you: %s", alert = true }, -- 8.3 his list's two-person piece
-	offer = { line = "Waiting by the van for hire", icon = "🧑‍🔧", short = "For hire" },
 	ride = { line = "Getting in the van", icon = "🚐", short = "Getting in the van" },
 	seat = { line = "Riding in the van", icon = "🪑", short = "Riding" },
 	alight = { line = "Getting out of the van", icon = "🚪", short = "Getting out of the van" }, -- 8.5 (his way out at its door)
 	stay = { line = "Staying out of the van (your order)", icon = "✋", short = "Staying out of the van" }, -- 8.6 GET OUT
+	-- 10.1 the crew (Config.Crew): down in a run (hold E by the helper within Down.Seconds), out of it (in hospital); Gus
+	revive = { line = "Down! Hold E close by to revive", icon = "🆘", short = "Down! Hold E to revive", alert = true },
+	out = { line = "Out of the run: in hospital", icon = "🏥", short = "Out: in hospital", alert = true },
+	guard = { line = "Walking with you, on guard", icon = "🛡", short = "On guard" },
+	fight = { line = "Fighting a zombie", icon = "👊", short = "Fighting!", alert = true },
 }
 MoveHelperBrain.Doing = DOING :: { [string]: Doing } -- (read only: the tests go through every action)
 
@@ -1064,13 +1193,9 @@ function MoveHelperBrain.doing(action: string, name: string?, full: boolean?): s
 	return named(words(action, full).line, name)
 end
 
-function MoveHelperBrain.bubble(action: string, name: string?, full: boolean?, price: number?): (string, boolean)
+function MoveHelperBrain.bubble(action: string, name: string?, full: boolean?): (string, boolean)
 	local w = words(action, full)
-	local short = named(w.short, name)
-	if action == "offer" and price then
-		short = `{short} · {UpgradeRules.money(price)}`
-	end
-	return `{w.icon} {short}`, w.alert == true
+	return `{w.icon} {named(w.short, name)}`, w.alert == true
 end
 
 function MoveHelperBrain.listChip(count: any): string?
@@ -1079,8 +1204,7 @@ function MoveHelperBrain.listChip(count: any): string?
 end
 
 MoveHelperBrain.Lines = {
-	hello = "Danny from the depot. Need a hand? Hire me!",
-	hired = "You got it, boss! Show me what to carry.", -- 8.3 the hire
+	hello = "Danny from the depot. Where do we start, boss?", -- (10.1: no hire; a crew's kind has his own: Config.Crew)
 	queued = "Got it, I'll take that one.",
 	cleared = "Okay, my list is empty.",
 	empty = "All done. Anything else, boss?",
@@ -1109,7 +1233,7 @@ MoveHelperBrain.Lines = {
 
 -- 8.0 SANDBOX (Config.Sandbox.On): the lines that would name the city's depot or the Wall.
 MoveHelperBrain.SandboxLines = {
-	hello = "Danny from ZDC. Need a hand? Hire me!",
+	hello = "Danny from Deliveros. Where do we start, boss?",
 	full = "Van's full, boss - drive it home?",
 } :: { [string]: string }
 

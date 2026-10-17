@@ -783,7 +783,7 @@ local function openEmployer(id: string)
 	Ui.clear(body)
 	employerWindow.title.Text = employer.name
 	employerWindow.icon.Text = employer.icon
-	employerWindow.subtitle.Text = `{employer.person} · the job goes in your ZDC Van`
+	employerWindow.subtitle.Text = `{employer.person} · the job goes in your Deliveros Van`
 	employerWindow.footer.Text = `{state.rep[employer.id] or 0} jobs done here`
 	employerWindow.frame.Visible = true
 	-- The person who runs it (5.8: the phone's tag line, the red square and caps), and what they say.
@@ -818,7 +818,7 @@ local function openEmployer(id: string)
 			TextYAlignment = Enum.TextYAlignment.Top,
 		})
 	end
-	Ui.caps(body, "Rewards  ·  your ZDC Van does every job", UDim2.new(1, -10, 0, 22), {
+	Ui.caps(body, "Rewards  ·  your Deliveros Van does every job", UDim2.new(1, -10, 0, 22), {
 		LayoutOrder = 4,
 		TextSize = 12,
 		TextColor3 = P.ink2,

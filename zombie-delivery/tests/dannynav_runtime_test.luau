@@ -4,8 +4,9 @@
 -- his hands properly, with an animation"; his screenshot: "Going for: Chair" at a wall, "Danny · 1 / 2 / 3" through the
 -- walls). The real server/Moving.luau and server/MoveHelper.luau on tests/runtime/MovingRuntime.luau's fakes
 -- (Config.Sandbox.On) with the real art (shared/FurnitureLooks.luau, shared/HouseLayout.luau, server/HouseInterior.luau
--- and its shell's real wall parts): a move into each of Jinočany's six houses, The Old Farmstead (the big house, 8.5.2
--- roomy) and the five family houses, each with another layout (the back row's order, mirrored or not). His walk is a
+-- and its shell's real wall parts): a move into each of the six places to empty, The Old Farmstead (the big house, 8.5.2
+-- roomy) and 9.5 the countryside's five, each of its own kind (its contract's: the lone house a family house, the cabin,
+-- the lodge, the mill and the cottage shared/Layouts/Countryside.luau's), each with another seed. His walk is a
 -- straight step toward the point he is given (useMover: his way's corners), the rays at the interior's walls the
 -- runtime's (a ray against the parts' boxes).
 --   * his ways on the server's own grid (the move's plan, the real pieces where they stand): from his way in to every
@@ -14,7 +15,7 @@
 --   * a pick through a wall is refused: Ann behind a wall from a piece, within the prompt's reach: no pick ("You can't
 --     reach the X through the wall."), the piece's prompts need a line of sight (RequiresLineOfSight)
 --   * Danny put at that same spot behind the wall with the piece given to him: he never takes it from there; he walks
---     round through the doorways (no step across a wall, never out of the rooms, never stuck: no stuck spell to a nudge)
+--     round through the doorways (no step across a wall, never out of the rooms, never stuck: 9.3 no stuck spell at all)
 --     and takes it from its own side, within Pick.Arm of it, his chest's ray to it clear of the walls; his pick-up:
 --     turned to it (Npcs.face), the bend with both hands on it ("lift", the Carrying attributes on its place while it
 --     still stands), then his, gliding up into his hands over steps (anchored, its weld off, never snapped), welded
@@ -104,6 +105,19 @@ Moving.parkVan = function(player: any, spot: any, _seat: boolean, carId: string?
 	return nil, car
 end
 Moving.start()
+-- 9.5 the countryside: the six places of the map, each with its contract (Config.Moving.Sandbox.Houses) of its own kind,
+-- the map's (no stand-in: every kind a place of its own)
+do
+	local kinds: { [string]: boolean } = {}
+	local ok = #SandboxMap.Houses == 6
+	for _, house in SandboxMap.Houses do
+		local own = Config.Moving.Sandbox.Houses[house.id]
+		ok = ok and own ~= nil and own.Kind == house.kind
+		kinds[house.kind] = true
+	end
+	check("the six places of the map, each with its contract of its own kind: the big house, a family house, the cabin, the lodge, the mill, the cottage",
+		ok and kinds.big and kinds.house and kinds.cabin and kinds.lodge and kinds.mill and kinds.cottage == true)
+end
 
 local function promptIn(model: any, action: string): any
 	for _, d in model:GetDescendants() do
@@ -128,7 +142,9 @@ local function pieceRect(s: any): HouseRoute.Rect
 	return { x0 = p.X - ex / 2, z0 = p.Z - ez / 2, x1 = p.X + ex / 2, z1 = p.Z + ez / 2 }
 end
 
--- Every layout of the family house: the first seed of each back-row order, mirrored or not (the five houses take five).
+-- Every layout of the family house: the first seed of each back-row order, mirrored or not (the five places after the
+-- farmstead take five of them as their seeds: the lone house a family house's layout, 9.5 the countryside's kinds the
+-- plan of theirs that seed gives).
 local function variants(kind: string): { number }
 	local found: { [string]: boolean } = {}
 	local list: { number } = {}
@@ -283,7 +299,9 @@ end
 
 -- A piece Danny takes alone (one hand or both, it fits the van) against an inside wall of its room, and a spot across
 -- that wall in the next room, 1.6 studs past it, open on his grid (nobody stands in a piece there) and near enough
--- for the piece's prompt: (spot, x, z in the plan) or nil.
+-- for the piece's prompt: (spot, x, z in the plan) or nil. The spot behind the piece's middle first, else along its
+-- length every half stud, the nearer its middle the sooner (9.5: in the next room a piece may stand right behind its
+-- middle, the cottage's wardrobe behind its sewing machine, with room beside it).
 local function behindWall(plan: any, grid: HouseRoute.Grid, move: any): (any, number?, number?)
 	for _, s in plan.spots do
 		local def = FurnitureLooks.Items[s.item]
@@ -303,15 +321,22 @@ local function behindWall(plan: any, grid: HouseRoute.Grid, move: any): (any, nu
 			local depth = (if alongX then rect.z1 - rect.z0 else rect.x1 - rect.x0) / 2
 			local along = if alongX then p.X else p.Z
 			local a0, a1 = if alongX then f.min.X else f.min.Z, if alongX then f.max.X else f.max.Z
-			if gap < 0 or gap - depth > 0.8 or along < a0 + 0.8 or along > a1 - 0.8 then
+			if gap < 0 or gap - depth > 0.8 then
 				continue
 			end
 			local past = gap + plan.wall + 1.6
-			local qx = if alongX then p.X else p.X - n.X * past
-			local qz = if alongX then p.Z - n.Z * past else p.Z
-			if HouseRoute.inside(grid, qx, qz) and HouseRoute.open(grid, qx, qz) and not HouseRoute.sees(grid, qx, qz, p.X, p.Z)
-				and math.sqrt((qx - p.X) ^ 2 + (qz - p.Z) ^ 2) <= T.Reach.Item + math.max(def.size.X, def.size.Z) / 2 + 2 then
-				return s, qx, qz
+			local half = (if alongX then rect.x1 - rect.x0 else rect.z1 - rect.z0) / 2
+			for k = 0, 2 * math.floor(half / 0.5) do
+				local at = along + (if k % 2 == 1 then 0.5 else -0.5) * math.ceil(k / 2)
+				if at < a0 + 0.8 or at > a1 - 0.8 then
+					continue
+				end
+				local qx = if alongX then at else p.X - n.X * past
+				local qz = if alongX then p.Z - n.Z * past else at
+				if HouseRoute.inside(grid, qx, qz) and HouseRoute.open(grid, qx, qz) and not HouseRoute.sees(grid, qx, qz, p.X, p.Z)
+					and math.sqrt((qx - p.X) ^ 2 + (qz - p.Z) ^ 2) <= T.Reach.Item + math.max(def.size.X, def.size.Z) / 2 + 2 then
+					return s, qx, qz
+				end
 			end
 		end
 	end
@@ -339,7 +364,6 @@ local function moveInto(index: number, house: any, seed: number): (any, any, any
 	local truck = E.cars[p]
 	truck.chassis.CFrame = CF(house.curb.x, 2, house.curb.z) * M.CFrame.Angles(0, math.rad(house.curb.yaw), 0)
 	truck.model:SetAttribute("BackOpen", true)
-	E.request(p, "helper", "hire")
 	run(0.6)
 	return p, danny, b
 end
@@ -369,13 +393,24 @@ for index, house in Houses do
 	end
 	HouseRoute.block(grid, rects)
 	local y = origin.Position.Y + 3
-	-- (the same walls and fixtures cell for cell; the pieces' cells the same but for a hair's float at his radius's edge)
-	local differ = 0
+	-- (the same walls and fixtures cell for cell; the pieces' cells the same but for a hair's float at his radius's edge;
+	-- 9.3 and the built interior's collidable parts the plan does not have: a cell the plan leaves open closed only by one
+	-- of those, HouseRoute.solid's rects after the plan's own solids)
+	local differ, unexplained = 0, 0
 	for k = 1, if live then #live.open else 0 do
-		differ += if live.open[k] ~= grid.open[k] then 1 else 0
+		local plain = live.open[k] ~= grid.open[k] and live.still[k] == grid.still[k]
+		differ += if plain then 1 else 0
+		if live.still[k] ~= grid.still[k] then
+			local x, z = grid.x0 + ((k - 1) % grid.nx) * grid.step, grid.z0 + ((k - 1) // grid.nx) * grid.step
+			local built = false
+			for n = #grid.solids + 1, #live.solids do
+				built = built or HouseRoute.toRect(x, z, live.solids[n]) < live.radius
+			end
+			unexplained += if live.still[k] == 1 or not built then 1 else 0
+		end
 	end
-	check(`{house.name}: his grid is the move's plan's (the walls, the fixtures, the pieces where they stand)`, live ~= nil and #live.walls == #grid.walls
-		and table.concat(live.still, "") == table.concat(grid.still, "") and differ <= #grid.open / 500, differ)
+	check(`{house.name}: his grid is the move's plan's (the walls, the fixtures, the pieces where they stand) and the built parts' (9.3)`, live ~= nil
+		and #live.walls == #grid.walls and unexplained == 0 and differ <= #grid.open / 500, `{differ} {unexplained}`)
 
 	-- his ways on the server's own grid, to every piece, against the shell's real wall parts
 	local ways = live or grid
@@ -451,8 +486,8 @@ for index, house in Houses do
 	check(`{house.name}: Danny never takes the {name} through the wall: he walks round and takes it from its side`, took and HouseRoute.sees(grid, at.X, at.Z, mx, mz)
 		and not wallPartBetween(b.model, chest, model.PrimaryPart.Position) and (at.X - qx) ^ 2 + (at.Z - qz) ^ 2 > 4, `{took} at ({at.X}, {at.Z})`)
 	check(`{house.name}: …beside it at arm's length (within Pick.Arm of its footprint: {math.floor(reachAt * 100) / 100})`, reachAt <= H.Pick.Arm)
-	check(`{house.name}: …his walk: no step across a wall, never out of the rooms and doorways, never stuck (no stuck spell to a nudge)`, w.crossed == 0 and w.outRoom == 0
-		and w.stuck < H.StuckSnap, `{w.crossed} {w.why} {w.outRoom} {w.stuck}`)
+	check(`{house.name}: …his walk: no step across a wall, never out of the rooms and doorways, never stuck (9.3: no stuck spell to a new way, let alone his ways out)`, w.crossed == 0 and w.outRoom == 0
+		and w.stuck < H.Unstuck.Repath, `{w.crossed} {w.why} {w.outRoom} {w.stuck}`)
 	check(`{house.name}: …his pick-up: turned to it, then the bend ("lift") with both hands on it as it stands`, w.faced and w.bent and w.hands, `{w.faced} {w.bent} {w.hands}`)
 	local glide = w.glide
 	local smooth = #glide >= 3
@@ -468,7 +503,7 @@ for index, house in Houses do
 		return danny.s.move.things[s.id].state == "truck"
 	end)
 	watch = nil
-	check(`{house.name}: …carried out of the house (no wall crossed on the way) and loaded`, loaded and w.crossed == 0 and w.outRoom == 0 and w.stuck < H.StuckSnap,
+	check(`{house.name}: …carried out of the house (no wall crossed on the way) and loaded`, loaded and w.crossed == 0 and w.outRoom == 0 and w.stuck < H.Unstuck.Repath,
 		danny.s.move.things[s.id].state)
 
 	if house.kind == "big" then

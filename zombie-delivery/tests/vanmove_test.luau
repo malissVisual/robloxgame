@@ -42,7 +42,7 @@ local VAN: Rules.Bed = { width = V.Width, length = V.Length, height = V.Height, 
 
 -- The van's bay ---------------------------------------------------------------------------------------------------------------
 
-check("the ZDC Van's bay: 6.2 wide, 6.4 long, 4.3 tall (its cargo box less its walls), smaller than the old truck's", V.Width == 6.2 and V.Length == 6.4 and V.Height == 4.3
+check("the Deliveros Van's bay: 6.2 wide, 6.4 long, 4.3 tall (its cargo box less its walls), smaller than the old truck's", V.Width == 6.2 and V.Length == 6.4 and V.Height == 4.3
 	and V.Width * V.Length * V.Height < T.Beds.movingtruck.Width * T.Beds.movingtruck.Length * T.Beds.movingtruck.Height)
 
 -- The hitch ---------------------------------------------------------------------------------------------------------------------
@@ -155,10 +155,10 @@ local FurnitureLooks = require("./FurnitureLooks")
 local SandboxMap = require("./SandboxMap")
 local SP = T.Beds.sprinter
 local SPRINTER: Rules.Bed = { width = SP.Width, length = SP.Length, height = SP.Height, cell = SP.Cell }
-check("the Sprinter's bay: 6.6 wide, 7.6 tall, 14 long, walk-in, its back from the van's doors; far bigger than the ZDC Van's", SP ~= nil and SP.Width == 6.6
+check("the Sprinter's bay: 6.6 wide, 7.6 tall, 14 long, walk-in, its back from the van's doors; far bigger than the Deliveros Van's", SP ~= nil and SP.Width == 6.6
 	and SP.Height == 7.6 and SP.Length == 13.7 and SP.WalkIn == true and type(SP.Back) == "number" and SP.Cell >= 0.4 and SP.Cell <= 0.5
 	and SP.Width * SP.Length * SP.Height > 2.5 * V.Width * V.Length * V.Height)
-check("…the ZDC Van's bay is no walk-in one (the city's game as it was)", V.WalkIn ~= true and V.Back == nil)
+check("…the Deliveros Van's bay is no walk-in one (the city's game as it was)", V.WalkIn ~= true and V.Back == nil)
 do
 	local lying, missing = {}, {}
 	local farm: { [string]: boolean } = {}
@@ -207,7 +207,7 @@ do -- a whole house (shared/HouseLayout.luau plan) loaded piece after piece: the
 	end
 	local sprinter, van = loaded(7, SPRINTER), loaded(7, VAN)
 	-- (8.0 merge: a house holds 2 – 4 small collectibles now, which both bays take: the ratio is a little lower)
-	check("a whole house loaded in one go: the Sprinter takes far more than the ZDC Van", sprinter >= 1.3 * van and sprinter >= 12, `{sprinter} vs {van}`)
+	check("a whole house loaded in one go: the Sprinter takes far more than the Deliveros Van", sprinter >= 1.3 * van and sprinter >= 12, `{sprinter} vs {van}`)
 end
 check("a new seed is a new house (the sandbox refills it every move)", (function()
 	local a, b = HouseLayout.plan(101, "house"), HouseLayout.plan(202, "house")
@@ -220,25 +220,32 @@ check("a new seed is a new house (the sandbox refills it every move)", (function
 	end
 	return not same
 end)())
-local farmstead = T.Sandbox.Houses[SandboxMap.House.id] -- (Jinočany: its contract among the six)
+local farmstead = T.Sandbox.Houses[SandboxMap.House.id] -- (six houses: its contract among the six)
 check("the sandbox's house: SandboxMap.House's id and name, 8.3 25 minutes and the big plan (several trips), no horde and no roamers by default (no guns), switches kept",
 	SandboxMap.House.id == "sandbox_house" and SandboxMap.House.name == "The Old Farmstead" and farmstead.Time == 25 * 60 and farmstead.Kind == "big"
 	and T.Sandbox.Horde == false and T.Sandbox.Roam == 0 and T.Sandbox.HordeAt > 0 and T.Sandbox.HordeAt < farmstead.Time
 	and #farmstead.Blurb <= Config.MoveStory.Limits.Blurb, `{#farmstead.Blurb} of {Config.MoveStory.Limits.Blurb}`)
-check("Jinočany: every house's contract (its Client and Blurb within the cards' limits, its clock past the horde's)", (function()
+-- (9.5 the countryside: every place of the map its contract, by id, of the place's kind; tests/sandboxhouses_test.luau
+-- matches the rest of them to the map)
+check("six places: every place's contract, of its kind (its Client and Blurb within the cards' limits, its clock past the horde's)", (function()
+	local n = 0
+	for _ in T.Sandbox.Houses do
+		n += 1
+	end
 	for _, h in SandboxMap.Houses do
 		local c = T.Sandbox.Houses[h.id]
-		if not c or #c.Blurb > Config.MoveStory.Limits.Blurb or #c.Client > Config.MoveStory.Limits.Client or c.Time <= T.Sandbox.HordeAt then
+		if not c or c.Kind ~= h.kind or #c.Blurb > Config.MoveStory.Limits.Blurb or #c.Client > Config.MoveStory.Limits.Client or c.Time <= T.Sandbox.HordeAt then
 			return false
 		end
 	end
-	return true
+	return n == #SandboxMap.Houses
 end)())
 check("the sandbox's van is the Sprinter, its bed set", Config.Sandbox.Van == "sprinter" and T.Beds[Config.Sandbox.Van] ~= nil)
-check("the house's front door looks out to the road, the van's curb between them (its back to the door)", (function()
+check("the house's front door looks out to its yard (9.7: Pražská's, no turnaround), the van's curb in it (its back to the door)", (function()
 	local h = SandboxMap.House
-	local road = SandboxMap.Turnaround
-	return h.door.yaw == 0 and h.curb.yaw == 0 and h.curb.z < h.door.z and math.abs(h.curb.z - road.z) <= road.r and h.door.z - h.curb.z > SP.Length / 2
+	local road = SandboxMap.Roads[1]
+	return h.door.yaw == 0 and h.curb.yaw == 0 and h.curb.z < h.door.z and road.name == h.street and h.curb.z >= road.z0 and h.curb.z <= road.z1
+		and h.door.z - h.curb.z > SP.Length / 2
 end)())
 
 check("Walt's lines fit their bubbles", (function()

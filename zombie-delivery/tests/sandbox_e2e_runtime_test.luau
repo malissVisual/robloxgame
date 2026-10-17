@@ -2,19 +2,22 @@
 -- tests/run_tests.py stages the real server modules SandboxE2E lists in E.real (SandboxBoot, SandboxWorld, HouseMesh,
 -- PlayerData, SandboxPlots, Collection, CollectionBook, Warehouse with WarehouseMesh, Upgrades, SandboxTasks, SandboxLeaders,
 -- Analytics, SandboxAnalytics, Moving with MoveLobby, MoveHelper, MoveGreeters, PairHold and MoveSites, HouseInterior,
--- FurnitureMesh) and
+-- FurnitureMesh; 9.7 LobbyWorld and Runs) and
 -- shared/Net.luau on tests/runtime/SandboxE2E.luau's Roblox stand-in: only Roblox (its services, AnalyticsService
 -- recorded) and the physics-heavy modules (Vehicles, Zombies, Npcs, Crew, Hand) are mocked; see its header. The clock is
--- the test's: the modules' own loops run (the moves' tick, the doors, Danny, the lobby, the payouts, the tasks, the
--- autosave).
---   0. The real boot (SandboxBoot.start): the map, the services, the plots, the warehouses, the moves; no Baseplate.
+-- the test's: the modules' own loops run (the moves' tick, the doors, Danny, the pads, the payouts, the tasks, the
+-- autosave). 9.7 RUNS: the lobby → a portal's pad → the run in the house → loaded → FINISH → the stock, all of it real.
+--   0. The real boot (SandboxBoot.start): the map, the services, the plots, the warehouses, the moves, 9.7 the lobby
+--      (its six portals, their pads and signs, the ZDC dispatch, the PAINT shop's booth) and the runs; no kiosk on the
+--      plots; no Baseplate.
 --   1. Ann and Bob join: plots 1 and 2, a new sandbox save each ($500), their warehouses' signs, the states; 8.3: their
---      warehouses are garages (level 1: 2 stands).
---   2. PLAY: the van at the plot's vanSpot (its back doors in the unload circle), you at the spawn.
---   3. The contract at your plot's kiosk, START (the lobby), LAUNCH: two moves at once (two houses, two interiors),
---      Danny for each (8.3: for hire, nobody hires him: he waits by the van). Bob at Ann's kiosk gets only his own card.
---      8.8 no roles: none in the planning or on the move; the van's Loads hold no time (step 6).
---   4. The van to the chalet's curb, the back doors open, the front door's walk-in zone: the dwell, the fade, inside
+--      warehouses are garages (level 1: 2 stands); 9.7 both in the lobby's plaza.
+--   2. PLAY: 9.7 no van in the lobby (the truck waits at a run's house; CAR says so).
+--   3. 9.7 the portals: Ann onto the farmstead's pad (the pad panel: she the host, the countdown, Easy and Normal open,
+--      Hard locked), her pick; the countdown over: her run (her truck parked at the curb, locked, she faded over to the
+--      house's front yard, the portal IN USE), Danny with her (10.1 free). Bob onto the farmstead's pad: IN USE; onto the Pond
+--      Cabin's: his own run at the same time. 8.8 no roles: none on the move; the van's Loads hold no time (step 6).
+--   4. The truck at the chalet's curb, the back doors open, the front door's walk-in zone: the dwell, the fade, inside
 --      (8.3: the chalet's leaves open before the fade, the move FadeOut + Margin s after it, the arrival a step past the
 --      door facing in, the leaves shut again Shut s later). 8.5 walking through: from 14 studs out on through the door
 --      without a stop (no dwell): the way in clear of anything that collides (the House box no more), the leaf fully
@@ -26,9 +29,10 @@
 --   6. Out through the doorway, loaded at the back doors; a one-hand piece loaded from inside the walk-in bay. 8.5: out by
 --      walking on through the doorway inside with the piece (the fade as she crossed its threshold, the way onto the
 --      porch clear, the move before its wall of daylight).
---   7. Home: no trip at another player's plot; backed into your circle: trip 1 (Collection.add: item, variant, condition,
---      name: the very look the piece had), into the book; trip 2 nose-in. Bob: a death mid-carry, the respawn by his
---      van, his trip.
+--   7. 9.7 FINISH at the truck (the host's prompt): everything in it into HER stock at once (Collection.add: item,
+--      variant, condition, name: the very look the piece had), into the book; the results card (the pieces, their
+--      rarity, who got them, the value), Hard unlocked; EndHold s later back in the lobby by the portal, the truck gone.
+--      A second run (the house refilled): one more piece. Bob: a death mid-carry, the respawn by his truck, his FINISH.
 --   8. The warehouse: Display opens the picker, the client's display, the stand's model and tag; a move to another
 --      stand, Take down; the refusals (a stand you haven't got, junk, a taken stand, another player's piece).
 --   9. 60 s on the clock: the income (CollectionIncome). The player list's $ / $/min / collection, the TOP MOVERS board.
@@ -36,26 +40,37 @@
 --      bought to the Big Warehouse (each level a rebuild, her pieces kept on their stands, the new desk's prompt); More
 --      stands (14), the new stand 13 shows a piece; Showroom lights (× 1.1).
 --  11. Sell at the stand (hold F); the bulk buttons: TAKE ALL DOWN, SELL… (duplicates; nothing else to sell), FILL BEST.
---  12. FINISH: the result card says what came home; the daily tasks counted the trips, the sales and the income (a done
---      one claimed); the analytics' funnel steps fired once each, the moves' events.
---  13. Ann leaves and comes back: the collection on its stands, the upgrades, the book, the tasks, every dollar; the
---      engine on her van and on one CAR brings later; Danny's training; 8.3: her warehouse level kept, then the
---      Logistics Center (level 5) with every piece still on its stand.
---  14. Bob cannot use Ann's stands or desk; her kiosk opens only his own move.
+--  12. The runs' ends: the daily tasks counted the trips home, the sales and the income (a done one claimed); the
+--      analytics' funnel steps fired once each, the moves' events.
+--  13. Ann leaves and comes back: the collection on its stands, the upgrades, the book, the tasks, every dollar, 9.7 her
+--      runs' unlocks; no van in the lobby (CAR says so); the engine bought (her next truck wears it: step 20); Danny's
+--      training; 8.3: her warehouse level kept, then the Logistics Center (level 5) with every piece still on its stand.
+--  14. Bob cannot use Ann's stands or desk; 9.7 his own run from a pad, GIVE UP with nothing loaded.
 --  14b. 8.7 trading between players: at Ann's stand Bob has Make an offer (tagged for client/TradePrompts.luau: hidden
 --      from her), its composer, his offer on her card, her ACCEPT: the money and the piece moved (the fee gone), the
 --      stand free; Ann's Set price (her FOR SALE sign on the tag for everybody), Bob's Buy $X, its question, BUY.
---  15. A full server: the fifth player waits for a plot, gets Bob's when he leaves.
---  16. A full warehouse at a trip.
---  17. Leaving mid-move with a piece in the van; coming back. Last: the all-time best in its OrderedDataStore.
+--  15. A full server: the fifth player waits for a plot (9.7: in the plaza; a run refused: no warehouse), gets Bob's
+--      when he leaves.
+--  16. A full warehouse at a run's end.
+--  17. Leaving mid-run with a piece in the truck: the run ends, the piece home in her save; coming back. Last: the
+--      all-time best in its OrderedDataStore.
 --  18. 8.3 the market: the state carries the day's hot and cold kinds; a hot piece on a stand: its tag shows the hot
 --      income (Warehouse's hook), sold at the stand for the hot price, the analytics' "hot". Every price and income the
 --      steps above expect is the market's (CollectionRules / StockPlan with Collection.market): any day passes.
---  19. 8.3 the PAINT shop: the van's 🎨 Paint van prompt at home, the window, a paint bought and worn.
---  20. 8.3 the big move: the card's big plan (Config.Furniture.Big), round the house to its back door, in by it, a
---      piece out by its doorway inside (the real plan's second way out), loaded, home. 8.3 walk-in doors: the back
---      door's leaves (the map's, the interior's) swing open as she walks up to them, the fade as the front door's. 8.5:
---      in and out by the back door walking through it without a stop, as by the front door.
+--  19. 8.3 the PAINT shop: 9.7 the lobby's booth (no van needed), the window, a paint bought, worn by the truck of her
+--      next run.
+--  20. 8.3 the big move: 9.7 Ann's run at Hard (opened by her first run, kept in her save across her leave), the big
+--      plan (Config.Furniture.Big), round the house to its back door, in by it, a piece out by its doorway inside (the
+--      real plan's second way out), loaded, FINISH: Insane opened. 8.3 walk-in doors: the back door's leaves (the map's,
+--      the interior's) swing open as she walks up to them, the fade as the front door's. 8.5: in and out by the back
+--      door walking through it without a stop, as by the front door.
+--  21. 9.7 a party run: four onto a pad one after the other (the first the host; Hard refused to her, a non-host's
+--      pick nothing; she steps off: the next one the host, the countdown going on; back on: last in the line), a fifth
+--      waits (MaxParty 4; IN USE for her); the party in the house's front yard, the host's truck; three of them load a
+--      piece each, one LEAVEs THE RUN alone (back to the lobby, her piece still counts), the others vote: the end, each
+--      piece in its loader's stock, a results card for everybody, Hard opened for the host (not for the one who left).
+--  22. 9.7 the clock runs out: the run ends late by itself, the truck's load home, the next difficulty opened.
+--  23. 9.7 the host leaves the game mid-run: the run ends for the party, each piece home to its loader.
 -- A real bug found here keeps its check as TODO(bug) (printed, not counted): see the report with this commit.
 math.randomseed(8202) -- (the houses' seeds, the grip checks' zones, the analytics' sampling: the same run every time)
 
@@ -72,6 +87,12 @@ local Plan = require("./AnalyticsPlan")
 local StockPlan = require("./StockPlan")
 local Market = require("./Market") -- (8.3: the day's hot and cold kinds)
 local SoundPlan = require("./SoundPlan") -- (8.3: "in the house" for the eyes and the sounds)
+-- 10.x danger: the runs' hazards are tests/danger_test.luau's and tests/danger_runtime_test.luau's: none on this loop's
+-- straight walks (a creaky patch under a carried piece drops it, the plaster knocks it); its locks, vault and zombies
+-- stay (H.choose leaves their pieces be)
+for _, level in Config.Runs.Danger do
+	level.Creak, level.Puddle, level.Plaster = 0, 0, 0
+end
 
 local failures = 0
 local todos: { string } = {}
@@ -142,6 +163,8 @@ local Moving = E.module("Moving")
 local MoveHelper = E.module("MoveHelper")
 local SandboxPlots = E.module("SandboxPlots")
 local Vehicles = E.fakes.Vehicles
+H.Runs = E.module("Runs") -- 9.7: the runs (the portals' pads, the parties)
+H.Danger = E.module("RunDanger") -- 10.x: a run's danger (its vault's sealed pieces, its locked rooms: tests/danger_*_test.luau)
 MoveHelper.useMover(E.mover) -- (no pathfinding in the CLI: Danny walks straight)
 
 local queued: { any } = {}
@@ -187,11 +210,35 @@ do
 		table.concat(failed, " | ") .. table.concat(E.errors, " | "))
 	local moves = workspace:FindFirstChild("Moves")
 	local warehouses = workspace:FindFirstChild("Warehouses")
-	check("…the map (workspace.Sandbox), the four warehouses, a kiosk on every plot, the Cars folder; no Baseplate", workspace:FindFirstChild("Sandbox") ~= nil
-		and warehouses ~= nil and #warehouses:GetChildren() == 4 and moves ~= nil and moves:FindFirstChild("MovingBoard1") ~= nil
-		and moves:FindFirstChild("MovingBoard4") ~= nil and workspace:FindFirstChild("Cars") ~= nil and rawget(baseplate, "destroyed") == true)
+	check("…the map (workspace.Sandbox), the four warehouses, the Cars folder; 9.7 no kiosk on the plots; no Baseplate", workspace:FindFirstChild("Sandbox") ~= nil
+		and warehouses ~= nil and #warehouses:GetChildren() == 4 and moves ~= nil and moves:FindFirstChild("MovingBoard1") == nil
+		and moves:FindFirstChild("MovingBoard4") == nil and workspace:FindFirstChild("Cars") ~= nil and rawget(baseplate, "destroyed") == true)
+	local lobby = workspace:FindFirstChild("Sandbox"):FindFirstChild("Lobby")
+	local portals = lobby and lobby:FindFirstChild("Portals")
+	local portalsOk = portals ~= nil and #portals:GetChildren() == #SandboxMap.Lobby.portals
+	for _, portal in SandboxMap.Lobby.portals do
+		local model = portals and portals:FindFirstChild(`Portal_{portal.house}`)
+		local pad = model and model:FindFirstChild("RunPad")
+		local sign = model and model:FindFirstChild("GateSign")
+		local words = sign and sign:FindFirstChild("Words")
+		local line = words and words:FindFirstChild("Status")
+		local status = if line then line.Text else ""
+		local title = words and words:FindFirstChild("Title")
+		portalsOk = portalsOk and model ~= nil and model:GetAttribute("RunPortal") == portal.house and pad ~= nil and pad:GetAttribute("RunPad") == portal.house
+			and pad.CanCollide == false and status == "WALK ONTO THE PAD" and title ~= nil and title.Text == string.upper(portal.name)
+	end
+	check("9.7 …the lobby (workspace.Sandbox.Lobby, Persistent): six portals, each its house's (RunPortal), its glowing pad (RunPad, no collision), its sign (its name, WALK ONTO THE PAD)",
+		lobby ~= nil and lobby.ModelStreamingMode == E.Mock.Enum.ModelStreamingMode.Persistent and portalsOk)
+	local dispatch: any = nil
+	for _, d in lobby:GetDescendants() do
+		if d.ClassName == "ProximityPrompt" and d.Name == "DispatchPrompt" then
+			dispatch = d
+		end
+	end
+	check("9.7 …the Deliveros dispatch kiosk on the plaza, its \"How runs work\" (server/Runs.luau's)", dispatch ~= nil and dispatch.ActionText == "How runs work"
+		and dispatch.Parent:GetAttribute("RunDispatch") == true)
 	local door, back: any, any = nil, nil
-	local farmstead = workspace:FindFirstChild("Sandbox"):FindFirstChild("TheOldFarmstead") -- (Jinočany: the stand-ins have doors of their own)
+	local farmstead = workspace:FindFirstChild("Sandbox"):FindFirstChild("TheOldFarmstead") -- (six houses: the stand-ins have doors of their own)
 	for _, d in farmstead:GetDescendants() do
 		if d:GetAttribute("SandboxDoor") then
 			door = d
@@ -339,20 +386,8 @@ function H.client(player: any): (string, ...any) -> ()
 		end
 	end
 end
-function H.play(player: any): any
-	E.fire(player, "Play")
-	E.advance(1)
-	return Vehicles.get(player)
-end
 function H.doorOf(van: any): any
 	return van.chassis:FindFirstChild("CargoDoor")
-end
-function H.inCircle(at: any, plot: any): boolean
-	return H.flat(at, V3(plot.unload.x, 0, plot.unload.z)) <= plot.unload.r
-end
-function H.kiosk(plot: any): (any, any)
-	local model = workspace:FindFirstChild("Moves"):FindFirstChild(`MovingBoard{plot.id}`)
-	return model:FindFirstChild("Board"), E.promptIn(model, "Moving contracts")
 end
 function H.stateOf(player: any): any
 	E.fire(player, "Moving", "state")
@@ -367,69 +402,64 @@ function H.itemOf(player: any, spot: number): any
 	end
 	return nil
 end
--- Walks to a plot's kiosk and uses its "Moving contracts" prompt: the card (or nil), the prompt's ok and why.
-function H.takeContract(player: any, plot: any): (any, boolean, string?)
-	local board, prompt = H.kiosk(plot)
-	local before = #E.sent
-	E.walk(player, H.groundAt(board.Position + V3(0, 0, 4)))
-	local ok, why = E.trigger(prompt, player)
-	local card = E.lastOf(player, "Moving", "contract", before)
-	return card and card[2], ok, why
-end
--- START, LAUNCH (solo); Danny waits by the van for hire (8.3: nobody hires him here, the pieces are the player's).
--- (Jinočany: the house on their card, the one the board showed them last)
-function H.launch(player: any)
-	local card = E.lastOf(player, "Moving", "contract")
-	E.fire(player, "Moving", "start", if card and card[2] then card[2].id else House.id)
-	E.fire(player, "MoveLobby", "launch")
-	E.advance(0.5)
-end
--- The van's middle along the roads: out of the plot, Depot Row, Pražská, round the turnaround to the curb, backed
--- toward the chalet's door (its nose north). Jinočany: `house` another house to empty (SandboxMap.Houses'): along
--- Depot Row and Hlavní to its street, then to its curb, its back to its door.
-function H.toHouse(plot: any, house: any?): { any }
-	local h = house or House
-	if h ~= House then
-		local c = h.curb
-		return {
-			{ x = plot.vanSpot.x, z = -60, yaw = 180 },
-			{ x = plot.vanSpot.x, z = -60, yaw = 90 },
-			{ x = c.x, z = -60, yaw = 90 },
-			{ x = c.x, z = c.z, yaw = c.yaw },
-		}
-	end
-	return {
-		{ x = plot.vanSpot.x, z = -60, yaw = 180 },
-		{ x = 0, z = -60, yaw = 270 },
-		{ x = 0, z = 466, yaw = 180 },
-		{ x = 14, z = 480, yaw = 90 },
-		{ x = House.curb.x, z = House.curb.z, yaw = House.curb.yaw },
-	}
-end
--- Jinočany: the house of `player`'s move (its state's contract, a SandboxMap.Houses id).
+-- six houses: the house of `player`'s move (its state's contract, a SandboxMap.Houses id).
 function H.houseOf(player: any): any
 	local view = H.stateOf(player)
 	return SandboxMap.house(view and view.contract) or House
 end
--- Home: Pražská north, Depot Row to the plot, then backed in (nose south, the back doors to the roller door) or
--- nose-in (nose north).
-function H.toPlot(plot: any, noseIn: boolean): { any }
-	return {
-		{ x = 0, z = 470, yaw = 0 },
-		{ x = 0, z = -60, yaw = 0 },
-		{ x = plot.vanSpot.x, z = -60, yaw = if plot.vanSpot.x < 0 then 90 else 270 },
-		if noseIn then { x = plot.unload.x, z = plot.unload.z + 8, yaw = 0 } else { x = plot.vanSpot.x, z = plot.vanSpot.z, yaw = 180 },
-	}
+-- 9.7 runs: the middle of a house's portal's pad in the lobby (SandboxMap.Lobby.portals), a root's height up.
+function H.padAt(house: string): any
+	local pad = (SandboxMap.portal(house) :: any).pad
+	return H.groundAt(V3((pad.x0 + pad.x1) / 2, 0, (pad.z0 + pad.z1) / 2))
+end
+-- The portal's sign's status line (its SurfaceGui "Words": server/Runs.luau paints it) and its pad.
+function H.portal(house: string): (string, any)
+	local model = workspace:FindFirstChild("Sandbox"):FindFirstChild("Lobby"):FindFirstChild("Portals"):FindFirstChild(`Portal_{house}`)
+	local sign = model and model:FindFirstChild("GateSign")
+	local words = sign and sign:FindFirstChild("Words")
+	local status = words and words:FindFirstChild("Status")
+	return if status then status.Text else "", model and model:FindFirstChild("RunPad")
+end
+-- `players` walk onto `house`'s pad one after the other (the first its host, picking `difficulty`), the countdown runs
+-- out: the run, the party faded over to the house's front yard. → the run (Runs.runOf) or nil.
+function H.run(players: { any }, house: string, difficulty: string?): any
+	for _, p in players do
+		E.walk(p, H.padAt(house))
+	end
+	E.advance(Config.Runs.Every + 0.05)
+	if difficulty then
+		E.advance(0.3) -- (the Runs remote's rate limit)
+		E.fire(players[1], "Runs", { kind = "difficulty", id = difficulty })
+	end
+	local started = E.waitUntil(function(): boolean
+		return H.Runs.runOf(players[1]) ~= nil
+	end, Config.Runs.Countdown + 1)
+	E.advance(Config.Runs.Fade.Out + 0.3) -- (the jump: the fade out, then over)
+	return if started then H.Runs.runOf(players[1]) else nil
+end
+-- The host's FINISH at the truck (its "Finish the run" prompt, held, from beside the truck's driver's side) → the
+-- results card ({ kind = "result" }: Runs') or nil, and the prompt's ok and why.
+function H.finishRun(player: any, van: any): (any, boolean, string?)
+	local prompt = E.promptIn(van.chassis, "Finish the run")
+	if not prompt then
+		return nil, false, "no FINISH prompt"
+	end
+	local at = #E.sent
+	local by = E.promptAt(prompt)
+	local mid = van.chassis.Position
+	local out = V3(by.X - mid.X, 0, by.Z - mid.Z).Unit -- (out of the truck's side, at the prompt)
+	E.walk(player, H.groundAt(V3(by.X + out.X * 2.5, 0, by.Z + out.Z * 2.5)))
+	local ok, why = E.trigger(prompt, player)
+	E.advance(0.5)
+	return E.lastKind(player, "Runs", "result", at), ok, why
+end
+-- The run's end over: EndHold s, the fade back to the lobby.
+function H.backHome()
+	E.advance(Config.Runs.EndHold + Config.Runs.Fade.Out + 0.5)
 end
 function H.behindVan(van: any, out: number): any
 	local back = van.chassis.CFrame:PointToObjectSpace(H.doorOf(van).WorldPosition)
 	return H.groundAt(van.chassis.CFrame * V3(0, 0, back.Z + out))
-end
-function H.drive(player: any, van: any, points: { any })
-	E.seat(player, van)
-	E.drive(van, points, 45)
-	E.unseat(player)
-	E.advance(0.3)
 end
 -- The back doors open or shut (its BackPrompt from behind the van).
 function H.setBack(player: any, van: any, open: boolean): boolean
@@ -516,7 +546,7 @@ function H.solidOn(from: any, to: any, half: number): { string }
 	return hit
 end
 -- Walks up to the chalet's front door and on through it (8.5: from beyond its approach into its dark hall, no stop:
--- the leaf open on the way, the fade as she crosses the threshold, the move in the dark), inside. Jinočany: the front
+-- the leaf open on the way, the fade as she crosses the threshold, the move in the dark), inside. six houses: the front
 -- door of the house of their move (H.houseOf), a stand-in's as the farmstead's.
 function H.enterHouse(player: any): boolean
 	local h = H.houseOf(player)
@@ -560,13 +590,15 @@ function H.leaveHouse(player: any): boolean
 		return not H.isInside(player)
 	end, 3)
 end
--- The model of the move's piece at `spot` (its prompts are the player's move's).
+-- The model of the move's piece at `spot` (its prompts are the player's move's: 9.7 a party member's, its host's).
 function H.pieceOf(player: any, spot: number): any
+	local run = H.Runs.runOf(player)
+	local owner = if run then run.host.UserId else player.UserId
 	for _, d in workspace:FindFirstChild("Moves"):GetDescendants() do
 		if d.ClassName == "Model" and d:GetAttribute("MoveSpot") == spot and not rawget(d, "destroyed") then
 			local root = d.PrimaryPart
 			local prompt = root and E.promptIn(root, "", function(p: any): boolean
-				return p:GetAttribute("MoveOwner") == player.UserId
+				return p:GetAttribute("MoveOwner") == owner
 			end)
 			if prompt then
 				return d
@@ -575,13 +607,36 @@ function H.pieceOf(player: any, spot: number): any
 	end
 	return nil
 end
--- A piece at home in the player's house that `fits` (by its def): the first in the state's order → item, model, def.
+-- 10.x danger: is the piece at `spot` of the player's run in its vault (sealed) or in a room behind a door still locked?
+function H.dangerous(player: any, spot: number): boolean
+	local st = H.Danger.stateFor(player)
+	if not st then
+		return false
+	end
+	if st.sealed[spot] then
+		return true
+	end
+	local room: string? = nil
+	for _, planned in st.s.plan.spots do
+		if planned.id == spot then
+			room = planned.room
+		end
+	end
+	for _, lock in st.locks do
+		if not lock.open and table.find(lock.plan.behind, room) then
+			return true
+		end
+	end
+	return false
+end
+-- A piece at home in the player's house that `fits` (by its def): the first in the state's order → item, model, def
+-- (10.x: never one in the run's vault or behind a locked door).
 function H.choose(player: any, fits: (any, any) -> boolean): (any, any, any)
 	for _, item in H.stateOf(player).items do
 		local model = H.pieceOf(player, item.spot)
 		local id = model and model:GetAttribute("FurnitureId")
 		local def = id and FurnitureLooks.Items[id]
-		if item.state == "home" and def and fits(item, def) then
+		if item.state == "home" and def and fits(item, def) and not H.dangerous(player, item.spot) then
 			return item, model, def
 		end
 	end
@@ -657,9 +712,9 @@ function H.inBay(van: any, model: any): boolean
 	local bay = SprinterLooks.Bay
 	return p.X > bay.x0 and p.X < bay.x1 and p.Z > bay.z0 and p.Z < bay.z1 and p.Y > 0
 end
--- One trip's load: to the chalet, the back open, in, a piece that `fits` out and loaded, the back shut → item, model.
-function H.fetch(player: any, van: any, plot: any, fits: (any, any) -> boolean): (any, any)
-	H.drive(player, van, H.toHouse(plot))
+-- One load (at the house of their run, its truck at the curb): the back open, in, a piece that `fits` out and loaded,
+-- the back shut → item, model.
+function H.fetch(player: any, van: any, fits: (any, any) -> boolean): (any, any)
 	H.setBack(player, van, true)
 	if not H.enterHouse(player) then
 		return nil, nil
@@ -722,9 +777,10 @@ do
 		and SandboxPlots.of(ann) == plots[1] and SandboxPlots.of(bob) == plots[2] and SandboxPlots.owner(1) == ann)
 	check("…a new sandbox save each, read and saveable ($" .. Config.Sandbox.StartMoney .. ")", H.profileOf(ann) ~= nil
 		and H.profileOf(ann).money == Config.Sandbox.StartMoney and PlayerData.loaded(ann) and H.profileOf(bob) ~= nil and PlayerData.loaded(bob))
-	check("…each at their plot's spawn, holstered (SandboxBoot's standAtHome)", H.flat(E.rootOf(ann).Position, V3(plots[1].spawn.x, 0, plots[1].spawn.z)) < 0.5
-		and H.flat(E.rootOf(bob).Position, V3(plots[2].spawn.x, 0, plots[2].spawn.z)) < 0.5 and ann.Character:GetAttribute("Holstered") == true,
-		E.rootOf(ann).Position)
+	local annAt, bobAt = Boot.spawnSpot(ann), Boot.spawnSpot(bob)
+	check("…9.7 each in the lobby's plaza (SandboxBoot's spawn: Lobby.spawn, apart by their plots), holstered", H.flat(E.rootOf(ann).Position, V3(annAt.x, 0, annAt.z)) < 0.5
+		and H.flat(E.rootOf(bob).Position, V3(bobAt.x, 0, bobAt.z)) < 0.5 and SandboxMap.inLobby(annAt.x, annAt.z) and H.flat(V3(annAt.x, 0, annAt.z), V3(bobAt.x, 0, bobAt.z)) > 1
+		and ann.Character:GetAttribute("Holstered") == true, E.rootOf(ann).Position)
 	E.advance(0.5)
 	check("…their warehouses' signs say whose they are; the others FOR RENT", H.anyText(Warehouse.model(1), "Ann") and H.anyText(Warehouse.model(2), "Bob")
 		and H.anyText(Warehouse.model(3), "FOR RENT"))
@@ -748,81 +804,138 @@ end
 
 -- ── 2. PLAY ───────────────────────────────────────────────────────────────
 
-local annVan = H.play(ann)
-local bobVan = H.play(bob)
+local annVan: any, bobVan: any = nil, nil -- (9.7: their trucks come with their runs, step 3)
 do
-	check("2. PLAY: Ann's ZDC Sprinter at her vanSpot, nose to the street, its back doors in the unload circle", annVan ~= nil and annVan.id == Config.Sandbox.Van
-		and H.flat(annVan.chassis.Position, V3(plots[1].vanSpot.x, 0, plots[1].vanSpot.z)) < 0.5 and annVan.chassis.CFrame.LookVector.Z > 0.99
-		and H.inCircle(H.doorOf(annVan).WorldPosition, plots[1]), annVan and annVan.chassis.Position)
-	check("…she is not in it, still at the spawn; told where it is", E.humanoidOf(ann).SeatPart == nil
-		and H.flat(E.rootOf(ann).Position, V3(plots[1].spawn.x, 0, plots[1].spawn.z)) < 0.5 and E.heard(ann, "parked at your warehouse"), E.lastNotice(ann))
-	check("…Bob's at his own vanSpot; both in workspace.Cars with their owner and the engine's SpeedMult (level 0: 1)", bobVan ~= nil and bobVan ~= annVan
-		and H.flat(bobVan.chassis.Position, V3(plots[2].vanSpot.x, 0, plots[2].vanSpot.z)) < 0.5 and annVan.model.Parent == workspace:FindFirstChild("Cars")
-		and annVan.model:GetAttribute("OwnerId") == 11 and annVan.model:GetAttribute("SpeedMult") == 1)
+	E.fire(ann, "Play")
+	E.advance(1)
+	E.fire(bob, "Play")
+	E.advance(1)
+	local cars = workspace:FindFirstChild("Cars")
+	check("2. PLAY: 9.7 no van in the lobby (the truck waits at a run's house): none out, the van hers all the same (profile.car the Sprinter)", Vehicles.get(ann) == nil
+		and Vehicles.get(bob) == nil and (cars == nil or #cars:GetChildren() == 0) and H.profileOf(ann).car == Config.Sandbox.Van, H.profileOf(ann).car)
+	check("…she is still in the plaza, on foot", E.humanoidOf(ann).SeatPart == nil and SandboxMap.inLobby(E.rootOf(ann).Position.X, E.rootOf(ann).Position.Z))
 	local calls = #E.vehicleCalls
 	E.fire(ann, "Play")
 	E.advance(1)
-	check("…a second PLAY brings no second van", Vehicles.get(ann) == annVan and #E.vehicleCalls == calls)
+	check("…a second PLAY changes nothing", Vehicles.get(ann) == nil and #E.vehicleCalls == calls)
 	check("…the analytics' funnel: PressedPlay once", H.steps(11).PressedPlay == 1)
+	local carAt = #E.sent
+	E.fire(ann, "SpawnCar")
+	E.advance(0.5)
+	check("…CAR in the lobby: no van comes, she is told why", Vehicles.get(ann) == nil and E.heard(ann, "No vans in the lobby", carAt), E.lastNotice(ann, carAt))
 end
 
--- ── 3. The contract at your plot's kiosk, START, LAUNCH ──────────────────
+-- ── 3. The portals: a pad, the difficulty, the countdown, the run ─────────
 
 do
-	local card, ok, why = H.takeContract(ann, plots[1])
-	check("3. Ann at her kiosk: the contract card, The Old Farmstead, free to start", ok and card ~= nil and card.id == House.id and card.busy == nil
-		and card.items > 0 and card.story == false, why or (card and card.busy))
-	local before = #E.sent
-	E.fire(ann, "Moving", "start", House.id)
-	local lobby = E.lastOf(ann, "MoveLobby", "lobby", before)
-	check("…START opens the planning lobby (solo: LAUNCH at once)", lobby ~= nil and lobby[2] ~= nil and lobby[2].canLaunch == true, E.lastNotice(ann))
-	check("…8.8: no role in it (the owner: everyone is the same)", lobby ~= nil and lobby[2] ~= nil and lobby[2].role == nil and lobby[2].members[1].role == nil)
-	before = #E.sent
-	E.fire(ann, "MoveLobby", "launch")
-	E.advance(0.5)
-	check("…LAUNCH: the move starts with her own Sprinter where it stands", E.heard(ann, "Move started", before) and Vehicles.get(ann) == annVan, E.lastNotice(ann))
+	local R = Config.Runs
+	local Runs = H.Runs
+	local padAt = #E.sent
+	E.walk(ann, H.padAt(House.id))
+	E.advance(R.Every + 0.05)
+	local pad = E.lastKind(ann, "Runs", "pad", padAt)
+	check("3. Ann onto the farmstead's pad: the pad panel (Runs' pad view): she the host, the countdown, Normal by default, Easy and Normal open",
+		pad ~= nil and pad.house == House.id and pad.mine == true and pad.host == 11 and pad.left > 0 and pad.left <= R.Countdown and pad.difficulty == R.Default
+		and table.concat(pad.open, ",") == "easy,normal" and pad.max == R.MaxParty and pad.going == 1, pad and `{pad.left} {pad.difficulty} {table.concat(pad.open or {}, ",")}`)
+	local status, glow = H.portal(House.id)
+	check("…its sign counts down (STARTING IN …, 1/4), its pad glows Waiting", string.find(status, "STARTING IN", 1, true) ~= nil and string.find(status, "1/4", 1, true) ~= nil
+		and glow ~= nil and math.abs(glow.Color.R - R.Portal.Waiting[1] / 255) < 1e-3 and math.abs(glow.Color.G - R.Portal.Waiting[2] / 255) < 1e-3, status)
+	local lockedAt = #E.sent
+	E.advance(0.3)
+	E.fire(ann, "Runs", { kind = "difficulty", id = "hard" })
+	E.advance(0.3)
+	check("NEG. Hard picked (not open to her yet: no run finished at Normal): refused, told why, the pad still Normal", E.heard(ann, "Finish a run", lockedAt)
+		and Runs.padOf(House.id).difficulty == "normal")
+	E.fire(ann, "Runs", { kind = "difficulty", id = "easy" })
+	E.advance(R.Every + 0.05)
+	check("…Easy (open): the pad's difficulty, her panel says so", Runs.padOf(House.id).difficulty == "easy" and E.lastKind(ann, "Runs", "pad").difficulty == "easy")
+	E.advance(0.3)
+	E.fire(ann, "Runs", { kind = "difficulty", id = "normal" })
+	E.advance(0.3)
+	E.fire(bob, "Runs", { kind = "difficulty", id = "easy" })
+	E.advance(0.3)
+	check("NEG. …Bob's pick (no pad's host): nothing changes", Runs.padOf(House.id).difficulty == "normal")
+	local fadeAt = #E.sent
+	local started = E.waitUntil(function(): boolean
+		return Runs.runOf(ann) ~= nil
+	end, R.Countdown + 1)
+	E.advance(R.Fade.Out + 0.3)
+	annVan = Vehicles.get(ann)
+	local run = Runs.runOf(ann)
+	check("…the countdown over: Ann's run on the farmstead at Normal (Runs.runOf: she the host, alone)", started and run ~= nil and run.house == House.id
+		and run.difficulty == "normal" and #run.party == 1 and run.host == ann)
+	check("…her own Sprinter parked at the farmstead's curb, its back to the front door, locked (RunParked: no Drive, its seat Disabled)", annVan ~= nil
+		and annVan.id == Config.Sandbox.Van and H.flat(annVan.chassis.Position, V3(House.curb.x, 0, House.curb.z)) < 0.5
+		and H.doorOf(annVan).WorldPosition.Z > annVan.chassis.Position.Z and annVan.model:GetAttribute(R.Truck.Attribute) == true and annVan.seat.Disabled == true,
+		annVan and annVan.chassis.Position)
+	local zone = SandboxMap.zone(House.id) :: SandboxMap.Zone
+	local fades = {}
+	for _, args in E.received(ann, "Moving", fadeAt) do
+		if args[1] == "fade" then
+			table.insert(fades, args[2])
+		end
+	end
+	check("…faded over (out, then in) to the house's front yard (its zone's arrival spot), facing its door", fades[1] == "out" and fades[#fades] == "in"
+		and H.flat(E.rootOf(ann).Position, V3(zone.arrive.x, 0, zone.arrive.z)) < 0.5 and E.rootOf(ann).CFrame.LookVector:Dot(H.yawLook(zone.arrive.yaw)) > 0.99
+		and SandboxMap.zoneAt(E.rootOf(ann).Position.X, E.rootOf(ann).Position.Z) == zone, E.rootOf(ann).Position)
+	E.advance(R.Every + 0.05)
+	status = H.portal(House.id)
+	local farmstead = workspace:FindFirstChild("Sandbox"):FindFirstChild("TheOldFarmstead")
+	check("…the farmstead's portal IN USE (its sign), the map's house marked RunDifficulty normal (traps, zombies and the loot read it)",
+		string.find(status, "IN USE", 1, true) ~= nil and Runs.inUse(House.id) and farmstead ~= nil and farmstead:GetAttribute("RunDifficulty") == "normal", status)
+	local runView = E.lastKind(ann, "Runs", "run")
+	check("…Runs' run view on her client (she the host, Normal, alone: nobody to vote)", runView ~= nil and runView.mine == true and runView.difficulty == "normal"
+		and runView.members == 1 and runView.house == House.id)
 	local view = H.stateOf(ann)
 	S.annMove = view.id
-	check("…its drop-off is her plot's unload circle; no horde; the clock runs", view.drop == "your warehouse" and view.dropOff.x == plots[1].unload.x
-		and view.dropOff.z == plots[1].unload.z and view.hordeAt == nil and view.endsAt > E.now)
+	local F = Config.Moving.Sandbox.Houses[House.id]
+	check("…the move: the run's (its difficulty, she the host), its clock the farmstead's × Normal's, no horde", view.run ~= nil and view.run.difficulty == "normal"
+		and view.run.mine == true and view.hordeAt == nil and math.abs(view.endsAt - E.now - F.Time) < 2, view.endsAt - E.now)
 	check("…8.8: no role on the move (no MoveRole; the state's team: only the van's call, not made yet)", ann:GetAttribute("MoveRole") == nil
 		and view.team.role == nil and view.team.called == false)
-	check("…Danny comes with her crew of one, for hire (8.3), his id for his card", MoveHelper.find(ann) ~= nil and MoveHelper.find(ann).hirer == nil
-		and ann:GetAttribute("MoveHelperId") == MoveHelper.find(ann).id)
+	check("…Danny comes with her crew of one, free (10.1: hers from the start, no hire), his id for his card", MoveHelper.find(ann) ~= nil
+		and MoveHelper.find(ann).hirer == ann and MoveHelper.find(ann).kind == "danny" and ann:GetAttribute("MoveHelperId") == MoveHelper.find(ann).id)
 	E.fire(ann, "Moving", "helper", "van")
-	check("…the old orders are gone (WAIT AT VAN: nothing): not hired, he leaves her pieces to her, his price on her status line",
-		ann:GetAttribute("MoveHelper") == "offer" and type(ann:GetAttribute("MoveHelperPrice")) == "number" and #MoveHelper.find(ann).queue == 0, ann:GetAttribute("MoveHelper"))
+	check("…the old orders are gone (WAIT AT VAN: nothing): he leaves her pieces to her, no price on her status line",
+		ann:GetAttribute("MoveHelper") == "hired" and ann:GetAttribute("MoveHelperPrice") == nil and #MoveHelper.find(ann).queue == 0, ann:GetAttribute("MoveHelper"))
 	check("…the analytics: FirstContract once, MoveStarted (solo)", H.steps(11).FirstContract == 1 and #H.events("MoveStarted", ann) == 1)
-	local bobCard = H.takeContract(bob, plots[2])
-	check("…Jinočany: Bob's card another house (never Ann's at once): the next free one, The Linden House on Hlavní, a family house",
-		bobCard ~= nil and bobCard.id == SandboxMap.Houses[2].id and bobCard.name == "The Linden House" and bobCard.address == "Hlavní 5"
-		and bobCard.time == Config.Moving.Sandbox.Houses[bobCard.id].Time and bobCard.items < card.items, bobCard and bobCard.id)
-	H.launch(bob)
+	-- Bob: the farmstead's pad IN USE; the Pond Cabin's: his own run at the same time
+	local inUseAt = #E.sent
+	E.walk(bob, H.padAt(House.id))
+	E.advance(R.Every * 3)
+	check("NEG. Bob onto the farmstead's pad while Ann's run is on: IN USE (told once), no pad panel, no line", E.heard(bob, "is in use", inUseAt)
+		and E.lastKind(bob, "Runs", "pad", inUseAt) == nil and Runs.padOf(House.id).host == nil and Runs.runOf(bob) == nil)
+	local cabin = SandboxMap.Houses[2]
+	E.walk(bob, H.padAt(cabin.id))
+	started = E.waitUntil(function(): boolean
+		return Runs.runOf(bob) ~= nil
+	end, R.Countdown + 2)
+	E.advance(R.Fade.Out + 0.3)
+	bobVan = Vehicles.get(bob)
 	local bobView = H.stateOf(bob)
-	check("…Bob's move too, at the same time: his own, his plot's drop-off, his own Danny", bobCard ~= nil and bobView ~= nil and bobView.id ~= view.id
-		and bobView.dropOff.x == plots[2].unload.x and Vehicles.get(bob) == bobVan and MoveHelper.find(bob) ~= nil and MoveHelper.find(bob) ~= MoveHelper.find(ann)
-		and bobView.contract == SandboxMap.Houses[2].id and bobView.house.x == SandboxMap.Houses[2].curb.x)
-	-- 14 (the board): Bob at Ann's kiosk sees only his own move (any kiosk opens YOUR contract: KONTRAKT), Ann's untouched
-	local atAnn = H.takeContract(bob, plots[1])
-	check("14. Bob at Ann's kiosk: only his own card (busy: he is on his move), nothing of Ann's", atAnn ~= nil and atAnn.busy == "You are on a move already."
-		and H.stateOf(ann).id == view.id, atAnn and atAnn.busy)
-	before = #E.sent
-	E.fire(bob, "Moving", "start", House.id)
-	check("…his START there is refused; Ann's move goes on as it was", E.lastOf(bob, "MoveLobby", "lobby", before) == nil and H.stateOf(ann).id == view.id
-		and H.stateOf(ann).counts.out == 0)
+	local own = Config.Moving.Sandbox.Houses[cabin.id]
+	check(`…Bob's run on {cabin.name} at the same time (a {own.Kind}, its own clock): his own move, his own truck at its curb, his own Danny`, started
+		and bobView ~= nil and bobView.id ~= view.id and bobView.contract == cabin.id and own.Kind == "cabin" and bobVan ~= nil and bobVan ~= annVan
+		and H.flat(bobVan.chassis.Position, V3(cabin.curb.x, 0, cabin.curb.z)) < 0.5 and MoveHelper.find(bob) ~= nil and MoveHelper.find(bob) ~= MoveHelper.find(ann)
+		and math.abs(bobView.endsAt - E.now - own.Time) < 2 and H.stateOf(ann).id == view.id, bobView and bobView.contract)
 end
 
--- ── 4–6. Ann: to the chalet, the door, the grip, the load ─────────────────
+-- ── 4–6. Ann at the chalet: the door, the grip, the load ─────────────────
 
 do
-	H.drive(ann, annVan, H.toHouse(plots[1]))
-	check("4. Ann drove her van to the chalet's curb, its back to the front door", H.flat(annVan.chassis.Position, V3(House.curb.x, 0, House.curb.z)) < 0.5
-		and H.doorOf(annVan).WorldPosition.Z > annVan.chassis.Position.Z, annVan.chassis.Position)
+	check("4. Ann at the chalet: her truck at its curb already (9.7: parked there by the run, no drive), its back to the front door",
+		H.flat(annVan.chassis.Position, V3(House.curb.x, 0, House.curb.z)) < 0.5 and H.doorOf(annVan).WorldPosition.Z > annVan.chassis.Position.Z, annVan.chassis.Position)
 	check("…got out and opened the back doors (Vehicles' BackPrompt: hers, on foot, hands free)", H.setBack(ann, annVan, true), E.lastNotice(ann))
 	-- 8.3: what her client sees of the trip, on the clock (the fade's messages, her body then, the leaf), and when the
 	-- chalet's leaf opened
 	local D = Config.Moving.Doors
 	local door = S.frontLeaf
+	-- (9.7: she landed in the front yard facing the door, within its approach: its leaf opened for her; back out of the
+	-- approach first, the leaf shut again, then on through the door)
+	E.walk(ann, V3(House.door.x, House.door.y + 3, House.door.z) + H.yawLook(House.door.yaw) * 14)
+	E.waitUntil(function(): boolean
+		return door:GetAttribute("DoorOpen") ~= true
+	end, D.Shut + 2)
 	local seen: { any } = {}
 	local openedAt: number? = nil
 	local opening = door:GetAttributeChangedSignal("DoorOpen"):Connect(function()
@@ -1006,92 +1119,27 @@ do
 		E.lastNotice(ann))
 	E.walk(ann, H.bayPoint(annVan, SprinterLooks.Bay.z1 - 1), Config.Movement.Walk * 0.5)
 	E.walk(ann, H.behindVan(annVan, 4))
-	check("…the back doors shut again before driving", H.setBack(ann, annVan, false))
+	check("…the back doors shut again", H.setBack(ann, annVan, false))
 end
 
--- ── 7. Home: the trips ────────────────────────────────────────────────────
+-- ── 7a. Bob at his house (two runs at once) ───────────────────────────────
 
 do
-	local big = S.annBigModel
-	local from = big.PrimaryPart.Position
-	H.drive(ann, annVan, { { x = 0, z = 470, yaw = 0 }, { x = 0, z = -60, yaw = 0 }, { x = plots[2].vanSpot.x, z = -60, yaw = 90 }, { x = plots[2].unload.x, z = plots[2].unload.z + 8, yaw = 0 } })
-	E.advance(1)
-	check("7. the loaded van at Bob's plot (in his unload circle): no trip", H.stateOf(ann).trips == 0 and #Collection.stock(ann) == 0 and #Collection.stock(bob) == 0
-		and H.stateOf(ann).counts.out == 2)
-	check("…the load rode along in the bay (welded to the van)", H.inBay(annVan, big) and H.flat(big.PrimaryPart.Position, from) > 100)
-	local tripAt = #E.sent
-	H.drive(ann, annVan, { { x = plots[2].vanSpot.x, z = -60, yaw = 0 }, { x = plots[1].vanSpot.x, z = -60, yaw = 90 }, { x = plots[1].vanSpot.x, z = plots[1].vanSpot.z, yaw = 180 } })
-	E.advance(1)
-	local stock = Collection.stock(ann)
-	check("…backed into her own unload circle: trip 1, both pieces into HER stock", H.stateOf(ann).trips == 1 and #stock == 2 and E.heard(ann, "Trip 1 home", tripAt)
-		and #Collection.stock(bob) == 0, E.lastNotice(ann))
-	local entry = H.entryFor(stock, S.annBigDef.id)
-	check("…Collection.add with the piece's item, name, condition (the move's) and a uid", entry ~= nil and entry.name == S.annBigDef.name
-		and math.abs(entry.condition - H.itemOf(ann, S.annBig.spot).condition) < 0.006 and type(entry.uid) == "string" and entry.stand == nil, entry and entry.condition)
-	local looked = #stock > 0
-	for _, e in stock do
-		looked = looked and H.lookOk(e.item, H.signature(FurnitureLooks.build(e.item, e.variant)))
-	end
-	check("…with the house's variant: each entry (item, variant) builds the very look the piece had in the house", looked)
-	check("…the pieces left the van (their models gone), no pay per piece", rawget(big, "destroyed") == true and rawget(S.annSmallModel, "destroyed") == true
-		and H.paid(ann, "MovePay") == 0)
-	E.advance(0.2)
-	local pushed = E.lastKind(ann, "Collection", "state")
-	check("…the collection's state went to her client (2 in stock)", pushed ~= nil and #pushed.stock == 2)
-	-- 8.2: the book
-	local book = Book.book(ann)
-	local bookState = E.lastKind(ann, "CollectionBook", "state", tripAt)
-	check("8.2 book: both pieces are in Ann's book (found once), her client told they are new", book ~= nil and book[S.annBigDef.id] ~= nil
-		and book[S.annBigDef.id].n == 1 and book[stock[1].item] ~= nil and book[stock[2].item] ~= nil and bookState ~= nil and #bookState.new == 2,
-		bookState and #bookState.new)
-	check("…nothing in Bob's", next(Book.book(bob) or {}) == nil)
-	-- 8.2: the tasks and the analytics
-	local trips = H.task(ann, "trips")
-	check("8.2 tasks: \"trips\" counts the trip (1 of " .. (if trips then tostring(trips.target) else "?") .. ")", trips ~= nil and trips.progress == 1, trips and trips.progress)
-	local rare = 0
-	for _, e in stock do
-		local d = CollectionRules.defOf(e.item)
-		rare += if d and (d :: any).rarity then 1 else 0
-	end
-	check("8.2 analytics: a CollectibleFound for each collectible that came home (" .. rare .. ")", #H.events("CollectibleFound", ann) == rare)
-	check("8.2 analytics: FirstTripHome once, one CollectionAdded for the trip (2 pieces)", H.steps(11).FirstTripHome == 1
-		and #H.events("CollectionAdded", ann) == 1 and H.events("CollectionAdded", ann)[1][3] == 2)
-end
-
-do
-	-- trip 2: back for one more, home nose-in
-	local item = H.fetch(ann, annVan, plots[1], function(_i: any, d: any): boolean
-		return d.class == "hand" and not d.fragile
-	end)
-	check("(a third piece fetched and loaded)", item ~= nil and H.itemOf(ann, item.spot).state == "truck", E.lastNotice(ann))
-	local tripAt = #E.sent
-	H.drive(ann, annVan, H.toPlot(plots[1], true))
-	E.advance(1)
-	check("…trip 2 home nose-in (the van's middle in the circle, its back out of it): 3 in her stock",
-		H.stateOf(ann).trips == 2 and #Collection.stock(ann) == 3 and E.heard(ann, "Trip 2 home", tripAt)
-		and not H.inCircle(H.doorOf(annVan).WorldPosition, plots[1]) and H.inCircle(annVan.chassis.Position, plots[1]), E.lastNotice(ann))
-	local trips = H.task(ann, "trips")
-	local done = E.lastKind(ann, "SandboxTasks", "done", tripAt)
-	check("8.2 tasks: \"trips\" 2" .. (if trips and trips.target == 2 then ", done: her client told" else ""), trips ~= nil and trips.progress == math.min(2, trips.target)
-		and (trips.target ~= 2 or (done ~= nil and trips.done)), trips and `{trips.progress}/{trips.target}`)
-end
-
-do
-	-- Bob: a piece through his grip (his client answers), a death on the way, the respawn by his van, loaded, home.
+	-- Bob: a piece through his grip (his client answers), a death on the way, the respawn by his truck, loaded.
 	S.auto[bob] = true
 	local bobHouse = H.houseOf(bob)
-	H.drive(bob, bobVan, H.toHouse(plots[2], bobHouse))
-	check("Bob: at his own house's curb (Jinočany: The Linden House on Hlavní, its back to its door)", bobHouse == SandboxMap.Houses[2]
+	check("Bob: at his own place (The Pond Cabin), his truck at its curb (its back to its door)", bobHouse == SandboxMap.Houses[2]
 		and H.flat(bobVan.chassis.Position, V3(bobHouse.curb.x, 0, bobHouse.curb.z)) < 0.5
 		and H.flat(H.doorOf(bobVan).WorldPosition, V3(bobHouse.door.x, 0, bobHouse.door.z)) < H.flat(bobVan.chassis.Position, V3(bobHouse.door.x, 0, bobHouse.door.z)), bobVan.chassis.Position)
 	check("(Bob's back open)", H.setBack(bob, bobVan, true), E.lastNotice(bob))
 	check("(Bob in)", H.enterHouse(bob))
-	check("…two houses at once: Bob's interior is another slot than Ann's (her move still runs)", S.rooms[bob] ~= nil and S.rooms[ann] ~= nil
-		and S.rooms[bob] ~= S.rooms[ann] and H.stateOf(ann) ~= nil and H.stateOf(ann).trips == 2)
+	check("…two houses at once: Bob's interior is another slot than Ann's (her run still on)", S.rooms[bob] ~= nil and S.rooms[ann] ~= nil
+		and S.rooms[bob] ~= S.rooms[ann] and H.stateOf(ann) ~= nil and H.stateOf(ann).counts.out == 2)
 	local piece, model = H.choose(bob, function(_i: any, d: any): boolean
 		return d.class ~= "pair" and CarryGrip.kind(d.class, d.fragile, false, nil) ~= nil
 	end)
 	H.remember(model)
+	S.bobPiece = piece
 	check("Bob lifts a piece (a grip check answered by his client, if it has one)", piece ~= nil and H.pickUp(bob, model), E.lastNotice(bob))
 	check("(Bob out)", H.leaveHouse(bob))
 	local outOf = H.yawLook(bobHouse.door.yaw)
@@ -1105,8 +1153,9 @@ do
 	E.advance(5) -- (Players.RespawnTime)
 	E.spawn(bob)
 	E.advance(1)
-	check("…his new body stands by his van's back (SandboxBoot's spawn → Moving.respawnAt), not at home",
-		H.flat(E.rootOf(bob).Position, H.doorOf(bobVan).WorldPosition) < 10 and not H.inCircle(E.rootOf(bob).Position, plots[2]), E.rootOf(bob).Position)
+	check("…his new body stands by his truck's back (SandboxBoot's spawn → Moving.respawnAt), not in the lobby",
+		H.flat(E.rootOf(bob).Position, H.doorOf(bobVan).WorldPosition) < 10 and not SandboxMap.inLobby(E.rootOf(bob).Position.X, E.rootOf(bob).Position.Z), E.rootOf(bob).Position)
+	check("…still in his run (Runs.runOf)", H.Runs.runOf(bob) ~= nil and H.Runs.runOf(bob).host == bob)
 	check("(he lifts it again where it lies: its lift check, his client's answer)", H.pickUp(bob, model), E.lastNotice(bob))
 	-- 8.1 review: a wobble still open when he loads it counts as a miss (Grip.forfeit), the piece goes in all the same
 	E.walk(bob, H.behindVan(bobVan, 2))
@@ -1118,15 +1167,118 @@ do
 	local loaded = E.trigger(E.promptIn(H.doorOf(bobVan), "Load"), bob)
 	E.advance(0.5)
 	local forfeit = H.lastGrip(bob, openAt, "result")
-	check("8.1 review: a WOBBLE! still open when he loads it is a miss (a stagger, a fragile piece's drop: its knock), the piece in the van",
+	check("8.1 review: a WOBBLE! still open when he loads it is a miss (a stagger, a fragile piece's drop: its knock), the piece in the truck",
 		opened and loaded and forfeit ~= nil and (forfeit.outcome == "stagger" or forfeit.outcome == "drop") and H.itemOf(bob, piece.spot).state == "truck"
 		and H.itemOf(bob, piece.spot).condition < held, forfeit and forfeit.outcome)
 	S.auto[bob] = true
 	H.setBack(bob, bobVan, false)
-	H.drive(bob, bobVan, H.toPlot(plots[2], false))
+end
+
+-- ── 7. FINISH at the truck: the run's end, everything home ────────────────
+
+do
+	local big = S.annBigModel
 	E.advance(1)
-	check("…Bob's trip: his piece in HIS stock and book, Ann's untouched", H.stateOf(bob).trips == 1 and #Collection.stock(bob) == 1 and #Collection.stock(ann) == 3
-		and Book.book(bob)[Collection.stock(bob)[1].item] ~= nil)
+	check("7. the loaded truck at the house: nothing home before the run's end (no trip at a plot: nobody drives)", H.stateOf(ann).trips == 0
+		and #Collection.stock(ann) == 0 and #Collection.stock(bob) == 0 and H.stateOf(ann).counts.out == 2)
+	check("…the load in the bay (welded to the truck)", H.inBay(annVan, big))
+	local tripAt = #E.sent
+	local result, ok, why = H.finishRun(ann, annVan)
+	local stock = Collection.stock(ann)
+	check("…FINISH at the truck (its \"Finish the run\" prompt: the host's): the run over, both pieces into HER stock at once", ok and #stock == 2
+		and #Collection.stock(bob) == 0 and H.Runs.runOf(ann) == nil and Moving.busy(ann) == nil, why or E.lastNotice(ann))
+	local entry = H.entryFor(stock, S.annBigDef.id)
+	check("…Collection.add with the piece's item, name, condition (the move's) and a uid", entry ~= nil and entry.name == S.annBigDef.name
+		and type(entry.condition) == "number" and type(entry.uid) == "string" and entry.stand == nil, entry and entry.condition)
+	local looked = #stock > 0
+	for _, e in stock do
+		looked = looked and H.lookOk(e.item, H.signature(FurnitureLooks.build(e.item, e.variant)))
+	end
+	check("…with the house's variant: each entry (item, variant) builds the very look the piece had in the house", looked)
+	check("…the pieces left the truck (their models gone), no pay per piece", rawget(big, "destroyed") == true and rawget(S.annSmallModel, "destroyed") == true
+		and H.paid(ann, "MovePay") == 0)
+	local worth = 0
+	for _, e in stock do
+		worth += CollectionRules.valueOf(e) * e.condition
+	end
+	local named = result ~= nil and #result.pieces == 2
+	for _, piece in (if result then result.pieces else {}) do
+		named = named and piece.by == "Ann" and piece.to == 11 and type(piece.rarity) == "string" and type(piece.name) == "string"
+	end
+	check("9.7 …the results card (Runs' \"result\"): the farmstead at Normal, done, 2 pieces (each its rarity, who got it), their value, hers all",
+		result ~= nil and result.house == House.id and result.difficulty == "normal" and result.phase == "done" and result.count == 2 and result.mine == 2
+		and math.abs(result.value - worth) <= 2 and result.mineValue == result.value and named, result and `{result.count} {result.value} vs {worth}`)
+	local unlocked = E.lastKind(ann, "Runs", "unlocked", tripAt)
+	check("9.7 …a run finished at Normal opens Hard: told so (\"unlocked\"), the card says it, her save's runUnlocked 3",
+		unlocked ~= nil and unlocked.id == "hard" and result ~= nil and result.opened == "hard" and H.profileOf(ann).runUnlocked == 3)
+	E.advance(0.2)
+	local pushed = E.lastKind(ann, "Collection", "state")
+	check("…the collection's state went to her client (2 in stock)", pushed ~= nil and #pushed.stock == 2)
+	-- 8.2: the book
+	local book = Book.book(ann)
+	local bookState = E.lastKind(ann, "CollectionBook", "state", tripAt)
+	check("8.2 book: both pieces are in Ann's book (found once), her client told they are new", book ~= nil and book[S.annBigDef.id] ~= nil
+		and book[S.annBigDef.id].n == 1 and book[stock[1].item] ~= nil and book[stock[2].item] ~= nil and bookState ~= nil and #bookState.new == 2,
+		bookState and #bookState.new)
+	check("…nothing in Bob's", next(Book.book(bob) or {}) == nil)
+	-- 8.2: the tasks and the analytics
+	local trips = H.task(ann, "trips")
+	check("8.2 tasks: \"trips\" counts the run's load home (1 of " .. (if trips then tostring(trips.target) else "?") .. ")", trips ~= nil and trips.progress == 1, trips and trips.progress)
+	local rare = 0
+	for _, e in stock do
+		local d = CollectionRules.defOf(e.item)
+		rare += if d and (d :: any).rarity then 1 else 0
+	end
+	check("8.2 analytics: a CollectibleFound for each collectible that came home (" .. rare .. ")", #H.events("CollectibleFound", ann) == rare)
+	check("8.2 analytics: FirstTripHome once, one CollectionAdded for the load (2 pieces)", H.steps(11).FirstTripHome == 1
+		and #H.events("CollectionAdded", ann) == 1 and H.events("CollectionAdded", ann)[1][3] == 2)
+	H.backHome()
+	local portal = SandboxMap.portal(House.id) :: SandboxMap.Portal
+	check("9.7 …EndHold s later: back in the lobby by the farmstead's portal (its back spot), the truck gone, Danny gone, the portal free again",
+		H.flat(E.rootOf(ann).Position, V3(portal.back.x, 0, portal.back.z)) < 0.5 and SandboxMap.inLobby(E.rootOf(ann).Position.X, E.rootOf(ann).Position.Z)
+		and Vehicles.get(ann) == nil and MoveHelper.find(ann) == nil and not H.Runs.inUse(House.id) and (H.portal(House.id)) == "WALK ONTO THE PAD", E.rootOf(ann).Position)
+end
+
+do
+	-- Bob's FINISH (his run went on meanwhile: Ann's end is hers)
+	check("…Bob's run went on through Ann's end (his own: his piece still in his truck)", H.Runs.runOf(bob) ~= nil and H.itemOf(bob, S.bobPiece.spot).state == "truck")
+	local result = H.finishRun(bob, bobVan)
+	check("…Bob's FINISH: his piece in HIS stock and book, Ann's untouched; his card his own (1 piece)", #Collection.stock(bob) == 1 and #Collection.stock(ann) == 2
+		and Book.book(bob)[Collection.stock(bob)[1].item] ~= nil and result ~= nil and result.count == 1 and result.mine == 1 and result.pieces[1].by == "Bob",
+		result and result.count)
+	H.backHome()
+	check("…back in the lobby by the Pond Cabin's portal", SandboxMap.inLobby(E.rootOf(bob).Position.X, E.rootOf(bob).Position.Z) and Vehicles.get(bob) == nil)
+end
+
+do
+	-- a second run: the farmstead again (refilled: something came home), one more piece, FINISH
+	local seedWas = S.annMove
+	local rideAt = #E.sent
+	local run = H.run({ ann }, House.id)
+	local ride = E.lastKind(ann, "Runs", "ride", rideAt)
+	check("10.4 the ride there: her client told before the jump (to the farmstead, its difficulty, nobody else, Config.Runs.Ride.To s)", ride ~= nil
+		and ride.to == House.name and ride.back == false and type(ride.difficulty) == "string" and #ride.party == 0 and ride.seconds == Config.Runs.Ride.To,
+		ride and ride.to)
+	annVan = Vehicles.get(ann)
+	check("(Ann's second run: the farmstead again, a new move; her truck back at its curb)", run ~= nil and H.stateOf(ann).id ~= seedWas and annVan ~= nil
+		and H.flat(annVan.chassis.Position, V3(House.curb.x, 0, House.curb.z)) < 0.5)
+	local item = H.fetch(ann, annVan, function(_i: any, d: any): boolean
+		return d.class == "hand" and not d.fragile
+	end)
+	check("(a third piece fetched and loaded)", item ~= nil and H.itemOf(ann, item.spot).state == "truck", E.lastNotice(ann))
+	local tripAt = #E.sent
+	local result = H.finishRun(ann, annVan)
+	check("…FINISH: 3 in her stock; the card 1 piece (no new difficulty: Hard opened already)", #Collection.stock(ann) == 3 and result ~= nil and result.count == 1
+		and result.opened == nil and E.lastKind(ann, "Runs", "unlocked", tripAt) == nil, result and result.count)
+	local trips = H.task(ann, "trips")
+	local done = E.lastKind(ann, "SandboxTasks", "done", tripAt)
+	check("8.2 tasks: \"trips\" 2" .. (if trips and trips.target == 2 then ", done: her client told" else ""), trips ~= nil and trips.progress == math.min(2, trips.target)
+		and (trips.target ~= 2 or (done ~= nil and trips.done)), trips and `{trips.progress}/{trips.target}`)
+	local homeAt = #E.sent
+	H.backHome()
+	local back = E.lastKind(ann, "Runs", "ride", homeAt)
+	check("10.4 the ride back: to the depot (Config.Runs.Ride.Home), no difficulty, Config.Runs.Ride.Back s", back ~= nil and back.back == true
+		and back.to == Config.Runs.Ride.Home and back.difficulty == nil and back.seconds == Config.Runs.Ride.Back, back and back.to)
 end
 
 -- ── 8. The warehouse: the picker, a display, the stand's model ───────────
@@ -1216,10 +1368,12 @@ do
 	local was = H.profileOf(ann).money
 	local weekly = H.task(ann, "w_income")
 	local weeklyWas = if weekly then weekly.progress else 0
-	E.advance(60)
+	-- (60 s, or as long as two whole dollars take: 10.x the run's vault and locked rooms leave her the plainer pieces)
+	local wait = math.max(60, math.ceil(120 / math.max(rate, 1e-3) / Config.Collection.Tick) * Config.Collection.Tick)
+	E.advance(wait)
 	local got = H.paid(ann, "CollectionIncome", incomeAt)
-	check("…60 s on the clock: paid as CollectionIncome at that rate (whole dollars; the payout every " .. Config.Collection.Tick .. " s)",
-		got > 0 and got >= math.floor(rate * 50 / 60) - 1 and got <= rate * 70 / 60 + 1 and H.profileOf(ann).money - was == got, `{got} at {rate}/min`)
+	check(`…{wait} s on the clock: paid as CollectionIncome at that rate (whole dollars; the payout every {Config.Collection.Tick} s)`,
+		got > 0 and got >= math.floor(rate * (wait - 10) / 60) - 1 and got <= rate * (wait + 10) / 60 + 1 and H.profileOf(ann).money - was == got, `{got} at {rate}/min`)
 	local only = true
 	for index = incomeAt + 1, #money do
 		if money[index].player == ann then
@@ -1283,7 +1437,7 @@ do
 	check("NEG. 8.3: More stands in her garage: refused with the lock's reason (\"Needs the Big Warehouse\"), nothing taken, nothing changed", said == "Needs the Big Warehouse"
 		and H.profileOf(ann).money - poor == H.paid(ann, "CollectionIncome", poorAt) and Upgrades.levels(ann).stands == nil and Collection.stands(ann) == WarehouseLayout.count(1), said)
 	said = H.buy(ann, "warehouse", 1)
-	check("NEG. the ZDC Warehouse (the Workshop) without the money: refused, nothing taken, nothing changed", poor < WP[1] and string.find(said, `costs {WarehouseLayout.money(WP[1])}`, 1, true) ~= nil
+	check("NEG. the Deliveros Warehouse (the Workshop) without the money: refused, nothing taken, nothing changed", poor < WP[1] and string.find(said, `costs {WarehouseLayout.money(WP[1])}`, 1, true) ~= nil
 		and H.profileOf(ann).money - poor == H.paid(ann, "CollectionIncome", poorAt) and Upgrades.levels(ann).warehouse == nil and Warehouse.level(1) == 1, said)
 	PlayerData.addMoney(ann, 250000, "Admin") -- (the admin panel's money button: PlayerData.addMoney; 8.3 economy: every level below)
 	local rich = H.profileOf(ann).money
@@ -1450,36 +1604,21 @@ do
 	end
 end
 
--- ── 12. FINISH; the tasks and the analytics of the move ───────────────────
+-- ── 12. The runs' ends: the tasks and the analytics ───────────────────────
 
 do
-	local resultAt = #E.sent
-	E.fire(ann, "Moving", "finish")
-	local result = E.lastOf(ann, "Moving", "result", resultAt)
-	local card = result and result[2]
-	check("12. FINISH: the result card says what came home: 3 pieces over 2 trips, no pay, no XP", card ~= nil and card.how == "done" and card.home ~= nil
-		and card.home.pieces == 3 and card.trips == 2 and card.money == 0 and card.xp == 0 and card.pay == 0, card and card.home and card.home.pieces)
-	local worth = 0
-	for _, entry in annStock do
-		worth += CollectionRules.valueOf(entry) * entry.condition
-	end
-	check("…its value is what the three pieces were worth as they came home (the stock's)", card ~= nil and math.abs(card.home.value - worth) <= 1.5,
-		card and `{card.home.value} vs {worth}`)
 	E.advance(0.5)
 	local collectibles = 0
 	for _, entry in annStock do
 		local d = CollectionRules.defOf(entry.item)
 		collectibles += if d and (d :: any).rarity then 1 else 0
 	end
-	-- (and the twin the admin's FILL STOCK gave her while the move ran, when it is a collectible: SandboxAnalytics reads every
-	-- new piece in the stock during a move as found on it)
-	local twin = CollectionRules.defOf(annStock[1].item)
-	local twins = if twin and (twin :: any).rarity then 1 else 0
-	check("8.2 analytics: one CollectibleFound for every collectible her move brought home (" .. collectibles .. ", the admin's twin " .. twins .. ")",
-		#H.events("CollectibleFound", ann) == collectibles + twins, #H.events("CollectibleFound", ann))
-	check("…the van's prompts gone, Danny gone; MoveDone, MoveFinished and MoveFinishedValue once (MoveGaveUp never)", annVan.chassis:FindFirstChild("MoveLoadBay") == nil
-		and MoveHelper.find(ann) == nil and #H.events("MoveDone", ann) == 1 and #H.events("MoveFinished", ann) == 1 and #H.events("MoveFinishedValue", ann) == 1
-		and #H.events("MoveGaveUp", ann) == 0)
+	-- (the twin the admin's FILL STOCK gave her came after her runs: never counted as found on one)
+	check("12. 8.2 analytics: one CollectibleFound for every collectible her runs brought home (" .. collectibles .. ")",
+		#H.events("CollectibleFound", ann) == collectibles, #H.events("CollectibleFound", ann))
+	check("…her trucks gone, Danny gone; MoveDone, MoveFinished and MoveFinishedValue once a run (2), MoveGaveUp never", Vehicles.get(ann) == nil
+		and MoveHelper.find(ann) == nil and #H.events("MoveDone", ann) == 2 and #H.events("MoveFinished", ann) == 2 and #H.events("MoveFinishedValue", ann) == 2
+		and #H.events("MoveGaveUp", ann) == 0, `{#H.events("MoveDone", ann)} {#H.events("MoveFinished", ann)} {#H.events("MoveFinishedValue", ann)}`)
 	local steps = H.steps(11)
 	local once = true
 	for index, step in Plan.SandboxSteps do
@@ -1510,12 +1649,7 @@ do
 		E.fire(ann, "SandboxTasks", { kind = "claim", slot = slot })
 		check("…claimed again: nothing more", H.paid(ann, "SandboxTask", twiceAt) == 0)
 	end
-	check("…Bob's move goes on (his own)", H.stateOf(bob) ~= nil and H.stateOf(bob).trips == 1)
-	E.advance(2)
-	resultAt = #E.sent
-	E.fire(bob, "Moving", "finish")
-	local bobResult = E.lastOf(bob, "Moving", "result", resultAt)
-	check("…Bob's FINISH: 1 piece home", bobResult ~= nil and bobResult[2].home.pieces == 1)
+	check("…Bob's run ended too (his piece home); nobody in a run", H.Runs.runOf(bob) == nil and H.Runs.runOf(ann) == nil and #Collection.stock(bob) == 1)
 	E.advance(2)
 end
 
@@ -1590,22 +1724,20 @@ do
 end
 
 do
-	local van = H.play(ann2)
-	check("…PLAY: her van at her vanSpot again (the old one went with her)", van ~= nil and H.flat(van.chassis.Position, V3(plots[1].vanSpot.x, 0, plots[1].vanSpot.z)) < 0.5
-		and #workspace:FindFirstChild("Cars"):GetChildren() == 2)
+	check("9.7 …her runs' unlocks kept (runUnlocked 3: Hard open; the save's flag, no migration)", H.profileOf(ann2).runUnlocked == 3
+		and E.saves["Player_11"].runUnlockedKept == true)
+	E.fire(ann2, "Play")
+	E.advance(1)
+	check("…PLAY: no van in the lobby (her truck comes with her next run)", Vehicles.get(ann2) == nil)
 	H.buy(ann2, "engine", 1)
-	check("…Van engine 1: her van's SpeedMult 1.05 (Upgrades tunes every van of hers), Bob's untouched", math.abs((van.model:GetAttribute("SpeedMult") or 0) - 1.05) < 1e-9
-		and Vehicles.get(bob).model:GetAttribute("SpeedMult") == 1, van.model:GetAttribute("SpeedMult"))
+	check("…Van engine 1 bought (her next truck wears it as it comes: step 20)", Upgrades.levels(ann2).engine == 1)
 	H.buy(ann2, "danny", 1)
 	check("…Danny's training 1: her player's DannyTraining (MoveHelper reads it)", ann2:GetAttribute(Config.SandboxUpgrades.Danny) == 1)
 	E.advance(1)
+	local carAt = #E.sent
 	E.fire(ann2, "SpawnCar")
 	E.advance(0.5)
-	local again = Vehicles.get(ann2)
-	check("…CAR (SandboxBoot's callVan → parkVan): a new van at her vanSpot, tuned as it comes (workspace.Cars' ChildAdded)", again ~= nil and again ~= van
-		and math.abs((again.model:GetAttribute("SpeedMult") or 0) - 1.05) < 1e-9 and H.flat(again.chassis.Position, V3(plots[1].vanSpot.x, 0, plots[1].vanSpot.z)) < 0.5,
-		again and again.model:GetAttribute("SpeedMult"))
-	S.annVan2 = again
+	check("…CAR in the lobby: no van comes, said why", Vehicles.get(ann2) == nil and E.heard(ann2, "No vans in the lobby", carAt), E.lastNotice(ann2, carAt))
 end
 
 -- 8.3: the Logistics Center (the warehouse's top level): her plot rebuilt once more, every piece on its stand
@@ -1634,10 +1766,10 @@ do
 		and Collection.stands(ann2) == 26 and Warehouse.isOpen(1, 26) and not Warehouse.isOpen(1, 27) and ann2:GetAttribute(Config.SandboxUpgrades.WarehouseAttribute) == 5, said)
 	check("8.3: …every piece still on its stand (the one on stand 13 too: a big stand there now), standing at the level's spots", kept and shown)
 	local top = H.buy(ann2, "warehouse", 5)
-	check("8.3: …the ZDC Warehouse at its top: refused, says so", top == "ZDC Warehouse is at its top level." and Warehouse.level(1) == 5, top)
+	check("8.3: …the Deliveros Warehouse at its top: refused, says so", top == "Deliveros Warehouse is at its top level." and Warehouse.level(1) == 5, top)
 end
 
--- ── 14. Bob cannot use Ann's stands or desk; her kiosk opens his own move ─
+-- ── 14. Bob cannot use Ann's stands or desk; a run of his own ───────────
 
 do
 	local first = Collection.stock(ann2)
@@ -1679,19 +1811,18 @@ do
 	E.advance(0.5)
 	check("…her UPGRADES desk: no window for him, her levels untouched", E.heard(bob, "This is Ann's warehouse.", heardAt)
 		and E.lastKind(bob, "Upgrades", "open", heardAt) == nil and Upgrades.levels(ann2).stands == 1)
-	-- the kiosks are everybody's (KONTRAKT: any of them opens YOUR contract): Bob's LAUNCH at Ann's is his own move
+	-- 9.7: a run of his own from the lobby's pad (the Lone House's), Ann's things untouched; GIVE UP with nothing loaded
 	E.advance(1.1)
-	local card = H.takeContract(bob, plots[1])
-	check("…Ann's kiosk after his FINISH: his own card, free to start", card ~= nil and card.busy == nil, card and card.busy)
-	E.fire(bob, "Moving", "start", if card then card.id else House.id) -- (Jinočany: the house on his card)
-	E.fire(bob, "MoveLobby", "launch")
-	E.advance(0.5)
-	local state = H.stateOf(bob)
-	check("…LAUNCH there: his move, HIS van where it stands, home = HIS plot; Ann's van and plot untouched", state ~= nil and state.dropOff.x == plots[2].unload.x
-		and Vehicles.get(bob) == bobVan and Vehicles.get(ann2) == S.annVan2 and H.flat(S.annVan2.chassis.Position, V3(plots[1].vanSpot.x, 0, plots[1].vanSpot.z)) < 0.5)
+	local lone = SandboxMap.Houses[3]
+	local run = H.run({ bob }, lone.id)
+	check("…Bob's next run (the Lone House's pad): his own, HIS truck at its curb; Ann in no run, no van of hers", run ~= nil and run.host == bob
+		and run.house == lone.id and Vehicles.get(bob) ~= nil and H.flat(Vehicles.get(bob).chassis.Position, V3(lone.curb.x, 0, lone.curb.z)) < 0.5
+		and Vehicles.get(ann2) == nil and H.Runs.runOf(ann2) == nil)
 	E.fire(bob, "Moving", "giveup")
 	E.advance(2)
-	check("…GIVE UP with nothing home: MoveGaveUp (how far: started)", #H.events("MoveGaveUp", bob) == 1)
+	check("…GIVE UP with nothing loaded: called off, MoveGaveUp (how far: started), his run over", #H.events("MoveGaveUp", bob) == 1 and H.Runs.runOf(bob) == nil
+		and Moving.busy(bob) == nil)
+	H.backHome()
 end
 
 -- ── 14b. 8.7: trading between players ────────────────────────────────────
@@ -1787,13 +1918,21 @@ do
 	E.advance(3.5) -- (SandboxBoot's wait for a plot before it stands a body at the fallback)
 	check("15. Cid and Dee get plots 3 and 4; Eve, the fifth, none", cid:GetAttribute("Plot") == 3 and dee:GetAttribute("Plot") == 4 and eve:GetAttribute("Plot") == nil
 		and SandboxPlots.of(eve) == nil)
-	check("…Eve stands on Depot Row in front of plot 1 (SandboxBoot's fallback)", H.flat(E.rootOf(eve).Position, V3(plots[1].spawn.x, 0, -50)) < 1, E.rootOf(eve).Position)
-	local van = H.play(eve)
-	check("…her PLAY: her van on Depot Row (no vanSpot of hers)", van ~= nil and van.chassis.Position.Z > -74 and van.chassis.Position.Z < -46, van and van.chassis.Position)
+	local L = SandboxMap.Lobby
+	check("…9.7 Eve stands in the lobby's plaza, its middle (SandboxBoot's spawn without a plot)", H.flat(E.rootOf(eve).Position, V3(L.spawn.x, 0, L.spawn.z)) < 1, E.rootOf(eve).Position)
+	E.fire(eve, "Play")
+	E.advance(1)
+	check("…her PLAY: no van either", Vehicles.get(eve) == nil)
 	check("…the upgrades refuse her (no warehouse of her own)", string.find(H.buy(eve, "danny", 1), "warehouse of your own", 1, true) ~= nil)
-	E.advance(1.1)
-	local card = H.takeContract(eve, plots[1])
-	check("…a kiosk's card says she has no warehouse (START refused)", card ~= nil and string.find(tostring(card.busy), "no warehouse", 1, true) ~= nil, card and card.busy)
+	local refusedAt = #E.sent
+	local orchard = SandboxMap.Houses[6].id
+	E.walk(eve, H.padAt(orchard))
+	E.waitUntil(function(): boolean
+		return E.heard(eve, "could not start", refusedAt)
+	end, Config.Runs.Countdown + 2)
+	E.walk(eve, H.groundAt(V3(L.spawn.x, 0, L.spawn.z)))
+	check("…9.7 a run from a pad refused: no warehouse of her own (nowhere to bring the loot), told why; no truck left behind, the portal free", H.Runs.runOf(eve) == nil
+		and E.heard(eve, "no warehouse", refusedAt) and Vehicles.get(eve) == nil and not H.Runs.inUse(orchard), E.lastNotice(eve, refusedAt))
 	-- two pieces in her stock (the admin's FILL STOCK: Collection.add); her STOCK list (B) opens anywhere: its FILL BEST, and
 	-- the picker's display through the remote
 	Collection.add(eve, { item = "radio", condition = 1, variant = 1 })
@@ -1821,55 +1960,54 @@ do
 	check("…the upgrades take her now (only the money says no)", string.find(H.buy(eve, "danny", 1), "costs", 1, true) ~= nil)
 end
 
--- ── 16. A full warehouse at a trip ────────────────────────────────────────
+-- ── 16. A full warehouse at a run's end ───────────────────────────────────
 
 do
-	local van = H.play(cid)
+	E.fire(cid, "Play")
 	E.advance(1.1)
-	local card = H.takeContract(cid, plots[3])
-	H.launch(cid)
-	check("16. (Cid's move, from his kiosk)", card ~= nil and H.stateOf(cid) ~= nil)
-	local item = H.fetch(cid, van, plots[3], function(_i: any, d: any): boolean
+	local lodge = SandboxMap.Houses[4]
+	local run = H.run({ cid }, lodge.id)
+	local van = Vehicles.get(cid)
+	check(`16. (Cid's run, from {lodge.name}'s pad)`, run ~= nil and van ~= nil and H.stateOf(cid) ~= nil and H.houseOf(cid) == lodge)
+	local item = H.fetch(cid, van, function(_i: any, d: any): boolean
 		return d.class ~= "pair"
 	end)
 	check("(Cid carries a piece out and loads it)", item ~= nil and H.itemOf(cid, item.spot).state == "truck", E.lastNotice(cid))
 	local maxStock = Config.Collection.MaxStock
 	Config.Collection.MaxStock = #Collection.stock(cid) -- (his warehouse full: Collection.add refuses)
 	local tripAt = #E.sent
-	H.drive(cid, van, H.toPlot(plots[3], false))
-	E.advance(1)
-	check("…home with a full warehouse: the trip says the piece could not be stored, the warehouse that it is full", H.stateOf(cid).trips == 1
-		and #Collection.stock(cid) == 0 and E.heard(cid, "could not be stored", tripAt) and E.heard(cid, "warehouse is full", tripAt), E.lastNotice(cid))
-	check("…not in his book either (only what came into the stock)", next(Book.book(cid) or {}) == nil)
-	local resultAt = #E.sent
-	E.fire(cid, "Moving", "finish")
-	local result = E.lastOf(cid, "Moving", "result", resultAt)
+	local result = H.finishRun(cid, van)
 	Config.Collection.MaxStock = maxStock
-	check("…FINISH: the refused piece never came home (lost), so there is nothing to finish with: no result card, told why",
-		result == nil and E.heard(cid, "Nothing delivered yet", resultAt), result and `home.pieces = {result[2].home.pieces}`)
-	E.fire(cid, "Moving", "giveup") -- (his move off, as GIVE UP does)
-	E.advance(1)
+	check("…FINISH with a full warehouse: the piece could not be stored (said so), the warehouse full", #Collection.stock(cid) == 0
+		and E.heard(cid, "could not be stored", tripAt) and E.heard(cid, "warehouse is full", tripAt), E.lastNotice(cid))
+	check("…not in his book either (only what came into the stock)", next(Book.book(cid) or {}) == nil)
+	check("…the results card: nothing came home (called off), the next difficulty not opened", result ~= nil and result.count == 0 and result.phase == "cancelled"
+		and result.opened == nil and H.profileOf(cid).runUnlocked == Config.Runs.Open, result and `{result.count} {result.phase}`)
+	H.backHome()
 end
 
--- ── 17. Leaving mid-move, a piece in the van ─────────────────────────────
+-- ── 17. Leaving mid-run, a piece in the truck ────────────────────────────
 
 do
-	local van = H.play(dee)
+	E.fire(dee, "Play")
 	E.clients[dee] = H.client(dee)
 	S.auto[dee] = true
 	E.advance(1.1)
-	H.takeContract(dee, plots[4])
-	H.launch(dee)
-	local first = H.fetch(dee, van, plots[4], function(_i: any, d: any): boolean
+	local cottage = SandboxMap.Houses[6]
+	H.run({ dee }, cottage.id)
+	local van = Vehicles.get(dee)
+	local first = H.fetch(dee, van, function(_i: any, d: any): boolean
 		return d.class ~= "pair"
 	end)
-	H.drive(dee, van, H.toPlot(plots[4], false))
-	E.advance(1)
-	check("17. (Dee's trip 1 home: 1 piece in her stock)", first ~= nil and H.stateOf(dee).trips == 1 and #Collection.stock(dee) == 1)
-	local second = H.fetch(dee, van, plots[4], function(_i: any, d: any): boolean
+	local result = H.finishRun(dee, van)
+	check(`17. (Dee's first run on {cottage.name}: 1 piece in her stock)`, first ~= nil and result ~= nil and result.count == 1 and #Collection.stock(dee) == 1)
+	H.backHome()
+	H.run({ dee }, cottage.id)
+	van = Vehicles.get(dee)
+	local second = H.fetch(dee, van, function(_i: any, d: any): boolean
 		return d.class ~= "pair"
 	end)
-	check("(a second piece in her van)", second ~= nil and H.itemOf(dee, second.spot).state == "truck")
+	check("(her second run: a piece in her truck)", second ~= nil and H.itemOf(dee, second.spot).state == "truck")
 	local interiors = 0
 	for _, d in workspace:FindFirstChild("Moves"):GetChildren() do
 		interiors += if d.ClassName == "Model" and E.interiorAt(d:GetPivot().Position) ~= nil then 1 else 0
@@ -1882,8 +2020,9 @@ do
 		after += if d.ClassName == "Model" and E.interiorAt(d:GetPivot().Position) ~= nil then 1 else 0
 	end
 	local save = E.saves["Player_44"]
-	check("…Dee leaves mid-move: her move ends (its interior taken down, the slot free), Danny gone", after == interiors - 1 and MoveHelper.find(dee) == nil)
-	check("…her save keeps what came home (1 piece); the one still in the van is lost", save ~= nil and #save.collection.entries == 1)
+	check("…Dee leaves mid-run: her run ends (its interior taken down, the slot free), Danny gone, the portal free", after == interiors - 1 and MoveHelper.find(dee) == nil
+		and not H.Runs.inUse(cottage.id))
+	check("9.7 …what was in her truck went home all the same: her save keeps both pieces", save ~= nil and #save.collection.entries == 2, save and #save.collection.entries)
 	local finished = 0
 	for index = events + 1, #E.analytics do
 		local call = E.analytics[index]
@@ -1891,12 +2030,13 @@ do
 			finished += 1
 		end
 	end
-	check("…the analytics: the move's end once (MoveFinished: pieces came home)", finished == 1, finished)
+	check("…the analytics: the run's end once (MoveFinished: pieces came home)", finished == 1, finished)
 	local dee2 = E.join(44, "Dee")
 	S.dee = dee2 -- (8.3: step 18's)
 	H.rebuilt()
-	check("…back: plot 4, her one piece, no move running (a fresh contract at her kiosk)", dee2:GetAttribute("Plot") == 4 and #Collection.stock(dee2) == 1
-		and H.stateOf(dee2) == nil and Moving.busy(dee2) == nil)
+	check("…back: plot 4, her two pieces, no run (in the lobby)", dee2:GetAttribute("Plot") == 4 and #Collection.stock(dee2) == 2
+		and H.stateOf(dee2) == nil and Moving.busy(dee2) == nil and H.Runs.runOf(dee2) == nil
+		and SandboxMap.inLobby(E.rootOf(dee2).Position.X, E.rootOf(dee2).Position.Z))
 end
 
 -- 8.2 SandboxLeaders' all-time best: in its OrderedDataStore (at most every AllTime.Every s), only ever up
@@ -1950,67 +2090,54 @@ end
 
 do
 	local dee = S.dee
-	local van = H.play(dee)
-	E.advance(Config.VanPaint.Prompt.Every + 0.1)
-	local prompt = if van then E.promptIn(van.model, "🎨 Paint van") else nil
-	check("19. the PAINT shop: Dee's van at her warehouse wears its 🎨 Paint van prompt (on, hers only: CargoOwner)", prompt ~= nil and prompt.Enabled == true
-		and prompt:GetAttribute("CargoOwner") == dee.UserId and van.model:GetAttribute("VanPaint") == "cream")
-	local at = E.promptAt(prompt)
-	local root = E.rootOf(dee)
-	E.walk(dee, V3(at.X - 1.5, root.Position.Y, at.Z))
+	local booth: any = nil
+	for _, d in workspace:FindFirstChild("Sandbox"):GetDescendants() do
+		if d.ClassName == "ProximityPrompt" and d:GetAttribute("PaintShop") == true then
+			booth = d
+		end
+	end
+	check("19. the PAINT shop: 9.7 the lobby's booth, its counter's \"Paint your truck\" (no van needed)", booth ~= nil and booth.Enabled == true
+		and booth.ActionText == "Paint your truck" and SandboxMap.inLobby(E.promptAt(booth).X, E.promptAt(booth).Z))
+	local stand = SandboxMap.Lobby.shops.paint.stand
+	E.walk(dee, H.groundAt(V3(stand.x, 0, stand.z)))
 	local sentAt = #E.sent
-	local ok, why = E.trigger(prompt, dee)
+	local ok, why = E.trigger(booth, dee)
 	check("…pressed there: the window opens (the state, then \"open\")", ok and E.lastKind(dee, "VanPaint", "state", sentAt) ~= nil and E.lastKind(dee, "VanPaint", "open", sentAt) ~= nil, why)
 	PlayerData.addMoney(dee, 1000, "Admin")
 	local paidAt = #money
 	E.advance(0.5)
 	E.fire(dee, "VanPaint", { kind = "buy", id = "white" })
 	E.advance(0.1)
-	check("…BUY Arctic white: $300 taken (the reason VanPaint), the van out wears it (VanPaint, PaintColor)", H.paid(dee, "VanPaint", paidAt) == -300 and van.model:GetAttribute("VanPaint") == "white"
-		and van.model:GetAttribute("PaintColor") ~= nil and E.lastKind(dee, "VanPaint", "bought", sentAt) ~= nil)
-	E.fire(dee, "SpawnCar")
-	E.advance(1)
-	local again = Vehicles.get(dee)
-	check("…CAR: the van that comes (a new one) wears it too, with its prompt", again ~= nil and again ~= van and again.model:GetAttribute("VanPaint") == "white"
-		and E.promptIn(again.model, "🎨 Paint van") ~= nil)
+	check("…BUY Arctic white: $300 taken (the reason VanPaint), bought", H.paid(dee, "VanPaint", paidAt) == -300 and E.lastKind(dee, "VanPaint", "bought", sentAt) ~= nil)
+	local run = H.run({ dee }, House.id)
+	E.advance(Config.VanPaint.Prompt.Every + 0.1)
+	local van = Vehicles.get(dee)
+	check("…her next run's truck at the house wears it (VanPaint white, PaintColor)", run ~= nil and van ~= nil and van.model:GetAttribute("VanPaint") == "white"
+		and van.model:GetAttribute("PaintColor") ~= nil, van and van.model:GetAttribute("VanPaint"))
+	E.fire(dee, "Moving", "giveup")
+	H.backHome()
 end
 
 -- ── 20. 8.3 the big move: the back door ────────────────────────────────────
--- Ann (back since step 13) on a new move: the card's big plan (Config.Furniture.Big) with its two ways out; round the
--- house to its back door (House.back, the back wall: the walk-in zone, the fade) to the corridor's east end inside, a
--- piece out by that doorway, out behind the house facing the garden, round to the van's back, loaded, home: a trip.
+-- Ann (back since step 13) on a new run of the farmstead at Hard (opened by her first run, kept in her save): the big
+-- plan (Config.Furniture.Big) with its two ways out; round the house to its back door (House.back, the back wall: the
+-- walk-in zone, the fade) to the corridor's east end inside, a piece out by that doorway, out behind the house facing
+-- the garden, round to the truck's back, loaded, FINISH: Insane opened.
 do
-	local van = S.annVan2
 	E.advance(1.1)
-	-- (Jinočany: her card moved on to the next house with each move that brought something home; the admin's REFILL
-	-- turns it on, a house at a time, until the farmstead comes round: never one another player's card has)
-	local holders = {}
-	for _, other in E.Players:GetPlayers() do -- (another player's card on the farmstead: theirs moves on first)
-		if other ~= ann2 and Moving.houseOf(other) == House and not Moving.busy(other) then
-			Moving.admin(other, "refill")
-			table.insert(holders, other.Name)
-		end
-	end
-	local turns, seen = 0, {}
-	while Moving.houseOf(ann2) ~= House and turns < #SandboxMap.Houses do
-		Moving.admin(ann2, "refill")
-		turns += 1
-		local h = Moving.houseOf(ann2)
-		if h then
-			table.insert(seen, h.id)
-		end
-	end
-	check("20. Jinočany: the admin's REFILL turns Ann's card from house to house in turn until the farmstead (another player's card on it moved on first)",
-		Moving.houseOf(ann2) == House and turns <= #SandboxMap.Houses - 1, `{table.concat(holders, ", ")}: {table.concat(seen, ", ")}`)
-	E.advance(1.1)
-	local card = H.takeContract(ann2, plots[1])
-	check("20. 8.3: Ann's card: the chalet, 25 minutes, its pieces (the big plan's: Config.Furniture.Big.Spots and collectibles)", card ~= nil
-		and card.id == House.id and card.name == House.name and card.time == 25 * 60 and card.items >= Config.Furniture.Big.Spots[1] and card.busy == nil,
-		card and (card.busy or card.items))
-	H.launch(ann2)
-	check("(her move)", H.stateOf(ann2) ~= nil, E.lastNotice(ann2))
-	H.drive(ann2, van, H.toHouse(plots[1]))
+	local R = Config.Runs
+	local run = H.run({ ann2 }, House.id, "hard")
+	local van = Vehicles.get(ann2)
+	local F = Config.Moving.Sandbox.Houses[House.id]
+	local view = H.stateOf(ann2)
+	local hard = (require("./RunRules").def("hard") :: any)
+	check("20. 9.7 Ann's run at Hard (open to her: her save's), the farmstead's clock × Hard's time (" .. hard.time .. ")", run ~= nil and run.difficulty == "hard"
+		and view ~= nil and view.run.difficulty == "hard" and math.abs(view.endsAt - E.now - F.Time * hard.time) < 2, view and view.endsAt - E.now)
+	check("…8.3: the big plan's pieces (Config.Furniture.Big.Spots and collectibles)", view ~= nil and view.counts.total >= Config.Furniture.Big.Spots[1], view and view.counts.total)
+	check("…8.1 her truck wears Van engine 1 as it comes (SpeedMult 1.05: Upgrades tunes every van of hers)", van ~= nil
+		and math.abs((van.model:GetAttribute("SpeedMult") or 0) - 1.05) < 1e-9, van and van.model:GetAttribute("SpeedMult"))
 	check("(at the chalet's curb, the back open)", H.setBack(ann2, van, true), E.lastNotice(ann2))
+	E.advance(R.Every)
 	local out = H.yawLook(House.back.yaw)
 	local backAt = V3(House.back.x, House.back.y + 3, House.back.z)
 	local side = V3(House.house.x + House.house.sx / 2 + 8, 3, 0) -- (round the house's east side)
@@ -2119,14 +2246,211 @@ do
 	E.walk(ann2, V3(side.X, 3, backAt.Z + 8)) -- (round the house again, to the van)
 	E.walk(ann2, V3(side.X, 3, House.door.z - 4))
 	local loaded, why = H.loadAtBack(ann2, van)
-	check("…loaded at the van's back", loaded and H.itemOf(ann2, piece.spot).state == "truck", why or E.lastNotice(ann2))
+	check("…loaded at the truck's back", loaded and H.itemOf(ann2, piece.spot).state == "truck", why or E.lastNotice(ann2))
 	H.setBack(ann2, van, false)
 	local before = #Collection.stock(ann2)
-	H.drive(ann2, van, H.toPlot(plots[1], false))
-	E.advance(1)
-	check("…home: a trip, the piece in her stock", H.stateOf(ann2).trips == 1 and #Collection.stock(ann2) == before + 1, E.lastNotice(ann2))
-	E.fire(ann2, "Moving", "finish")
-	E.advance(1)
+	local tripAt = #E.sent
+	local result = H.finishRun(ann2, van)
+	check("…FINISH: the piece in her stock; finished at Hard: Insane opened (runUnlocked 4)", #Collection.stock(ann2) == before + 1 and result ~= nil
+		and result.count == 1 and result.opened == "insane" and E.lastKind(ann2, "Runs", "unlocked", tripAt) ~= nil and H.profileOf(ann2).runUnlocked == 4,
+		result and result.opened)
+	H.backHome()
+end
+
+-- ── 21. 9.7 a party run: the pad's line, the host, MaxParty, loads, LEAVE THE RUN, the vote ──
+-- Eve (plot 2 since Bob left), Cid, Dee and Ann onto the Old Mill's pad: Eve the host (Easy and Normal open to her; Hard
+-- refused), her pick; she steps off: Cid the host, the countdown going on; she steps back on: behind the others. Fay, a
+-- sixth player (no plot), steps on fifth: MaxParty (4) go, she stays (IN USE). In the run: everybody in the mill's front
+-- yard, one truck (the host's); Dee, Ann and Eve each load a piece; Eve LEAVEs THE RUN alone (back to the lobby, her
+-- piece still in the truck); Dee's vote, then Ann's: the run ends; each piece in its loader's stock (Eve's too), every one
+-- of them a results card, Hard opened for the host who had it locked (not for Eve, who left).
+do
+	local R = Config.Runs
+	local Runs = H.Runs
+	local mill = SandboxMap.Houses[5]
+	local dee = S.dee
+	local fay = E.join(66, "Fay")
+	E.advance(4) -- (SandboxBoot's wait for a plot: none for her, then the plaza)
+	for _, p in { ann2, cid, dee, eve, fay } do
+		E.clients[p] = H.client(p)
+		S.auto[p] = true
+	end
+	-- (each a few studs off the pad: they step on one after the other within the countdown)
+	local pad = (SandboxMap.portal(mill.id) :: any).pad
+	local pmid = V3((pad.x0 + pad.x1) / 2, 3, (pad.z0 + pad.z1) / 2)
+	local beside = V3(pad.x1 + 6, 3, pmid.Z) -- (east of it: the plaza's side)
+	for n, p in { eve, cid, dee, ann2, fay } do
+		E.place(p, beside + V3(n * 1.5, 0, 0))
+	end
+	E.advance(R.Every * 3)
+	local before = { eve = H.profileOf(eve).runUnlocked, cid = H.profileOf(cid).runUnlocked, dee = H.profileOf(dee).runUnlocked, ann = H.profileOf(ann2).runUnlocked }
+	local padAt = #E.sent
+	E.walk(eve, pmid)
+	E.advance(R.Every + 0.05)
+	E.walk(cid, pmid + V3(2, 0, 2))
+	E.walk(dee, pmid + V3(-2, 0, 2))
+	E.walk(ann2, pmid + V3(2, 0, -2))
+	E.advance(R.Every + 0.05)
+	local eveView, cidView = E.lastKind(eve, "Runs", "pad", padAt), E.lastKind(cid, "Runs", "pad", padAt)
+	check("21. the Old Mill's pad: Eve first (the host: hers to pick), Cid, Dee and Ann behind her in the line, one countdown", eveView ~= nil and eveView.mine == true
+		and eveView.place == 1 and cidView ~= nil and cidView.mine == false and cidView.place == 2 and cidView.host == eve.UserId and #Runs.padOf(mill.id).order == 4
+		and table.concat(eveView.open, ",") == "easy,normal", eveView and eveView.place)
+	local lockedAt = #E.sent
+	E.advance(0.3)
+	E.fire(eve, "Runs", { kind = "difficulty", id = "insane" })
+	E.advance(0.3)
+	check("NEG. …Eve's Insane (locked for her): refused, the pad still Normal", E.heard(eve, "Finish a run", lockedAt) and Runs.padOf(mill.id).difficulty == "normal")
+	E.fire(ann2, "Runs", { kind = "difficulty", id = "insane" })
+	E.advance(0.3)
+	check("NEG. …Ann's Insane (open to her, but she is not the host): nothing", Runs.padOf(mill.id).difficulty == "normal")
+	local endsAt = Runs.padOf(mill.id).endsAt
+	E.walk(eve, beside + V3(-1, 0, 0))
+	E.advance(R.Every + 0.05)
+	check("Eve steps off: Cid is the host now (his panel says so), the countdown goes on, Normal (open to him)", Runs.padOf(mill.id).host == cid.UserId
+		and E.lastKind(cid, "Runs", "pad").mine == true and Runs.padOf(mill.id).endsAt == endsAt and Runs.padOf(mill.id).difficulty == "normal"
+		and E.lastKind(eve, "Runs", "pad").house == nil)
+	E.walk(eve, pmid + V3(-2, 0, -2))
+	E.walk(fay, pmid)
+	E.advance(R.Every + 0.05)
+	local fayView = E.lastKind(fay, "Runs", "pad")
+	check(`…Eve back on it: at the end of the line (4th); Fay 5th: {R.MaxParty} go, she waits (her panel: place 5)`, table.concat(Runs.padOf(mill.id).order, ",")
+		== `{cid.UserId},{dee.UserId},{ann2.UserId},{eve.UserId},{fay.UserId}` and fayView ~= nil and fayView.place == 5 and fayView.going == R.MaxParty,
+		table.concat(Runs.padOf(mill.id).order, ","))
+	local started = E.waitUntil(function(): boolean
+		return Runs.runOf(cid) ~= nil
+	end, R.Countdown + 1)
+	local inUseAt = #E.sent
+	E.advance(R.Fade.Out + 0.3)
+	local run = Runs.runOf(cid)
+	local van = Vehicles.get(cid)
+	local zone = SandboxMap.zone(mill.id) :: SandboxMap.Zone
+	local landed = true
+	for _, p in { cid, dee, ann2, eve } do
+		landed = landed and Runs.runOf(p) ~= nil and SandboxMap.zoneAt(E.rootOf(p).Position.X, E.rootOf(p).Position.Z) == zone
+			and H.flat(E.rootOf(p).Position, V3(zone.arrive.x, 0, zone.arrive.z)) <= R.Apart * 2 + 0.5
+	end
+	check("…the countdown over: the four in the run (Cid the host, Normal), all four in the mill's front yard by its door, apart; Fay not", started and run ~= nil
+		and run.host == cid and #run.party == 4 and run.difficulty == "normal" and landed and Runs.runOf(fay) == nil
+		and SandboxMap.inLobby(E.rootOf(fay).Position.X, E.rootOf(fay).Position.Z))
+	E.advance(R.Every * 2)
+	check("NEG. …Fay, still on the pad: IN USE (told), no run of her own", E.heard(fay, "is in use", inUseAt) and Runs.runOf(fay) == nil and Moving.busy(fay) == nil)
+	E.walk(fay, beside + V3(8, 0, 0)) -- (off the pad)
+	check("…one truck, the host's, at the mill's curb; the move one for all four (its crew), each sees its state", van ~= nil and Vehicles.get(dee) == nil
+		and H.flat(van.chassis.Position, V3(mill.curb.x, 0, mill.curb.z)) < 0.5 and H.stateOf(dee) ~= nil and H.stateOf(dee).id == H.stateOf(cid).id
+		and H.stateOf(eve).id == H.stateOf(cid).id and E.lastKind(ann2, "Runs", "run").members == 4)
+	check("(Cid opens the truck's back)", H.setBack(cid, van, true), E.lastNotice(cid))
+	local loads: { [string]: any } = {}
+	for _, p in { dee, ann2, eve } do
+		local ok = H.enterHouse(p)
+		local item, model = H.choose(p, function(_i: any, d: any): boolean
+			return d.class ~= "pair"
+		end)
+		if ok and item and H.pickUp(p, model) and H.leaveHouse(p) and (H.loadAtBack(p, van)) then
+			loads[p.Name] = item
+		end
+	end
+	check("…Dee, Ann and Eve each carry a piece out and load it into the truck", loads.Dee ~= nil and loads.Ann ~= nil and loads.Eve ~= nil
+		and H.itemOf(cid, loads.Dee.spot).state == "truck" and H.itemOf(cid, loads.Ann.spot).state == "truck" and H.itemOf(cid, loads.Eve.spot).state == "truck",
+		`{loads.Dee ~= nil} {loads.Ann ~= nil} {loads.Eve ~= nil}: {E.lastNotice(dee)} | {E.lastNotice(ann2)} | {E.lastNotice(eve)}`)
+	local stocks = { dee = #Collection.stock(dee), ann = #Collection.stock(ann2), eve = #Collection.stock(eve), cid = #Collection.stock(cid) }
+	local leaveAt = #E.sent
+	E.advance(0.3)
+	E.fire(eve, "Runs", { kind = "leave" })
+	E.advance(0.5)
+	check("LEAVE THE RUN: Eve out of it alone (told; her run view gone), the others still in it", Runs.runOf(eve) == nil and E.heard(eve, "You leave the run", leaveAt)
+		and E.lastKind(eve, "Runs", "run", leaveAt) ~= nil and E.lastKind(eve, "Runs", "run", leaveAt).house == nil and Runs.runOf(cid) ~= nil and #Runs.runOf(cid).party == 3
+		and E.heard(dee, "Eve left the run", leaveAt))
+	E.advance(R.LeaveHold + R.Fade.Out + 0.5)
+	local portal = SandboxMap.portal(mill.id) :: SandboxMap.Portal
+	check("…LeaveHold s later she is back in the lobby by the mill's portal; her piece still in the truck", H.flat(E.rootOf(eve).Position, V3(portal.back.x, 0, portal.back.z)) < 0.5
+		and H.itemOf(cid, loads.Eve.spot).state == "truck")
+	local voteAt = #E.sent
+	E.fire(dee, "Runs", { kind = "vote" })
+	E.advance(0.5)
+	check("Dee votes to finish: 1 of 2 (Ann not yet), everybody told; the run goes on", Runs.runOf(cid) ~= nil and E.heard(cid, "wants to finish (1/2", voteAt)
+		and E.lastKind(dee, "Runs", "run").voted == true)
+	local endAt = #E.sent
+	E.fire(ann2, "Runs", { kind = "vote" })
+	E.advance(0.5)
+	check("…Ann's vote too: the party voted, the run over for all", Runs.runOf(cid) == nil and Runs.runOf(dee) == nil and Runs.runOf(ann2) == nil and Moving.busy(cid) == nil)
+	check("…each piece in its loader's stock: Dee's to Dee, Ann's to Ann, Eve's to Eve (she left the run, not the game); nothing to Cid",
+		#Collection.stock(dee) == stocks.dee + 1 and #Collection.stock(ann2) == stocks.ann + 1 and #Collection.stock(eve) == stocks.eve + 1 and #Collection.stock(cid) == stocks.cid,
+		`{#Collection.stock(dee) - stocks.dee} {#Collection.stock(ann2) - stocks.ann} {#Collection.stock(eve) - stocks.eve} {#Collection.stock(cid) - stocks.cid}`)
+	local cards = {}
+	for _, p in { cid, dee, ann2, eve } do
+		cards[p.Name] = E.lastKind(p, "Runs", "result", endAt)
+	end
+	check("…a results card for every one of them (Eve's too): 3 pieces, who got each, yours apart (Cid's none, Dee's one)", cards.Cid ~= nil and cards.Dee ~= nil
+		and cards.Ann ~= nil and cards.Eve ~= nil and cards.Cid.count == 3 and cards.Cid.mine == 0 and cards.Dee.mine == 1 and cards.Ann.mine == 1 and cards.Eve.mine == 1
+		and cards.Cid.phase == "done" and string.find(cards.Cid.why, "voted", 1, true) ~= nil, cards.Cid and `{cards.Cid.count} {cards.Cid.phase}`)
+	check("…finished at Normal: Hard opened for Cid (his first), nothing new for Dee and Ann (open already), nothing for Eve (she left)",
+		H.profileOf(cid).runUnlocked == 3 and before.cid == 2 and cards.Cid.opened == "hard" and H.profileOf(dee).runUnlocked == before.dee
+		and H.profileOf(ann2).runUnlocked == before.ann and H.profileOf(eve).runUnlocked == before.eve and cards.Eve.opened == nil)
+	H.backHome()
+	local home = true
+	for _, p in { cid, dee, ann2 } do
+		home = home and SandboxMap.inLobby(E.rootOf(p).Position.X, E.rootOf(p).Position.Z)
+	end
+	check("…EndHold s later: the three back in the lobby by the mill's portal, the truck gone, the portal free", home and Vehicles.get(cid) == nil and not Runs.inUse(mill.id))
+	S.fay = fay
+end
+
+-- ── 22. 9.7 the clock runs out ─────────────────────────────────────────────
+
+do
+	local R = Config.Runs
+	local lone = SandboxMap.Houses[3]
+	local run = H.run({ cid }, lone.id, "hard")
+	local van = Vehicles.get(cid)
+	local view = H.stateOf(cid)
+	local hard = (require("./RunRules").def("hard") :: any)
+	check(`22. Cid's run at Hard (opened by step 21): {lone.name}'s clock × Hard's time`, run ~= nil and run.difficulty == "hard" and view ~= nil
+		and math.abs(view.endsAt - E.now - Config.Moving.Sandbox.Houses[lone.id].Time * hard.time) < 2, view and view.endsAt - E.now)
+	local item = H.fetch(cid, van, function(_i: any, d: any): boolean
+		return d.class ~= "pair"
+	end)
+	check("(a piece in his truck)", item ~= nil and H.itemOf(cid, item.spot).state == "truck")
+	local had = #Collection.stock(cid)
+	check("(the admin's SKIP CLOCK: a minute left)", string.find(Moving.admin(cid, "time"), "minute", 1, true) ~= nil)
+	local endAt = #E.sent
+	E.advance(62)
+	local card = E.lastKind(cid, "Runs", "result", endAt)
+	check("…the clock runs out: the run ends by itself (late), what was in the truck went home", H.Runs.runOf(cid) == nil and #Collection.stock(cid) == had + 1
+		and card ~= nil and card.phase == "late" and string.find(card.why, "Time's up", 1, true) ~= nil and card.count == 1, card and card.phase)
+	check("…late is finished too: Insane opened for him", H.profileOf(cid).runUnlocked == 4 and card ~= nil and card.opened == "insane")
+	H.backHome()
+	E.advance(R.Every)
+end
+
+-- ── 23. 9.7 the host leaves the game mid-run ──────────────────────────────
+
+do
+	local cabin = SandboxMap.Houses[2]
+	local dee = S.dee
+	local pad = (SandboxMap.portal(cabin.id) :: any).pad
+	local pmid = V3((pad.x0 + pad.x1) / 2, 3, (pad.z0 + pad.z1) / 2)
+	E.place(dee, pmid + V3(pad.x1 - pmid.X + 4, 0, 0))
+	E.place(ann2, pmid + V3(pad.x1 - pmid.X + 6, 0, 0))
+	E.advance(0.3)
+	local run = H.run({ dee, ann2 }, cabin.id)
+	local van = Vehicles.get(dee)
+	check(`23. Dee's run on {cabin.name} with Ann in her party`, run ~= nil and run.host == dee and #run.party == 2 and van ~= nil)
+	check("(Dee opens the back)", H.setBack(dee, van, true))
+	local ok = H.enterHouse(ann2)
+	local item, model = H.choose(ann2, function(_i: any, d: any): boolean
+		return d.class ~= "pair"
+	end)
+	check("(Ann loads a piece)", ok and item ~= nil and H.pickUp(ann2, model) and H.leaveHouse(ann2) and (H.loadAtBack(ann2, van)) and H.itemOf(ann2, item.spot).state == "truck")
+	local had = #Collection.stock(ann2)
+	local leftAt = #E.sent
+	E.leave(dee)
+	E.advance(0.5)
+	local card = E.lastKind(ann2, "Runs", "result", leftAt)
+	check("Dee (the host) leaves the game: the run ends for Ann (told: the host left), her piece in HER stock, her results card", H.Runs.runOf(ann2) == nil
+		and E.heard(ann2, "the host) left", leftAt) and #Collection.stock(ann2) == had + 1 and card ~= nil and card.count == 1 and card.mine == 1, card and card.count)
+	H.backHome()
+	check("…EndHold s later Ann is back in the lobby, the Pond Cabin's portal free", SandboxMap.inLobby(E.rootOf(ann2).Position.X, E.rootOf(ann2).Position.Z)
+		and not H.Runs.inUse(cabin.id))
 end
 
 -- ── The run ───────────────────────────────────────────────────────────────

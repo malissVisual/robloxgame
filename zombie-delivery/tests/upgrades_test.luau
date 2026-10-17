@@ -72,7 +72,7 @@ for _, id in Config.SandboxUpgrades.Order do
 	end
 end
 check(`everything bought costs {Rules.money(total)} (Config's tuning, 8.3 economy: the warehouse's levels and More stands in it)`, total == wanted and total > 0, total)
-check("8.3 ZDC Warehouse: 4 levels over the Garage (level 1 … 5), one price a level", warehouse ~= nil and warehouse.name == "ZDC Warehouse" and warehouse.max == 4
+check("8.3 Deliveros Warehouse: 4 levels over the Garage (level 1 … 5), one price a level", warehouse ~= nil and warehouse.name == "Deliveros Warehouse" and warehouse.max == 4
 	and warehouse.step == 1 and #warehouse.prices == 4 and warehouse.max == #Config.Warehouse.Levels - 1)
 check("More stands: +2 a level, 4 levels (12 → 20)", stands ~= nil and stands.step == 2 and stands.max == 4 and stands.name == "More stands")
 check("Showroom lights: ×1.1 a level, 5 levels", lights ~= nil and near(lights.step, 0.1) and lights.max == 5 and lights.name == "Showroom lights")

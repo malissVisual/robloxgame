@@ -102,7 +102,7 @@ local function draw(board: BasePart, stopId: number): SurfaceGui
 		Size = UDim2.new(1, -12, TITLE, -6),
 		Position = UDim2.fromOffset(6, 4),
 		BackgroundTransparency = 1,
-		Text = "ZDC TRANSIT · EXPRESS",
+		Text = "DELIVEROS TRANSIT · EXPRESS",
 		TextScaled = true,
 		Font = Theme.HeadingFont,
 		TextColor3 = K.text,

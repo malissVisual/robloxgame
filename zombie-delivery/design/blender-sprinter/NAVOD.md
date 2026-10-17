@@ -1,8 +1,8 @@
-# ZDC Sprinter v Blenderu a ve hře
+# Deliveros Sprinter v Blenderu a ve hře
 
 ![Sprinter](sprinter-preview.png)
 
-Tvůj model velké dodávky pro testovací verzi hry (8.0 SANDBOX): **ZDC Sprinter** s vysokou střechou, do kterého se dá
+Tvůj model velké dodávky pro testovací verzi hry (8.0 SANDBOX): **Deliveros Sprinter** s vysokou střechou, do kterého se dá
 vejít. Má přesně rozměry Sprinteru ve hře: 8,0 × 10,4 × 22,0 studu (šířka bez zrcátek × výška × délka), rozvor 13,0,
 světlá výška 1,2. Nákladový prostor uvnitř je 6,6 široký, 7,6 vysoký a 14,0 dlouhý, s podlahou 2,4 nad zemí; kabina je
 předních 7 studů. Postavil ho skript `sprinter.py`, takže každou barvu a nápis můžeš změnit a nechat ho postavit znovu.
@@ -36,6 +36,9 @@ na přední hraně), proto se otáčejí jako opravdové.
 ## 2. Změň ho skriptem
 Nahoře ve `sprinter.py` je část **NASTAVENÍ**: barvy (`PAINT`, `STRIPE`, `PLYWOOD` …), nápisy (`LOGO`, `NAME`, `SLOGAN`)
 a SPZ (`PLATE`). Změň, co chceš, a zmáčkni **Run Script**: stará dodávka se smaže a postaví se nová.
+8.9: hra se jmenuje **Deliveros**, ne ZDC: na bocích je DELIVEROS / MOVING & STORAGE / MOVE · FIND · GROW, na zadních
+dveřích DELIVEROS a slogan, na masce znak D a SPZ DLV 08 (`fit`: delší nápis se zmenší, aby se vešel). Ve Studiu smaž
+starý `ZDCSprinterArt` a naimportuj nový `roblox/ZDCSprinterArt.fbx` (jméno souboru zůstává, hra ho hledá pod ním).
 
 Míry pod tím (`LENGTH`, `WIDTH`, `HEIGHT`, `WHEELBASE`, `BAY_…`, `FLOOR`) **neměň**: hra má stejná čísla v kódu (díly
 Sprinteru, kolize, nakládání nábytku) a model by pak neseděl. Kdybys chtěl Sprinter jinak velký, řekni Claudovi.

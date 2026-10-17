@@ -10,7 +10,9 @@
 --   Pick up 2 pizzas (E)        (title: the words of the moment, the server's own key in brackets)
 --   Tony's Pizza · 120 m        (place and distance: the target the world marker and the minimap show)
 -- and `action`, the one thing you can press right now (the HUD's pill at the lower centre: "E  Pick up pizza"), nil when
--- there is none (walking, driving, waiting: the card says it, the pill hides).
+-- there is none (walking, driving, waiting: the card says it, the pill hides). 9.0 (the owner's screenshot: "G PUT IT
+-- DOWN" over the Sofa's own "G Put down" prompt, carried with Danny): a move's piece carried in two (`pair`: the
+-- character's CarryPair) has its own G prompt on the piece for each of its holders, so no pill says it again.
 --
 -- The situations (kind):
 --   tutorial    Marge's first day without a job (shared/TutorialSteps.luau hint: "Talk to Marge by the job board (E)");
@@ -48,6 +50,7 @@ export type Input = {
 	result: Result?, -- the last delivery's result while it is fresh (Config.Goal.ResultShown), else nil
 	distance: number?, -- studs to the target: the job's (the pile, the person, the circle) or, with no job, the board
 	holding: string?, -- what your hands hold (the character's Carrying attribute)
+	pair: boolean?, -- 9.0 a move's piece carried in two (the character's CarryPair): its own G prompt says it, no pill
 	canThrow: boolean?, -- X throws at the door now (the ThrowTo attribute, not fragile)
 	seat: string?, -- 6.5 review: you sit: "bus" (E rings the stop) or "seat" (E gets out), nil on foot
 	touch: boolean?, -- a touch screen: no keys in the words
@@ -330,7 +333,7 @@ function Goal.now(input: Input): Card
 	end
 	-- Something in your hands without a job: put it down (G).
 	local holding: Action? = nil
-	if input.holding then
+	if input.holding and not input.pair then -- (9.0 in two: the piece's own G prompt, one put-down on the screen)
 		holding = if input.holding == "horse" then { key = if touch then nil else "G", text = "Let it go" } else { key = if touch then nil else "G", text = "Put it down" }
 	end
 	local result = if input.tutorial == "retry" then nil else input.result -- (6.5 review: Marge's ANOTHER JOB wins)

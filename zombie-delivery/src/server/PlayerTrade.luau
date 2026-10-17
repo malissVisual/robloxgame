@@ -138,7 +138,7 @@ local function nameOf(player: Player): string
 end
 
 local function rarityOf(entry: { item: string }): string
-	return CollectionRules.rarityOf(CollectionRules.defOf(entry.item))
+	return CollectionRules.pieceRarity(entry) -- (9.x loot: its own roll, as its value)
 end
 
 -- The player's piece on stand `stand` (a copy), nil for none.
@@ -582,7 +582,7 @@ function PlayerTrade.setPrice(owner: Player, uid: any, price: any): (boolean, st
 	end
 	local ok, why = Collection.setSale(owner, entry.uid, price)
 	if ok then
-		say(owner, `🏷 FOR SALE: your {entry.name} at {Market.money(price)} (you get {Market.money(Rules.net(price))} after the ZDC fee).`)
+		say(owner, `🏷 FOR SALE: your {entry.name} at {Market.money(price)} (you get {Market.money(Rules.net(price))} after the Deliveros fee).`)
 	end
 	return ok, why
 end

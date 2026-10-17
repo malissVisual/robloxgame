@@ -30,9 +30,9 @@ check("the Cargo Rack is gone (3.5: stages)", Economy.findUpgrade("rack") == nil
 local start = Config.Cars[1]
 local VAN = Config.CompanyVan.Car
 local room = Economy.maxCapacity(VAN) -- what the van holds: every job and mission fits it
-check("the first car is the ZDC Van, every courier's from level 1, never sold", start.id == VAN and start.id == "zdcvan" and start.starter == true
+check("the first car is the Deliveros Van, every courier's from level 1, never sold", start.id == VAN and start.id == "zdcvan" and start.starter == true
 	and start.price == 0 and (start.level or 1) == 1 and start.mission == nil)
-check("the ZDC Van holds 4 (one stage)", room == 4 and Economy.stageCapacity(VAN, 0) == 4 and Economy.maxStage(VAN) == 0, room)
+check("the Deliveros Van holds 4 (one stage)", room == 4 and Economy.stageCapacity(VAN, 0) == 4 and Economy.maxStage(VAN) == 0, room)
 check("a Roof Rack adds 2 light slots on it", Economy.capacity(VAN, {}, { roofrack = true }, "parcel") == 6
 	and Economy.capacity(VAN, {}, { roofrack = true }, "ammo") == 4)
 for _, def in Config.Cars do
@@ -86,7 +86,7 @@ check("capacity: an unknown car holds nothing", Economy.capacity("spaceship", {}
 check("the next stage's price", #van == 4 and Economy.stageCost("van", 0) == van[2].price and Economy.stageCost("van", 3) == nil)
 check("the stage's health, speed and accel", old ~= nil and #van == 4 and Economy.carStats("van", { stage = 3 }).health == (old :: Config.CarDef).health + (van[4].health or 0)
 	and Economy.carStats("van", { stage = 3 }).maxSpeed == (old :: Config.CarDef).maxSpeed + (van[4].speed or 0))
-check("the car's title at a stage", Economy.carTitle("van", { stage = 2 }) == "Old Van · Work Van" and Economy.carTitle(VAN, {}) == "ZDC Van")
+check("the car's title at a stage", Economy.carTitle("van", { stage = 2 }) == "Old Van · Work Van" and Economy.carTitle(VAN, {}) == "Deliveros Van")
 check("advice: the next stage that holds it", string.find(Economy.roomAdvice("van", 0, 4), "Long Cargo Van", 1, true) ~= nil)
 check("advice: no bigger car any more (7.x: the Roof Rack's light slots)", string.find(Economy.roomAdvice(VAN, 0, 6), "Roof Rack", 1, true) ~= nil
 	and string.find(Economy.roomAdvice(VAN, 0, 6), "Box Truck", 1, true) == nil)
@@ -100,14 +100,14 @@ check("Box Truck (6): rack 0 → stage 0, +1 → stage 1, +2 and +3 → stage 2"
 	and Economy.legacyStage("boxtruck", 1) == 1 and Economy.legacyStage("boxtruck", 2) == 2 and Economy.legacyStage("boxtruck", 3) == 2)
 check("Rally Van: no stage adds room, stays at stage 0", Economy.legacyStage("rallyvan", 0) == 0 and Economy.legacyStage("rallyvan", 3) == 0)
 check("a company vehicle: nothing", Economy.legacyStage("ambulance", 2) == 0)
-check("the ZDC Van: no stage to move to", Economy.legacyStage(VAN, 2) == 0)
+check("the Deliveros Van: no stage to move to", Economy.legacyStage(VAN, 2) == 0)
 
 -- ── The special jobs (Config.JobTypes) ───────────────────────────────────────
 
 for _, def in Config.JobTypes do
 	local need = Economy.cargoNeed(def.load, def.items)
-	check(`job {def.id}: lends no vehicle (7.x: it goes in your ZDC Van)`, def.vehicle == nil, def.vehicle)
-	check(`job {def.id}: the ZDC Van takes its {need} pieces`, need <= room, need)
+	check(`job {def.id}: lends no vehicle (7.x: it goes in your Deliveros Van)`, def.vehicle == nil, def.vehicle)
+	check(`job {def.id}: the Deliveros Van takes its {need} pieces`, need <= room, need)
 	check(`job {def.id}: no pallets, no horses (7.x)`, def.load ~= "pallet" and def.load ~= "lead", def.load)
 end
 
@@ -140,11 +140,11 @@ for _, mission in Missions.List do
 		lent += 1
 	end
 	print(`  {mission.id} {mission.name} (level {mission.level or 1}): {need} slots`)
-	check(`{mission.id}: fits the ZDC Van (7.x: its four slots at most)`, need <= room, need)
+	check(`{mission.id}: fits the Deliveros Van (7.x: its four slots at most)`, need <= room, need)
 	check(`{mission.id}: no horses led any more (7.x: a horse does not fit a van)`, mission.load ~= "lead" and mission.itemKind ~= "horse")
 end
 check(`all {#Missions.List} missions listed (6.8: eleven chapters of six)`, listed == #Missions.List and listed == 66, listed)
-check("no mission lends a vehicle (7.x: your ZDC Van does them all)", lent == 0, lent)
+check("no mission lends a vehicle (7.x: your Deliveros Van does them all)", lent == 0, lent)
 
 -- ── The repair shop ──────────────────────────────────────────────────────────
 
@@ -158,6 +158,6 @@ check("a wreck comes back damaged", Config.Repair.WreckedHealth > 0 and Config.R
 
 -- ── The garages ──────────────────────────────────────────────────────────────
 
-check("the depot holds the starting van (7.x: the ZDC Van, the one car)", Config.Estate.BaseCarSlots == 1)
+check("the depot holds the starting van (7.x: the Deliveros Van, the one car)", Config.Estate.BaseCarSlots == 1)
 
 print(if failed == 0 then "ALL CHECKS PASSED" else `{failed} CHECK(S) FAILED`)

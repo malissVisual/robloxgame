@@ -8,18 +8,21 @@
 --     reaches down to the line) and is itself a top block ("SandboxGuide"), so the quick chat's
 --     lines and the banners go under it. Its words wrap rather than grow wide; on a touch screen it is at least
 --     TouchScale big and its ✕ a finger's size.
---   * The 3D guide: a soft glowing path on the ground (Beams between Attachments in the Terrain: no parts) along the
---     roads (SandboxSteps.route: out to the nearest road, along the roads the shortest way, in), a floating orange
---     chevron over the target and its distance tag ("THE OLD FARMSTEAD · 420 m"). Inside the house only the hint (no
---     target there). Jinočany: the drive steps name the move's house (the Moving state's `contract`, a SandboxMap.Houses
---     id: "Drive to The Linden House on Hlavní"), the chevron over its curb ("THE LINDEN HOUSE") and its door.
+--   * The 3D guide: a soft glowing path on the ground (Beams between Attachments in the Terrain: no parts; 9.7 a
+--     straight one: the lobby and a run's front yard have no roads to follow), a floating orange chevron over the
+--     target and its distance tag ("THE OLD FARMSTEAD · 42 m": 9.7 the nearest portal's pad, named for its house).
+--     Inside the house only the hint (no target there). 9.7 runs: nobody drives (the run's truck stands at the curb).
+--     10.3 (the owner: "I don't want that line on the ground all the time, I know what to do … and if it shows, let it
+--     show smoothly, not jump after every step"): the path on the ground only while it helps (Config.SandboxGuide.Path:
+--     "new", a player with nothing home yet, i.e. no piece in stock or on show this session; "always"; "never"), and
+--     always for a place picked on the big map (SandboxGuide.goTo); the chevron and the hint as before. Its first point
+--     follows your feet every frame, eased (PathFollow), so it slides along as you walk instead of jumping each look.
 --   * The steps come from shared/SandboxSteps.luau (pure, tested) on a state read from what the client sees: the player
 --     attribute Plot (server/SandboxPlots.luau); the Moving remote's "state" (as client/MovingHud.luau reads it: a move
 --     runs, `inside` the house, the van's load counts.out, counts.delivered, your piece in your hands: an item `mine` and
 --     "carried"); the MoveLobby remote's "lobby" (the planning: LAUNCH); the Collection remote's "state" (the stock, the
 --     pieces on show and their stands); where you stand and whether you sit in a vehicle.
---   * Each step goes quiet once done (per session: SandboxSteps.doneBy); the arrow to the house and home stays while you
---     drive. Hold G (not while you carry: G puts a piece down) or the ✕ hides the guide ("Guide off" for a moment); hold G
+--   * Each step goes quiet once done (per session: SandboxSteps.doneBy). Hold G (not while you carry: G puts a piece down) or the ✕ hides the guide ("Guide off" for a moment); hold G
 --     again, or on a touch screen the 💡 chip left in its place, brings it back. SandboxGuide.setEnabled for a settings row.
 --   * 8.3 keys (shared/SandboxPad.luau, client/PadGlyph.luau): the line's words are the device's used now, a gamepad
 --     used last first: a prompt's E is the gamepad's X ("X at the back"; a touch screen's "tap at the back"), "Guide off ·
@@ -37,13 +40,12 @@
 --     busy), Config.SandboxGuide.SoftGap s apart; each shows SoftSeconds at most,
 --     and the ✕ on one dismisses that step alone for the session (the guide stays on; on a core step the ✕ hides the
 --     guide as before).
---   * 8.4, Danny for hire (SandboxSteps.danny: in a move, before its own step, each said once as a soft step):
---     "Hire Danny to carry with you" while he is for hire and your money pays him (the chevron over his body: the
---     model in workspace.Npcs whose MoveHelper is your player attribute MoveHelperId, as client/MoveHelperCard.luau
---     finds it), "Pick a piece to give it to Danny" in the house once he is hired with his list empty, "Heavy piece:
+--   * 8.4, Danny (SandboxSteps.danny: in a move, before its own step, each said once as a soft step; 10.1 no "Hire
+--     Danny" step: he is free, the words his name's, the crew's helper's): "Pick a piece to give it to Danny" in the
+--     house while his list is empty, "Heavy piece:
 --     press Lift and wait for Danny" the first time a two-person piece of your move is within Config.SandboxGuide
 --     .HeavyNear studs (its own Lift prompt, tagged MovePrompt, looked for at most once a second and only while that
---     step may still show). Read from your player attributes (MoveHelper, MoveHelperPrice, MoveHelperQueue,
+--     step may still show). Read from your player attributes (MoveHelper, MoveHelperName, MoveHelperQueue,
 --     MoveHelperCall: every look) and the Moving state (its two-person pieces left: readMove). In a move with him, what
 --     covers the screen and what talks are asked too (his card, the move's cards, a grip check, a hint): his steps
 --     wait for them. A gamepad's words end in its button: "(L1)" at him, "(R1)" at a piece (SandboxSteps.onDevice).
@@ -62,6 +64,9 @@
 --   SandboxGuide.setEnabled(on)     shows or hides the guide (the G hold, the ✕, a settings row)
 --   SandboxGuide.enabled()          is it on?
 --   SandboxGuide.close()            the hint's ✕ (8.3: a soft step dismissed, else the guide off)
+--   SandboxGuide.goTo(at?, label?, seconds?)   10.x the map: a place picked on the big map (client/SandboxMapUi.luau:
+--                                   a portal) takes the chevron and the path until you are there, a run starts or
+--                                   `seconds` pass (180); nil lets go. SandboxGuide.picked: the pick now
 --   SandboxGuide.step()             the step now (its id, SandboxSteps.Steps), nil before the first look
 --   SandboxGuide.hint()             the hint line (a top block), for the layout checks
 --   SandboxGuide.covered / windowOpen   8.3 hooks: what covers the screen, the sandbox window open now (nil: asked of
@@ -72,6 +77,7 @@ local CollectionService = game:GetService("CollectionService") -- 8.4: the move'
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService") -- 10.3 the path's first point eased after your feet
 local StarterGui = game:GetService("StarterGui")
 local TextService = game:GetService("TextService")
 local TweenService = game:GetService("TweenService")
@@ -99,18 +105,16 @@ local K = Theme.Contract
 local player = Players.LocalPlayer
 local COLOR = Color3.fromRGB(G.Color[1], G.Color[2], G.Color[3])
 local ABOVE = { "MovePanel", "MoveHelper", "PlanningPill" } -- the top's middle blocks the line goes under (TopBlocks)
-local SIDE_GUIS = { "SandboxHud", "SandboxTasksChip" } -- the HUD at the top's sides the line keeps clear of (client/SandboxHud.luau; 8.2: client/SandboxTasksUi.luau's chip)
-local MAX_POINTS = 8 -- SandboxSteps.route's most points (SandboxSteps.MaxPoints; Jinočany: 8, was 6: a path of seven beams)
+local SIDE_GUIS = { "SandboxHud", "SandboxTasksChip", "SandboxMiniMap" } -- the HUD at the top's sides the line keeps clear of (client/SandboxHud.luau; 8.2: client/SandboxTasksUi.luau's chip; 10.x: a touch screen's minimap in a run, client/SandboxMiniMap.luau)
+local MAX_POINTS = 8 -- SandboxSteps.route's most points (SandboxSteps.MaxPoints; 8.9: 8, was 6: a path of seven beams)
 local PAD_L, PAD_R, PAD_V = 14, 4, 5 -- the line's padding (at scale 1)
 local LINE_H = G.TextSize + 4 -- one line of words
 local CLOSE_W = 28 -- the ✕'s column (at scale 1; a finger's size on a touch screen)
 local MIN_ROOM = 220 -- px at scale 1: narrower than this beside the sides' HUD, the line goes under it
 local LABELS: { [string]: string } = {
-	board = "CONTRACTS",
-	curb = string.upper(SandboxMap.House.name), -- (Jinočany: the move's house's, HOUSE_LABELS)
+	portal = "PORTAL", -- 9.7 runs (a portal's own name: its house's)
 	door = "FRONT DOOR",
-	van = "YOUR VAN",
-	unload = "UNLOAD HERE",
+	van = "THE TRUCK",
 	stand = "EMPTY STAND",
 	warehouse = "WAREHOUSE",
 	desk = "UPGRADES DESK", -- 8.3
@@ -118,7 +122,7 @@ local LABELS: { [string]: string } = {
 	danny = string.upper(Config.MoveHelper.Name), -- 8.4
 	sale = "SET PRICE", -- 8.9
 }
-local HOUSE_LABELS: { [string]: string } = {} -- Jinočany: a house's id → its chevron's tag (its name, made once)
+local HOUSE_LABELS: { [string]: string } = {} -- a place's id → its chevron's tag (its name, made once)
 for _, h in SandboxMap.Houses do
 	HOUSE_LABELS[h.id] = string.upper(h.name)
 end
@@ -154,8 +158,8 @@ local state: SandboxSteps.State = {
 	window = nil,
 	covered = false,
 	hush = false,
-	helper = nil, -- 8.4, Danny for hire (SandboxSteps.State)
-	helperPrice = nil,
+	helper = nil, -- 8.4, Danny (SandboxSteps.State)
+	helperName = nil, -- 10.1
 	helperQueue = nil,
 	waiting = false,
 	heavy = 0,
@@ -192,15 +196,15 @@ local function seated(): boolean
 	return humanoid ~= nil and humanoid.SeatPart ~= nil
 end
 
--- 8.4: Danny on your move, from your player attributes (server/MoveHelper.luau's: for hire or hired, his price, his
--- list, your call to him): every look and every Moving state (they change without one). 8.5: your clipboard out (your
+-- 8.4: Danny on your move, from your player attributes (server/MoveHelper.luau's: with you, 10.1 his name, his list,
+-- your call to him): every look and every Moving state (they change without one). 8.5: your clipboard out (your
 -- character's ClipboardHeld, server/Clipboard.luau's: the give step's words then).
 local function readHelper()
 	local helper = player:GetAttribute("MoveHelper")
-	local price, queue = player:GetAttribute("MoveHelperPrice"), player:GetAttribute("MoveHelperQueue")
+	local name, queue = player:GetAttribute("MoveHelperName"), player:GetAttribute("MoveHelperQueue")
 	local call = player:GetAttribute("MoveHelperCall")
-	state.helper = if move ~= nil and (helper == "offer" or helper == "hired") then helper else nil
-	state.helperPrice = if type(price) == "number" then price else nil
+	state.helper = if move ~= nil and helper == "hired" then helper else nil
+	state.helperName = if type(name) == "string" and name ~= "" then name else nil
 	state.helperQueue = if type(queue) == "number" then queue else nil
 	state.waiting = type(call) == "string" and call ~= ""
 	local character = player.Character
@@ -235,7 +239,7 @@ local function readMove(view: any)
 	state.vanLoad = inVan
 	state.delivered = delivered
 	state.heavy = heavy -- 8.4
-	-- Jinočany: the move's house (its contract's id, a SandboxMap.Houses id; another: none, the farmstead's words)
+	-- the move's place (its contract's id, a SandboxMap.Houses id; another: none, the farmstead's words)
 	local house = if move then move.contract else nil
 	state.house = if SandboxMap.house(house) then house else nil
 	readHelper() -- 8.4 (Danny's part: your player attributes)
@@ -440,21 +444,6 @@ local function vanBack(): Vector3?
 	return (chassis.CFrame * CFrame.new(0, 0, chassis.Size.Z / 2 + 2)).Position
 end
 
--- 8.3: your van stands at your plot's van spot (Config.VanPaint.Prompt.Home: its 🎨 Paint van prompt is on there).
-local function vanHome(): boolean
-	local plotId = state.plot
-	local plot = if plotId then SandboxMap.Plots[plotId] else nil
-	local model = if plot then van() else nil
-	local chassis = model and model.PrimaryPart
-	local at = chassis and chassis.Position
-	if not plot or not at then
-		return false
-	end
-	local spot, reach = plot.vanSpot, Config.VanPaint.Prompt.Home
-	local dx, dz = at.X - spot.x, at.Z - spot.z
-	return dx * dx + dz * dz <= reach * reach
-end
-
 -- 8.4: Danny's body on your move (the model in workspace.Npcs whose MoveHelper is your player attribute MoveHelperId,
 -- as client/MoveHelperCard.luau finds it): looked up at most once a second, kept while it stays.
 local function dannyRoot(): BasePart?
@@ -548,26 +537,26 @@ local function targetOf(kind: string?, px: number, pz: number): (Vector3?, strin
 	end
 	local plotId = state.plot
 	local plot = if plotId then SandboxMap.Plots[plotId] else nil
-	local house = SandboxMap.house(state.house) or SandboxMap.House -- (Jinočany: the move's house)
-	if kind == "board" then
-		if plot then
-			return Vector3.new(plot.board.x, plot.board.y + 4, plot.board.z), LABELS.board
+	local house = SandboxMap.house(state.house) or SandboxMap.House -- (the move's place)
+	if kind == "portal" then -- 9.7 runs: the nearest portal's pad (its house's name on the chevron)
+		local best: SandboxMap.Portal? = nil
+		local bestD = math.huge
+		for _, portal in SandboxMap.Lobby.portals do
+			local mx, mz = (portal.pad.x0 + portal.pad.x1) / 2, (portal.pad.z0 + portal.pad.z1) / 2
+			local d = (mx - px) ^ 2 + (mz - pz) ^ 2
+			if d < bestD then
+				best, bestD = portal, d
+			end
 		end
-	elseif kind == "curb" then
-		return Vector3.new(house.curb.x, house.curb.y, house.curb.z), HOUSE_LABELS[house.id] or LABELS.curb
+		if best then
+			return Vector3.new((best.pad.x0 + best.pad.x1) / 2, SandboxMap.GroundTop + 1, (best.pad.z0 + best.pad.z1) / 2), HOUSE_LABELS[best.house] or LABELS.portal
+		end
 	elseif kind == "door" then
 		return Vector3.new(house.door.x, house.door.y + 3, house.door.z), LABELS.door
 	elseif kind == "van" then
 		local back = vanBack()
 		if back then
 			return back, LABELS.van
-		end
-	elseif kind == "unload" then
-		local drop = move and move.dropOff
-		if plot and mine then
-			return Vector3.new(plot.unload.x, SandboxMap.RoadTop, plot.unload.z), LABELS.unload
-		elseif type(drop) == "table" and type(drop.x) == "number" and type(drop.z) == "number" then
-			return Vector3.new(drop.x, SandboxMap.RoadTop, drop.z), LABELS.unload
 		end
 	elseif kind == "stand" or kind == "hot" then
 		if plotId and plot then
@@ -586,17 +575,10 @@ local function targetOf(kind: string?, px: number, pz: number): (Vector3?, strin
 			end
 			return Vector3.new(plot.door.x, plot.door.y + 4, plot.door.z), LABELS.warehouse
 		end
-	elseif kind == "paint" then -- 8.3: the van's 🎨 Paint van prompt (server/VanPaint.luau's PaintPoint)
-		local model = van()
-		local chassis = model and model.PrimaryPart
-		if chassis then
-			local point = chassis:FindFirstChild("PaintPoint")
-			if point and point:IsA("Attachment") then
-				return point.WorldPosition, LABELS.paint
-			end
-			return chassis.Position, LABELS.paint
-		end
-	elseif kind == "danny" then -- 8.4: Danny, for hire on your move
+	elseif kind == "paint" then -- 9.7: the lobby's PAINT shop booth (its counter: SandboxMap.Lobby.shops.paint)
+		local stand = SandboxMap.Lobby.shops.paint.stand
+		return Vector3.new(stand.x, SandboxMap.GroundTop + 3, stand.z), LABELS.paint
+	elseif kind == "danny" then -- 8.4: Danny on your move (10.1 no hire step aims here any more)
 		local root = dannyRoot()
 		if root then
 			return root.Position + Vector3.new(0, 2, 0), LABELS.danny
@@ -1040,7 +1022,7 @@ local function hideWorld()
 end
 
 -- The chevron over `at` with its tag, the path from the player (px, pz) to it along the roads.
-local function showWorld(at: Vector3, label: string, px: number, pz: number)
+local function showWorld(at: Vector3, label: string, px: number, pz: number, withPath: boolean)
 	if at ~= world.targetAt then -- (8.2 perf: the marker moved only when its target did)
 		world.targetAt = at
 		world.target.WorldPosition = at
@@ -1057,13 +1039,14 @@ local function showWorld(at: Vector3, label: string, px: number, pz: number)
 		world.tag.Text = `{label} · {metres} m`
 	end
 	local count = 0
-	if metres > G.Near then
+	if metres > G.Near and withPath then -- (10.3: only while the path helps)
 		count = SandboxSteps.route(px, pz, at.X, at.Z, path, G.Direct)
 	end
 	local y = SandboxMap.RoadTop + G.PathLift
 	for i = 1, count do
 		local point = Vector3.new(path[i * 2 - 1], y, path[i * 2])
-		if point ~= world.pointAt[i] then
+		-- (10.3: the first point, your feet, is eased every frame by follow(); written here only when the path lights)
+		if point ~= world.pointAt[i] and (i > 1 or (world.pathOn or 0) == 0) then
 			world.pointAt[i] = point
 			world.points[i].WorldPosition = point
 		end
@@ -1090,7 +1073,7 @@ local function look()
 	end
 	local plot = player:GetAttribute("Plot")
 	state.plot = if type(plot) == "number" then plot else nil
-	state.atHouse = root ~= nil and SandboxSteps.atHouse(px, pz, G.HouseMargin, state.house) -- (Jinočany: the move's house)
+	state.atHouse = root ~= nil and SandboxSteps.atHouse(px, pz, G.HouseMargin, state.house) -- (the move's place)
 	state.seated = seated()
 	state.stock, state.shown, state.freeStands = summary.stock, summary.shown, summary.free
 	if summary.free == nil and summary.stock > 0 then
@@ -1113,7 +1096,14 @@ local function look()
 	state.covered = asks and ask(SandboxGuide.covered, "isCovered") == true
 	local window = if state.covered then ask(SandboxGuide.windowOpen, "window") else nil -- (a window open covers it)
 	state.window = if type(window) == "string" then window else nil
-	state.vanHome = calm and state.painted == false and vanHome()
+	state.vanHome = calm and state.painted == false -- (9.7: in the lobby, the PAINT shop's booth there)
+	-- 9.7 runs: on a portal's pad (client/RunUi.luau's pad view: you its host or not)
+	local pad: any = nil
+	pcall(function()
+		pad = (require(script.Parent.RunUi) :: any).pad()
+	end)
+	state.pad = type(pad) == "table" and not state.move
+	state.padHost = state.pad == true and pad.mine == true
 	state.hush = asks and (os.clock() < softAfter or ask(nil, "busy") == true) -- (a first-time hint talks)
 	SandboxSteps.doneBy(state, done, last)
 	local step = SandboxSteps.choose(state, done)
@@ -1166,7 +1156,7 @@ local function look()
 			-- Danny's "Pick a piece …")
 			ui.stepText = SandboxSteps.onDevice(step, words, device)
 		end
-		setHint(hint, ui.stepText, true)
+		setHint(hint and not state.pad, ui.stepText, true) -- (9.7: on a pad its panel says it: client/RunUi.luau's, where the line is)
 	end
 	if (ui.shown or ui.chip.Visible) and (os.clock() - (ui.laidAt or 0) > 1 or under(ui.root.AbsolutePosition, Ui.screenScale()) ~= ui.under) then
 		layout() -- (what is above moved: at once; the sides' HUD may have moved: a second's look is enough)
@@ -1178,8 +1168,26 @@ local function look()
 	if guide and root and not state.inside then
 		at, label = targetOf(step.target, px, pz)
 	end
+	-- 10.x the map: a place picked on the big map takes the chevron and the path until you are there (G.Near), a run
+	-- starts or its time is up
+	local picked = SandboxGuide.picked
+	if picked then
+		local dx, dz = picked.at.X - px, picked.at.Z - pz
+		if state.move or os.clock() > picked.untilAt or (root ~= nil and dx * dx + dz * dz < G.Near * G.Near) then
+			SandboxGuide.picked = nil
+		elseif root then
+			at, label = picked.at, picked.label
+		end
+	end
 	if at and label then
-		showWorld(at, label, px, pz)
+		-- 10.3 the path on the ground only while it helps: a place picked on the map, else Config.SandboxGuide.Path
+		-- ("new": nothing of yours home yet this session; "always"; "never")
+		if summary.stock + summary.shown > 0 then
+			ui.homeOnce = true
+		end
+		local mode = G.Path
+		local withPath = SandboxGuide.picked ~= nil or mode == "always" or (mode == "new" and not ui.homeOnce)
+		showWorld(at, label, px, pz, withPath)
 	else
 		hideWorld()
 	end
@@ -1201,6 +1209,21 @@ end
 
 function SandboxGuide.enabled(): boolean
 	return on
+end
+
+-- 10.x the map (client/SandboxMapUi.luau): a place picked there (a portal's pad) is the chevron's and the path's for
+-- `seconds` (or until you are there, or a run starts); nil `at` lets go. It turns the guide on.
+SandboxGuide.picked = nil :: { at: Vector3, label: string, untilAt: number }?
+function SandboxGuide.goTo(at: Vector3?, label: string?, seconds: number?)
+	if at and label then
+		SandboxGuide.picked = { at = at, label = label, untilAt = os.clock() + (seconds or 180) }
+		SandboxGuide.setEnabled(true)
+	else
+		SandboxGuide.picked = nil
+	end
+	if started then
+		pcall(look)
+	end
 end
 
 -- The hint's ✕: 8.3, on a soft step that step alone is dismissed (for the session; the next soft one waits SoftGap s),
@@ -1225,6 +1248,27 @@ function SandboxGuide.hint(): GuiObject?
 	return ui.holder
 end
 
+-- 10.3 the path's first point after your feet every frame, eased (PathFollow a second): it slides along as you walk
+-- (the look every Every s draws the rest). Nothing while no path is lit.
+local function follow(dt: number)
+	if (world.pathOn or 0) == 0 or not world.points then
+		return
+	end
+	local root = rootPart()
+	if not root then
+		return
+	end
+	local feet = root.Position
+	local point = world.points[1]
+	local want = Vector3.new(feet.X, SandboxMap.RoadTop + G.PathLift, feet.Z)
+	local now = point.WorldPosition
+	local step = now:Lerp(want, math.min(1, dt * G.PathFollow))
+	if (step - now).Magnitude > 1e-3 then
+		point.WorldPosition = step
+		world.pointAt[1] = step
+	end
+end
+
 function SandboxGuide.start()
 	if started or not Config.Sandbox.On then
 		return
@@ -1232,6 +1276,10 @@ function SandboxGuide.start()
 	started = true
 	build()
 	buildWorld()
+	local stepped = (RunService :: any).RenderStepped -- 10.3 the path's first point after your feet, eased
+	if stepped then
+		stepped:Connect(follow)
+	end
 	-- the move (client/MovingHud.luau reads the same remote), its planning, the collection (when it is there)
 	local moving = Net.get("Moving")
 	moving.OnClientEvent:Connect(function(kind: any, view: any)

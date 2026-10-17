@@ -19,6 +19,10 @@
 --                             a piece at Config.Moving.Damage.BrokenAt or under is broken), their colours 1 … Variants
 --                             (shared/HouseLayout.luau's range), Most pieces at most whatever is asked
 --   Van                       a van's footprint (studs: width, length) for SHOW ZONES' curb (SandboxMap: "~20 long")
+--   9.7 runs (server/Runs.luau admin): the Runs group's 🎚 EASY … NIGHTMARE pick the difficulty of the admin's next run,
+--   ▶ FARMSTEAD … ▶ ORCHARD start a run on that house for the TARGET alone (at the picked difficulty, open or not), ⏹ END
+--   RUN ends the TARGET's run (what is in the truck goes home); SKIP CLOCK and HORDE NOW act on the TARGET's run. The
+--   travel group's BRING VAN is gone (no van in the lobby); 📍 TO LOBBY: the TARGET to the lobby's plaza.
 --
 --   SandboxAdmin.find(id)                   the action with that id, nil for anything else (any type)
 --   SandboxAdmin.check(admin, sandbox, id)  the action, else nil and why: not an admin, not the sandbox, unknown
@@ -28,9 +32,11 @@
 --   SandboxAdmin.standPlan(stock, stands)   FILL STANDS: { uid, stand } for the stock's pieces not on show (in
 --                                           stock order), each on the next free stand of 1 … stands
 --   SandboxAdmin.standCount(warehouse)      Config.Warehouse's Stands (a count, or a list of stands), 0 without it
---   SandboxAdmin.zones()                    SHOW ZONES' fixed marks (shared/SandboxMap.luau): each plot's unload
---                                           circle and the houses' curbs (a van's footprint at the spot; Jinočany:
---                                           every house to empty's, SandboxMap.Houses' order, its name on it)
+--   SandboxAdmin.zones()                    SHOW ZONES' fixed marks (shared/SandboxMap.luau): 9.7 each portal's pad
+--                                           (the lobby's) and the houses' curbs (the truck's footprint at the spot:
+--                                           every place to empty's, SandboxMap.Houses' order, its name on it)
+--   SandboxAdmin.runHouse(id) / runDifficulty(id)   9.7: the house a "run_<house>" button starts, the difficulty a
+--                                           "rundiff_<id>" button picks (nil: not such a button)
 
 local SandboxMap = require(script.Parent.SandboxMap)
 
@@ -40,7 +46,7 @@ export type Group = { id: string, name: string, hint: string }
 export type Action = { id: string, group: string, label: string, color: string }
 export type Pick = { item: string, variant: number, condition: number }
 export type Zone = {
-	kind: string, -- "unload" | "curb"
+	kind: string, -- "pad" (9.7: a portal's pad) | "curb"
 	label: string,
 	shape: string, -- "circle" (r) | "box" (sx, sy, sz, turned by yaw)
 	x: number,
@@ -56,9 +62,9 @@ export type Zone = {
 SandboxAdmin.Groups = {
 	{ id = "money", name = "Money", hint = "The TARGET's money: a pile to buy with, or none to try being broke." },
 	{
-		id = "moves",
-		name = "Moves",
-		hint = "The sandbox's houses (Moving's admin; Jinočany: six, one on your card). REFILL calls a running move off: the next START brings the next house, filled anew. SKIP CLOCK: one minute left. HORDE NOW: the horde comes.",
+		id = "runs",
+		name = "Runs",
+		hint = "9.7: the runs (server/Runs.luau). EASY … NIGHTMARE: the difficulty of the next run you start here (locks ignored). ▶ a house: a run there for the TARGET alone, now. END RUN: the TARGET's run ends (what is in the truck goes home). SKIP CLOCK: one minute left. HORDE NOW: the horde comes.",
 	},
 	{
 		id = "collection",
@@ -68,35 +74,46 @@ SandboxAdmin.Groups = {
 	{
 		id = "travel",
 		name = "Travel and the van",
-		hint = "BRING VAN: the sandbox van to the TARGET's plot, its back to the roller door. TO HOUSE / TO WAREHOUSE: the TARGET (and the van they drive) there.",
+		hint = "TO HOUSE: the TARGET to the front door of their run's house (else the farmstead's). TO WAREHOUSE: to their warehouse. TO LOBBY: to the lobby's plaza. (9.7: no van in the lobby, no BRING VAN.)",
 	},
 	{
 		id = "debug",
 		name = "Debug",
-		hint = "SHOW ZONES (only on your screen): the plots' unload circles, the houses' curbs, the display stands and every van's cargo bay.",
+		hint = "SHOW ZONES (only on your screen): the portals' pads, the houses' curbs (the truck's spot), the display stands and every van's cargo bay.",
 	},
 	{
 		id = "upgrades",
 		name = "Upgrades",
-		hint = "8.1: the TARGET's upgrades (the UPGRADES desk). MAX: every one at its top for free (the Logistics centre's 24 stands and More stands' 8, the lights, the van, Danny). RESET: none (the Garage; the pieces on the lost stands go back to the stock). LV 1 – 5: the warehouse at that level (1 the Garage … 5 the Logistics centre), the rest as it is. 8.3: UNLOCK PAINTS: every paint and livery of the PAINT shop owned for free (wear them at the van). RESET PAINTS: none, the van back in ZDC cream.",
+		hint = "8.1: the TARGET's upgrades (the UPGRADES desk). MAX: every one at its top for free (the Logistics centre's 24 stands and More stands' 8, the lights, the van, Danny). RESET: none (the Garage; the pieces on the lost stands go back to the stock). LV 1 – 5: the warehouse at that level (1 the Garage … 5 the Logistics centre), the rest as it is. 8.3: UNLOCK PAINTS: every paint and livery of the PAINT shop owned for free (wear them at the van). RESET PAINTS: none, the van back in Deliveros cream.",
 	},
 } :: { Group }
 
 SandboxAdmin.Actions = {
 	{ id = "money", group = "money", label = "💰 +$10K", color = "green" },
 	{ id = "broke", group = "money", label = "💸 MONEY 0", color = "grey" },
-	{ id = "refill", group = "moves", label = "🏠 REFILL HOUSE", color = "gold" },
-	{ id = "start", group = "moves", label = "▶ START MOVE", color = "yellow" },
-	{ id = "clock", group = "moves", label = "⏩ SKIP CLOCK", color = "grey" },
-	{ id = "horde", group = "moves", label = "🧟 HORDE NOW", color = "red" },
+	-- 9.7 runs: the next run's difficulty, a run on each house, its end
+	{ id = "rundiff_easy", group = "runs", label = "🎚 EASY", color = "green" },
+	{ id = "rundiff_normal", group = "runs", label = "🎚 NORMAL", color = "blue" },
+	{ id = "rundiff_hard", group = "runs", label = "🎚 HARD", color = "yellow" },
+	{ id = "rundiff_insane", group = "runs", label = "🎚 INSANE", color = "gold" },
+	{ id = "rundiff_nightmare", group = "runs", label = "🎚 NIGHTMARE", color = "red" },
+	{ id = "run_sandbox_house", group = "runs", label = "▶ FARMSTEAD", color = "violet" },
+	{ id = "run_pond_cabin", group = "runs", label = "▶ POND CABIN", color = "violet" },
+	{ id = "run_lone_house", group = "runs", label = "▶ LONE HOUSE", color = "violet" },
+	{ id = "run_forest_lodge", group = "runs", label = "▶ FOREST LODGE", color = "violet" },
+	{ id = "run_old_mill", group = "runs", label = "▶ OLD MILL", color = "violet" },
+	{ id = "run_orchard_cottage", group = "runs", label = "▶ ORCHARD", color = "violet" },
+	{ id = "runend", group = "runs", label = "⏹ END RUN", color = "red" },
+	{ id = "clock", group = "runs", label = "⏩ SKIP CLOCK", color = "grey" },
+	{ id = "horde", group = "runs", label = "🧟 HORDE NOW", color = "red" },
 	{ id = "fill", group = "collection", label = "📦 FILL STOCK", color = "green" },
 	{ id = "clear", group = "collection", label = "🗑 CLEAR STOCK", color = "red" },
 	{ id = "stands", group = "collection", label = "⭐ FILL STANDS", color = "yellow" },
 	{ id = "bookfill", group = "collection", label = "📖 FILL BOOK", color = "violet" }, -- 8.2: the collection book
 	{ id = "bookclear", group = "collection", label = "📖 CLEAR BOOK", color = "grey" },
-	{ id = "van", group = "travel", label = "🚐 BRING VAN", color = "blue" },
 	{ id = "house", group = "travel", label = "📍 TO HOUSE", color = "violet" },
 	{ id = "warehouse", group = "travel", label = "📍 TO WAREHOUSE", color = "violet" },
+	{ id = "lobby", group = "travel", label = "📍 TO LOBBY", color = "violet" }, -- 9.7
 	{ id = "upmax", group = "upgrades", label = "⬆ MAX UPGRADES", color = "gold" },
 	{ id = "upreset", group = "upgrades", label = "↺ RESET UPGRADES", color = "grey" },
 	{ id = "level1", group = "upgrades", label = "🏗 LV 1", color = "blue" }, -- 8.3: the warehouse's level
@@ -199,24 +216,24 @@ end
 
 function SandboxAdmin.zones(): { Zone }
 	local list: { Zone } = {}
-	for _, plot in SandboxMap.Plots do
-		local circle = plot.unload
+	for _, portal in SandboxMap.Lobby.portals do -- (9.7: the pads players stand on to go in)
+		local pad = portal.pad
 		table.insert(list, {
-			kind = "unload",
-			label = `UNLOAD · PLOT {plot.id}`,
-			shape = "circle",
-			x = circle.x,
-			y = SandboxMap.RoadTop, -- (the van's apron: vanSpot stands at the asphalt's top)
-			z = circle.z,
+			kind = "pad",
+			label = `PAD · {string.upper(portal.name)}`,
+			shape = "box",
+			x = (pad.x0 + pad.x1) / 2,
+			y = SandboxMap.GroundTop,
+			z = (pad.z0 + pad.z1) / 2,
 			yaw = 0,
-			r = circle.r,
-			sx = 0,
-			sy = 0,
-			sz = 0,
+			r = 0,
+			sx = pad.x1 - pad.x0,
+			sy = 0.3,
+			sz = pad.z1 - pad.z0,
 		})
 	end
 	local NOSE = { [0] = "north", [90] = "west", [180] = "south", [270] = "east" } :: { [number]: string }
-	for _, house in SandboxMap.Houses do -- (Jinočany: every house to empty's curb, the farmstead's first)
+	for _, house in SandboxMap.Houses do -- (every place to empty's curb, the farmstead's first)
 		local curb = house.curb
 		table.insert(list, {
 			kind = "curb",
@@ -233,6 +250,21 @@ function SandboxAdmin.zones(): { Zone }
 		})
 	end
 	return list
+end
+
+function SandboxAdmin.runHouse(id: any): string?
+	if type(id) ~= "string" or string.sub(id, 1, 4) ~= "run_" then
+		return nil
+	end
+	local house = string.sub(id, 5)
+	return if SandboxMap.house(house) then house else nil
+end
+
+function SandboxAdmin.runDifficulty(id: any): string?
+	if type(id) ~= "string" or string.sub(id, 1, 8) ~= "rundiff_" then
+		return nil
+	end
+	return string.sub(id, 9)
 end
 
 return SandboxAdmin

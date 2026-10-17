@@ -9,6 +9,8 @@
 --   * his legs (the far bodies' walk): his root driven forwards, backwards, sideways, standing: MoveHelperBrain.holdLegs
 --     then Npcs.stride each step: the walk track forwards or played in reverse, at his speed / the walk's stride
 --   * a walk with jump = false (Danny's) turns the Jumping state off; another person's (a buddy's: they jump) keeps it
+--   * 9.3 a walk with `legs` (Danny's): the walk only while the root really moves, at its pace; the idle while it stands
+--     (pressed against a wall, or there with `through`): never running on the spot
 local R = require("./NpcsRuntime")
 local Npcs = require("./NpcsServer")
 local Brain = require("./MoveHelperBrain")
@@ -49,7 +51,7 @@ end
 
 -- Danny ---------------------------------------------------------------------------------------------------------------------------
 
-local danny = Npcs.spawn(Npcs.look("mover", "Danny", "ZDC Moving"), M.CFrame.new(0, 0, 0))
+local danny = Npcs.spawn(Npcs.look("mover", "Danny", "Deliveros Moving"), M.CFrame.new(0, 0, 0))
 local humanoid = danny:FindFirstChildOfClass("Humanoid")
 local root = danny.PrimaryPart
 local tracks = R.tracks(danny)
@@ -131,6 +133,49 @@ Npcs.carried(other, true)
 local off = not otherHumanoid:GetStateEnabled("Jumping")
 Npcs.carried(other, false)
 check("8.3 …and a person who could jump before: off while carried, on again after", off and otherHumanoid:GetStateEnabled("Jumping") and otherHumanoid.AutoRotate == true)
+
+-- 9.3 (the owner: "he takes it completely like a robot … runs on the spot"): a walk with `legs` (Danny's) plays the walk only
+-- while the body really moves (its root's speed along the ground), at that pace, and the idle while it stands (pressed
+-- against something), on past its arrival with `through` until the next order; another person's walk as ever
+do
+	local walker = Npcs.spawn(Npcs.look("mover", "Danny", "Deliveros Moving"), M.CFrame.new(60, 0, 0))
+	local root2 = walker.PrimaryPart
+	local tracks2 = R.tracks(walker)
+	local walk2, idle2 = tracks2[WALK_ID], tracks2[IDLE_ID]
+	root2.AssemblyLinearVelocity = V3(0, 0, 0)
+	local spawnedAt = #R.spawned
+	Npcs.walkTo(walker, V3(90, 0, 0), nil, 8, { through = true, near = 0.6, jump = false, legs = true })
+	check("9.3 `legs`: ordered, not moving yet: no walk on the spot (the idle plays)", not walk2.IsPlaying and idle2.IsPlaying and root2.Anchored == false)
+	-- the walk's loop, its looks 0.1 s apart (each look sees the speed the look before set): moving 8 studs/s, then pressed
+	-- against a wall (0), then on at 6, then there
+	local script = { 8, 8, 8, 0, 0, 0, 0, 6, 6, -1, 0, 0, 0, -2 }
+	local seen: { { walking: boolean, idle: boolean, speed: number } } = {}
+	local step = 0
+	local wait = R.env.task.wait
+	R.env.task.wait = function(): number
+		table.insert(seen, { walking = walk2.IsPlaying, idle = idle2.IsPlaying, speed = walk2.Speed })
+		step += 1
+		local v = script[step]
+		if v == -1 then
+			root2.CFrame = M.CFrame.new(90, 3, 0) -- (there: the loop's arrival, `through`: no stand)
+			v = 0
+		elseif v == -2 or v == nil then
+			Npcs.stop(walker) -- (the next order: the loop ends)
+			v = 0
+		end
+		root2.AssemblyLinearVelocity = V3(v, 0, 0)
+		R.clock += 0.1
+		return 0.1
+	end
+	R.spawned[spawnedAt + 1]()
+	R.env.task.wait = wait
+	local rate = 8 / STRIDE
+	check("…moving at 8 studs/s: the walk at that pace (8 / stride), the idle off", seen[2].walking and math.abs(seen[2].speed - rate) < 1e-6 and not seen[2].idle
+		and seen[4].walking, `{seen[2].walking} {seen[2].speed}`)
+	check("…pressed against a wall (no speed): the idle once it has stood a moment, never the walk on the spot", not seen[8].walking and seen[8].idle)
+	check("…on again at 6: the walk at that pace", seen[10].walking and math.abs(seen[10].speed - 6 / STRIDE) < 1e-6)
+	check("…there (`through`, no stand): the idle as it stands, until the next order", #seen >= 13 and not seen[13].walking and seen[13].idle and root2.Anchored == true)
+end
 
 if failures == 0 then
 	print("ALL CHECKS PASSED")

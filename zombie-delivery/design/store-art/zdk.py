@@ -2,7 +2,7 @@
 
 Builds scenes from the game's own Blender models (design/blender-*/*.blend: the ZDC Sprinter, the chalet, the
 warehouse levels, the furniture and the collectibles) plus a few things of its own: an alpine sky, a meadow, snowy
-mountains, fir trees, moving boxes and a classic blocky Roblox-style avatar in the ZDC crew's clothes.
+mountains, fir trees, moving boxes and a classic blocky Roblox-style avatar in the ZDC crew's clothes (8.9: Deliveros, its name on the shirts and the boxes, a D on the caps).
 Rendered with Cycles on the CPU (no GPU needed). Units are studs, Z up.
 """
 import math
@@ -559,18 +559,18 @@ def moving_box(at, size=(2.0, 2.0, 1.8), rot_z=0.0, parent=None, open_top=False,
             box("Side", (t, sy, sz), (x * (sx / 2 - t / 2), 0, 0), card, origin=(0, 0, -1), parent=root)
         for y in (-1, 1):
             box("Side", (sx, t, sz), (0, y * (sy / 2 - t / 2), 0), card, origin=(0, 0, -1), parent=root)
-        for x, rot in ((-1, -115), (1, 115)):
+        for x in (-1, 1):  # (each flap hinged on its top edge, standing up and leaning out)
             f = box("Flap", (sx / 2, sy * 0.98, t), (x * sx / 2, 0, sz), card, origin=(-x, 0, -1), parent=root)
-            f.rotation_euler.y = math.radians(rot * -x / abs(x) * -1)
-        for y, rot in ((-1, 120), (1, -120)):
+            f.rotation_euler.y = math.radians(-x * 62)
+        for y in (-1, 1):
             f = box("Flap", (sx * 0.98, sy / 2, t), (0, y * sy / 2, sz), card, origin=(0, -y, -1), parent=root)
-            f.rotation_euler.x = math.radians(-rot * -1)
+            f.rotation_euler.x = math.radians(y * 58)
     else:
         box("Carton", (sx, sy, sz), (0, 0, 0), card, bevel=0.04, origin=(0, 0, -1), parent=root)
         box("Tape", (sx * 0.22, sy + 0.02, 0.02), (0, 0, sz), tape, origin=(0, 0, 0), parent=root)
         box("Tape side", (sx * 0.22, 0.02, sz * 0.3), (0, -sy / 2 - 0.005, sz * 0.85), tape, parent=root)
     if logo:
-        text("Logo", "ZDC", min(sx, sz) * 0.32, (0, -sy / 2 - 0.02, sz * 0.45), red, rot=(90, 0, 0), extrude=0.005,
+        text("Logo", "DELIVEROS", min(sx * 0.13, sz * 0.22), (0, -sy / 2 - 0.02, sz * 0.45), red, rot=(90, 0, 0), extrude=0.005,
              parent=root, font=os.path.join(HERE, "fonts", "LilitaOne-Regular.ttf"))
     return root
 
@@ -640,7 +640,7 @@ def avatar(at, rot_z=0.0, skin=(234, 184, 146), shirt=ZDC_RED, pants=CHARCOAL, f
     hips.rotation_euler.x = math.radians(lean)
     torso = box("Torso", (2.0, 1.0, 2.0), (0, 0, 0), shirt_m, bevel=0.08, origin=(0, 0, -1), parent=hips)
     if logo:
-        text("Logo", "ZDC", 0.62, (0, -0.52, 1.22), mat("Logo white", (250, 250, 250), 0.5), rot=(90, 0, 0),
+        text("Logo", "DELIVEROS", 0.3, (0, -0.52, 1.3), mat("Logo white", (250, 250, 250), 0.5), rot=(90, 0, 0),
              extrude=0.01, parent=torso, font=os.path.join(HERE, "fonts", "LilitaOne-Regular.ttf"))
     neck = empty("Neck", (0, 0, 2.0), parent=hips)
     neck.rotation_euler = tuple(math.radians(v) for v in pose.get("head", (0, 0, 0)))
@@ -652,7 +652,7 @@ def avatar(at, rot_z=0.0, skin=(234, 184, 146), shirt=ZDC_RED, pants=CHARCOAL, f
         cap_m = mat("Cap", cap, 0.6)
         box("Cap", (H + 0.08, H + 0.08, 0.5), (0, 0, H * 0.82), cap_m, bevel=0.2, segments=4, origin=(0, 0, -1), parent=neck)
         box("Brim", (H * 0.9, 0.8, 0.09), (0, -H / 2 - 0.3, H * 0.86), cap_m, bevel=0.03, parent=neck)
-        text("Cap logo", "ZDC", 0.32, (0, -H / 2 - 0.045, H * 0.82 + 0.25), mat("ZDC red", ZDC_RED, 0.5), rot=(90, 0, 0),
+        text("Cap logo", "D", 0.4, (0, -H / 2 - 0.045, H * 0.82 + 0.25), mat("ZDC red", ZDC_RED, 0.5), rot=(90, 0, 0),
              extrude=0.005, parent=neck, font=os.path.join(HERE, "fonts", "LilitaOne-Regular.ttf"))
     for side, key in ((-1, "arm_l"), (1, "arm_r")):
         sh = empty("Shoulder", (side * 1.5, 0, 1.75), parent=hips)

@@ -13,7 +13,10 @@
 --                                       spot id) and Star (★), under the folder "Items". The safety ground under the
 --                                       house (Config.Furniture.Ground) and the walls and ceiling round it keep
 --                                       everyone in; the porch's daylight wall stops a walk out of the front door.
---   HouseInterior.slot(index)           the origin of interior number `index` (0, 1, 2 ...): far off the map
+--                                       10.x the map: the model's attribute MapPlan is the plan in one short string
+--                                       (shared/SandboxMapRules.luau encode: its rooms, doorways, fixtures, windows
+--                                       and the origin), the clients' big map and minimap draw a run's floor plan from it
+--   HouseInterior.slot(index)          the origin of interior number `index` (0, 1, 2 ...): far off the map
 --                                       (Config.Furniture.Slot, past Map.Bounds), Spacing apart, never overlapping
 --   HouseInterior.destroy(model)        takes an interior down (pieces carried out of it are not in it any more)
 --
@@ -48,6 +51,13 @@
 -- "Fixture_<kind>" (attribute Fixture) in Decor, and once ZDCFixtureArt is imported server/FixtureMesh.luau dresses it
 -- (its solid parts stay, hidden; without the import, or a fixture of another size, its parts as before). The farm's own
 -- looks (FARM_LOOKS), the rugs, mats, stains, antlers and pictures stay loose in Decor.
+-- 9.5 the countryside's spots: a plan of kind "cabin", "lodge", "mill" or "cottage" (shared/Layouts/Countryside.luau)
+-- builds as a house in its own style (SPOTS: the walls, the wainscot, the floors, the ceiling and its beams, the lace;
+-- its dice after a house's, so a house looks as it did): the Pond Cabin's dark stained boards, the Forest Lodge's
+-- plaster over a high wainscot of logs, the Old Mill's stone workroom and whitewashed miller's room, the Orchard
+-- Cottage's whitewash, its painted band and the kitchen's clay tiles. Their own fixtures' looks: the wood stove (its
+-- pipe up to the ceiling), the net and the lifebuoy on the cabin's walls, the millstones under their hopper, the pit
+-- wheel on the water wheel's shaft, the sack hoist and the hanging lanterns (no light of their own).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -59,6 +69,7 @@ local FixtureMesh = require(script.Parent.FixtureMesh) -- 8.9.1: the fixtures in
 local FurnitureMesh = require(script.Parent.FurnitureMesh)
 local HouseLayout = require(Shared.HouseLayout)
 local LightRules = require(Shared.SandboxLightRules) -- 8.5.2: the rooms' ceiling lamps
+local MapRules = require(Shared.SandboxMapRules) -- 10.x the map: the floor plan published on the model (MapPlan)
 
 local T = Config.Furniture
 local LIT = Config.SandboxLight.House -- 8.3: the lights' numbers and the Neon's colours (Config.SandboxLight)
@@ -451,6 +462,169 @@ LOOKS.stain = function(parent, at, s)
 	local stain = cylinder(part(parent, "OilStain", Vector3.new(0.02, s.X, s.Z), at * CFrame.new(0, 0.01, 0) * CFrame.Angles(0, 0, math.pi / 2), rgb(40, 38, 36), SMOOTH))
 	stain.Transparency = 0.35
 end
+
+-- ── 9.5 the countryside's spots ────────────────────────────────────────────────
+-- (their plans: shared/Layouts/Countryside.luau; each fixture in its own frame as the others)
+
+-- a cast iron wood stove on its legs, the fire door and its glow, the stovepipe up to the ceiling (s.Y)
+LOOKS.wood_stove = function(parent, at, s)
+	local iron = rgb(46, 44, 42)
+	local front = -(s.Z - 0.8) / 2 + 0.1
+	part(parent, "StoveLegs", Vector3.new(s.X - 0.4, 0.5, s.Z - 0.6), at * CFrame.new(0, 0.25, 0.1), rgb(36, 34, 32), Enum.Material.Metal, true)
+	part(parent, "Stove", Vector3.new(s.X - 0.6, 2.4, s.Z - 0.8), at * CFrame.new(0, 1.7, 0.1), iron, Enum.Material.Metal, true)
+	part(parent, "StoveTop", Vector3.new(s.X - 0.4, 0.2, s.Z - 0.6), at * CFrame.new(0, 3.0, 0.1), rgb(30, 30, 30), Enum.Material.Metal, true)
+	part(parent, "FireDoor", Vector3.new(1.2, 1.0, 0.1), at * CFrame.new(0, 1.6, front - 0.06), rgb(30, 28, 26), Enum.Material.Metal)
+	part(parent, "Glow", Vector3.new(0.8, 0.12, 0.05), at * CFrame.new(0, 1.35, front - 0.12), rgb(255, 130, 50), Enum.Material.Neon)
+	local pipe = s.Y - 3.1
+	cylinder(part(parent, "Pipe", Vector3.new(pipe, 0.6, 0.6), at * CFrame.new(0, 3.1 + pipe / 2, 0.6) * CFrame.Angles(0, 0, math.pi / 2), iron, Enum.Material.Metal))
+	part(parent, "Hearthstone", Vector3.new(s.X + 0.4, 0.1, 1.2), at * CFrame.new(0, 0.05, -s.Z / 2 - 0.4), rgb(84, 84, 88), Enum.Material.Slate)
+end
+
+-- a fishing net hung on the wall (its bottom `at`), its floats along the top
+LOOKS.net = function(parent, at, s)
+	local wall = s.Z / 2
+	local net = part(parent, "Net", Vector3.new(s.X, s.Y, 0.05), at * CFrame.new(0, s.Y / 2, wall - 0.1), rgb(70, 92, 72), Enum.Material.Fabric)
+	net.Transparency = 0.35
+	for n, x in { -1.4, -0.45, 0.5, 1.45 } do
+		local float = part(parent, "Float", Vector3.new(0.4, 0.4, 0.4), at * CFrame.new(x * s.X / 4, s.Y - 0.25, wall - 0.25), if n % 2 == 0 then rgb(240, 236, 226) else rgb(232, 120, 40), SMOOTH)
+		float.Shape = Enum.PartType.Ball
+	end
+end
+
+-- a lifebuoy on the wall: its ring in eight pieces, red and white
+LOOKS.lifebuoy = function(parent, at, s)
+	local wall = s.Z / 2
+	local r = s.X / 2 - 0.25
+	for n = 0, 7 do
+		local a = n * math.pi / 4
+		part(parent, "Lifebuoy", Vector3.new(0.75, 0.42, 0.3), at * CFrame.new(math.cos(a) * r, s.Y / 2 + math.sin(a) * r, wall - 0.2) * CFrame.Angles(0, 0, a + math.pi / 2),
+			if n % 2 == 0 then rgb(214, 50, 40) else rgb(240, 236, 226), SMOOTH)
+	end
+end
+
+-- the millstones: the stone floor (a wooden platform, its step), the vat round the stones and its lid, the horse and
+-- the hopper over them with grain in it, the shoe feeding the stones, the meal spout and its bin, the stone crane
+LOOKS.millstones = function(parent, at, s)
+	local wood = rgb(120, 86, 56)
+	local up = 1.2
+	part(parent, "StoneFloor", Vector3.new(s.X, up, s.Z), at * CFrame.new(0, up / 2, 0), wood, Enum.Material.WoodPlanks, true)
+	part(parent, "Step", Vector3.new(2.4, 0.6, 0.8), at * CFrame.new(0, 0.3, -s.Z / 2 + 0.4), wood, Enum.Material.WoodPlanks, true)
+	cylinder(part(parent, "Vat", Vector3.new(1.8, 6.2, 6.2), at * CFrame.new(0, up + 0.9, 0.4) * CFrame.Angles(0, 0, math.pi / 2), rgb(150, 110, 70), Enum.Material.Wood, true))
+	cylinder(part(parent, "VatLid", Vector3.new(0.2, 6.4, 6.4), at * CFrame.new(0, up + 1.9, 0.4) * CFrame.Angles(0, 0, math.pi / 2), rgb(130, 94, 60), Enum.Material.Wood, true))
+	for _, x in { -1.5, 1.5 } do
+		part(parent, "Horse", Vector3.new(0.35, 2.8, 0.35), at * CFrame.new(x, up + 3.4, 0.4), rgb(100, 70, 46), Enum.Material.Wood, true)
+	end
+	part(parent, "Hopper", Vector3.new(2.8, 1.8, 2.8), at * CFrame.new(0, up + 5.7, 0.4), wood, Enum.Material.WoodPlanks, true)
+	part(parent, "Grain", Vector3.new(2.5, 0.1, 2.5), at * CFrame.new(0, up + 6.65, 0.4), rgb(214, 180, 100), SMOOTH)
+	part(parent, "Shoe", Vector3.new(0.5, 0.3, 1.6), at * CFrame.new(0, up + 4.4, -0.2) * CFrame.Angles(0.3, 0, 0), wood, Enum.Material.Wood)
+	part(parent, "Spout", Vector3.new(0.5, 0.5, 1.0), at * CFrame.new(0, up + 0.8, -2.9), rgb(110, 78, 50), Enum.Material.Wood)
+	part(parent, "MealBin", Vector3.new(2.0, 1.0, 1.0), at * CFrame.new(1.4, up + 0.5, -3.3), wood, Enum.Material.WoodPlanks, true)
+	part(parent, "Flour", Vector3.new(1.8, 0.08, 0.8), at * CFrame.new(1.4, up + 1.02, -3.3), rgb(246, 244, 236), SMOOTH)
+	part(parent, "CranePost", Vector3.new(0.45, s.Y - up, 0.45), at * CFrame.new(s.X / 2 - 0.4, up + (s.Y - up) / 2, s.Z / 2 - 0.4), rgb(90, 64, 42), Enum.Material.Wood, true)
+	part(parent, "CraneArm", Vector3.new(3.4, 0.4, 0.4), at * CFrame.new(s.X / 2 - 2.0, s.Y - 0.6, s.Z / 2 - 0.4), rgb(90, 64, 42), Enum.Material.Wood)
+end
+
+-- the pit wheel on the water wheel's shaft through the wall: the wheel and its spokes in its pit (fenced, so nobody
+-- falls in), the shaft, the stone bearing at the wall
+LOOKS.pit_wheel = function(parent, at, s)
+	local wood = rgb(110, 78, 50)
+	local back = s.Z / 2
+	part(parent, "PitFence", Vector3.new(s.X, 3.2, 0.3), at * CFrame.new(0, 1.6, -s.Z / 2 + 0.15), wood, Enum.Material.WoodPlanks, true)
+	for _, x in { -1, 1 } do
+		part(parent, "PitFence", Vector3.new(0.3, 3.2, s.Z - 0.3), at * CFrame.new(x * (s.X / 2 - 0.15), 1.6, 0.15), wood, Enum.Material.WoodPlanks, true)
+	end
+	part(parent, "Pit", Vector3.new(s.X - 0.6, 0.06, s.Z - 0.6), at * CFrame.new(0, 0.03, 0.15), rgb(40, 34, 28), SMOOTH)
+	local hub = s.Y - 4.9
+	cylinder(part(parent, "PitWheel", Vector3.new(0.7, 7.6, 7.6), at * CFrame.new(0, hub, 0.2) * CFrame.Angles(0, math.pi / 2, 0), rgb(124, 88, 56), Enum.Material.Wood, true))
+	for n = 0, 1 do
+		part(parent, "Spoke", Vector3.new(7.2, 0.5, 0.2), at * CFrame.new(0, hub, -0.2) * CFrame.Angles(0, 0, math.pi / 4 + n * math.pi / 2), rgb(96, 68, 44), Enum.Material.Wood)
+	end
+	cylinder(part(parent, "Shaft", Vector3.new(s.Z, 1.0, 1.0), at * CFrame.new(0, hub, 0) * CFrame.Angles(0, math.pi / 2, 0), rgb(90, 64, 42), Enum.Material.Wood))
+	part(parent, "Bearing", Vector3.new(1.6, hub - 0.5, 1.0), at * CFrame.new(0, (hub - 0.5) / 2, back - 0.5), rgb(130, 126, 118), Enum.Material.Slate, true)
+end
+
+-- the sack hoist: its trap in the ceiling (at the top), the chain down from it, the hook and a sack on it
+LOOKS.sack_hoist = function(parent, at, s)
+	part(parent, "Trap", Vector3.new(s.X, 0.1, s.Z), at * CFrame.new(0, s.Y - 0.05, 0), rgb(40, 32, 26), Enum.Material.WoodPlanks)
+	part(parent, "Chain", Vector3.new(0.12, s.Y - 1.8, 0.12), at * CFrame.new(0, 1.8 + (s.Y - 1.8) / 2, 0), rgb(60, 60, 62), Enum.Material.Metal)
+	part(parent, "Hook", Vector3.new(0.4, 0.4, 0.12), at * CFrame.new(0, 1.7, 0), rgb(60, 60, 62), Enum.Material.Metal)
+	part(parent, "Sack", Vector3.new(1.2, 1.5, 0.9), at * CFrame.new(0, 0.75, 0), rgb(196, 168, 116), Enum.Material.Fabric)
+end
+
+-- a lantern hung from the ceiling (`at` its bottom, size.Y up to the ceiling): the chain, the cap, its warm glass (the
+-- room's lamps light it: no light of its own)
+LOOKS.hanging_lantern = function(parent, at, s)
+	local metal = rgb(44, 42, 40)
+	part(parent, "Chain", Vector3.new(0.08, s.Y - 1.2, 0.08), at * CFrame.new(0, 1.2 + (s.Y - 1.2) / 2, 0), metal, Enum.Material.Metal)
+	part(parent, "LanternCap", Vector3.new(s.X, 0.25, s.Z), at * CFrame.new(0, 1.075, 0), metal, Enum.Material.Metal)
+	local glow = part(parent, "Lantern", Vector3.new(s.X - 0.3, 0.95, s.Z - 0.3), at * CFrame.new(0, 0.475, 0), LAMP, Enum.Material.Neon)
+	glow.CastShadow = false
+end
+
+-- Each spot's own inside (a plan of its kind): the walls' colours and material and the wainscot's (by room kind, `any`
+-- the rest; a kind with no wainscot gets neither it nor a baseboard: the cabin's boards), the floor under it all (`any`)
+-- and a room kind's own over it, the ceiling's boards and beams, the room kinds whose windows have lace.
+type SpotStyle = {
+	walls: { [string]: { Color3 } },
+	material: { [string]: Enum.Material },
+	panels: { [string]: { Color3 } },
+	panelHeight: number,
+	panelMaterial: Enum.Material,
+	floors: { [string]: Floor },
+	ceiling: Color3,
+	beam: Color3,
+	lace: { [string]: boolean },
+}
+local SPOTS: { [string]: SpotStyle } = {
+	cabin = {
+		walls = { any = { rgb(96, 70, 50), rgb(84, 62, 46), rgb(106, 78, 56) } },
+		material = { any = Enum.Material.WoodPlanks },
+		panels = {},
+		panelHeight = 3.8,
+		panelMaterial = Enum.Material.WoodPlanks,
+		floors = { any = { color = rgb(122, 92, 64), material = Enum.Material.WoodPlanks }, store = { color = rgb(112, 108, 100), material = Enum.Material.Concrete } },
+		ceiling = rgb(112, 84, 60),
+		beam = rgb(66, 48, 36),
+		lace = {},
+	},
+	lodge = {
+		walls = { any = { rgb(222, 208, 182), rgb(214, 200, 176) } },
+		material = { any = Enum.Material.Plaster },
+		panels = { any = { rgb(120, 82, 52), rgb(134, 94, 60) }, kitchen = { rgb(166, 118, 74), rgb(150, 104, 64) } },
+		panelHeight = 5.2,
+		panelMaterial = Enum.Material.Wood,
+		floors = { any = { color = rgb(132, 94, 62), material = Enum.Material.WoodPlanks } },
+		ceiling = rgb(156, 114, 74),
+		beam = rgb(74, 50, 34),
+		lace = { bedroom = true },
+	},
+	mill = {
+		walls = { any = { rgb(150, 144, 132), rgb(140, 136, 128) }, living = { rgb(216, 210, 196), rgb(212, 206, 194) } },
+		material = { any = Enum.Material.Cobblestone, living = Enum.Material.Plaster },
+		panels = { living = { rgb(110, 80, 56), rgb(96, 70, 50) } },
+		panelHeight = 3.8,
+		panelMaterial = Enum.Material.WoodPlanks,
+		floors = { any = { color = rgb(152, 124, 90), material = Enum.Material.WoodPlanks } },
+		ceiling = rgb(132, 100, 70),
+		beam = rgb(82, 58, 40),
+		lace = { living = true },
+	},
+	cottage = {
+		walls = { any = { rgb(220, 214, 202), rgb(216, 212, 204) }, bedroom = { rgb(208, 214, 216), rgb(218, 208, 200) } },
+		material = { any = Enum.Material.Plaster },
+		panels = { kitchen = { rgb(96, 128, 158), rgb(116, 146, 116) }, bedroom = { rgb(150, 120, 160), rgb(120, 150, 170) } },
+		panelHeight = 3,
+		panelMaterial = Enum.Material.SmoothPlastic,
+		floors = {
+			any = { color = rgb(170, 128, 86), material = Enum.Material.WoodPlanks },
+			kitchen = { color = rgb(170, 98, 70), material = Enum.Material.CeramicTiles },
+			store = { color = rgb(150, 140, 126), material = Enum.Material.Brick },
+		},
+		ceiling = rgb(206, 196, 176),
+		beam = rgb(112, 80, 54),
+		lace = { kitchen = true, bedroom = true },
+	},
+}
 
 -- ── 7.x the farm ──────────────────────────────────────────────────────────────
 -- Walt's farm (shared/Layouts/Farm.luau, a plan of kind "farm"). Its farmhouse's rooms are a house's kinds (hall,
@@ -866,6 +1040,11 @@ function HouseInterior.build(plan: HouseLayout.Plan, origin: CFrame): (Model, { 
 	model.Name = "HouseInterior"
 	model:SetAttribute("Seed", plan.seed)
 	model:SetAttribute("Kind", plan.kind)
+	-- 10.x the map: the floor plan in one short string (shared/SandboxMapRules.luau encode; the clients' big map and
+	-- minimap draw it), written once with the interior. (A recorder's frame has no LookVector: no turn.)
+	local facing = (origin :: any).LookVector
+	local yaw = if facing then math.deg(math.atan2(-facing.X, -facing.Z)) else 0
+	model:SetAttribute("MapPlan", MapRules.encode(plan, { x = origin.Position.X, y = origin.Position.Y, z = origin.Position.Z, yaw = yaw }))
 	local shell = folder(model, "Shell")
 	local decor = folder(model, "Decor")
 	local items = folder(model, "Items")
@@ -884,6 +1063,26 @@ function HouseInterior.build(plan: HouseLayout.Plan, origin: CFrame): (Model, { 
 	end
 	plaster.pantry, panelling.pantry = plaster.hall, panelling.hall -- (7.x the farm's pantry looks like its hall)
 	local planks = PLANKS[roll(#PLANKS)]
+	-- 9.5 the countryside's spots: their own walls, wainscot and floor (SPOTS; the dice after a house's)
+	local style = SPOTS[plan.kind]
+	local spotWall: { [string]: Color3 } = {}
+	local spotPanel: { [string]: Color3 } = {}
+	if style then
+		local styled: { [string]: boolean } = {}
+		for _, room in plan.rooms do
+			local k = room.kind
+			if not styled[k] then
+				styled[k] = true
+				local walls = style.walls[k] or style.walls.any
+				spotWall[k] = walls[roll(#walls)]
+				local panels = style.panels[k] or style.panels.any
+				if panels then
+					spotPanel[k] = panels[roll(#panels)]
+				end
+			end
+		end
+		planks = style.floors.any
+	end
 	local kindOf: { [string]: string } = {}
 	for _, room in plan.rooms do
 		kindOf[room.id] = room.kind
@@ -902,7 +1101,7 @@ function HouseInterior.build(plan: HouseLayout.Plan, origin: CFrame): (Model, { 
 		if FARM_OWN[room.kind] then
 			continue -- 7.x the farm's barn and yard: farmShell
 		end
-		local floor = FLOOR_OF[room.kind]
+		local floor = (if style then style.floors[room.kind] else nil) or FLOOR_OF[room.kind]
 		local w, d = room.max.X - room.min.X + plan.wall, room.max.Z - room.min.Z + plan.wall
 		local cx, cz = (room.min.X + room.max.X) / 2, (room.min.Z + room.max.Z) / 2
 		if floor then
@@ -918,7 +1117,7 @@ function HouseInterior.build(plan: HouseLayout.Plan, origin: CFrame): (Model, { 
 	if plan.kind == "farm" then
 		farmShell(shell, decor, plan, origin, roll) -- 7.x the farm: its two roofs, the barn and the yard
 	else
-		part(shell, "Ceiling", Vector3.new(plan.size.X, 1, plan.size.Z), at(mid.X, ceiling + 0.5, mid.Z), CEILING, Enum.Material.WoodPlanks, true)
+		part(shell, "Ceiling", Vector3.new(plan.size.X, 1, plan.size.Z), at(mid.X, ceiling + 0.5, mid.Z), if style then style.ceiling else CEILING, Enum.Material.WoodPlanks, true)
 	end
 
 	-- the beams under the ceiling: BeamRows across every row of rooms (rooms side by side, the same depth), a beam
@@ -949,7 +1148,7 @@ function HouseInterior.build(plan: HouseLayout.Plan, origin: CFrame): (Model, { 
 			local x0, x1 = run[1].X - half, run[2].X + half
 			for k = 1, T.Alpine.BeamRows do
 				local z = run[1].Z + (run[2].Z - run[1].Z) * k / (T.Alpine.BeamRows + 1)
-				part(decor, "Beam", Vector3.new(x1 - x0, beam, beam), at((x0 + x1) / 2, ceiling - beam / 2, z), BEAM, Enum.Material.Wood)
+				part(decor, "Beam", Vector3.new(x1 - x0, beam, beam), at((x0 + x1) / 2, ceiling - beam / 2, z), if style then style.beam else BEAM, Enum.Material.Wood)
 			end
 		end
 	end
@@ -963,8 +1162,11 @@ function HouseInterior.build(plan: HouseLayout.Plan, origin: CFrame): (Model, { 
 		end
 		local size = face.max - face.min
 		local centre = (face.min + face.max) / 2
-		local material = if kind == "garage" then Enum.Material.Concrete elseif kind == "bath" then Enum.Material.CeramicTiles else Enum.Material.Plaster
-		part(shell, if face.header then "Header" else "Wall", size, at(centre.X, centre.Y, centre.Z), plaster[kind] or TRIM, material, true)
+		local material = if style then style.material[kind] or style.material.any
+			elseif kind == "garage" then Enum.Material.Concrete
+			elseif kind == "bath" then Enum.Material.CeramicTiles
+			else Enum.Material.Plaster
+		part(shell, if face.header then "Header" else "Wall", size, at(centre.X, centre.Y, centre.Z), (if style then spotWall[kind] else plaster[kind]) or TRIM, material, true)
 		if face.header then
 			continue
 		end
@@ -977,9 +1179,11 @@ function HouseInterior.build(plan: HouseLayout.Plan, origin: CFrame): (Model, { 
 			local s = if math.abs(n.X) > 0.5 then Vector3.new(depth, height, along) else Vector3.new(along, height, depth)
 			part(shell, name, s, at(sx + n.X * depth / 2, height / 2, sz + n.Z * depth / 2), c, material2)
 		end
-		local panel = panelling[kind]
-		if along <= 1.6 or kind == "garage" or kind == "bath" then
-			continue -- (nothing on a stub beside a doorway; the bathroom's walls are tiles all the way up)
+		local panel = if style then spotPanel[kind] else panelling[kind]
+		if along <= 1.6 or kind == "garage" or kind == "bath" or (style and not panel) then
+			continue -- (nothing on a stub beside a doorway; the bathroom's walls are tiles all the way up; 9.5 the cabin's boards)
+		elseif style and panel then
+			strip("Wainscot", style.panelHeight, 0.12, panel, style.panelMaterial)
 		elseif panel then
 			strip("Wainscot", T.Alpine.Wainscot, 0.12, panel, Enum.Material.WoodPlanks)
 		else
@@ -1055,7 +1259,7 @@ function HouseInterior.build(plan: HouseLayout.Plan, origin: CFrame): (Model, { 
 		if not small then
 			part(decor, "Sill", Vector3.new(w.width + 1, 0.2, 0.6), frame * CFrame.new(0, -w.height / 2 - 0.1, -0.3), WOODWORK, Enum.Material.Wood)
 		end
-		if not small and kind ~= "bath" and kind ~= "garage" then
+		if not small and kind ~= "bath" and kind ~= "garage" and (style == nil or style.lace[kind] == true) then
 			local lace = part(decor, "Lace", Vector3.new(w.width + 0.1, w.height * 0.55, 0.05), frame * CFrame.new(0, -w.height * 0.225, -0.3), LACE, Enum.Material.Fabric)
 			lace.Transparency = 0.3
 		end

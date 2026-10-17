@@ -1562,6 +1562,11 @@ E.real = {
 	PlayerTrade = true, -- 8.7: trading between players (the stands' trade prompts: Warehouse.onTrade)
 	VillageWorld = true, -- 8.9: Jinočany's village on the map (SandboxWorld builds it)
 	FixtureMesh = true, -- 8.9.1: the houses' fixtures in the owner's Blender model (no import here: the parts' look)
+	SaveSlots = true, -- 10.1: the save slots (E.join picks slot 1 on the start screen: CONTINUE)
+	LobbyWorld = true, Runs = true, -- 9.7: the lobby (SandboxWorld builds it) and the runs (the portals' pads, the parties)
+	Loot = true, -- 9.x loot: every piece of the house gets its rarity, stars and value (Moving's hook)
+	RunDanger = true, -- 10.x danger: a run's locks and keys, its vault, its hazards (Runs starts it; Zombies is the fake's)
+	HelperCrew = true, -- 10.1 the helpers' crew (MoveHelper's hooks, the lobby's stands, the Crew remote)
 }
 E.fakes = {}
 
@@ -1668,6 +1673,7 @@ end
 for _, name in { "CarRighting", "Admin", "Transport", "KitWear", "Horn", "SprinterMesh", "Clipboard" } do -- (8.5: Danny's clipboard, its own test)
 	E.fakes[name] = stub(name, { start = noop })
 end
+E.fakes.CourierAvatar = stub("CourierAvatar", { start = noop, setLook = noop }) -- (10.1: SaveSlots puts the slot's courier on)
 E.fakes.DayNight = stub("DayNight", { nightLight = noop, start = noop, isNight = function()
 	return false
 end })
@@ -2112,6 +2118,7 @@ function E.join(userId: number, name: string): any
 	local player = E.player(userId, name)
 	player.Parent = Players
 	Players.PlayerAdded:Fire(player)
+	E.fire(player, "Slots", { kind = "play", slot = 1 }) -- 10.1: the start screen's CONTINUE (slot 1: the save of before)
 	E.advance(0.3)
 	E.spawn(player)
 	E.advance(0.5)

@@ -22,12 +22,12 @@
 --                                     and the city's evacuation spots (Atomic each)
 --   MoveSites.build(parent, place, pieces, name, mode?)   one set as a Model (the others' builder)
 --   8.0 SANDBOX (design/sandbox/KONTRAKT.md): no Wall, no dressing, no city house (no moving-day dress on the sandbox's
---   houses either: Jinočany's six stand on the map as server/SandboxWorld.luau builds them, server/Moving.luau's SB.site
+--   houses either: the countryside's six stand on the map as server/SandboxWorld.luau builds them, server/Moving.luau's SB.site
 --   their doors and curbs); a kiosk on every player's plot:
 --   MoveSites.plotBoard(parent, plot)    the "MovingBoard<id>" kiosk (Persistent) at the plot's board spot
 --                                     (shared/SandboxMap.luau plot.board: by the warehouse's roller door, on its wall's
 --                                     outside, facing out), half a stud farther out (its plinth against the wall), its
---                                     corkboard the sandbox's (MoveSiteLooks.board(true): Jinočany's houses to empty,
+--                                     corkboard the sandbox's (MoveSiteLooks.board(true): the places to empty,
 --                                     no Wall; each card shows its player's own house, server/Moving.luau SB.contractFor);
 --                                     returns the model and its corkboard ("Board", the part Moving hangs its prompt
 --                                     on; its attribute Plot = the plot's id)
@@ -180,6 +180,15 @@ function MoveSites.plotBoard(parent: Instance, plot: SandboxMap.Plot): (Model, B
 	local model = MoveSites.build(parent, MoveSites.plotBoardPlace(plot), Looks.board(true), `MovingBoard{plot.id}`, Enum.ModelStreamingMode.Persistent)
 	local board = named(model, "Board")
 	board:SetAttribute("Plot", plot.id)
+	model.PrimaryPart = board
+	return model, board
+end
+
+-- 9.7 RUNS: the kiosk's art at any spot (the lobby's ZDC dispatch: SandboxMap.Lobby.dispatch), named `name`
+-- (Persistent like the plots' were); returns it and its corkboard ("Board").
+function MoveSites.kiosk(parent: Instance, spot: SandboxMap.Spot, name: string): (Model, BasePart)
+	local model = MoveSites.build(parent, { x = spot.x, y = spot.y, z = spot.z, yaw = spot.yaw }, Looks.board(true), name, Enum.ModelStreamingMode.Persistent)
+	local board = named(model, "Board")
 	model.PrimaryPart = board
 	return model, board
 end

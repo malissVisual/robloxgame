@@ -20,9 +20,14 @@
 --   StyleBuild.decals(model, chassis, def?, anchored?) -> Folder?   the decal in a Folder "StyleDecals" (an old one
 --       goes first; nil def: none)
 --   StyleBuild.color(def, paint) -> (Color3, Enum.Material, reflectance)   a piece's paint ("main", "trim" …)
+--   StyleBuild.character(character, look, anchored?) -> Model?   10.1: a made courier's pieces (shared/CharacterLooks.luau:
+--       the hair, a hat, the top's sleeves or a jacket, the belt, the face's extra) in a Model "CourierLook" in the
+--       character (an old one goes first; a piece whose body part is missing is left out); nil for the player's own
+--       avatar (nothing to weld on)
 
 local Config = require(script.Parent.Config)
 local KitFit = require(script.Parent.KitFit)
+local CharacterLooks = require(script.Parent.CharacterLooks) -- 10.1: the courier you make
 local StyleLooks = require(script.Parent.StyleLooks)
 
 local StyleBuild = {}
@@ -151,6 +156,48 @@ function StyleBuild.courier(character: Model, def: Config.CosmeticDef, anchored:
 	end
 	model.Parent = character
 	return built
+end
+
+StyleBuild.Look = "CourierLook"
+
+-- 10.1: the made courier's pieces (see the header), each group in its own colours (its def), fitted to the real parts as
+-- the hats and the jackets are.
+function StyleBuild.character(character: Model, look: CharacterLooks.Look, anchored: boolean?): Model?
+	local old = character:FindFirstChild(StyleBuild.Look)
+	if old then
+		old:Destroy()
+	end
+	local groups = CharacterLooks.parts(look)
+	if #groups == 0 then
+		return nil
+	end
+	local model = Instance.new("Model")
+	model.Name = StyleBuild.Look
+	local bones: { [string]: BasePart } = {}
+	local scales: { [string]: { number } } = {}
+	for _, group in groups do
+		local kept: { StyleLooks.Piece } = {}
+		for _, piece in group.pieces do
+			local name = piece.attach
+			if not bones[name] then
+				local found = character:FindFirstChild(name)
+				if not found or not found:IsA("BasePart") then
+					continue
+				end
+				local bone = found :: BasePart
+				local size = if name == "Head" then StyleBuild.headSize(bone) else bone.Size
+				bones[name] = bone
+				scales[name] = StyleLooks.factors(name, { size.X, size.Y, size.Z })
+			end
+			table.insert(kept, piece)
+		end
+		for _, piece in KitFit.fit(kept, scales) do
+			local bone = bones[piece.attach]
+			part(model, piece, bone.CFrame * pose(piece.at, piece.turn), group.def, bone, anchored == true)
+		end
+	end
+	model.Parent = character
+	return model
 end
 
 function StyleBuild.fits(built: Built): boolean

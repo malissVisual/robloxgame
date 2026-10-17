@@ -45,7 +45,7 @@ def main():
         assert result.returncode==0,result.stdout+result.stderr
         print(result.stdout,end='')
         # 6.12: the vehicles' cosmetics (every decal look, a wrap, the bikes' paint) on the actual factory (decal-check.luau).
-        for name in ['Style','StyleLooks','KitFit']:
+        for name in ['Style','StyleLooks','KitFit','CharacterLooks']:  # (10.1: StyleBuild requires CharacterLooks)
             s=re.sub(r'require\(script.Parent.(\w+)\)',r'require("./\1")',(ROOT/'src/shared'/f'{name}.luau').read_text())
             (temp/f'{name}.luau').write_text(s)
         s=re.sub(r'require\(script.Parent.(\w+)\)',r'require("./\1")',(ROOT/'src/shared/StyleBuild.luau').read_text())

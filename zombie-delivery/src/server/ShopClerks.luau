@@ -40,7 +40,7 @@ local CLERKS: { [string]: Clerk } = {
 	bikes = { name = "Kip", title = "Dead End Motors · Bikes", role = "townsperson", lines = { "Two wheels beat two feet. Have a look.", "Fresh chains, fresh tyres." } }, -- (6.12.7: the BIKES counter, next to Sal)
 	dealer = { name = "Sal", title = "Dead End Motors · Cars", role = "townsperson", lines = { "Every one of these runs. Mostly.", "Need more room in the back? Let's talk." } },
 	mechanic = { name = "Gus", title = "Wrench Garage", role = "townsperson", lines = { "Bring it in, I'll make it purr.", "Armour, tyres, a bigger engine?" } },
-	bags = { name = "Nell", title = "ZDC Bags", role = "townsperson", lines = { "A good bag and you can sprint with the goods.", "Pick a bag, any bag." } }, -- (6.12.2: next to Dot)
+	bags = { name = "Nell", title = "Deliveros Bags", role = "townsperson", lines = { "A good bag and you can sprint with the goods.", "Pick a bag, any bag." } }, -- (6.12.2: next to Dot)
 }
 
 local BEHIND = 1.6 -- studs behind the counter's back face where the clerk stands

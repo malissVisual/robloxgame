@@ -133,7 +133,7 @@ Challenges.List = {
 	-- ── Wealth ──
 	{ id = "first_paycheck", name = "First Paycheck", description = "Earn $10,000.", category = "wealth", stat = "earned", goal = 10000, money = 300 },
 	{ id = "home_sweet_home", name = "Home Sweet Home", description = "Buy 1 property.", category = "wealth", stat = "properties", goal = 1, money = 1000 },
-	{ id = "car_collector", name = "Car Collector", description = "Own 5 vehicles: the ZDC Van and bikes.", category = "wealth", stat = "cars", goal = 5, money = 2000 },
+	{ id = "car_collector", name = "Car Collector", description = "Own 5 vehicles: the Deliveros Van and bikes.", category = "wealth", stat = "cars", goal = 5, money = 2000 },
 	{ id = "millionaire", name = "Millionaire", description = "Earn $1,000,000.", category = "wealth", stat = "earned", goal = 1000000, money = 10000, title = "Millionaire", hidden = true },
 } :: { ChallengeDef }
 

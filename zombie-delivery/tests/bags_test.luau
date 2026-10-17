@@ -57,7 +57,7 @@ for id, n in want do
 end
 check("the shoes are no bag", not Transport.isBag(kit("shoes")) and not Transport.isBag(nil))
 check("6.23: no bag is a starter (every bag is bought for each game)", kit("bag").starter == nil and kit("tote").starter == nil and kit("duffel").starter == nil)
-check("6.7: every bag at ZDC Bags", Transport.kitShop(kit("bag")) == "bags" and Transport.kitShop(kit("duffel")) == "bags")
+check("6.7: every bag at Deliveros Bags", Transport.kitShop(kit("bag")) == "bags" and Transport.kitShop(kit("duffel")) == "bags")
 
 -- 6.6, one carrying item: the backpacks are gone, their owners paid back ------------------------------------------
 
@@ -87,7 +87,7 @@ local Map = require("./Map")
 local shop = Map.Shops.bags
 -- (6.11: Config.BagShop, the rack, the spawn, the board, the terminal and Marge are given from the depot's middle,
 -- Map.Depot: the checks below are in the depot's own studs)
-check("6.6: ZDC Bags is a shop", shop ~= nil and shop.name == "ZDC Bags" and shop.x == Map.Depot.x + Config.BagShop.X and shop.z == Map.Depot.z + Config.BagShop.Z)
+check("6.6: Deliveros Bags is a shop", shop ~= nil and shop.name == "Deliveros Bags" and shop.x == Map.Depot.x + Config.BagShop.X and shop.z == Map.Depot.z + Config.BagShop.Z)
 check("6.6: a kiosk's own radius, the big shops' as before (6.12.2: the gear stall's, Last Stop Supplies' too; 6.12.14: Lead & Co.'s range its own)", Map.shopRadius("bags") == Config.BagShop.Radius and Map.shopRadius("supplies") == Config.GearStall.Radius
 	and Map.shopRadius("guns") == Config.GunRange.Radius and Map.shopRadius("mechanic") == Map.ShopRadius and Map.shopRadius("moon") == Map.ShopRadius)
 local function away(x: number, z: number): number
@@ -301,7 +301,7 @@ check("6.23: no kit, a broken save: nothing", (Transport.bagRefund({ money = 1 }
 	and (Transport.bagRefund({ money = 1, kit = "tote" })) == 0)
 check("6.23: only the plastic bag: nothing to pay back", (Transport.bagRefund({ money = 1, kit = { bag = true } })) == 0)
 check("6.23: the notice names the money", string.find(string.gsub(B.Refunded, "{money}", "$1050"), "Bags are now bought for each game: $1050 refunded for your bags.", 1, true) ~= nil)
-check("6.23: the hints", B.NoBag == "No bag this game: buy one at ZDC Bags (by the spawn)." and B.BuyHint == "BUY A BAG" and B.ForGame == "FOR THIS GAME"
+check("6.23: the hints", B.NoBag == "No bag this game: buy one at Deliveros Bags (by the spawn)." and B.BuyHint == "BUY A BAG" and B.ForGame == "FOR THIS GAME"
 	and Holding.whyText("nobag") == B.NoBag)
 
 if failures == 0 then

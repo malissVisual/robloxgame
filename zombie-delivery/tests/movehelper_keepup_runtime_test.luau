@@ -3,7 +3,7 @@
 -- server/MoveHelper.luau and server/PairHold.luau on tests/runtime/MovingRuntime.luau's fakes, Config.MoveHelper.HoldLead
 -- as the game has it (the runtime's default: off). Danny's hold is played as Roblox's constraints do it: each of his
 -- steps his root goes toward where his hold aims it at the hold's top speed × dt at most (AlignPosition.MaxVelocity;
--- this mover has no `keep`, so server/MoveHelper.luau's keepAt steps him). Sol hires him (8.3 Danny for hire), lifts the
+-- this mover has no `keep`, so server/MoveHelper.luau's keepAt steps him). Danny is Sol's from the start (10.1 free), she lifts the
 -- sofa, he walks over to its far end.
 --   * the 8.2 hold (his top speed from the carry's walk alone, MoveHelperBrain.holdSpeed(walk)): Sol faster than that
 --     (a sprint: what nothing on her client stops if anything raises her walk) leaves him further behind every step:
@@ -44,6 +44,9 @@ local M = E.Mock
 local V3 = M.Vector3.new
 local workspace = M.workspace
 H.HoldLead.Base, H.HoldLead.Ping = E.gameLead.Base, E.gameLead.Ping -- (the game's lead)
+-- 9.2: the hold the SERVER keeps (Danny's when no leader's client drives him: a drive it took back, PairLead.On false;
+-- a crew mate's always): Sol's client drives none here (tests/movehelper_backwards_runtime_test.luau drives him)
+H.PairLead.On = false
 T.Doors.Walk = false -- (the walk-in doors off: these walks stay in the living room)
 
 local home = Map.home(T.Contracts[1].home) :: any
@@ -150,8 +153,7 @@ check("a solo move starts", string.find(started, "started", 1, true) ~= nil, sta
 Moving.step()
 danny = MoveHelper.find(sol)
 check("Danny comes", danny ~= nil and danny.body ~= nil)
-E.request(sol, "helper", "hire") -- (8.3 Danny for hire: a two-person Lift calls him once he is hired)
-check("Sol hires him", danny.hirer == sol)
+check("Danny is Sol's from the start (10.1 free)", danny.hirer == sol)
 local body = danny.body
 local site = workspace:FindFirstChild("Moves"):FindFirstChild("Move_marge")
 E.place(sol, outside)
@@ -242,8 +244,14 @@ local pairWorst = walkAt(PAIR, 3, 0.2)
 local leadX, leadZ = lead()
 local ahead = distance(body.root.Position, place())
 check(`8.3 Sol at the pair's walk ({string.format("%.1f", PAIR)}) for 3 s: every step he is where his hold aims him`, pairWorst < 0.05 and holding(), pairWorst)
-check("8.3 …aimed her velocity × leadTime ahead of his place, her way (her screen shows his body that late)",
-	math.abs(ahead - PAIR * Brain.leadTime(0)) < 0.02 and leadZ > 0 and math.abs(leadX) < 1e-6 and H.HoldLead.Base > 0, `{ahead} studs ahead`)
+-- 9.0 (the owner's screenshot: Danny inside the Sofa): following her his lead would take him toward the piece's middle,
+-- into it: his body stays at his place (HoldLead.In 0), his hands reach on by that lead instead (her screen shows his body
+-- that late: there his hands are on its edge; Config.MoveHelper.Edge.Reach at most)
+local carryAt = body.model:GetAttribute("CarryAt")
+local reach = if M.typeof(carryAt) == "Vector3" then -carryAt.Z - (H.Standoff + H.Edge.Depth / 2) else 0
+check("8.3 …her velocity × leadTime his lead (her screen shows his body that late); 9.0 following her, never into the piece: his body at his place, his hands reaching on by it",
+	ahead < 0.02 and math.abs(leadX) + math.abs(leadZ) <= H.HoldLead.In + 1e-6 and H.HoldLead.Base > 0
+	and math.abs(reach - math.min(PAIR * Brain.leadTime(0), H.Edge.Reach)) < 0.06, `{ahead} studs ahead, hands {reach} on`)
 local fasterWorst = walkAt(PAIR * 1.2, 3)
 check("8.3 20% faster (a lag spike, a slope) for 3 s: every step at his aim, from the first", fasterWorst < 0.05 and holding(), fasterWorst)
 local mark = #E.strides

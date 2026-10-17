@@ -34,16 +34,29 @@ for _, action in SandboxAdmin.Actions do
 	ids[action.id] = true
 end
 check("every button: a new id, a group of the tab, a known colour, a short label", #bad == 0, table.concat(bad, ", "))
-local wanted = { "money", "broke", "refill", "start", "clock", "horde", "fill", "clear", "stands", "van", "house", "warehouse", "upmax", "upreset", "bookfill", "bookclear",
-	"level1", "level2", "level3", "level4", "level5", "paintall", "paintreset" } -- (8.1: the upgrades' two; 8.2: the book's two; 8.3: the warehouse's levels, the PAINT shop's two)
+local wanted = { "money", "broke", "clock", "horde", "fill", "clear", "stands", "house", "warehouse", "upmax", "upreset", "bookfill", "bookclear",
+	"level1", "level2", "level3", "level4", "level5", "paintall", "paintreset", -- (8.1: the upgrades' two; 8.2: the book's two; 8.3: the warehouse's levels, the PAINT shop's two)
+	-- 9.7 runs: a difficulty to start at, a run on any house, END RUN, TO LOBBY (no START, REFILL HOUSE or BRING VAN:
+	-- a run is the move, its truck parked at the house)
+	"rundiff_easy", "rundiff_normal", "rundiff_hard", "rundiff_insane", "rundiff_nightmare", "run_sandbox_house", "run_pond_cabin", "run_lone_house",
+	"run_forest_lodge", "run_old_mill", "run_orchard_cottage", "runend", "lobby" }
 local missing: { string } = {}
 for _, id in wanted do
 	if not ids[id] then
 		table.insert(missing, id)
 	end
 end
-check("the owner's twelve server buttons (8.1: and the upgrades' MAX / RESET) are all there", #missing == 0 and #SandboxAdmin.Actions == #wanted, table.concat(missing, ", "))
-check("the groups in the asked order", SandboxAdmin.Groups[1].id == "money" and SandboxAdmin.Groups[2].id == "moves" and SandboxAdmin.Groups[3].id == "collection" and SandboxAdmin.Groups[4].id == "travel" and SandboxAdmin.Groups[5].id == "debug")
+check("the owner's server buttons (8.1: and the upgrades' MAX / RESET; 9.7 the runs') are all there", #missing == 0 and #SandboxAdmin.Actions == #wanted, table.concat(missing, ", "))
+check("the groups in the asked order (9.7: Runs where Moves was)", SandboxAdmin.Groups[1].id == "money" and SandboxAdmin.Groups[2].id == "runs" and SandboxAdmin.Groups[3].id == "collection" and SandboxAdmin.Groups[4].id == "travel" and SandboxAdmin.Groups[5].id == "debug")
+local runsOk = true
+for _, h in SandboxMap.Houses do
+	runsOk = runsOk and SandboxAdmin.runHouse(`run_{h.id}`) == h.id
+end
+for _, d in Config.Runs.Difficulties do
+	runsOk = runsOk and SandboxAdmin.runDifficulty(`rundiff_{d.id}`) == d.id
+end
+check("9.7: a ▶ button a house (SandboxAdmin.runHouse), a 🎚 button a difficulty (runDifficulty); anything else none", runsOk and SandboxAdmin.runHouse("run_nowhere") == nil
+	and SandboxAdmin.runHouse("money") == nil and SandboxAdmin.runHouse(5) == nil and SandboxAdmin.runDifficulty("money") == nil and SandboxAdmin.runDifficulty(nil) == nil)
 check("the labels the owner asked for", SandboxAdmin.find("money").label == "💰 +$10K" and SandboxAdmin.find("broke").label == "💸 MONEY 0" and SandboxAdmin.find("clock").label == "⏩ SKIP CLOCK")
 check("+$10K is 10 000", SandboxAdmin.Money == 10_000)
 local maxUp, resetUp = SandboxAdmin.find("upmax"), SandboxAdmin.find("upreset")
@@ -154,18 +167,20 @@ check("Config.Warehouse.Stands: a count, a list, or none", SandboxAdmin.standCou
 -- SHOW ZONES ---------------------------------------------------------------------------------------------------------
 
 local zones = SandboxAdmin.zones()
-local unloads, curbs = 0, 0
+local pads, curbs = 0, 0
 local off2: { string } = {}
 for _, zone in zones do
-	if zone.kind == "unload" then
-		unloads += 1
-		local plot = SandboxMap.plotAt(zone.x, zone.z)
-		if zone.shape ~= "circle" or zone.r <= 0 or not plot or plot.unload.x ~= zone.x or plot.unload.r ~= zone.r then
+	if zone.kind == "pad" then
+		pads += 1
+		local portal = SandboxMap.Lobby.portals[pads]
+		local pad = portal and portal.pad
+		if zone.shape ~= "box" or not pad or zone.x ~= (pad.x0 + pad.x1) / 2 or zone.z ~= (pad.z0 + pad.z1) / 2 or zone.sx ~= pad.x1 - pad.x0
+			or not string.find(zone.label, string.upper(portal.name), 1, true) then
 			table.insert(off2, zone.label)
 		end
 	elseif zone.kind == "curb" then
 		curbs += 1
-		-- (Jinočany: every house to empty's, in SandboxMap.Houses' order, its name on it)
+		-- (every place to empty's, in SandboxMap.Houses' order, its name on it)
 		local house = SandboxMap.Houses[curbs]
 		local curb = if house then house.curb else SandboxMap.House.curb
 		if zone.shape ~= "box" or zone.x ~= curb.x or zone.z ~= curb.z or zone.yaw ~= curb.yaw or zone.sx <= 0 or zone.sz <= zone.sx
@@ -174,10 +189,10 @@ for _, zone in zones do
 		end
 	end
 end
-check("SHOW ZONES: every plot's unload circle at its plot, every house's curb at its spot (Jinočany: six, each named)", unloads == #SandboxMap.Plots
+check("SHOW ZONES: 9.7 every portal's pad (six, each named), every place's curb at its spot (six, each named)", pads == #SandboxMap.Lobby.portals
 	and curbs == #SandboxMap.Houses and curbs == 6 and #off2 == 0, table.concat(off2, ", "))
-check("…the farmstead's says its van's nose is north, the Linden House's south", string.find(zones[#SandboxMap.Plots + 1].label, "nose north", 1, true) ~= nil
-	and string.find(zones[#SandboxMap.Plots + 2].label, "nose south", 1, true) ~= nil, zones[#SandboxMap.Plots + 2].label)
+check("…the farmstead's says its van's nose is north, the Pond Cabin's east", string.find(zones[#SandboxMap.Lobby.portals + 1].label, "nose north", 1, true) ~= nil
+	and string.find(zones[#SandboxMap.Lobby.portals + 2].label, "nose east", 1, true) ~= nil, zones[#SandboxMap.Lobby.portals + 2].label)
 
 -- The rate limit -----------------------------------------------------------------------------------------------------
 

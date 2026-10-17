@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "8.9.3"
+Config.Version = "10.3"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -288,7 +288,7 @@ Config.Arms = {
 	MaxArmour = 0.8,
 	-- 6.0.1: Marge's text about the plastic bag (server/Tutorial.luau bagCheck); 6.7: the vest's tips
 	-- 6.12.2: Last Stop Supplies is the GEAR counter of the gear stall by the spawn, ZDC Bags the counter next to it
-	BagTip = "Customers tip a courier they can see: the ZDC Courier Vest ({price}) adds 5% to every delivery. Last Stop Supplies sells it at the gear stall by the spawn. It's on your GPS. Bags are at the counter next to it.",
+	BagTip = "Customers tip a courier they can see: the Deliveros Courier Vest ({price}) adds 5% to every delivery. Last Stop Supplies sells it at the gear stall by the spawn. It's on your GPS. Bags are at the counter next to it.",
 }
 
 -- 3.7: the first-day tutorial (server/Tutorial.luau, client/TutorialUi.luau): the dispatcher at the depot greets a new
@@ -456,7 +456,7 @@ Config.Cars = {
 		trolley = true,
 		level = 1,
 		mount = true,
-		name = "ZDC Van",
+		name = "Deliveros Van",
 		price = 0,
 		style = "zdcvan",
 		maxSpeed = 66,
@@ -469,9 +469,9 @@ Config.Cars = {
 		ramPower = 1.35,
 		color = { 217, 204, 176 },
 		role = "The company van: every courier drives one",
-		description = "Zombie Delivery Co.'s own van, yours from day one: a bull bar in front, a roof rack with a spare wheel, a hollow cargo bay with two back doors. Room for 4 pieces (+2 light ones with the Roof Rack). 1 passenger.",
+		description = "Deliveros's own van, yours from day one: a bull bar in front, a roof rack with a spare wheel, a hollow cargo bay with two back doors. Room for 4 pieces (+2 light ones with the Roof Rack). 1 passenger.",
 		stages = {
-			{ name = "ZDC Van", price = 0, capacity = 4, adds = "" },
+			{ name = "Deliveros Van", price = 0, capacity = 4, adds = "" },
 		},
 	},
 	-- 5.1, the bikes (CarDef.bike): sold at the bike counter from level 2 (6.12.7: Dead End Motors' BIKES counter), after
@@ -590,7 +590,7 @@ Config.Cars = {
 		id = "sprinter",
 		sandboxOnly = true,
 		level = 1,
-		name = "ZDC Sprinter",
+		name = "Deliveros Sprinter",
 		price = 0,
 		style = "sprinter",
 		maxSpeed = 58,
@@ -603,7 +603,7 @@ Config.Cars = {
 		ramPower = 1.5,
 		color = { 232, 226, 210 },
 		role = "The sandbox's walk-in van",
-		description = "Zombie Delivery Co.'s high-roof van: walk into its cargo bay through the back doors or the sliding side door. 1 passenger.",
+		description = "Deliveros's high-roof van: walk into its cargo bay through the back doors or the sliding side door. 1 passenger.",
 	},
 } :: { CarDef }
 
@@ -1470,7 +1470,7 @@ Config.Kit = {
 	-- just the look (no armour), worn until a Kevlar or heavy vest covers it (shared/KitFit.luau). Saves from before
 	-- 6.0.1 get it once on load (server/PlayerData.luau), so nobody who played loses it. 6.7: customers tip a courier
 	-- they can see: +5% of every order's pay (tips; it counts under an armoured vest too: kit is always worn).
-	{ id = "hivis", name = "Courier Vest", level = 1, price = 20, icon = "🦺", tips = 0.05, description = "The ZDC reflective vest: customers see a courier and tip +5% on every delivery (it still counts under a Kevlar or heavy vest)." },
+	{ id = "hivis", name = "Courier Vest", level = 1, price = 20, icon = "🦺", tips = 0.05, description = "The Deliveros reflective vest: customers see a courier and tip +5% on every delivery (it still counts under a Kevlar or heavy vest)." },
 	-- 6.4, the bigger bags (6.6: sold at ZDC Bags; USE there or in the I window's BAGS tab picks the one you hold)
 	{ id = "tote", name = "Canvas Tote", level = 2, price = 120, icon = "👜", extra = 3, carry = "shoulder", stays = true, description = "Sprint with your deliveries: 3 light pieces ride in this canvas tote over your shoulder. Swings onto your back when you draw your gun." },
 	{ id = "thermal", name = "Thermal Delivery Bag", level = 3, price = 300, icon = "🔥", extra = 4, carry = "hand", bagWarm = 0.35, description = "Sprint with your deliveries: 4 light pieces ride in it. Insulated: food in it stays hot (cools ×0.35)." },
@@ -1518,14 +1518,14 @@ Config.GearStall = {
 	Height = 10,
 	Counter = 6.5,
 	Radius = 14,
-	Board = "LAST STOP SUPPLIES · ZDC BAGS  GEAR & BAGS FOR COURIERS",
+	Board = "LAST STOP SUPPLIES · DELIVEROS BAGS  GEAR & BAGS FOR COURIERS",
 }
 
 -- 6.6, ZDC Bags (Map.Shops.bags): the bags (Config.Kit pieces with `extra`). 6.12.2: the BAGS counter of the gear stall
 -- (Config.GearStall; the 6.6 kiosk east of the spawn is gone). X / Z: the counter's front (the customers' side), studs
 -- from the depot's middle; Radius: the stall's. (Last Stop Supplies, the GEAR counter: Map.Shops.supplies.)
 Config.BagShop = {
-	Name = "ZDC Bags",
+	Name = "Deliveros Bags",
 	X = Config.GearStall.X + Config.GearStall.Depth / 2,
 	Z = Config.GearStall.Z - Config.GearStall.Counter,
 	Radius = Config.GearStall.Radius,
@@ -1548,7 +1548,7 @@ Config.BagShop = {
 	Refund = {} :: { [string]: number },
 	Flag = "perGameBags",
 	Refunded = "Bags are now bought for each game: {money} refunded for your bags.",
-	NoBag = "No bag this game: buy one at ZDC Bags (by the spawn).",
+	NoBag = "No bag this game: buy one at Deliveros Bags (by the spawn).",
 	BuyHint = "BUY A BAG",
 	Pill = "BUY",
 	ForGame = "FOR THIS GAME",
@@ -1566,9 +1566,9 @@ Config.VanQuest = {
 	Sign = "· SOLD",
 	Tag = "SOLD · Earl's own, not for sale",
 	Lines = {
-		"Sold my last van years ago, kid. Your company hands every courier a ZDC Van now.",
+		"Sold my last van years ago, kid. Your company hands every courier a Deliveros Van now.",
 		"She ain't for sale. Thirty years on the road: she's earned her rest.",
-		"Treat that ZDC Van right, kid. They don't build 'em like my old girl any more.",
+		"Treat that Deliveros Van right, kid. They don't build 'em like my old girl any more.",
 	} :: { string },
 }
 
@@ -1598,11 +1598,11 @@ Config.VanQuest = {
 Config.CompanyVan = {
 	Car = "zdcvan",
 	Flag = "vanOnly",
-	Refunded = "The company runs on one car now: your ZDC Van. {money} paid back for your other cars, and the van took over their best upgrades.",
-	Kept = "The company runs on one car now: your ZDC Van. It took over the best upgrades of your other cars.",
+	Refunded = "The company runs on one car now: your Deliveros Van. {money} paid back for your other cars, and the van took over their best upgrades.",
+	Kept = "The company runs on one car now: your Deliveros Van. It took over the best upgrades of your other cars.",
 	Bonus = "{employer} pays you a {money} bonus for your work!",
-	Hello = "One more thing: the company's ZDC Van is yours. Press CAR and it comes to you. The ★ car jobs open at level {level}.",
-	MissionsNeed = "Missions need your ZDC Van: press CAR and it comes to you.",
+	Hello = "One more thing: the company's Deliveros Van is yours. Press CAR and it comes to you. The ★ car jobs open at level {level}.",
+	MissionsNeed = "Missions need your Deliveros Van: press CAR and it comes to you.",
 }
 
 -- 5.1, the bikes (Config.Cars with bike = true) and the bike gear (Config.Gear bikeOnly), sold at Spoke & Chain Cycles
@@ -1903,7 +1903,7 @@ Config.Cosmetics = {
 	} :: { [string]: CosmeticCounter },
 	Items = {
 		-- Hats (StyleLooks.hat: fitted to the head; the player's own hat and hair accessories hide under it)
-		{ id = "cap_red", name = "Backwards Cap · ZDC Red", slot = "hat", look = "cap", price = 120, color = { 196, 40, 38 }, trim = { 28, 31, 34 }, description = "The dispatcher's favourite, worn the courier way." },
+		{ id = "cap_red", name = "Backwards Cap · Deliveros Red", slot = "hat", look = "cap", price = 120, color = { 196, 40, 38 }, trim = { 28, 31, 34 }, description = "The dispatcher's favourite, worn the courier way." },
 		{ id = "cap_black", name = "Backwards Cap · Black", slot = "hat", look = "cap", price = 120, color = { 32, 34, 38 }, trim = { 196, 40, 38 }, description = "A black cap with a red snap, peak to the back." },
 		{ id = "beanie_orange", name = "Beanie · Safety Orange", slot = "hat", look = "beanie", price = 150, color = { 245, 120, 30 }, trim = { 214, 92, 22 }, description = "A knitted beanie with a pom-pom. Seen from three blocks away." },
 		{ id = "beanie_grey", name = "Beanie · Heather Grey", slot = "hat", look = "beanie", price = 150, color = { 150, 152, 156 }, trim = { 196, 40, 38 }, description = "A grey beanie with a red cuff." },
@@ -1914,7 +1914,7 @@ Config.Cosmetics = {
 		{ id = "helmet_chrome", name = "Chrome Helmet", slot = "hat", look = "helmet", price = 0, reward = "pass", color = { 205, 210, 216 }, trim = { 30, 30, 34 }, material = "Foil", description = "Not for sale: a reward of a later pass." },
 		-- Jackets (StyleLooks.jacket: thin shells over the torso and the arms, under the vest and the bag)
 		{ id = "hoodie_grey", name = "Hoodie · Grey", slot = "jacket", look = "hoodie", price = 350, color = { 118, 122, 128 }, trim = { 196, 40, 38 }, description = "A grey hoodie: a hood, a kangaroo pocket, red cuffs." },
-		{ id = "hoodie_red", name = "Hoodie · ZDC Red", slot = "jacket", look = "hoodie", price = 350, color = { 176, 36, 34 }, trim = { 30, 32, 36 }, description = "The company's red hoodie with black cuffs." },
+		{ id = "hoodie_red", name = "Hoodie · Deliveros Red", slot = "jacket", look = "hoodie", price = 350, color = { 176, 36, 34 }, trim = { 30, 32, 36 }, description = "The company's red hoodie with black cuffs." },
 		{ id = "track_blue", name = "Track Jacket", slot = "jacket", look = "track", price = 500, color = { 36, 74, 160 }, trim = { 236, 236, 232 }, description = "Blue, with two white stripes down each sleeve." },
 		{ id = "bomber_olive", name = "Bomber Jacket", slot = "jacket", look = "bomber", price = 650, level = 3, color = { 88, 98, 62 }, trim = { 214, 110, 40 }, description = "An olive bomber with ribbed orange cuffs and a sleeve pocket." },
 		{ id = "puffer_yellow", name = "Puffer Jacket", slot = "jacket", look = "puffer", price = 800, level = 4, color = { 238, 190, 40 }, trim = { 60, 60, 64 }, material = "SmoothPlastic", description = "A quilted puffer for the cold night shifts." },
@@ -1939,7 +1939,7 @@ Config.Cosmetics = {
 		{ id = "wrap_teal", name = "Satin Teal", slot = "wrap", look = "wrap", price = 900, color = { 32, 150, 150 }, description = "A satin teal wrap." },
 		{ id = "wrap_orange", name = "Sunset Orange", slot = "wrap", look = "wrap", price = 900, color = { 240, 110, 40 }, description = "A sunset orange wrap." },
 		{ id = "wrap_ice", name = "Ice Blue", slot = "wrap", look = "wrap", price = 900, color = { 150, 200, 236 }, description = "A pale ice-blue wrap." },
-		{ id = "wrap_red", name = "ZDC Courier Red", slot = "wrap", look = "wrap", price = 1000, color = { 190, 36, 34 }, description = "The company's red, on every car of yours." },
+		{ id = "wrap_red", name = "Deliveros Courier Red", slot = "wrap", look = "wrap", price = 1000, color = { 190, 36, 34 }, description = "The company's red, on every car of yours." },
 		{ id = "wrap_green", name = "Racing Green", slot = "wrap", look = "wrap", price = 1100, color = { 22, 92, 56 }, description = "A deep racing green." },
 		{ id = "wrap_matte", name = "Matte Black", slot = "wrap", look = "wrap", price = 1200, color = { 30, 31, 34 }, material = "Plastic", description = "A flat, matte black." },
 		{ id = "wrap_purple", name = "Candy Purple", slot = "wrap", look = "wrap", price = 1500, level = 6, color = { 130, 40, 170 }, material = "Metal", description = "A metallic candy purple." },
@@ -1953,7 +1953,7 @@ Config.Cosmetics = {
 		{ id = "bike_white", name = "Pearl White Frame", slot = "bikepaint", look = "bikepaint", price = 250, color = { 236, 236, 230 }, description = "Every bike's frame and the E-Scooter in pearl white." },
 		{ id = "bike_gold", name = "Gold Frame", slot = "bikepaint", look = "bikepaint", price = 0, reward = "event", color = { 222, 176, 48 }, material = "Metal", description = "Not for sale: a reward of a later event." },
 		-- Decals for the cars, vans and trucks (StyleLooks.decals)
-		{ id = "logo", name = "ZDC Logo", slot = "decal", look = "logo", price = 500, color = { 236, 236, 232 }, trim = { 196, 40, 38 }, description = "The company's roundel on both sides." },
+		{ id = "logo", name = "Deliveros Logo", slot = "decal", look = "logo", price = 500, color = { 236, 236, 232 }, trim = { 196, 40, 38 }, description = "The company's roundel on both sides." },
 		{ id = "stripes_white", name = "Racing Stripes · White", slot = "decal", look = "stripes", price = 900, color = { 236, 236, 232 }, description = "Two white stripes over the hood and the roof." },
 		{ id = "stripes_black", name = "Racing Stripes · Black", slot = "decal", look = "stripes", price = 900, color = { 26, 27, 30 }, description = "Two black stripes over the hood and the roof." },
 		{ id = "checker", name = "Checker Band", slot = "decal", look = "checker", price = 1200, level = 5, color = { 236, 236, 232 }, trim = { 24, 24, 26 }, description = "A black and white checker band down both sides." },
@@ -1976,15 +1976,9 @@ Config.Cosmetics = {
 	},
 }
 
--- Supply crates lying around the world: drive or walk into one.
-Config.Loot = {
-	Count = 16,
-	Respawn = 40,
-	MoneyMin = 25,
-	MoneyMax = 90,
-	ItemChance = 0.4,
-	Reach = 9,
-}
+-- Supply crates lying around the world: drive or walk into one. Their numbers (Count, Respawn, MoneyMin, MoneyMax,
+-- ItemChance, Reach: server/Items.luau) are Config.Loot's first six; 9.x: Config.Loot is defined further down, with the
+-- houses' loot (its rarities by the difficulty) beside them.
 
 -- The bandits' pickup: chases you along the roads, two gunners in the bed shoot at your car.
 Config.BanditCar = {
@@ -2883,7 +2877,7 @@ Config.Levels = {
 	Rewards = {
 		[2] = { money = 500, items = { medkit = 2 }, text = "Your first bike: the BIKES counter at Dead End Motors" }, -- (6.12.7: Spoke & Chain before)
 		[3] = { money = 750, items = { medkit = 2 }, kit = "tote" }, -- (6.6: the Canvas Tote, no backpack any more)
-		[4] = { money = 1000, items = { medkit = 2 }, kit = "thermal", text = "The ★ car jobs, in your ZDC Van" }, -- (6.12.2: the shoes before; 7.x: Earl's Old Van before)
+		[4] = { money = 1000, items = { medkit = 2 }, kit = "thermal", text = "The ★ car jobs, in your Deliveros Van" }, -- (6.12.2: the shoes before; 7.x: Earl's Old Van before)
 		[5] = { money = 1500, items = { repair = 2 }, paint = "hivis" },
 		[6] = { money = 2000, items = { molotov = 4 } },
 		[7] = { money = 2500, items = { mine = 2 } },
@@ -3397,11 +3391,105 @@ Config.Shortcuts = {
 }
 
 -- Crews (server/Crew.luau): invite another player into your job (they ride along or follow, share the pay).
+-- 10.1 THE HELPERS' CREW (the owner: "you'll be able to get different employees who can do something different. There
+-- don't have to be many, but Danny will be the base, so I'd cancel having to buy him. Because you'll have to get them
+-- somehow. And maybe when one dies, then … something"): the same table holds the NPC helpers a player has (the rules
+-- shared/CrewRules.luau, tests/crewrules_test.luau; the server server/HelperCrew.luau with its hooks in
+-- server/MoveHelper.luau; the CREW window and the down ring client/CrewUi.luau). Danny is free and everybody's from the
+-- start; the others are rescued in runs. One of them (the run host's pick) comes into a run as its MoveHelper.
+--   Order      the kinds in the CREW window's order (Default first: Danny)
+--   Default    the helper everybody has from the start and who comes when nothing else is picked
+--   Kinds      each kind: Name, Role (the name tag's "<Role> · ZDC Moving", the window's line), Icon, She (her words),
+--              Ability (the window's words), Speed (× the helper's walk: Config.MoveHelper.Speed × Walk), Health,
+--              Carry (Hand: one-hand pieces; Both: the heaviest two-hands piece by its weight 1 … 10, 0 none; Pair:
+--              "with" lifts a piece for two with you, "alone" carries it alone too, false never), Solo (× his carry's
+--              drag when he carries a piece for two alone), Guard (Gus: Damage a hit, Reach studs, Every s between hits,
+--              Range studs round him or his boss he goes after a zombie in, Leash studs from his boss at most, Follow
+--              studs he walks behind his boss), Sense (Lucy: studs the party sees Epic and Legendary loot through walls
+--              in; the players' and the run's inside attribute CrewSense), Look (shared/NpcLooks.luau's Look over the
+--              mover's: shirt, pants, hat, hatColor, apron, vest, shortSleeves, boots, shoes), Hello (his first words of
+--              a move), Freed (his words when the party unties him), Up (his words when revived)
+--   Rescue     a run's trapped helper: Chance (a run's odds of one, by its difficulty), Hold (s E is held to untie him),
+--              Reach (the prompt's studs), Bonus (the money each party player who has him already gets instead, by the
+--              difficulty), Away (studs from the house's way in the chair stands at least), Help (s between his
+--              "Help!" while a party player is within Call studs), Leave / Fade (10.3: s after his thanks the freed one
+--              fades away home over Fade s: he waits at your warehouse, never walks after the party)
+--   Down       a helper at 0 health in a run: Seconds to revive him (hold E for Revive s within Reach studs), up again
+--              with Health × his full health; nobody did: out of the run and to hospital
+--   Hospital   Seconds out of the crew after a run's out (the save's crew.hospital: os.time() until); discharging him
+--              early costs Base + PerMinute × the minutes left, to Round dollars
+--   Lobby      your picked helper waits at your warehouse: Stand (studs across and out from its door), Reach (the
+--              "Crew" prompt's studs: it opens the CREW window), Every (s between the server's looks at the stands)
+--   Window     the CREW window (client/CrewUi.luau): Width (px at scale 1), Row (a helper's row's height), TouchScale
+--   Ring       the down ring over a helper (client/CrewUi.luau): Size (px), Range (studs it shows within), Every (s)
+--   Flag       the save's mark: profile.crew is read only from a real save written with it
+-- The Crew remote (Config.Robust.Limits.Crew): client → server { kind = "state" } | { kind = "pick", id } |
+-- { kind = "discharge", id }; server → client { kind = "state", rows, pick, comes, money } | { kind = "open" }.
+export type CrewKind = {
+	Name: string,
+	Role: string,
+	Icon: string,
+	She: boolean,
+	Ability: string,
+	Speed: number,
+	Health: number,
+	Carry: { Hand: boolean, Both: number, Pair: string | boolean },
+	Solo: number,
+	Sense: number,
+	Guard: { Damage: number, Reach: number, Every: number, Range: number, Leash: number, Follow: number }?,
+	Look: { [string]: any },
+	Hello: string,
+	Freed: string,
+	Up: string,
+}
 Config.Crew = {
 	MaxMembers = 3,
 	InviteRange = 60, -- studs to the player you invite (or use the crew button from anywhere)
 	InviteTimeout = 30,
 	RiderRange = 250, -- a rider who got out stays on the owner's job (paid, credited) within this of the owner
+	-- 10.1 the helpers' crew (see above)
+	Order = { "danny", "bruno", "zip", "gus", "lucy" } :: { string },
+	Default = "danny",
+	Kinds = {
+		danny = { Name = "Danny", Role = "Mover", Icon = "🧑‍🔧", She = false, Ability = "Carries what you give him; lifts the heavy pieces with you",
+			Speed = 1, Health = 100, Carry = { Hand = true, Both = 10, Pair = "with" }, Solo = 1, Sense = 0,
+			Look = { shirt = { 230, 120, 40 }, pants = { 60, 60, 70 }, hat = "cap", hatColor = { 230, 120, 40 }, shortSleeves = true, boots = true },
+			Hello = "Danny from Deliveros. Where do we start, boss?", Freed = "Thanks, boss!", Up = "Thanks! Back on my feet!" },
+		bruno = { Name = "Bruno", Role = "Strong", Icon = "💪", She = false, Ability = "Carries two-person pieces alone, slowly",
+			Speed = 0.9, Health = 160, Carry = { Hand = true, Both = 10, Pair = "alone" }, Solo = 1.6, Sense = 0,
+			Look = { shirt = { 158, 42, 40 }, pants = { 46, 46, 52 }, hat = "beanie", hatColor = { 36, 36, 40 }, apron = { 112, 76, 46 }, shortSleeves = true, boots = true },
+			Hello = "Bruno here. Point me at the heavy stuff.", Freed = "Finally! I'm Bruno - leave the heavy stuff to me.", Up = "Takes more than that to stop Bruno!" },
+		zip = { Name = "Zip", Role = "Quick", Icon = "⚡", She = false, Ability = "Fast with one-hand and small pieces; no heavy or two-person ones",
+			Speed = 1.4, Health = 80, Carry = { Hand = true, Both = 3, Pair = false }, Solo = 1, Sense = 0,
+			Look = { shirt = { 250, 204, 48 }, pants = { 52, 92, 160 }, hat = "cap", hatColor = { 40, 170, 230 }, shortSleeves = true, boots = false, shoes = { 240, 240, 240 } },
+			Hello = "Zip's here! Small stuff? I'm on it!", Freed = "Woo, free! I'm Zip - I'll run the small stuff out for you!", Up = "Okay, okay, I'm up!" },
+		gus = { Name = "Gus", Role = "Guard", Icon = "🛡", She = false, Ability = "Carries nothing: walks with you and fights the zombies",
+			Speed = 1.1, Health = 220, Carry = { Hand = false, Both = 0, Pair = false }, Solo = 1, Sense = 0,
+			Guard = { Damage = 30, Reach = 5, Every = 0.9, Range = 36, Leash = 45, Follow = 7 },
+			Look = { shirt = { 70, 84, 62 }, pants = { 50, 56, 46 }, hat = "helmet", hatColor = { 64, 74, 56 }, vest = { 38, 42, 38 }, boots = true, shoes = { 30, 28, 26 } },
+			Hello = "Gus. Stay close - I've got your back.", Freed = "Thanks. Name's Gus. Nothing gets past me now.", Up = "I'm good. Where are they?" },
+		lucy = { Name = "Lucy", Role = "Finder", Icon = "🔍", She = true, Ability = "Carries small pieces; shows the party Epic and Legendary loot through walls",
+			Speed = 1.1, Health = 90, Carry = { Hand = true, Both = 2, Pair = false }, Solo = 1, Sense = 160,
+			Look = { shirt = { 120, 84, 176 }, pants = { 48, 50, 62 }, hat = "beanie", hatColor = { 214, 70, 140 }, apron = { 214, 186, 120 }, shortSleeves = true },
+			Hello = "Lucy here. I can smell the good stuff from here!", Freed = "You found me! I'm Lucy - I'll find the treasures for you.", Up = "Phew! Thank you!" },
+	} :: { [string]: CrewKind },
+	Rescue = {
+		Chance = { easy = 0.15, normal = 0.25, hard = 0.4, insane = 0.5, nightmare = 0.65 } :: { [string]: number },
+		Hold = 3,
+		Reach = 8,
+		Bonus = { easy = 150, normal = 250, hard = 400, insane = 600, nightmare = 900 } :: { [string]: number },
+		Away = 12,
+		Help = 9,
+		Call = 45,
+		Leave = 2.5, -- 10.3: s after his thanks the freed one fades away home (never after the party)
+		Fade = 1,
+	},
+	Down = { Seconds = 15, Revive = 3, Reach = 8, Health = 0.5 },
+	Hospital = { Seconds = 240, Base = 50, PerMinute = 50, Round = 10 },
+	Lobby = { Stand = { 16, 9 } :: { number }, Reach = 10, Every = 1 },
+	Window = { Width = 680, Row = 78, TouchScale = 0.78 },
+	Ring = { Size = 92, Range = 90, Every = 0.2 },
+	Flag = "crewKept",
 }
 
 -- 4.5: the admin's test buddies (server/Buddy.luau, shared/BuddyBrain.luau): NPC couriers that follow their owner on
@@ -3682,11 +3770,12 @@ Config.Soundscape = {
 	-- Fallback). Where you are (shared/SoundPlan.luau sandboxPlace): "outdoors" in the village, in a "warehouse" (8.3:
 	-- its level's building, WarehouseLayout.site) or in the "house" (inside the Old Farmstead: the move's interior, its
 	-- state's inside, or the farmstead's own box). client/SoundScape.luau blends the loops (SoundPlan.sandboxAmbience:
-	-- the city's day and night never play here), plays Jinočany's far sounds and sets the room's echo;
+	-- the city's day and night never play here), plays the countryside's far sounds and sets the room's echo;
 	-- client/SandboxSounds.luau the rest. Volumes 0 … 1.
-	-- JINOČANY (design/jinocany/NAVRH.md §5: Jinočany in place of the Alps; no cowbells, no alpine meadow): outdoors the
-	-- fields (birds and larks over them, a breeze), the D5 motorway's far hum from the east, now and then the chapel's
-	-- bell, a dog far off and a tractor on the fields. Each is a sound wanted on the next sheet; until a sheet has it, a
+	-- 8.9 in place of the Alps (no cowbells, no alpine meadow); 9.4 the countryside (design/countryside/plan.py; no
+	-- village: no chapel's bell): outdoors the fields (birds and larks over them, a breeze), the D5 motorway's far hum from
+	-- the east, now and then a woodpecker in the forest, a dog far off and a tractor on the fields. Each is a sound
+	-- wanted on the next sheet; until a sheet has it, a
 	-- sound of the sheets up now stands in (shared/SoundPlan.luau SandboxStandIns). Indoors and in a warehouse as before.
 	Sandbox = {
 		Fields = 0.24, -- the fields outdoors (amb_fields; its stand-in sfx4's amb_alpine: a breeze, finches, a lark) …
@@ -3698,19 +3787,19 @@ Config.Soundscape = {
 		-- SoundService.AmbientReverb by place (an Enum.ReverbType's name; a place not here: NoReverb), only while you are
 		-- in the game and SOUND is not all off
 		Reverb = { warehouse = "Room" } :: { [string]: string },
-		-- The D5's far hum (amb_motorway): a 3D loop on the motorway's middle line (design/jinocany/plan.json's landmark
-		-- "d5": X, from Z0 to Z1) at its point nearest you, Y up, so it always comes from the east; Volume within Near
+		-- The D5's far hum (amb_motorway): a 3D loop on the motorway's middle line (SandboxMap's landmark "d5": X, from
+		-- Z0 to Z1) at its point nearest you, Y up, so it always comes from the east; Volume within Near
 		-- studs, fading out (Roblox's inverse taper) to nothing at Range. Outdoors; × FieldsIndoors in a warehouse.
 		Motorway = { X = 360, Z0 = -680, Z1 = 760, Y = 6, Volume = 0.35, Near = 80, Range = 1900 },
 		-- Now and then outdoors, each on its own clock (Gap: seconds between two, a random pick), 3D (you hear where):
 		-- Volume within Near studs, nothing past Range.
-		--   Bell      the chapel's bell (chapel_bell, one stroke) from its little tower (plan.json's landmark "chapel":
-		--             X, Z; Y up), Strokes strokes Every s apart
+		--   Woodpecker  a woodpecker drumming in the forest (woodpecker_far, one drum) from its middle (SandboxMap's
+		--             wood "forest": X, Z; Y up in the crowns), Drums drums Every s apart
 		--   Dog       a dog barking far off (dog_far), Far studs (a random pick) a random way round you
 		--   Tractor   a tractor on the fields (tractor_far, a loop), Far studs a random way round you at the middle of
 		--             its pass: it drives across your view at Speed studs a second for Seconds s, fading in and out
 		--             over Fade s
-		Bell = { X = -700, Z = -144, Y = 28, Gap = { 150, 300 } :: { number }, Strokes = 3, Every = 1.8, Volume = 0.8, Near = 200, Range = 2200 },
+		Woodpecker = { X = -960, Z = -560, Y = 26, Gap = { 90, 200 } :: { number }, Drums = 3, Every = 0.9, Volume = 0.7, Near = 120, Range = 1500 },
 		Dog = { Gap = { 45, 110 } :: { number }, Far = { 90, 170 } :: { number }, Volume = 0.8, Near = 30, Range = 260 },
 		Tractor = { Gap = { 80, 170 } :: { number }, Far = { 150, 240 } :: { number }, Seconds = 16, Fade = 4, Speed = 5, Volume = 0.9, Near = 40, Range = 360 },
 		Display = 0.7, -- a piece put on a stand (stand_display: a soft thunk and a sparkle)
@@ -3978,7 +4067,7 @@ Config.Jobs = {
 		StrayDistance = { 60, 110 } :: { number },
 		-- A car job (the board's ★ … ★★★★, a special in your own car) while you have no vehicle: locked with these words.
 		-- (7.x: every courier has the ZDC Van, so only a save still loading sees them.)
-		NeedsVehicle = "Needs your ZDC Van: press CAR and it comes to you.",
+		NeedsVehicle = "Needs your Deliveros Van: press CAR and it comes to you.",
 		NeedsVehicleButton = "🚐 CALL YOUR VAN",
 		TutorialDrop = 220,
 		TutorialCargo = { cargo = "Letters", kind = "crate", look = "mail", piece = "letter bundle", plural = "letter bundles" },
@@ -4020,7 +4109,7 @@ Config.Jobs = {
 		NeedsBikeButton = "🚲 NEEDS A BIKE",
 		RideBike = "Bike jobs are ridden: MY BIKE on your phone brings your bike (your car stays where it is).",
 		RideBikeButton = "🚲 RIDE YOUR BIKE",
-		NeedsCar = "You're on your bike: car jobs need your ZDC Van. CALL CAR on your phone.",
+		NeedsCar = "You're on your bike: car jobs need your Deliveros Van. CALL CAR on your phone.",
 		NeedsCarButton = "🚐 CALL YOUR VAN",
 	},
 	-- Every job is a list of stops. At a pick-up you park in the circle, get out, carry the pieces from the giver to
@@ -5151,11 +5240,11 @@ Config.Courier = {
 	Step = 3.5,
 	Switch = 0.5,
 	-- 6.4: Marge texts once when a level opens a bag you don't own (server/Tutorial.luau; {name}, {room}, {price}).
-	BagUnlock = "Sprint with more of your deliveries: ZDC Bags at the depot has the {name} for you now, {room} pieces in it, {price} for this game. It's on your GPS.", -- (6.23: bags for each game)
+	BagUnlock = "Sprint with more of your deliveries: Deliveros Bags at the depot has the {name} for you now, {room} pieces in it, {price} for this game. It's on your GPS.", -- (6.23: bags for each game)
 	-- 6.6: Marge's text, once, to a save that owned a backpack (Config.RetiredKit): {money} is the refund
 	PackRefund = "Backpacks are gone: bags do it all now. You got {money} back.",
 	-- 6.7: Marge's text, once, to a save that owned the Thermal Jacket (Config.RetiredKit, its noJacket flag)
-	JacketRefund = "The Thermal Jacket is gone: the Thermal Delivery Bag at ZDC Bags keeps food far hotter. You got {money} back.",
+	JacketRefund = "The Thermal Jacket is gone: the Thermal Delivery Bag at Deliveros Bags keeps food far hotter. You got {money} back.",
 	-- 6.12.2: … and to a save that owned the Running Shoes (Config.RetiredKit, its noShoes flag)
 	ShoeRefund = "The Running Shoes are gone from the shops: you got {money} back. Need more legs? An Energy Drink at the gear stall by the spawn.",
 	-- 6.4.1, what is in the bag shows (shared/BagFill.luau; server/KitWear.luau on you, server/Cargo.luau on the ground):
@@ -5335,7 +5424,7 @@ Config.JobTypes = {
 	{
 		id = "schoolrun",
 		name = "School Run",
-		description = "Pick the kids up at three homes and bring them to Sunny Hill School in your ZDC Van.",
+		description = "Pick the kids up at three homes and bring them to Sunny Hill School in your Deliveros Van.",
 		employer = "school",
 		level = 4, -- 5.0: a company vehicle (or your own car) needs level 4 (7.x: the car jobs' level)
 		pickups = 3,
@@ -5359,7 +5448,7 @@ Config.JobTypes = {
 	{
 		id = "armysupply",
 		name = "Army Supply",
-		description = "Load ammo at the Harbor Docks and drive it in your ZDC Van through the tunnel to the base.",
+		description = "Load ammo at the Harbor Docks and drive it in your Deliveros Van through the tunnel to the base.",
 		level = 7, -- (3.2: the armored truck it earned could carry a car gun; 7.x: the army's bonus)
 		employer = "army",
 		pickups = 1,
@@ -5383,7 +5472,7 @@ Config.JobTypes = {
 	{
 		id = "icecream",
 		name = "Ice Cream Route",
-		description = "Load up at Frosty's and sell ice cream from your ZDC Van at 4 stops. Hold still while the kids buy.",
+		description = "Load up at Frosty's and sell ice cream from your Deliveros Van at 4 stops. Hold still while the kids buy.",
 		employer = "icecream",
 		pickups = 1,
 		pickupAt = "frosty",
@@ -5407,7 +5496,7 @@ Config.JobTypes = {
 	{
 		id = "moving",
 		name = "Moving Day",
-		description = "Load a family's furniture into your ZDC Van at their house and unload it at their new home.",
+		description = "Load a family's furniture into your Deliveros Van at their house and unload it at their new home.",
 		employer = "movers",
 		level = 4, -- 5.0: a company vehicle (or your own car) needs level 4 (7.x: the car jobs' level)
 		pickups = 1,
@@ -5431,7 +5520,7 @@ Config.JobTypes = {
 	{
 		id = "farmrun",
 		name = "Farm Run",
-		description = "Load fresh food into your ZDC Van at the Old Farm and bring it to two markets in the city.",
+		description = "Load fresh food into your Deliveros Van at the Old Farm and bring it to two markets in the city.",
 		employer = "farm",
 		level = 9, -- 5.0: the Muscle Car's level then (4.x: 8)
 		pickups = 1,
@@ -5479,7 +5568,7 @@ Config.JobTypes = {
 	{
 		id = "horses", -- (the id stays: 7.x turned the Horse Transport into Feed and Tack, horses do not fit a van)
 		name = "Feed and Tack",
-		description = "Walt's mares went to the Riverside Riding School. Load their feed sacks and saddles at Silver Spur Ranch into your ZDC Van and bring them over.",
+		description = "Walt's mares went to the Riverside Riding School. Load their feed sacks and saddles at Silver Spur Ranch into your Deliveros Van and bring them over.",
 		employer = "ranch",
 		level = 5,
 		pickups = 1,
@@ -5503,7 +5592,7 @@ Config.JobTypes = {
 	{
 		id = "fuelrun",
 		name = "Fuel Run",
-		description = "Load fuel barrels into your ZDC Van at the Harbor Fuel Depot and refill the Gas Station on the North Highway.",
+		description = "Load fuel barrels into your Deliveros Van at the Harbor Fuel Depot and refill the Gas Station on the North Highway.",
 		employer = "gas",
 		level = 4,
 		pickups = 1,
@@ -5527,7 +5616,7 @@ Config.JobTypes = {
 	{
 		id = "cashrun",
 		name = "Cash Transport",
-		description = "Load sacks of cash at the First Zombie Bank into your ZDC Van and bring them to the Military Base vault. Every bandit in town wants this cargo.",
+		description = "Load sacks of cash at the First Zombie Bank into your Deliveros Van and bring them to the Military Base vault. Every bandit in town wants this cargo.",
 		employer = nil,
 		board = true,
 		level = 5,
@@ -5553,7 +5642,7 @@ Config.JobTypes = {
 	{
 		id = "ambulance",
 		name = "Ambulance Run",
-		description = "A patient is waiting at their home. Pick them up in your ZDC Van and rush them to the City Clinic before it is too late.",
+		description = "A patient is waiting at their home. Pick them up in your Deliveros Van and rush them to the City Clinic before it is too late.",
 		employer = "clinic",
 		level = 4, -- 5.0: a company vehicle (or your own car) needs level 4 (7.x: the car jobs' level)
 		pickups = 1,
@@ -5703,7 +5792,7 @@ Config.Robust = {
 		SandboxTasks = 4, -- 8.2: the SandboxTasks remote's state / claim (server/SandboxTasks.luau)
 		Auction = 4, -- 8.8: the Auction remote's state / consign / withdraw (the server's step: design/auction/PLAN.md)
 		AuctionBid = 3, -- 8.8: and its bids (one step a tap)
-		MoveHelper = 4, -- 8.3: Danny's HIRE, CLEAR QUEUE and STOP (the Moving remote's "helper": server/MoveHelper.luau)
+		MoveHelper = 4, -- 8.3: Danny's CLEAR QUEUE and STOP (the Moving remote's "helper": server/MoveHelper.luau; 10.1 no HIRE)
 		MoveHelperAssign = 5, -- 8.3: a piece clicked into (or out of) Danny's list (the Moving remote's ("helper", "assign"))
 		Clipboard = 4, -- 8.5: Danny's clipboard out or away (the Clipboard remote: server/Clipboard.luau)
 		MoveHelperOrder = 3, -- 8.6: an order to Danny, PUT IT DOWN / GET OUT (the Moving remote's ("helper", "putdown" | "getout"))
@@ -5711,6 +5800,9 @@ Config.Robust = {
 		Visitors = 2, -- 8.3: the Visitors remote's ACCEPT / DECLINE of a visitor's offer (server/VisitorOffers.luau)
 		PlayerTrade = 4, -- 8.7: the PlayerTrade remote's offer / answer / price / buy (server/PlayerTrade.luau)
 		TradeOffer = 0.2, -- 8.7: and a new offer to a player on top: one every 5 s at most (no offer spam)
+		Slots = 4, -- 10.1: the Slots remote's list / play / new (the start screen's save slots: server/SaveSlots.luau)
+		Runs = 4, -- 9.7: the Runs remote's state / difficulty / vote / leave (a run's pad and the run: server/Runs.luau)
+		Crew = 4, -- 10.1: the Crew remote's state / pick / discharge (the CREW window: server/HelperCrew.luau)
 	},
 }
 
@@ -6409,14 +6501,20 @@ Config.CarryGrip = {
 --                     8.3 the big move: The Old Farmstead (the owner's big Blender house, 44 × 14.5 × 34) empties as a big
 --                     house: Kind its plan's (HouseLayout's "big", Config.Furniture.Big: more rooms, more pieces, a back
 --                     door), a longer Time (the Sprinter's bed takes it home in several trips).
---                     Jinočany step 1 (design/jinocany/NAVRH.md §3): Houses, a contract per house of SandboxMap.Houses (by
---                     its id; server/Moving.luau's kiosk offers one at a time, never one another player has): Client (a
---                     made-up Czech family), Address (by its street), Blurb (the card's), Kind (its plan: HouseLayout's
---                     "big" the farmstead, "house" a family house) and Time (the move's clock, s). Its pieces are its
+--                     8.9, 9.4 the countryside (design/countryside/plan.py): Houses, a contract per place to empty of
+--                     SandboxMap.Houses (by its id; server/Moving.luau's kiosk offers one at a time, never one another
+--                     player has): Client (a made-up Czech family), Address (by its road), Blurb (the card's), Kind (its
+--                     plan: HouseLayout's "big" the farmstead, "house" the rest) and Time (the move's clock, s). Its pieces are its
 --                     Kind's (HouseLayout): a family house Config.Furniture.Spots (18 – 24) and Collectibles.Count (1 – 2),
 --                     19 – 26 pieces worth $5,700 – 14,000 at 90 % (Config.Collection's tuning), the farmstead Big.Spots
 --                     (34 – 40) and Big.Collectibles.Count (2 – 3), 36 – 43 pieces worth $10,200 – 21,300: about half
 --                     as much, so 15 minutes against the farmstead's 25 (tests/sandboxhouses_test.luau checks it)
+--                     9.5 the countryside (design/countryside/): the five family houses are gone; six spots in open
+--                     country instead, each a contract of its own: The Old Farmstead as ever, The Pond Cabin ("cabin"),
+--                     The Lone House ("house", a family house's plan), The Forest Lodge ("lodge"), The Old Mill ("mill")
+--                     and The Orchard Cottage ("cottage"): Kind its plan's (HouseLayout's; Config.Furniture.Countryside
+--                     the new kinds' pieces), Address a short place, not a street number ("by the Little Pond"), Time
+--                     by its size and its pieces (12 – 16 minutes: about the farmstead's minutes a piece)
 Config.Moving = {
 	Time = 12 * 60,
 	HordeAt = 3 * 60,
@@ -6448,7 +6546,7 @@ Config.Moving = {
 			hordeAt = 3.5 * 60,
 			pay = 1.25,
 		},
-	} :: { { id: string, name: string, client: string, icon: string, home: string?, place: string?, seed: number, kind: string, blurb: string, time: number?, hordeAt: number?, pay: number? } },
+	} :: { { id: string, name: string, client: string, icon: string, home: string?, place: string?, seed: number, kind: string, blurb: string, time: number?, hordeAt: number?, pay: number?, difficulty: string? } },
 	Sites = {
 		farm = {
 			House = { At = { 45, -84 } :: { number }, Size = { 26, 10, 16 } :: { number } },
@@ -6508,7 +6606,7 @@ Config.Moving = {
 	Pack = { Support = 0.4, Level = 0.35, Contact = 7.5, Flush = 3.6, Waste = 4.2, Base = 0.3, Side = 0.45, Depth = 0.4, Dead = 2.4, High = 2.4, Headroom = 1.1, Probe = 1, Lie = true, Repack = true },
 	Sandbox = {
 		Icon = "🏡",
-		-- Jinočany step 1: a contract per house of SandboxMap.Houses (its id), the families and numbers made up
+		-- a contract per place to empty of SandboxMap.Houses (its id), the families made up
 		Houses = {
 			sandbox_house = {
 				Client = "The Nováks", -- (The Hubers in the Alps)
@@ -6517,40 +6615,41 @@ Config.Moving = {
 				Kind = "big", -- 8.3: the big house's plan (shared/HouseLayout.luau, Config.Furniture.Big)
 				Time = 25 * 60, -- (8.3: the big house's, was 20 min: it takes several trips)
 			},
-			["Hlavní_n_5"] = {
-				Client = "The Dvořáks",
-				Address = "Hlavní 5",
-				Blurb = "A family house under the old linden. Grandma's things are going to the city: one trip or two home.",
-				Kind = "house",
+			-- 9.5 the countryside's spots (SandboxMap.Houses' ids; the families made up, Czech names, as ever)
+			pond_cabin = {
+				Client = "The Vodičkas",
+				Address = "by the Little Pond",
+				Blurb = "Grandpa's fishing cabin by the pond: rods, nets and an outboard motor. The motor is a two-person job.",
+				Kind = "cabin", -- (shared/Layouts/Countryside.luau: a timber fishing cabin, its bunk room and its store)
+				Time = 12 * 60,
+			},
+			lone_house = {
+				Client = "The Kopeckýs",
+				Address = "on Hill Road",
+				Blurb = "The last house up the hill before the woods. The Kopeckýs are moving to the city at last.",
+				Kind = "house", -- (a family house's plan, HouseLayout's "house")
+				Time = 16 * 60,
+			},
+			forest_lodge = {
+				Client = "The Lesáks",
+				Address = "in the Black Wood",
+				Blurb = "The old forester's lodge: antlers, a stuffed owl and a gun cabinet (empty, thank goodness).",
+				Kind = "lodge",
 				Time = 15 * 60,
 			},
-			["Hlavní_s_11"] = {
-				Client = "The Svobodas",
-				Address = "Hlavní 11",
-				Blurb = "The house with the blue gate, sold at last. Empty it before the new owners come.",
-				Kind = "house",
+			old_mill = {
+				Client = "The Mlynářs",
+				Address = "on the mill stream",
+				Blurb = "The old watermill still smells of flour. The spare millstone weighs a ton: grab a friend or Danny.",
+				Kind = "mill",
 				Time = 15 * 60,
 			},
-			["Školní_e_20"] = {
-				Client = "The Procházkas",
-				Address = "Školní 20",
-				Blurb = "The old schoolmaster's house, full of books and odd old things. Mind the fragile ones.",
-				Kind = "house",
-				Time = 15 * 60,
-			},
-			["Lidická_e_30"] = {
-				Client = "The Kučeras",
-				Address = "Lidická 30",
-				Blurb = "A family house with a rose garden. The Kučeras are moving out: bring everything home to your warehouse.",
-				Kind = "house",
-				Time = 15 * 60,
-			},
-			["Smetanova_w_84"] = {
-				Client = "The Horáks",
-				Address = "Smetanova 84",
-				Blurb = "The end house of the row on Smetanova, packed to the roof. Narrow doors: lift the big pieces with care.",
-				Kind = "house",
-				Time = 15 * 60,
+			orchard_cottage = {
+				Client = "The Sadíleks",
+				Address = "in the old orchard",
+				Blurb = "A whitewashed cottage among the apple trees: jam jars, a beehive box and Grandma's sewing machine.",
+				Kind = "cottage",
+				Time = 13 * 60,
 			},
 		} :: { [string]: { Client: string, Address: string, Blurb: string, Kind: string, Time: number } },
 		HordeAt = 3 * 60,
@@ -6558,7 +6657,7 @@ Config.Moving = {
 		Roam = 0, -- (none, as the horde; e.g. 2: a few round the house)
 		-- 8.4: a house's seed is a whole number 1 … this (server/Moving.luau rolls it); the one a player's card shows is
 		-- kept in their save until a trip brings something home (server/PlayerData.luau's sandboxHouseSeed: another
-		-- number there is none); Jinočany: with its house (sandboxHouse, a SandboxMap.Houses id)
+		-- number there is none); with its house (sandboxHouse, a SandboxMap.Houses id)
 		Seeds = 1073741823,
 	},
 }
@@ -6766,6 +6865,64 @@ Config.Furniture = {
 		BarnLight = { Brightness = 1.6, Range = 22, Color = { 255, 246, 226 } :: { number } },
 		Apron = 6,
 	},
+	-- 9.5 the countryside (the owner: "instead of those houses make rather six different spots: by the pond, on the farm,
+	-- one house, somewhere else again ... not any towns, and not villages"): the four new places to empty and their
+	-- insides, shared/Layouts/Countryside.luau's plans (HouseLayout.plan(seed, kind) for the kinds below: the Pond Cabin's
+	-- "cabin", the Forest Lodge's "lodge", the Old Mill's "mill", the Orchard Cottage's "cottage"; the Lone House is a
+	-- family house's "house"); server/HouseInterior.luau builds each in its own style. Per kind:
+	--   Box            the building's footprint on the map (SandboxMap.Houses' box: along its front × deep)
+	--   Ceiling        its rooms' height (the mill's workroom is tall: its millstones' hopper)
+	--   Spots / Stars  its pieces (at least, at most) and its ★ ones (its recipes' star entries first)
+	--   Collectibles   its collector's pieces: Count (at least, at most), Legendary (the chance of one); the house's Odds
+	--                  and Salt; the kind's own themed ones (Countryside.Themes in the layout) tried first in a rarity
+	--   InteriorMaxParts  an interior's parts at most, its furniture included (tests/countryside_test.luau)
+	--   Scale          an inside is its Box × Scale (whole even studs between its outer walls' middles), as a family
+	--                  house's inside is about twice its 30 × 24 box
+	Countryside = {
+		Scale = 1.7,
+		cabin = { Box = { 24, 18 } :: { number }, Ceiling = 11, Spots = { 12, 15 } :: { number }, Stars = 2, Collectibles = { Count = { 2, 4 } :: { number }, Legendary = 0.05 }, InteriorMaxParts = 520 },
+		lodge = { Box = { 28, 22 } :: { number }, Ceiling = 12, Spots = { 18, 22 } :: { number }, Stars = 3, Collectibles = { Count = { 2, 4 } :: { number }, Legendary = 0.05 }, InteriorMaxParts = 640 },
+		mill = { Box = { 24, 26 } :: { number }, Ceiling = 15, Spots = { 16, 20 } :: { number }, Stars = 2, Collectibles = { Count = { 2, 4 } :: { number }, Legendary = 0.05 }, InteriorMaxParts = 600 },
+		cottage = { Box = { 26, 20 } :: { number }, Ceiling = 11, Spots = { 14, 18 } :: { number }, Stars = 3, Collectibles = { Count = { 2, 4 } :: { number }, Legendary = 0.05 }, InteriorMaxParts = 580 },
+	},
+	-- 9.5 the countryside's own pieces (shared/FurnitureLooks.luau draws them and reads its catalogue's numbers here; the
+	-- collection book lists them with the rest): Class ("hand" one hand; "both" both hands; "pair" two people, or one
+	-- dragging it), Weight (1 … 10), Value ($: under every collectible of its class) and Fragile
+	Pieces = {
+		-- the Pond Cabin's: the fishing things in its store, the bunk room's bed
+		tackle_box = { Class = "hand", Weight = 2, Value = 90, Fragile = false },
+		fishing_rods = { Class = "both", Weight = 2, Value = 320, Fragile = true },
+		landing_net = { Class = "hand", Weight = 1, Value = 45, Fragile = false },
+		oars = { Class = "both", Weight = 3, Value = 110, Fragile = false },
+		outboard_motor = { Class = "pair", Weight = 7, Value = 620, Fragile = false },
+		cool_box = { Class = "both", Weight = 3, Value = 70, Fragile = false },
+		folding_chair = { Class = "hand", Weight = 1, Value = 30, Fragile = false },
+		coal_scuttle = { Class = "hand", Weight = 3, Value = 55, Fragile = false },
+		bunk_bed = { Class = "pair", Weight = 7, Value = 380, Fragile = false },
+		-- the Forest Lodge's
+		antler_trophy = { Class = "both", Weight = 2, Value = 380, Fragile = true },
+		gun_cabinet = { Class = "pair", Weight = 9, Value = 420, Fragile = false },
+		log_basket = { Class = "both", Weight = 4, Value = 60, Fragile = false },
+		stuffed_owl = { Class = "hand", Weight = 1, Value = 240, Fragile = true },
+		boot_rack = { Class = "both", Weight = 3, Value = 70, Fragile = false },
+		oak_table = { Class = "pair", Weight = 9, Value = 520, Fragile = false },
+		-- the Old Mill's
+		flour_sacks = { Class = "both", Weight = 4, Value = 40, Fragile = false },
+		grain_scales = { Class = "both", Weight = 5, Value = 240, Fragile = false },
+		grain_crate = { Class = "both", Weight = 4, Value = 50, Fragile = false },
+		millstone = { Class = "pair", Weight = 10, Value = 780, Fragile = false },
+		sack_trolley = { Class = "both", Weight = 3, Value = 80, Fragile = false },
+		joiners_bench = { Class = "pair", Weight = 8, Value = 260, Fragile = false },
+		-- the Orchard Cottage's
+		fruit_crates = { Class = "both", Weight = 3, Value = 50, Fragile = false },
+		jam_shelf = { Class = "both", Weight = 4, Value = 150, Fragile = true },
+		bee_box = { Class = "both", Weight = 4, Value = 180, Fragile = true },
+		rocking_chair = { Class = "both", Weight = 4, Value = 160, Fragile = false },
+		plate_dresser = { Class = "pair", Weight = 8, Value = 420, Fragile = true },
+		sewing_machine = { Class = "both", Weight = 5, Value = 480, Fragile = false },
+		apple_press = { Class = "pair", Weight = 8, Value = 360, Fragile = false },
+		flower_pots = { Class = "hand", Weight = 2, Value = 35, Fragile = true },
+	} :: { [string]: { Class: string, Weight: number, Value: number, Fragile: boolean } },
 }
 
 -- 7.0, the moves' story "The Last Move" (shared/MoveStory.luau: the chapters and their words; client/MoveStoryUi.luau
@@ -6792,11 +6949,14 @@ Config.MoveStory = {
 -- carries with you. 8.3 for hire (the owner: "I have to PAY for him when I want help … you click on something, and that
 -- assigns it to him, and the rest you carry yourself"; "he must sit in my car with me"): he waits by the van until a
 -- crew player hires him for the move (Hire), then carries the pieces the crew clicks (Queue) to the van, lifts the
--- two-person ones with you and rides in the van's passenger seat.
---   Solo / Duo         a crew of one / of two players has him by the van for hire (Duo: off); once hired he stays with
---                      any crew until the move ends (or his hirer leaves it)
---   Name / Title       his name tag
---   Health / Respawn   his health; at 0 he drops what he holds and is back at the van Respawn s later
+-- two-person ones with you and rides in the van's passenger seat. 10.1 (Config.Crew): no hire any more: he is free and
+-- every player's from the start, with every run's party (its host's pick of their crew comes, Danny or one of
+-- the helpers rescued in runs, each a MoveHelper of his own kind: shared/CrewRules.luau, server/HelperCrew.luau).
+--   Solo / Duo         the city's moves (Config.Sandbox.On false): a crew of one / of two players has him (Duo: off); 10.1
+--                      the sandbox's runs: every party has its host's helper; once with a move he stays with any crew
+--   Name / Title       his name tag (10.1: Danny's; the crew's kinds have their own names, the title "<Role> · Title")
+--   Health / Respawn   his health; at 0 he drops what he holds and is back at the van Respawn s later (10.1: in a run he
+--                      goes down instead: Config.Crew.Down, revived by the party or out to hospital)
 --   Speed              × the walk (Config.Movement.Walk), and × the carry's (MovingRules.speedFactor) with a piece:
 --                      slower than a player; Sprint: × the walk on his way to your lift (8.3: and to the van's seat)
 --   KeepUp / Flee      × the pair's carry speed (his speed's word for "with you"); × the walk running away
@@ -6817,7 +6977,8 @@ Config.MoveStory = {
 --   PairLift), so that is the far end of its length; its turn, a square-ish piece, a lag never make it another end
 --   Edge               carrying in two, the hands of both (yours and the far end's: client/ArmPose.luau's box, the
 --                      CarryAt / CarrySize attributes) on its end's edge at its grips' height: Width across at most,
---                      Height, Depth (studs)
+--                      Height, Depth (studs); 9.0 Reach: studs his hands reach on toward it at most, following you (his
+--                      body never in the piece: HoldLead.In)
 --   8.1 carrying in two (the owner: "when I turn around he teleports … we must walk, like, backwards and slowly"; shared/
 --   PairCarry.luau the leader's steering, MoveHelperBrain.holdSpeed / holdTrack the far end's holder, server/PairHold.luau
 --   the constraints; Danny and a crew mate who helps lift alike):
@@ -6857,7 +7018,47 @@ Config.MoveStory = {
 --                      and the lead changes Rate studs a second at most (it was your root's velocity, taken at once: a
 --                      step back, a turn's step aside, an uneven look at you threw his aim up to Far × 2 studs across in
 --                      a tenth of a second, and he ran there)
---   RunHint            carrying in two (the character attribute CarryPair on both players, server/Moving.luau setHands)
+--   9.0 (the owner, 8.9.3: "Danny carries better now, but only when I walk backwards. When I want to walk forwards,
+--   Danny can't walk backwards"; then "and he still teleports", a screenshot of Danny standing inside the Sofa):
+--   HoldLead.In        studs his lead may take him toward the piece's middle at most (0: his body never goes into the
+--                      piece, a stop after you walked backwards never leaves him in it; his hands reach on instead,
+--                      Edge.Reach); HoldLead.Back: s more of lead while he walks backwards himself (your screen may show
+--                      him later than the lead's guess: he stays clear of the piece, his hands reach on by it)
+--   PairStart          s the carry in two takes from standing to its full walk (client/PairSteer.luau, shared/PairCarry.
+--                      luau: the walk eases in, again after the way turns round): the far end's holder is shown on your
+--                      screen a moment late, and a start at once ran the piece into him before he could step back
+--                      (9.2: a held far end only, a crew mate's: Danny driven by the leader's client has none, PairLead)
+--   PairKeep           the far end's holder as YOUR screen shows him (the character attributes PairFar: his place in
+--                      your root's frame; PairWith: Danny's MoveHelperId, a crew mate's UserId): shown more than Wait
+--                      studs nearer than his place, your walk's start waits for him (shared/PairCarry.luau waits); From
+--                      studs nearer your walk toward him starts to go, all of it at Stop (keep): you never push the
+--                      piece into him, whatever the lag
+--   HoldWall           inside a house (its plan's wall slabs: shared/HouseRoute.luau slide) his place keeps Clear studs
+--                      off the walls, sliding along them, never through; held back by a wall (his lead looks ahead), the
+--                      leader's walk into that wall loses that many studs' share of Block (the character attribute
+--                      PairWall: client/PairSteer.luau takes it away): slowed as he nears the wall, stopped against it
+--                      (9.2: Clear is also his body's clearance the leader's client keeps off a wall, PairLead)
+--   9.2 (the owner, 8.9.5: "the carrying is better, but it feels like it's harder to control … fix it so it's
+--   playable"; 8.9.4 hid his server-held body's lag by holding your walk back: its start took 0.85 s in Studio, 2 s
+--   online): while Danny holds the far end of a piece a PLAYER leads, that player's client drives his end (server/
+--   PairHold.luau lead: his body's physics theirs, SetNetworkOwner; client/PairLead.luau sets his hold's goals from
+--   their own piece every frame before the physics): nothing late to hide, so PairStart, PairKeep and PairWall are
+--   only a crew mate's now (and Danny's when the server holds him: PairLead.On false, a drive it took back)
+--   PairLead           On: the leader drives Danny's end (false: the server holds him as in 8.9.4, his lead and all);
+--                      Turn: degrees a second the leader's heading turns meanwhile (PairTurn stays a crew mate's),
+--                      TurnWalk: × the walk while it turns PairTurnFull or more (PairTurnWalk: a crew mate's); Glide:
+--                      studs a second over his place's own speed he closes on it until he is there (the first catch-up
+--                      glides the last studs, never a snap); Settle: studs off his place where he is there (rigid from
+--                      then: Rigid studs a second, Spin radians a second his turn), Loose: studs off it where he glides
+--                      again; Jump: his place this far off (a door's trip into or out of the house, its interior far
+--                      off the map): put there at once; Soft: studs before his body's clearance from a wall of the house
+--                      (HoldWall.Clear) where the leader's walk or turn pushing his end into it starts to go (all of it
+--                      at the clearance; along the wall it stays); Sane / Grace: the server's look, his body more than
+--                      Sane studs off his end in its own view for Grace s (a door's trip aside): it takes his body back
+--                      and holds him itself for the rest of that carry (an exploit's fling, a client that stopped
+--                      driving: walked back at the hold's speed, never put there); Look: s between two looks for the
+--                      house's walls and floors while a carry in two is driven
+--   RunHint           carrying in two (the character attribute CarryPair on both players, server/Moving.luau setHands)
 --                      nobody runs: the walk is held at CarrySpeed (× the admin's and kit's boosts) every step, and the
 --                      run key or button says this once a carry
 --   PathRadius / PathHeight / PathSpacing   his paths (PathfindingService: never a jump, never a climb); PathAgain:
@@ -6874,8 +7075,40 @@ Config.MoveStory = {
 --   FleeRange / SafeRange / FleeStep   a zombie this close: he runs FleeStep studs away until none is within SafeRange
 --                      (never while he holds the other end of your piece)
 --   WaitShut           s he waits with a piece at the van's shut back (when he may not open it) before he sets it down
---   StuckRepath / StuckSnap / Far   s without progress before a new path / before he appears at his way's next point;
---                      studs away he appears at once
+--   Far                studs on foot to his goal from which he may be put there at once (a fade in: Walk.Seen, never in
+--                      a player's sight; your call's walk and the ride's never)
+--   9.3 (the owner, 8.9.5: "Danny still annoys me. He takes it completely like a robot. For example, he runs for 2
+--   seconds and then on the spot he somehow teleports around"; tests/movehelper_stuck_runtime_test.luau sweeps his body
+--   along his ways in the six real houses, the parts as built: his walk turned to the next corner a stud before it, his
+--   2-stud body 0.35 studs off a wall's end at the closest, then pressed against it, a stuck spell, and 4 s later the
+--   nudge put him on: the teleport on the spot; server/MoveHelper.luau's go, shared/HouseRoute.luau ahead, MoveHelper-
+--   Brain progress / unstuck / ease):
+--   Walk               how he walks a way (inside a house its grid's, outside PathfindingService's): aimed at a point
+--                      Ahead studs (his walk × Lead s when that is more, AheadMost at most) along his way, the farthest
+--                      whose straight line from him keeps Clear studs off every wall, fixture and piece of the house
+--                      (exactly: his root's half diagonal and a margin; never nearer to one than he is) or, outside,
+--                      cuts the way's corners Cut studs at most; ordered again every Reorder s, or once he is within Near
+--                      studs of the point (never a stop on the way). Over the last Ease studs to his goal he slows to
+--                      EaseMin × his walk; standing still Settle s within Arrive studs of it past his `near` counts as
+--                      there (the humanoid stops a hair short). DoorIn: studs into a doorway he walks on while he fades
+--                      out (Config.Moving.Doors FadeOut + Margin, then he is put on its other side and fades in FadeIn s,
+--                      walking on: the players' walk-in doors). Seen: studs from a player within which no teleport may
+--                      be seen (the Far rule: he walks instead). Turn: s his turn on the spot takes (a short tween,
+--                      never a snap)
+--   Unstuck            no progress along his way (Progress studs nearer than its best) for Repath s: a new way from
+--                      where he stands; then every Cycle s his walking ways out: a new way (to Back s into it), walked
+--                      back BackStep studs off what blocks him (to Side s), a sidestep of SideStep studs onto open ground
+--                      (the other side each time) at Pace × his walk; only Fade s without progress the last resort: he
+--                      fades over onto his way Rescue studs on (never a pop)
+--   Body               his body as the audit sweeps it and his way keeps off things (Roblox's classic R15: the root 2
+--                      studs wide, Radius its half; Hip the HipHeight; Height his head's top; StepUp the highest rise a
+--                      Humanoid walks onto without a jump, an assumption: with the Jumping state off a higher ledge in
+--                      his way stops him); the built interior's collidable parts between StepUp and Height over the floor
+--                      close his grid's cells as the plan's walls do (HouseRoute.solid)
+--   Diag               Roblox Studio only (RunService:IsStudio): the Output's "[Danny] teleport <why> <studs> studs at
+--                      <where>" for every time he is put somewhere (Every s apart at most for the same why) and "[Danny]
+--                      stuck <s>s at <where> going to <where>, blocked by <the part's full name>" once a stuck spell lasts
+--                      Stuck s (again every Every s while it lasts; the part a ray along his walk finds)
 --   Aside              doorways he keeps clear of when he stands somewhere: within the door's half width + Margin
 --                      along its wall and Depth (FrontDepth at the front door outside) through it, his place moves Step
 --                      past its edge, Off at least from the wall
@@ -6895,17 +7128,12 @@ Config.MoveStory = {
 --                      the last resort, he fades over (a door's own walk-through is not a fade-over)
 --   CallLeave / CallIdle   your call ends when you walk CallLeave studs past the Lift's reach, or he stood ready
 --                      CallIdle s and you never lifted (Lift again, G or the STOP button end it too)
---   8.3 for hire (shared/MoveHelperBrain.luau's hirePrice, hireCheck, assignCheck, nextQueued, pickSeat, getOut;
---   server/MoveHelper.luau's hire, list and ride; client/MoveHelperCard.luau his card and the clicks on the pieces;
---   the rate limits Config.Robust.Limits.MoveHelper (HIRE, CLEAR QUEUE, STOP) and MoveHelperAssign (a piece clicked)):
---   Hire               the hire, for one move, paid by the crew player who hires him (PlayerData.spend, the analytics
---                      reason HelperHire): Base + PerPiece × the house's pieces (the bigger the house, the more he
---                      saves you), to Round dollars, Min … Max. The tuning: the sandbox starts you with $500 and a
---                      first haul on show earns about $40 – 50 a minute (8.3 economy), so the Old Farmstead's big
---                      house (36 – 43 pieces: $230 – 270) is a real choice on the first move and five or six minutes of
---                      the warehouse's income later; a smaller house (20 or so pieces: about $150) costs less, Max at
---                      most. Danny's training (Config.SandboxUpgrades danny) makes him faster, not cheaper. No
---                      refund: a hire lasts the move (CLEAR QUEUE stops him working; nothing more is charged)
+--   8.3 his list (shared/MoveHelperBrain.luau's assignCheck, nextQueued, pickSeat, getOut; server/MoveHelper.luau's list
+--   and ride; client/MoveHelperCard.luau his card and the clicks on the pieces; the rate limits
+--   Config.Robust.Limits.MoveHelper (CLEAR QUEUE, STOP) and MoveHelperAssign (a piece clicked)). 10.1: no hire any more
+--   (8.3 – 10.0 he cost $100 – 400 a move, Hire): Danny is free and every player's from the start, and the run host's
+--   pick of their crew comes into a run instead of him (Config.Crew: Bruno, Zip, Gus, Lucy, each a MoveHelper with
+--   his own carry, speed and look)
 --   Queue              the pieces on his list at most (a click on one more: "his list is full"); he carries them in
 --                      the order they were clicked, the rest is yours
 --   RideReach          studs from his spot at the van's passenger door (RideStand) where he starts getting in (your seat
@@ -6980,9 +7208,11 @@ Config.MoveStory = {
 --                      outside): Step studs a cell; Radius studs his body keeps off every wall, solid fixture and piece
 --                      standing in the house (a cell he fits in is open: the doorways' 6 studs take him); Stand studs
 --                      from a piece's footprint at most where he stands to take it (arm's length, its near side, his
---                      line to its middle through no wall; none: "can't get to it", refused at the assignment); Snap
---                      studs he looks for the nearest open cell from a spot off them (a start, a goal, a stuck nudge:
---                      onto it, never into a wall); Again s at least between two ways worked out for the same goal
+--                      line to its middle through no wall; 9.3 1.8, was 2: his hands on it as he bends, not gliding
+--                      from afar; StandFar where no such spot is; none: "can't get to it", refused at the assignment);
+--                      Snap studs he looks for the nearest open cell from a spot off them (a start, a goal, a stuck
+--                      spell's sidestep: onto it, never into a wall); Again s at least between two ways worked out for
+--                      the same goal
 --   Pick               his pick-up: within Arm studs of the piece's footprint (Stand and the walk's give), his chest's
 --                      line to its middle through no wall (a ray at the interior's walls) he turns to it (Turn s), bends
 --                      and reaches with both arms (Bend s: shared/BodyMotion.luau's "lift", client/ArmPose.luau's hands
@@ -6995,7 +7225,7 @@ Config.MoveHelper = {
 	Solo = true,
 	Duo = false,
 	Name = "Danny",
-	Title = "ZDC Moving",
+	Title = "Deliveros Moving",
 	Health = 100,
 	Respawn = 15,
 	Speed = 0.7,
@@ -7026,8 +7256,13 @@ Config.MoveHelper = {
 	HoldLegs = { From = 0.8, To = 0.4, Band = 0.3 },
 	HoldCap = 40, -- 8.3 keeping up
 	HoldPace = { Fall = 0.5, Jump = 12 },
-	HoldLead = { Base = 0.06, Ping = 1, Most = 0.25, Far = 3, Smooth = 0.1, Rate = 5 }, -- (8.6 Rate)
-	Edge = { Width = 2.4, Height = 0.3, Depth = 0.6 }, -- 8.6
+	HoldLead = { Base = 0.06, Ping = 1, Most = 0.25, Far = 3, Smooth = 0.1, Rate = 5, In = 0, Back = 0.05 }, -- (8.6 Rate; 9.0 In, Back)
+	PairStart = 0.6, -- 9.0
+	PairKeep = { Wait = 0.1, From = 0.25, Stop = 0.8 }, -- 9.0
+	HoldWall = { Clear = 0.8, Block = 0.4 }, -- 9.0
+	PairLead = { On = true, Turn = 120, TurnWalk = 0.75, Glide = 6, Settle = 0.5, Loose = 1.5, Rigid = 400, Spin = 30, Jump = 30, Soft = 0.6, Sane = 8,
+		Grace = 1.5, Look = 0.5 }, -- 9.2
+	Edge = { Width = 2.4, Height = 0.3, Depth = 0.6, Reach = 1.2 }, -- 8.6 (9.0 Reach)
 	RunHint = "Too heavy to run with",
 	PathRadius = 1.5,
 	PathHeight = 5,
@@ -7048,9 +7283,13 @@ Config.MoveHelper = {
 	SafeRange = 24,
 	FleeStep = 18,
 	WaitShut = 8,
-	StuckRepath = 2,
-	StuckSnap = 4,
 	Far = 120,
+	-- 9.3 his walk (the owner: "he runs for 2 seconds and then on the spot he somehow teleports around")
+	Walk = { Ahead = 2.5, Lead = 0.35, AheadMost = 5, Clear = 1.15, Cut = 0.5, Reorder = 0.2, Near = 1.5, Ease = 3, EaseMin = 0.35, Arrive = 0.6,
+		Settle = 0.3, DoorIn = 0.5, Seen = 150, Turn = 0.25 },
+	Unstuck = { Progress = 0.5, Repath = 1, Cycle = 2.4, Back = 0.6, Side = 1.4, BackStep = 1.5, SideStep = 2, Pace = 0.6, Fade = 10, Rescue = 4 },
+	Body = { Radius = 1, Hip = 2, Height = 5.2, StepUp = 1 },
+	Diag = { Every = 2, Stuck = 1.5 },
 	Aside = { Margin = 1, Depth = 2.5, FrontDepth = 6, Step = 2.4, Off = 1.2 },
 	TruckFar = 150,
 	TalkGap = 3,
@@ -7065,8 +7304,7 @@ Config.MoveHelper = {
 	CallBlink = 15,
 	CallLeave = 4,
 	CallIdle = 25,
-	-- 8.3 for hire
-	Hire = { Base = 50, PerPiece = 5, Round = 10, Min = 100, Max = 400 },
+	-- 8.3 his list (10.1: no hire, Config.Crew)
 	Queue = 6,
 	RideReach = 1.2,
 	RideStand = 2.8, -- 8.5 getting in like a player
@@ -7101,7 +7339,7 @@ Config.MoveHelper = {
 	-- 8.6 the bubble over his head
 	Bubble = { Near = 35, Far = 75, Top = 20, Tick = 0.15, Text = 13, Tall = 26, Pad = 9, Gap = 4, Wide = 340 },
 	-- 9.0 his way inside a house, his pick-up, his list's markers
-	Route = { Step = 0.5, Radius = 1.25, Stand = 2, Snap = 3, Again = 0.5 },
+	Route = { Step = 0.5, Radius = 1.25, Stand = 1.8, StandFar = 2.4, Snap = 3, Again = 0.5 }, -- (9.3 Stand 1.8, was 2: StandFar)
 	Pick = { Arm = 2.8, Turn = 0.3, Bend = 0.45, Lift = 0.4, Tries = 3 },
 	MarkFar = 60,
 }
@@ -7332,10 +7570,277 @@ Config.Collection = {
 	IdleRemotes = { "Collection", "Moving", "Upgrades", "SandboxTasks", "Visitors", "VanPaint", "PlayerTrade" } :: { string }, -- (8.7: PlayerTrade)
 }
 
+-- 9.7 RUNS (the owner: "like Dungeon Quest: from the lobby you go into a house, alone, with friends or with Danny. In
+-- the house you carry loot into the truck standing right at the house. When you leave, the loot is taken to your
+-- warehouse in the lobby on its own"): the lobby's portals (shared/SandboxMap.luau Lobby.portals, design/lobby/plan.py),
+-- the runs (server/Runs.luau; their rules shared/RunRules.luau, tests/runrules_test.luau; client/RunUi.luau). A run is
+-- a sandbox move (server/Moving.luau) of one house by a party, its truck parked at the house's curb, no driving.
+--   Difficulties   in order: id (the run's contract.difficulty, the house's RunDifficulty attribute), name, time (× the
+--                  house's clock, Config.Moving.Sandbox.Houses' Time), color (the pad panel's and the results card's).
+--                  The difficulty does nothing else yet: traps and zombies (harder ones) and the loot's rarity read it
+--   Default        a run's difficulty when nobody picked one
+--   Open           the difficulties open from the start (Easy, Normal); each next one opens for a player who finished
+--                  a run at the one before it (any house: a run ended done or late, with something home)
+--   Flag           the save's mark: profile.runUnlocked (how many are open) is read only from a real save written with it
+--   Countdown      s from the first player on a portal's pad to the run (everybody on the pad then goes)
+--   MaxParty       the players a run takes at most (the first on the pad first)
+--   PadHeight      studs over the pad a body's root may be and still stand on it
+--   Every          s between two looks at the pads (the server's loop)
+--   Apart          studs between the party's arrival spots in the house's front yard (across the way they look)
+--   Fade           s: the screen's fade out before a jump (the run's start, its end, leaving), its fade in after
+--   EndHold        s from a run's end (its results card) to the fade back to the lobby (the house's own door trips of
+--                  whoever was inside, Config.Moving.Doors' FadeOut + Margin + Stream, are over by then)
+--   LeaveHold      s from LEAVE RUN to the fade back (the same door trip out of the house first)
+--   Truck          Attribute: the truck's model attribute while it stands at a run's house (client/CarVisuals.luau: no
+--                  Drive or Ride along prompt; its driver's seat is Disabled); Reach: its FINISH / VOTE prompts' reach;
+--                  At: their place on its chassis (x across, y up, z along: the driver's side behind the cab)
+--   Zone           a run zone's edge (SandboxMap.Zones): Screen (CountryLooks' "screen" hedge: Height, Width, its colour),
+--                  Wall (the invisible walls' height on it), View (studs: the forest's and the orchard's trees, the
+--                  stream's pieces kept within this of a zone, the rest of them never built)
+--   Portal         the lobby's gates (server/LobbyWorld.luau): Gate { width, height }, the pad's glow by its state (Free,
+--                  Waiting: a countdown, InUse: a run in that house), Styles: each house's colours for its gate and
+--                  facade (wall, trim, roof, accent: RGB), SignRange (its words' MaxDistance)
+--   Panel          the pad panel (client/RunUi.luau): Width (px at scale 1), TouchScale (its least scale on a phone)
+--   Result         the results card: Width, Rows (pieces listed at most; the rest summed up), TouchScale
+-- The Runs remote (Config.Robust.Limits.Runs): client → server { kind = "state" } | { kind = "difficulty", id } (the
+-- host on the pad) | { kind = "vote" } (to finish) | { kind = "leave" } (out of your run alone); server → client
+-- { kind = "pad", ... } | { kind = "pad" } (off a pad), { kind = "run", ... } | { kind = "run" } (not in a run),
+-- { kind = "result", ... } (the results card), { kind = "unlocked", id } (a difficulty opened). 10.x danger: server →
+-- client { kind = "danger", ... } (the run's keys, vault, zombies and its events: client/RunDangerUi.luau).
+-- 10.x DANGER (the owner: "both: on the easier difficulties only a timer and traps, on the harder ones zombies too ... it
+-- has to be designed to be fun"; the pure rules shared/DangerRules.luau, tests/danger_test.luau; the server
+-- server/RunDanger.luau, tests/danger_runtime_test.luau; the HUD client/RunDangerUi.luau):
+--   Danger         per difficulty id: Locks (inside doorways locked, each its key hidden in a searchable piece of a room
+--                  you can get to first), Vault (the vault's pieces: 0 none; its gold key hidden like the others, deeper
+--                  when it can be), Legendary (the chance a vault piece comes Legendary, else Vault.Floor), Creak /
+--                  Puddle / Plaster (the hazards of each kind at most: as many as the house has open floor for), Harm (×
+--                  a creak's knock and the plaster's damage), Inside / Yard (zombies in the house and in its yard from the
+--                  start), Wave (zombies in the yard once Zombies.WaveAt of the clock is gone, marching at the door, "A
+--                  horde is coming!"), Speed (× their speed), Boss (the boss by the vault), Weapon (every party member
+--                  gets the run's bat: Weapon), Kinds (the zombies' kinds' weights: Config.Zombies' kinds)
+--   Locks          Hold, Reach: the locked door's Unlock prompt; Lift: tiers a locked room's pieces come up (server/
+--                  Loot.luau boost); Swing s, Open degrees: the leaf swinging open; its colours (RGB)
+--   Search         a searchable piece's Search prompt (F, the gamepad's Y): Hold s, Reach studs; Items: the pieces that
+--                  are searched (things with drawers, doors, lids or cushions; never a collectible)
+--   Rooms          a room id's name (a key's: "Bedroom key")
+--   Vault          the vault: a steel and glass case round each of its pieces (Margin studs out, Lid over its top), its
+--                  Open prompt (Hold, Reach) at the case's lock; Floor: the least rarity of its pieces; Entry: × a piece's
+--                  chance of the vault in a room you come in by (the vault deeper in the house); Sink s: the case
+--                  sinking away when it opens; its colours
+--   Hazard         Every s between two looks at the party's feet; Grid, Radius: the planning grid's cells and a body's
+--                  room (shared/HouseRoute.luau); Tries per hazard; Gap studs: from a doorway, a piece, the way in, each
+--                  other, the walls, a fixture; Reach: a piece's reach kept walkable. Creak: a cracked patch of boards
+--                  (Size studs): carrying over it you stumble and drop the piece (Knock: as hp of a bite,
+--                  MovingRules.hitDamage: a fragile piece takes more); Rearm s per player. Puddle: you slide Slide studs /
+--                  s along your walk (the Knock remote); Danny walks round both. Plaster: a cracked ceiling patch over a
+--                  dusty floor (Size); a player within Trigger studs starts it: it shakes Warn s, then drops (Damage on
+--                  everybody under it, × Harm), Rearm s to the next
+--   Zombies        Aggro / YardAggro: studs a zombie in the house / in the yard notices you at while calm (Config.Horde
+--                  .Roam.aggro elsewhere: the yard's under its YardAway, so the party arrives unseen); Away / YardAway /
+--                  Truck / Edge: studs a new zombie keeps from the players (and the way in) / the yard's players and
+--                  the arrival / the truck / the zone's edge; Tries; Grid, Radius: their way inside (HouseRoute);
+--                  Steer, Again: a new way every Steer s at most or when its goal moved Again studs; Block s: the pieces
+--                  standing looked at again; WaveAt (of the clock), WaveFar (studs from the door at least); Boss: its
+--                  kind, name (over its head), Health, Scale, Guard (studs round the vault it keeps to while calm)
+--   Weapon         the run's melee weapon: Kind (Config.Melee.Kinds: server/CloseCombat.luau swings it), Name (its Tool)
+--   DangerHud      client/RunDangerUi.luau: Width px, Event s a line shows, Banner s the horde's banner, Every s, Hint
+--                  studs (⚠ a hazard near), TouchScale (the banner's least scale on a phone)
+export type RunDifficulty = { id: string, name: string, time: number, color: { number } }
+export type RunDanger = {
+	Locks: number,
+	Vault: number,
+	Legendary: number,
+	Creak: number,
+	Puddle: number,
+	Plaster: number,
+	Harm: number,
+	Inside: number,
+	Yard: number,
+	Wave: number,
+	Speed: number,
+	Boss: boolean,
+	Weapon: boolean,
+	Kinds: { [string]: number },
+}
+Config.Runs = {
+	Difficulties = {
+		{ id = "easy", name = "Easy", time = 1.3, color = { 120, 214, 120 } },
+		{ id = "normal", name = "Normal", time = 1, color = { 120, 190, 255 } },
+		{ id = "hard", name = "Hard", time = 0.85, color = { 255, 196, 70 } },
+		{ id = "insane", name = "Insane", time = 0.72, color = { 255, 120, 60 } },
+		{ id = "nightmare", name = "Nightmare", time = 0.6, color = { 220, 70, 90 } },
+	} :: { RunDifficulty },
+	Default = "normal",
+	Open = 2,
+	Flag = "runUnlockedKept",
+	Countdown = 10,
+	MaxParty = 4,
+	PadHeight = 8,
+	Every = 0.2,
+	Apart = 3.5,
+	Fade = { Out = 0.45, In = 0.6 },
+	-- 10.4 the ride (client/RideUi.luau): s the van drives on its way to a house (To) and back (Back), over the fade;
+	-- Home: the lobby's name on the way back; Out: s the ride fades into the place
+	Ride = { To = 3.4, Back = 2.4, Out = 0.5, Home = "the Deliveros depot" },
+	EndHold = 3.5,
+	LeaveHold = 3,
+	Truck = { Attribute = "RunParked", Reach = 9, At = { -4.6, 3.4, -1.5 } :: { number } },
+	Zone = { Screen = { Height = 14, Width = 4, Color = { 44, 82, 38 } :: { number } }, Wall = 80, View = 110 },
+	Portal = {
+		Gate = { 16, 15 } :: { number },
+		Free = { 90, 210, 255 } :: { number },
+		Waiting = { 255, 190, 70 } :: { number },
+		InUse = { 220, 64, 64 } :: { number },
+		SignRange = 180,
+		Styles = {
+			sandbox_house = { wall = { 226, 214, 186 }, trim = { 120, 58, 44 }, roof = { 150, 62, 44 }, accent = { 196, 160, 96 } },
+			pond_cabin = { wall = { 132, 94, 60 }, trim = { 60, 96, 120 }, roof = { 72, 76, 82 }, accent = { 176, 72, 52 } },
+			lone_house = { wall = { 236, 226, 200 }, trim = { 110, 80, 56 }, roof = { 172, 72, 52 }, accent = { 90, 130, 70 } },
+			forest_lodge = { wall = { 112, 76, 46 }, trim = { 60, 42, 28 }, roof = { 74, 92, 60 }, accent = { 226, 214, 186 } },
+			old_mill = { wall = { 150, 148, 142 }, trim = { 96, 70, 48 }, roof = { 92, 88, 86 }, accent = { 120, 90, 60 } },
+			orchard_cottage = { wall = { 244, 240, 230 }, trim = { 80, 112, 60 }, roof = { 198, 166, 98 }, accent = { 200, 60, 60 } },
+		} :: { [string]: { wall: { number }, trim: { number }, roof: { number }, accent: { number } } },
+	},
+	Panel = { Width = 380, TouchScale = 0.8 },
+	Result = { Width = 420, Rows = 8, TouchScale = 0.8 },
+	-- 10.x DANGER (the block above Config.Runs): per difficulty, what a run's house holds besides the loot
+	Danger = {
+		easy = { Locks = 1, Vault = 0, Legendary = 0, Creak = 2, Puddle = 1, Plaster = 0, Harm = 1, Inside = 0, Yard = 0, Wave = 0, Speed = 1, Boss = false, Weapon = false, Kinds = {} },
+		normal = { Locks = 1, Vault = 1, Legendary = 0, Creak = 2, Puddle = 2, Plaster = 1, Harm = 1.15, Inside = 0, Yard = 0, Wave = 0, Speed = 1, Boss = false, Weapon = false, Kinds = {} },
+		hard = { Locks = 2, Vault = 1, Legendary = 0, Creak = 3, Puddle = 2, Plaster = 2, Harm = 1.3, Inside = 3, Yard = 3, Wave = 0, Speed = 1, Boss = false, Weapon = true, Kinds = { walker = 1 } },
+		insane = { Locks = 2, Vault = 2, Legendary = 0, Creak = 3, Puddle = 3, Plaster = 3, Harm = 1.45, Inside = 5, Yard = 4, Wave = 8, Speed = 1.2, Boss = false, Weapon = true,
+			Kinds = { walker = 0.65, runner = 0.25, bloater = 0.1 } },
+		nightmare = { Locks = 2, Vault = 2, Legendary = 0.35, Creak = 4, Puddle = 3, Plaster = 4, Harm = 1.6, Inside = 7, Yard = 6, Wave = 12, Speed = 1.3, Boss = true, Weapon = true,
+			Kinds = { walker = 0.5, runner = 0.25, brute = 0.15, bloater = 0.1 } },
+	} :: { [string]: RunDanger },
+	Locks = { Hold = 0.5, Reach = 8, Lift = 1, Swing = 0.7, Open = 100, Leaf = { 104, 70, 44 } :: { number }, Iron = { 58, 58, 64 } :: { number }, Brass = { 214, 170, 70 } :: { number } },
+	Search = {
+		Hold = 1,
+		Reach = 7,
+		Items = { "wardrobe", "dresser", "nightstand", "desk", "toy_box", "shoe_cabinet", "toolbox", "tool_chest", "bookshelf", "painted_cupboard", "carved_chest",
+			"tackle_box", "cool_box", "gun_cabinet", "plate_dresser", "jam_shelf", "grain_crate", "fridge", "box", "dishes_box", "laundry_basket", "coal_scuttle",
+			"log_basket", "boot_rack", "sofa", "armchair", "heart_chair", "bed", "kids_bed", "bunk_bed", "flour_sacks", "feed_sacks", "fruit_crates", "apple_crate" } :: { string },
+	},
+	Rooms = {
+		hall = "Hall", corridor = "Corridor", living = "Living Room", kitchen = "Kitchen", bedroom = "Bedroom", kids = "Kids' Room", bath = "Bathroom",
+		garage = "Garage", guest = "Guest Room", study = "Study", main = "Main Room", bunks = "Bunk Room", store = "Store", gunroom = "Gun Room",
+		workroom = "Workroom", millers = "Miller's Room",
+	} :: { [string]: string },
+	Vault = { Hold = 1, Reach = 8, Floor = "epic", Entry = 0.5, Margin = 0.4, Lid = 0.6, Sink = 0.8, Steel = { 70, 74, 82 } :: { number }, Glass = { 170, 214, 236 } :: { number }, Gold = { 255, 196, 60 } :: { number } },
+	Hazard = {
+		Every = 0.1,
+		Grid = 1,
+		Radius = 1.25,
+		Tries = 40,
+		Gap = { Door = 4, Piece = 2.5, Entry = 9, Each = 3, Wall = 1.5, Fixture = 1, Reach = 3 },
+		Creak = { Size = { 4, 4 } :: { number }, Knock = 20, Rearm = 2.5, Color = { 96, 66, 42 } :: { number }, Crack = { 34, 24, 18 } :: { number } },
+		Puddle = { Size = { 5, 3.5 } :: { number }, Slide = 24, Rearm = 1.2, Color = { 120, 172, 204 } :: { number } },
+		Plaster = { Size = { 5, 5 } :: { number }, Trigger = 5, Warn = 1.3, Damage = 12, Rearm = 10, Chunk = { 3, 0.6, 3 } :: { number }, Color = { 222, 216, 202 } :: { number } },
+	},
+	Zombies = {
+		Aggro = 30,
+		YardAggro = 32,
+		Away = 16,
+		YardAway = 36,
+		Truck = 14,
+		Edge = 8,
+		Tries = 40,
+		Grid = 1,
+		Radius = 1,
+		Steer = 0.6,
+		Again = 3,
+		Block = 2,
+		WaveAt = 0.5,
+		WaveFar = 45,
+		Boss = { Kind = "brute", Name = "THE LANDLORD", Health = 420, Scale = 1.35, Guard = 12, Color = { 220, 70, 90 } :: { number } },
+	},
+	Weapon = { Kind = "bat", Name = "Bat" },
+	DangerHud = { Width = 360, Event = 4, Banner = 3.2, Every = 0.2, Hint = 10, TouchScale = 0.8 },
+}
+
+-- 9.x LOOT (the owner: "like Dungeon Quest: you go into a house and you get loot there ... outlines with their own colour
+-- by how rare it is, and stars by rarity, so it has value"). Every carryable piece of a house has a rarity, one of
+-- Config.Collection's tiers (common … legendary), decided by the server as the house's pieces are made (server/Loot.luau;
+-- its pure rules shared/LootRules.luau, tests/loot_test.luau). A piece's own rarity is where it starts (CollectionRules
+-- .rarityOf: a collectible's own, uncommon … legendary; the furniture's by its value), and the contract's difficulty
+-- (contract.difficulty; nil or unknown: Default) rolls on it. The house's seed and the difficulty decide the dice: the
+-- same house at the same difficulty always holds the same loot (giving up and taking it again rolls nothing new).
+--   Order        the difficulties, the easiest first (the lobby's portals: "easy" … "nightmare")
+--   Default      a contract without one (and the city's moves): Normal, the rarities as before 9.x
+--   Difficulty   per difficulty: Down, the chance a piece comes a tier under its own (never under Common; a collectible
+--                never under Least); Up, the chance a roll lifts it a tier, Again the chance of each tier more, Most tiers
+--                a roll lifts at most (and never past Legendary); Rolls, the rolls a piece gets (the best kept: the extra
+--                rolls); Floor (a tier's id), the least the house's best piece comes as (its best lifted to it when the
+--                dice gave none that rare). Over the six places' layouts (48 houses × 8 seeds of dice), a haul's income
+--                on show against Normal: Easy × 0.95, Hard × 1.1 (an Epic or better in a third of the houses), Insane
+--                × 1.36 (85 %), Nightmare × 1.5 (every house; a Legendary in about one house of three);
+--                tests/loot_test.luau checks the order and the floor
+--   Lift / Drop  × its catalogue value a tier over (Lift) or under (Drop) its own, a whole number of $ (a tier is worth
+--                more on show and sold too: Config.Collection's income and sell); its own tier: its value as before
+--   Least        the least a collectible comes as
+--   Salt         the dice's own salt (with the house's seed and the difficulty)
+--   Tag          the CollectionService tag on every piece's model with a rarity (a house's pieces, server/Loot.luau;
+--                the pieces on the warehouse's stands, server/Warehouse.luau); the model's attributes: Rarity (the tier's
+--                id), Stars (1 … 5: its rank) and Value ($ it is worth in the warehouse)
+-- The stock keeps a piece's rarity (shared/CollectionRules.luau Entry.rarity: a piece without one is its own rarity, as
+-- every piece was before 9.x), so the stands, selling, the book, the trades and the auction all see the same rarity
+-- and value (CollectionRules.pieceRarity / valueOf).
+-- The client only shows them (client/LootOutline.luau, client/LootStars.luau):
+--   Outline      a Roblox Highlight on the pieces within Range studs of the camera in the tier's colour (FillTransparency
+--                Fill, OutlineTransparency Edge, DepthMode Occluded: never through a wall), the rarest first, then the
+--                nearest (shared/OutlinePick.luau loot); Count at most, and never past Roblox's 31 less
+--                Config.Outline.Spare less the enemies outlined now (one budget with client/EnemyOutline.luau: the
+--                enemies first). One outlined keeps it out to HoldRange × Range and counts HoldRange times nearer (no
+--                blinking); picked every Every s; a phone: DeviceBudget's share. Common false: a Common wears none
+--                (most of a house is Common: their outlines would spend the budget and drown the colours that mean
+--                something; its ★ still shows near); true: Faint, a pale grey-white edge
+--   Stars        a small BillboardGui over each of the Count nearest pieces within Range studs: ★ × Stars in the tier's
+--                colour (Text px) on the HUD's charcoal pill (Tall px high, Pad px round the words), fading out from Fade
+--                to Range studs, AlwaysOnTop false (never through a wall); within Near studs also the tier's name and its
+--                value ("★★★ RARE · $450", Detail px); Lift studs over the piece's top; looked at every Every s; none
+--                while a window is open
+--   Toast        your own pick-up or load of a piece of From's tier or better: "+ RARE Grandma's Clock ★★★ $450" in the
+--                tier's colour under the HUD's toasts (client/Hud.luau's column), once a piece, Gap s apart at least,
+--                Seconds on screen, Most at once; Width px at most (the name shortened), Text px
+--   Sparkle      an Epic or Legendary piece in a house, first seen within See studs (a ray from the camera: not
+--                through a wall): a sparkle in its colour for Seconds s and a sound of the sheets (Sounds: { name,
+--                volume, pitch } by tier: no new audio)
+-- (Config.Loot's first six are the city's supply crates' numbers, as they were before 9.x: see "Supply crates" above.)
+Config.Loot = {
+	Count = 16,
+	Respawn = 40,
+	MoneyMin = 25,
+	MoneyMax = 90,
+	ItemChance = 0.4,
+	Reach = 9,
+	-- 9.x the houses' loot
+	Order = { "easy", "normal", "hard", "insane", "nightmare" } :: { string },
+	Default = "normal",
+	Difficulty = {
+		easy = { Down = 0.15, Up = 0, Again = 0, Most = 1, Rolls = 1 },
+		normal = { Down = 0, Up = 0, Again = 0, Most = 1, Rolls = 1 },
+		hard = { Down = 0, Up = 0.12, Again = 0, Most = 1, Rolls = 1 },
+		insane = { Down = 0, Up = 0.14, Again = 0.3, Most = 2, Rolls = 2 },
+		nightmare = { Down = 0, Up = 0.2, Again = 0.35, Most = 2, Rolls = 2, Floor = "epic" },
+	} :: { [string]: { Down: number, Up: number, Again: number, Most: number, Rolls: number, Floor: string? } },
+	Lift = 1.5,
+	Drop = 0.8,
+	Least = "uncommon",
+	Salt = 9817,
+	Tag = "LootPiece",
+	Outline = { Count = 20, Range = 60, HoldRange = 1.15, Every = 0.25, Fill = 0.88, Edge = 0.1, Common = false, Faint = { 232, 234, 238 } :: { number } },
+	Stars = { Count = 8, Range = 40, Fade = 24, Near = 10, Text = 13, Detail = 12, Tall = 22, Pad = 8, Lift = 0.8, Every = 0.2 },
+	Toast = { From = "uncommon", Gap = 0.6, Seconds = 2.6, Most = 2, Width = 340, Text = 14 },
+	Sparkle = {
+		See = 30,
+		Seconds = 1.6,
+		Sounds = { epic = { "ding", 0.5, 1.3 }, legendary = { "stored_fanfare", 0.6, 1.1 } } :: { [string]: { any } },
+	},
+}
+
 -- 8.0 SANDBOX, the guide (client/SandboxGuide.luau, its steps shared/SandboxSteps.luau): a thin hint line at the top in
--- the middle and a 3D guide (a soft glowing path on the ground along the roads, a floating chevron over the target with
--- its distance) to what to do next. Each step goes quiet once done (per session); the arrow to the house and home
--- stays while you drive. Hold G (or press the hint's ✕) to hide it; hold G again (a touch screen: tap the 💡 chip) to bring
+-- the middle and a 3D guide (a soft glowing path on the ground, 9.7 a straight one: the lobby has no roads; a floating
+-- chevron over the target with its distance) to what to do next. Each step goes quiet once done (per session). Hold G (or press the hint's ✕) to hide it; hold G again (a touch screen: tap the 💡 chip) to bring
 -- it back.
 --   Every         s between two looks: the step, the path, the distance (nothing is done frame by frame)
 --   Fade          s the hint line takes to fade in or out
@@ -7349,6 +7854,9 @@ Config.Collection = {
 --   PathLift      studs over the ground the path glows
 --   PathWidth     studs: the path's width
 --   PathAlpha     the path's transparency (0 solid … 1 gone)
+--   Path          10.3 (the owner: "not that line all the time, I know what to do"): when the path shows: "new" (nothing of
+--                 yours home yet this session: no piece in stock or on show), "always", "never"; a place picked on the big
+--                 map always shows it. PathFollow: 1/s its first point eases after your feet every frame (no jump a look)
 --   Color         the guide's colour (the path, the chevron, the hint's edge): a warm ZDC orange
 --   HintWidth     px at scale 1: the widest the hint line gets (its words wrap beyond)
 --   TextSize      px at scale 1: the hint's words
@@ -7360,7 +7868,7 @@ Config.Collection = {
 --   SoftSeconds   s a soft step shows before it counts as done (said long enough)
 --   SoftGap       s after a soft step ended (done, dismissed, covered) before the next one may show
 --   PaintMoney    $ from which the PAINT shop's step may show (else once a warehouse level is bought)
---   8.4, Danny for hire's steps (hire him, give him a piece, a heavy piece: SandboxSteps.Danny; said once as a soft step):
+--   8.4, Danny's steps (give him a piece, a heavy piece: SandboxSteps.Danny; said once as a soft step; 10.1 no hire):
 --   HeavyNear     studs: a two-person piece of your move this near you (its Lift shown) says "press Lift and wait for
 --                 Danny" (looked for at most once a second, only while that step may still show)
 --   8.9, trading between players' step ("🏷 Sell to players: set a price on a piece on show", the last soft step):
@@ -7379,6 +7887,8 @@ Config.SandboxGuide = {
 	PathLift = 0.45,
 	PathWidth = 1.3,
 	PathAlpha = 0.45,
+	Path = "new", -- 10.3 the path on the ground: "new" (nothing of yours home yet this session), "always", "never" (a map pick always)
+	PathFollow = 12, -- 10.3: 1/s the path's first point eases after your feet (every frame)
 	Color = { 255, 168, 60 },
 	HintWidth = 460,
 	TextSize = 15,
@@ -7598,7 +8108,7 @@ export type SandboxUpgradeDef = { name: string, icon: string, max: number, step:
 Config.SandboxUpgrades = {
 	Order = { "warehouse", "stands", "lights", "engine", "danny" } :: { string },
 	List = {
-		warehouse = { name = "ZDC Warehouse", icon = "🏭", max = 4, step = 1, prices = { 1000, 7500, 30000, 100000 } },
+		warehouse = { name = "Deliveros Warehouse", icon = "🏭", max = 4, step = 1, prices = { 1000, 7500, 30000, 100000 } },
 		stands = { name = "More stands", icon = "🏛️", max = 4, step = 2, prices = { 4000, 8000, 15000, 25000 } },
 		lights = { name = "Showroom lights", icon = "💡", max = 5, step = 0.1, prices = { 1500, 4000, 12000, 30000, 75000 } },
 		engine = { name = "Van engine", icon = "🚐", max = 3, step = 0.05, prices = { 1500, 5000, 15000 } },
@@ -7679,7 +8189,8 @@ Config.CollectionBook = {
 --   rare      … of them RareRank or rarer (Config.Collection's tiers: 3 is rare)
 --   clean     a move finished with pieces home and nothing broken (everybody in its crew)
 --   moves     a move finished with pieces home (everybody in its crew)
---   trips     the trips home of one move (`best`: the most in one move counts, not a sum)
+--   trips     the truckloads home (9.7 runs: a run's truck going home at its end is one; a sum: was the most trips of
+--             one move, which a run never has more than one of)
 --   shown     pieces on show at once (`best`)
 --   sell      $ your pieces sold for
 --   income    $ your display stands paid
@@ -7729,7 +8240,7 @@ Config.SandboxTasks = {
 		{ id = "home", group = "home", event = "home", icon = "📦", text = "Bring {n} pieces home", target = { 8, 14 }, money = 120 },
 		{ id = "rare", group = "home", event = "rare", icon = "💎", text = "Bring home {n} rare or better pieces", one = "Bring home a rare or better piece", target = { 1, 2 }, money = 150 },
 		{ id = "clean", group = "move", event = "clean", icon = "✨", text = "Finish {n} moves with nothing broken", one = "Finish a move with nothing broken", target = { 1, 1 }, money = 200 },
-		{ id = "trips", group = "move", event = "trips", best = true, icon = "🚐", text = "Make {n} trips home in one move", target = { 2, 3 }, money = 150 },
+		{ id = "trips", group = "move", event = "trips", icon = "🚐", text = "Bring {n} truckloads home", target = { 2, 3 }, money = 150 }, -- (9.7: a run's truck home at its end is one)
 		{ id = "shown", event = "shown", best = true, icon = "🏛️", text = "Have {n} pieces on show at once", target = { 6, 10 }, money = 120 },
 		{ id = "sell", group = "money", event = "sell", icon = "💰", text = "Sell pieces worth ${n}", target = { 150, 400 }, step = 50, money = 120 },
 		{ id = "income", group = "money", event = "income", icon = "📈", text = "Earn ${n} from your stands", target = { 300, 800 }, step = 50, money = 150 },
@@ -7760,9 +8271,8 @@ Config.SandboxTasks = {
 --   Legendary    the collection tier (Config.Collection.Tiers) the board's LEGENDARY column counts
 --   Stats        the player list's columns, in their order (the first sorts the list): the money (an IntValue), $ a
 --                minute (a NumberValue, to a tenth), the collection's worth (an IntValue)
---   Board        the signboard: Corner studs east of Pražská's east edge and south of Depot Row's south edge (the
---                crossroads' south-east corner, off the shoulders, the lamps and the trees), its face Yaw (degrees,
---                SandboxMap's: 45 looks north-west, to the crossroads); the painted panel Width × Height studs, Lift
+--   Board        the signboard: 9.7 in the lobby (SandboxMap.Lobby.shops.leaders: its spot and its face's yaw; Corner
+--                and Yaw were its place by the old crossroads, unused now); the painted panel Width × Height studs, Lift
 --                over the ground, Thick; the gable roof Over past the panel each side, Run deep each way from the
 --                ridge, Rise high; PixelsPerStud and Range (studs) of its SurfaceGuis (one on each face)
 --   AllTime      the best collection worth each player ever had, kept in the OrderedDataStore Store (key: the user
@@ -7787,6 +8297,111 @@ Config.SandboxLeaders = {
 		Range = 260,
 	},
 	AllTime = { On = true, Store = "Sandbox_TopCollection", Every = 120, Studio = false },
+}
+
+-- 10.x THE MAP (the owner: "I need you to add a way to look at the map"): the sandbox's big map and its minimap
+-- (client/SandboxMapUi.luau, client/SandboxMiniMap.luau, drawn by client/SandboxMapDraw.luau from what
+-- client/SandboxMapData.luau reads of the world; the pure rules shared/SandboxMapRules.luau, tests/sandboxmaprules_test.luau).
+-- In the lobby a plan of it from SandboxMap.Lobby (the plaza, the hedge, the plots and your warehouse, the shops and
+-- desks, the six portals with their live state, the players, you); in a run the house's floor plan (its interior's
+-- MapPlan: server/HouseInterior.luau) over a strip of its front yard with the truck, who is where, the loot under fog
+-- and the danger markers (the CollectionService tags Danger: none there, none drawn).
+--   Key / Button   M opens and closes it; the gamepad's Button (on foot: L2 is the brake only in a seat; the D-pad is
+--                  the HUD's three chips', Select Roblox's): SandboxPad.chip("map"); a touch screen's 🗺 MAP chip
+--   Every          s between two looks at the markers while the big map is open (its plan is drawn once an open)
+--   Window         the window: Width × Height px at its scale (a computer: the HUD's, at least LeastScale; a touch
+--                  screen: TouchScale), Margin (TouchMargin) px to the screen's edge, Header px, a side column Side
+--                  (TouchSide) px when the map keeps most of the window, Pad px
+--   Text           px at scale 1: Title, Label, Small; never under Least (a phone's too)
+--   Inside / Below / Above   studs: a point is in a run's house within its box + Inside, from Below under its floor
+--                  to Above over its ceiling
+--   Yard           the strip of the front yard under the plan: Depth studs past the truck's far end (Truck studs long),
+--                  Half studs each side of the door at least (the plan's width when wider)
+--   Fog            a piece shows once you saw it: within See studs of your eyes (Eye studs over your root), no wall in
+--                  between (a ray against the house's shell), looked at every Every s, Most pieces a look at most (the
+--                  nearest first); it stays until carried out (in the truck, home or lost)
+--   Pulse          the uncarried pieces of From's tier and up pulse (Seconds a beat)
+--   Zombies        studs: the zombies within this of you show (a run's), the others not
+--   Names          most names on a portal's line before "+n" (the side column's HOUSES); MapNames on the map, where a
+--                  portal's line keeps LineEm × its text size px (its words cut at their end past it) on a lobby drawn
+--                  at LongScale px a stud or more; a smaller one's (a phone's) says only its state (FREE, STARTING IN 7,
+--                  IN USE · HARD): its labels would cover each other, the side column says who
+--   Mini           the minimap in a run (its plan, you, your party, the loot you saw near you): Size px at the HUD's
+--                  scale (a computer: the bottom right corner), TouchSize px on a touch screen (its top right), shrunk by
+--                  Step to Least to keep clear of the HUD (else none); Scale px a stud (TouchScale on a touch screen);
+--                  Margin px to the edges (Top px under Roblox's top bar on a touch screen); Every s a look; hidden with
+--                  the HUD, under a window and during a grip check
+--   Danger         the tags another worker's runs put on the house's dangers (none: nothing drawn): their icon; RunLock
+--                  (a locked doorway: its attribute Open), RunKey, RunVault (Open), RunHazard (its Kind: Hazards), RunRescue
+--   Colors         { r, g, b } of the drawing
+Config.SandboxMapUi = {
+	Key = "M",
+	Button = "ButtonL2",
+	Every = 0.2,
+	Window = { Width = 1180, Height = 760, Margin = 24, TouchMargin = 8, Header = 44, Side = 260, TouchSide = 200, Pad = 10, TouchScale = 0.9, LeastScale = 0.8 },
+	Text = { Title = 18, Label = 13, Small = 12, Least = 11 },
+	Inside = 4,
+	Below = 6,
+	Above = 8,
+	Yard = { Depth = 6, Truck = 22, Half = 20 },
+	Fog = { See = 40, Eye = 1.5, Every = 0.25, Most = 16 },
+	Pulse = { From = "epic", Seconds = 0.7 },
+	Zombies = 60,
+	Names = 3,
+	MapNames = 2,
+	LineEm = 17,
+	LongScale = 1.2,
+	Mini = { Size = 190, TouchSize = 140, Least = 96, Step = 8, Scale = 2.4, TouchScale = 2, Margin = 16, Top = 8, Every = 0.15 },
+	Danger = {
+		RunLock = { icon = "🔒", open = "🔓", name = "LOCKED DOOR" },
+		RunKey = { icon = "🔑", name = "KEY" },
+		RunVault = { icon = "🏦", open = "💰", name = "VAULT" },
+		RunHazard = { icon = "⚠", name = "HAZARD" },
+		RunRescue = { icon = "🆘", name = "TRAPPED HELPER" },
+	} :: { [string]: { icon: string, open: string?, name: string } },
+	Hazards = { fire = "🔥", gas = "☣", electric = "⚡", spark = "⚡", water = "💧", flood = "💧", hole = "🕳", spikes = "⚠", trap = "⚠", zombie = "🧟" } :: { [string]: string },
+	Colors = {
+		Back = { 16, 19, 23 },
+		Meadow = { 74, 112, 62 },
+		Hedge = { 38, 70, 34 },
+		Plaza = { 178, 170, 156 },
+		Water = { 76, 140, 190 },
+		Tree = { 54, 96, 48 },
+		Lamp = { 240, 232, 200 },
+		Plot = { 122, 124, 122 },
+		Warehouse = { 86, 92, 100 },
+		Yours = { 255, 206, 92 },
+		Desk = { 228, 170, 82 },
+		Paint = { 214, 72, 120 },
+		Leaders = { 226, 196, 92 },
+		Dispatch = { 215, 74, 70 },
+		Auction = { 150, 112, 200 },
+		Wall = { 40, 44, 52 },
+		Floor = { 198, 186, 164 },
+		Fixture = { 112, 104, 94 },
+		Door = { 226, 216, 196 },
+		Exit = { 126, 196, 120 },
+		Glass = { 150, 190, 220 },
+		Grass = { 84, 120, 70 },
+		Road = { 86, 90, 96 },
+		Truck = { 242, 242, 240 },
+		You = { 255, 255, 255 },
+		Party = { 255, 210, 90 },
+		Player = { 140, 200, 255 },
+		Helper = { 240, 132, 44 },
+		Zombie = { 215, 74, 70 },
+	} :: { [string]: { number } },
+	Rooms = {
+		hall = { 196, 186, 166 },
+		living = { 204, 180, 140 },
+		kitchen = { 206, 196, 166 },
+		bedroom = { 184, 176, 200 },
+		kids = { 176, 200, 182 },
+		bath = { 168, 200, 210 },
+		garage = { 156, 156, 152 },
+		store = { 186, 168, 136 },
+		workroom = { 176, 168, 156 },
+	} :: { [string]: { number } },
 }
 
 -- 8.3 SANDBOX, the market (the owner: selling should be a decision, not a reflex). shared/Market.luau has the rules
@@ -8009,7 +8624,7 @@ export type VanPaintDef = {
 }
 Config.VanPaint = {
 	Paints = {
-		{ id = "cream", name = "ZDC cream", color = { 232, 226, 210 }, price = 0 },
+		{ id = "cream", name = "Deliveros cream", color = { 232, 226, 210 }, price = 0 },
 		{ id = "white", name = "Arctic white", color = { 241, 243, 245 }, price = 300 },
 		{ id = "silver", name = "Silver grey", color = { 170, 175, 181 }, price = 400 },
 		{ id = "graphite", name = "Graphite", color = { 66, 70, 76 }, price = 500 },
@@ -8024,7 +8639,7 @@ Config.VanPaint = {
 		{ id = "chrome", name = "Mirror chrome", color = { 206, 212, 218 }, material = "Foil", price = 50000, premium = true },
 	} :: { VanPaintDef },
 	Liveries = {
-		{ id = "zdc", name = "ZDC classic", stripe = { 179, 38, 30 }, price = 0 },
+		{ id = "zdc", name = "Deliveros classic", stripe = { 179, 38, 30 }, price = 0 },
 		{ id = "alpine", name = "Alpine", stripe = { 34, 110, 70 }, roof = "snow", price = 1200 },
 		{ id = "racing", name = "Racing stripes", stripe = "contrast", roof = "racing", price = 1500 },
 		{ id = "goldline", name = "Gold line", stripe = { 212, 170, 60 }, material = "Metal", roof = "pinstripe", price = 3000 },
@@ -8046,7 +8661,7 @@ Config.VanPaint = {
 -- warehouse is a flashbang"). Every light number of the sandbox, in one place. shared/SandboxLightRules.luau has the
 -- rules; tests/sandboxlight_test.luau and tests/sandboxlight_runtime_test.luau hold every light to Caps.
 --   Sky        the fixed warm afternoon outside (server/SandboxWorld.luau lighting(), as SandboxScenery.Light): Clock
---              (Lighting.ClockTime), Latitude (Jinočany's 50° north; the Alps' 47 before), Brightness (the sun),
+--              (Lighting.ClockTime), Latitude (central Bohemia's 50° north; the Alps' 47 before), Brightness (the sun),
 --              Exposure (the base ExposureCompensation: the eyes add their place's), Ambient (the light indoors and in the shade: the house's and the hall's fill),
 --              Outdoor (OutdoorAmbient), ShiftTop / ShiftBottom (ColorShift_Top / _Bottom), Diffuse / Specular
 --              (EnvironmentDiffuseScale / SpecularScale), Softness (ShadowSoftness); the Atmosphere: Air (its Color and
@@ -8090,7 +8705,7 @@ Config.VanPaint = {
 Config.SandboxLight = {
 	Sky = {
 		Clock = 15.4,
-		Latitude = 50, -- (Jinočany, design/jinocany/NAVRH.md; 47 in the Alps: the same warm afternoon)
+		Latitude = 50, -- (central Bohemia's; 47 in the Alps: the same warm afternoon)
 		Brightness = 1.8,
 		Exposure = 0,
 		Ambient = { 78, 72, 68 } :: { number },
@@ -8213,8 +8828,8 @@ Config.SandboxLight = {
 --   Grand       the Grand Auction (later; hooks only): On, its daily start (Hour, UTC), Lots of the house's own (Items:
 --               the exclusive legendaries' ids, none yet), Reserve × their worth
 --   House       the building (shared/AuctionHouseLayout.luau): Spot, the middle of its front wall on the ground, looking
---               out (yaw as SandboxMap's spots; the one place to move it when the Jinočany village is built:
---               design/jinocany/plan.json keeps x 40 – 120 here for the Corner Drugstore); Width × Depth, Wall (the walls'
+--               out (yaw as SandboxMap's spots; 9.7: the lobby's south edge, SandboxMap.Lobby.shops.auction's spot from
+--               design/lobby/plan.py: tests/lobby_test.luau holds them together); Width × Depth, Wall (the walls'
 --               height over the floor), Roof (the ridge's rise), Door ({ width, height }), Budget (its parts at most),
 --               Range (studs its signs are drawn from), Lamp (its hanging lamps' light)
 --   Window      the window (client/AuctionUi.luau): Width × Height at most (unscaled px), Tile a consign tile's
@@ -8252,7 +8867,7 @@ Config.Auction = {
 	Salt = 8808,
 	Grand = { On = false, Hour = 19, Lots = 3, Reserve = 1.5, Items = {} :: { string } },
 	House = {
-		Spot = { x = 158, y = 0, z = -22, yaw = 0 } :: AuctionSpot,
+		Spot = { x = 1800, y = 0, z = 156, yaw = 0 } :: AuctionSpot, -- (9.7: the lobby's, SandboxMap.Lobby.shops.auction)
 		Width = 48,
 		Depth = 32,
 		Wall = 16,
@@ -8289,6 +8904,7 @@ Config.Auction = {
 --   Front     studs: a house's front wall this far in from its box's front edge (its eaves stay inside the box; the
 --             door's face about 1.2 in from plan.json's door)
 --   RowUnit   studs: one house of a terraced row along the street (plan.py's 18)
+--   Countryside   9.5: the countryside's spots' looks (see there); Budget's cabin, lodge, mill and cottage their parts
 --   Facing    the yaw each of plan.json's landmarks looks (SandboxMap's: 0 north, 90 west, 180 south, 270 east): the
 --             chapel and the green to Hlavní, the pond to Pražská, the drugstore to Depot Row, the D5 to the village,
 --             Sýkorka to its car park; Barrier: the barrier stands on plan.json's road Road, Inset studs in from its
@@ -8358,6 +8974,10 @@ Config.Village = {
 		row = 15,
 		modern = 15,
 		Rich = 25,
+		cabin = 32, -- 9.5 the countryside's spots (Countryside below: always as rich as they get, rich or not)
+		lodge = 32,
+		mill = 34,
+		cottage = 28,
 		tree = 2,
 		chapel = 26,
 		green = 40,
@@ -8374,6 +8994,35 @@ Config.Village = {
 	Chunk = 128,
 	Front = 1.5,
 	RowUnit = 18,
+	-- 9.5 the countryside's spots (VillageLooks.house's "cabin", "lodge", "mill" and "cottage": the Pond Cabin, the
+	-- Forest Lodge, the Old Mill, the Orchard Cottage): Porch, the studs the cabin's veranda may reach past its box's
+	-- front edge (into its front yard: everything else of a look is inside its box); Wheel, the studs the mill's water
+	-- wheel and its chute reach past its box's right-hand side at most (seen from outside facing the front door: its
+	-- stream runs there); WheelAt, the wheel's middle past that side (9.5 review: in the millrace, whose water runs 2 –
+	-- 10 studs past it on the map, the wheel's foot in it; was against the wall, on the bank); their colours (Stain: the cabin's dark stained boards, Tar its roof; Logs, Shingles, Shutters,
+	-- Bone: the lodge's; Stone, Boards: the mill's and the lodge's plinth; Whitewash, Band, Thatch, Terracotta, Doors,
+	-- Flowers: the cottage's; Buoy and Lantern: the cabin's lifebuoy and its lantern by the door)
+	Countryside = {
+		Porch = 2.5,
+		Wheel = 6,
+		WheelAt = 3.6,
+		Stain = { { 84, 62, 46 }, { 72, 56, 44 }, { 96, 70, 50 } } :: { { number } },
+		Tar = { { 58, 62, 60 }, { 70, 66, 62 }, { 56, 72, 62 } } :: { { number } },
+		Logs = { { 120, 84, 54 }, { 108, 76, 50 }, { 134, 96, 62 } } :: { { number } },
+		Shingles = { { 92, 74, 60 }, { 78, 66, 58 }, { 104, 82, 62 } } :: { { number } },
+		Shutters = { { 58, 104, 70 }, { 46, 90, 62 } } :: { { number } },
+		Bone = { 232, 220, 192 } :: { number },
+		Stone = { { 170, 164, 150 }, { 156, 150, 138 }, { 178, 170, 154 } } :: { { number } },
+		Boards = { 116, 86, 58 } :: { number },
+		Whitewash = { { 244, 242, 234 }, { 238, 236, 226 } } :: { { number } },
+		Band = { { 96, 112, 128 }, { 120, 104, 90 } } :: { { number } },
+		Thatch = { { 182, 156, 98 }, { 168, 142, 88 } } :: { { number } },
+		Terracotta = { { 176, 92, 60 }, { 164, 84, 56 } } :: { { number } },
+		Doors = { { 74, 110, 150 }, { 70, 120, 84 }, { 150, 66, 52 } } :: { { number } },
+		Flowers = { { 214, 54, 60 }, { 232, 120, 160 }, { 236, 178, 60 } } :: { { number } },
+		Buoy = { 214, 50, 40 } :: { number },
+		Lantern = { 255, 214, 150 } :: { number },
+	},
 	Facing = { chapel = 180, green = 180, pond = 90, shop = 0, motorway = 90, hardware = 180 } :: { [string]: number },
 	Barrier = { Road = "Hornická", Inset = 8, Deep = 6, Yaw = 270 },
 	Trees = {
@@ -8389,21 +9038,20 @@ Config.Village = {
 	Far = { Reach = 1200 },
 }
 
--- 8.9 SANDBOX, Jinočany step 1 on the map (design/jinocany/NAVRH.md §4): shared/VillageScenery.luau lays
--- shared/SandboxMap.luau's village (its houses, landmarks, fields, lawns, tree lines and orchard) out with
--- shared/VillageLooks.luau's art, server/VillageWorld.luau makes the parts (tests/villageworld_test.luau), the D5's cars
--- are client/VillageTraffic.luau's (this screen's only).
---   Lawn       the village's lawns' colour and material (SandboxMap.Lawns: the gardens round its houses, a little
---              greener than the meadow)
---   Trees      a tree of a tree line or the orchard stands where the map's rules let it (SandboxScenery.treeRule: off
---              the roads and their 12 studs, the plots, the farmstead, the vans' ways; VillageScenery.treeRule: Keep
---              studs off a village house's box, a landmark's rect or the Auction House's site); where they say no it
---              moves off its spot, Step studs at a time across its line (then along it), at most Nudge studs, else it is
---              left out. Two crowns stay Apart × their radii apart
---   Shadow     a village part throws a shadow only when it is a mass (solid, not a door nor a trunk: the walls, roofs,
---              gables, chimneys, the landmarks' bodies) or a tree's crown (the tree's shadow), Low studs tall at least
---              (a plinth's, a bench's shadow is hardly seen), and big enough for SandboxScenery.Shadow and
---              RenderBudget's rule
+-- 8.9 SANDBOX on the map; 9.4 the countryside (design/countryside/plan.py, plan.json): shared/VillageScenery.luau lays
+-- shared/SandboxMap.luau's map (its six spots' houses, landmarks, fields, lawns, tree lines, woods, orchard and stream)
+-- out with shared/VillageLooks.luau's and shared/CountryLooks.luau's art, server/VillageWorld.luau makes the parts
+-- (tests/villageworld_test.luau), the D5's cars are client/VillageTraffic.luau's (this screen's only).
+--   Lawns      a ground tile's colour and material by its kind (SandboxMap.Lawns: the forest's floor, a darker green
+--              than the meadow)
+--   Trees      a tree of a tree line, the orchard or a wood stands where the map's rules let it (SandboxScenery.treeRule:
+--              off the roads and their 12 studs, the plots, the lots, the vans' ways; VillageScenery.treeRule: Keep studs
+--              off a spot's box, a landmark's rect or the Auction House's site, its crown off a stream's water and out of a
+--              wood's clearing); where they say no it moves off its spot, Step studs at a time across its line (then
+--              along it), at most Nudge studs, else it is left out. Two crowns stay Apart × their radii apart
+--   Shadow     a part throws a shadow only when it is a mass (solid, not a door nor a trunk: the walls, roofs, gables,
+--              chimneys, the landmarks' bodies) or a tree's crown (the tree's shadow), Low studs tall at least (a
+--              plinth's, a bench's shadow is hardly seen), and big enough for SandboxScenery.Shadow and RenderBudget's rule
 --   Cars      the D5's cars (client/VillageTraffic.luau): Count in all, Speed studs/s (each its own share of Spread
 --              more or less), Beyond studs past the Bounds they run on the far D5 (VillageLooks.horizon's) before they
 --              go round again unseen; a car is a body (Size: width, height, length) and a cabin on it (Cabin, its
@@ -8411,7 +9059,7 @@ Config.Village = {
 --              out from its middle each of its two lanes runs
 export type VillageCars = { Count: number, Speed: number, Spread: number, Beyond: number, Size: { number }, Cabin: { number }, Lanes: number, Colors: { { number } } }
 Config.VillageWorld = {
-	Lawn = { Color = { 104, 148, 62 } :: { number }, Material = "Grass" },
+	Lawns = { forest = { Color = { 72, 104, 52 } :: { number }, Material = "LeafyGrass" } } :: { [string]: { Color: { number }, Material: string } },
 	Trees = { Step = 4, Nudge = 12, Keep = 3, Apart = 0.85 },
 	Shadow = { Low = 2 },
 	Cars = {
@@ -8424,6 +9072,83 @@ Config.VillageWorld = {
 		Lanes = 0.25,
 		Colors = { { 196, 32, 38 }, { 236, 236, 232 }, { 34, 38, 44 }, { 46, 84, 150 }, { 150, 154, 158 }, { 92, 120, 76 }, { 226, 176, 52 } },
 	} :: VillageCars,
+}
+
+-- 9.4 SANDBOX, the countryside's art kit (shared/CountryLooks.luau, tests/countrylooks_test.luau): the six spots'
+-- surroundings (the farm's barn, tractor, bales, paddock and muck heap; the fish pond; the lone house's garden; the
+-- lodge's woodpile; the millrace's weir and footbridge; the orchard's beehives), the railway and its halt, the
+-- hedges, fences and the stream. Nothing of a village (no street, no shop, no chapel); the houses themselves are
+-- shared/VillageLooks.luau's.
+--   Palette    the colours (RGB 0-255)
+--   Budget     the most parts a landmark of each kind may give
+--   Woods      a wood's trees (SandboxMap.Woods): on a grid Spacing apart, each moved up to Jitter studs, its kind
+--              Mix's in turn at random (VillageLooks' trees)
+--   Lines      a fence's posts at most Post studs apart, its rails at Rails' heights; a hedge Height high, Width wide
+--   Streams    a stream's water Water over the ground (its top), its bed Bank wider each side, BankTop high; a tree's
+--              crown keeps Clear studs off its water (VillageScenery.treeRule)
+--   Far        the railway going on Rails studs past the Bounds at both ends (the far view)
+Config.Country = {
+	Palette = {
+		Barn = { Wall = { 116, 60, 44 }, Trim = { 72, 42, 30 }, Roof = { 86, 84, 88 }, Door = { 88, 54, 36 }, Loft = { 58, 36, 26 } } :: { [string]: { number } },
+		Tractor = { Body = { 186, 38, 32 }, Dark = { 52, 52, 56 }, Tyre = { 32, 32, 34 }, Hub = { 214, 176, 52 }, Glass = { 150, 180, 190 } } :: { [string]: { number } },
+		Trailer = { Bed = { 120, 92, 64 }, Side = { 96, 112, 72 } } :: { [string]: { number } },
+		Hay = { { 218, 190, 112 }, { 204, 176, 98 } } :: { { number } },
+		Muck = { 78, 60, 44 } :: { number },
+		Log = { 132, 96, 62 } :: { number },
+		LogEnd = { 198, 162, 114 } :: { number },
+		Stump = { 112, 84, 58 } :: { number },
+		Steel = { 150, 154, 160 } :: { number },
+		Fence = { 152, 118, 82 } :: { number },
+		Post = { 104, 78, 54 } :: { number },
+		Trough = { 120, 124, 128 } :: { number },
+		Water = { 62, 104, 112 } :: { number },
+		Bank = { 98, 118, 60 } :: { number },
+		Bed = { 92, 84, 64 } :: { number },
+		Reeds = { { 96, 120, 56 }, { 122, 136, 64 } } :: { { number } },
+		Jetty = { 146, 110, 72 } :: { number },
+		Boat = { 176, 72, 52 } :: { number },
+		BoatInside = { 150, 118, 80 } :: { number },
+		Bench = { 142, 102, 64 } :: { number },
+		Iron = { 52, 54, 58 } :: { number },
+		Stone = { 150, 148, 142 } :: { number },
+		Foam = { 226, 236, 238 } :: { number },
+		Ballast = { 128, 120, 108 } :: { number },
+		Sleepers = { 88, 70, 56 } :: { number },
+		Rail = { 150, 150, 152 } :: { number },
+		Concrete = { 170, 168, 162 } :: { number },
+		Opening = { 28, 28, 30 } :: { number },
+		Platform = { 176, 174, 168 } :: { number },
+		Edge = { 236, 236, 228 } :: { number },
+		Shelter = { 168, 92, 70 } :: { number },
+		ShelterRoof = { 62, 66, 72 } :: { number },
+		Sign = { 34, 76, 150 } :: { number },
+		Hives = { { 236, 196, 60 }, { 88, 140, 200 }, { 120, 168, 90 }, { 240, 236, 226 }, { 184, 96, 64 } } :: { { number } },
+		HiveRoof = { 96, 96, 100 } :: { number },
+		Hedge = { 58, 96, 46 } :: { number },
+		Soil = { 104, 80, 58 } :: { number },
+		Veg = { 92, 150, 62 } :: { number },
+		Washing = { { 236, 236, 240 }, { 200, 60, 60 }, { 80, 120, 190 } } :: { { number } },
+		Line = { 220, 220, 220 } :: { number },
+	},
+	Budget = {
+		barn = 12,
+		tractor = 20,
+		bales = 12,
+		paddock = 40,
+		muckheap = 12,
+		fishpond = 34,
+		garden = 30,
+		woodyard = 14,
+		weir = 6,
+		footbridge = 10,
+		apiary = 16,
+		railway = 10,
+		halt = 14,
+	} :: { [string]: number },
+	Woods = { Spacing = 26, Jitter = 5, Mix = { "oak", "linden", "oak", "birch", "linden" } :: { string } },
+	Lines = { Post = 24, Rails = { 1.5, 2.9 } :: { number }, Hedge = { Height = 3.4, Width = 2.6 } },
+	Streams = { Water = 0.22, Bank = 1.5, BankTop = 0.12, Clear = 2 },
+	Far = { Rails = 900 },
 }
 
 -- 8.3 SANDBOX, Roblox badges for the sandbox's milestones (the owner's guide: design/sandbox/BADGES.md).
@@ -8499,6 +9224,181 @@ Config.Saving = {
 	CloseWait = 25,
 	WarnBytes = 1_000_000,
 	MaxBytes = 4_000_000,
+}
+
+-- 10.1, the start (the owner: "každý hráč … si dělá charaktera … má svůj save, … má nahraný level 15, pak může jít od
+-- znova"): every player has Count save slots, each its own game (money, warehouse, collection, upgrades, its courier).
+-- The start screen lists them (client/Menu.luau): CONTINUE a save, NEW GAME in an empty slot, START OVER a used one (a
+-- fresh game in it), LOOK (the courier changed, the save kept). server/SaveSlots.luau answers the Slots remote; the save
+-- loads only once a slot is picked (server/PlayerData.luau: PlayerData.chooseSlot); the pure rules (the slots' keys,
+-- their summaries) are shared/SaveSlotRules.luau. Slot 1 is the save of before 10.1 (its key unchanged: "Player_<id>");
+-- slot n is "Player_<id>_slot<n>". The summaries read each slot once (GetAsync) when the start screen asks.
+--   On        the start screen picks a slot (off, or a server without server/SaveSlots.luau: slot 1 at once, as before)
+--   Count     the slots a player has
+--   Read      s at least between two reads of one player's slots (the list; a flood reads nothing)
+--   NameMin / NameMax   a courier's name, its characters (filtered by Roblox's TextService before it is kept)
+Config.SaveSlots = {
+	On = true,
+	Count = 3,
+	Read = 4,
+	NameMin = 2,
+	NameMax = 16,
+}
+
+-- 10.1, the courier you make (the start screen's character creator, client/CharacterCreator.luau): your own Roblox avatar
+-- (base "own", the look of 6.9: server/CourierAvatar.luau) or a courier made here (base "custom"): Roblox's classic
+-- blocky R15 in these colours (its HumanoidDescription: the head and the arms the skin, the torso the top's colour, the
+-- legs the trousers'; no clothes, no accessories, the classic face) and parts welded on (shared/CharacterLooks.luau's
+-- geometry, shared/StyleBuild.luau's builder): the hair, a hat (StyleLooks' hats), the top's sleeves or a jacket
+-- (StyleLooks' jackets), the belt and something on the face. Kept in the slot's save (profile.character), checked on
+-- load (CharacterLooks.clean). Every list: { id, name, rgb? (RGB), trim? (a cloth's second colour) }; Default the
+-- creator's start (a new slot), every id one of its list's.
+export type LookOption = { id: string, name: string, rgb: { number }?, trim: { number }? }
+Config.Characters = {
+	Default = { base = "custom", skin = "warm", hair = "short", hairColor = "brown", hat = "cap", hatColor = "orange", top = "tee", topColor = "orange", pants = "denim", extra = "none" },
+	Bases = {
+		{ id = "custom", name = "Make a courier" },
+		{ id = "own", name = "My Roblox avatar" },
+	} :: { LookOption },
+	Skins = {
+		{ id = "porcelain", name = "Porcelain", rgb = { 255, 226, 200 } },
+		{ id = "light", name = "Light", rgb = { 241, 200, 167 } },
+		{ id = "warm", name = "Warm", rgb = { 218, 166, 119 } },
+		{ id = "tan", name = "Tan", rgb = { 196, 140, 96 } },
+		{ id = "olive", name = "Olive", rgb = { 172, 126, 82 } },
+		{ id = "brown", name = "Brown", rgb = { 138, 92, 58 } },
+		{ id = "deep", name = "Deep", rgb = { 100, 66, 42 } },
+		{ id = "ebony", name = "Ebony", rgb = { 68, 45, 30 } },
+		{ id = "green", name = "Zombie", rgb = { 128, 168, 104 } },
+	} :: { LookOption },
+	HairColors = {
+		{ id = "black", name = "Black", rgb = { 30, 28, 28 } },
+		{ id = "dark", name = "Dark brown", rgb = { 60, 42, 32 } },
+		{ id = "brown", name = "Brown", rgb = { 104, 70, 44 } },
+		{ id = "auburn", name = "Auburn", rgb = { 140, 62, 34 } },
+		{ id = "ginger", name = "Ginger", rgb = { 206, 112, 48 } },
+		{ id = "blond", name = "Blond", rgb = { 228, 188, 106 } },
+		{ id = "platinum", name = "Platinum", rgb = { 238, 230, 208 } },
+		{ id = "grey", name = "Grey", rgb = { 150, 150, 152 } },
+		{ id = "blue", name = "Blue", rgb = { 60, 112, 214 } },
+		{ id = "pink", name = "Pink", rgb = { 236, 112, 172 } },
+	} :: { LookOption },
+	Colors = { -- the cloth of the hats and the tops (trim: the cuffs, the snap, the band)
+		{ id = "orange", name = "Deliveros orange", rgb = { 245, 124, 30 }, trim = { 40, 40, 44 } },
+		{ id = "red", name = "Red", rgb = { 196, 40, 38 }, trim = { 28, 31, 34 } },
+		{ id = "gold", name = "Gold", rgb = { 240, 190, 50 }, trim = { 60, 60, 64 } },
+		{ id = "green", name = "Green", rgb = { 60, 150, 80 }, trim = { 236, 236, 232 } },
+		{ id = "teal", name = "Teal", rgb = { 32, 150, 150 }, trim = { 236, 236, 232 } },
+		{ id = "blue", name = "Blue", rgb = { 40, 98, 196 }, trim = { 236, 236, 232 } },
+		{ id = "navy", name = "Navy", rgb = { 34, 46, 86 }, trim = { 245, 124, 30 } },
+		{ id = "purple", name = "Purple", rgb = { 110, 60, 170 }, trim = { 240, 190, 50 } },
+		{ id = "pink", name = "Pink", rgb = { 236, 112, 172 }, trim = { 255, 255, 255 } },
+		{ id = "white", name = "White", rgb = { 236, 236, 232 }, trim = { 196, 40, 38 } },
+		{ id = "grey", name = "Grey", rgb = { 118, 122, 128 }, trim = { 196, 40, 38 } },
+		{ id = "black", name = "Black", rgb = { 34, 36, 40 }, trim = { 245, 124, 30 } },
+	} :: { LookOption },
+	Pants = {
+		{ id = "denim", name = "Denim", rgb = { 52, 82, 140 } },
+		{ id = "dark", name = "Charcoal", rgb = { 44, 48, 56 } },
+		{ id = "black", name = "Black", rgb = { 30, 31, 34 } },
+		{ id = "khaki", name = "Khaki", rgb = { 176, 152, 108 } },
+		{ id = "olive", name = "Olive", rgb = { 88, 98, 62 } },
+		{ id = "grey", name = "Grey", rgb = { 120, 122, 126 } },
+		{ id = "brown", name = "Brown", rgb = { 96, 66, 44 } },
+		{ id = "orange", name = "Work orange", rgb = { 230, 116, 34 } },
+	} :: { LookOption },
+	Hair = {
+		{ id = "none", name = "Bald" },
+		{ id = "short", name = "Short" },
+		{ id = "buzz", name = "Buzz cut" },
+		{ id = "spiky", name = "Spiky" },
+		{ id = "long", name = "Long" },
+		{ id = "ponytail", name = "Ponytail" },
+		{ id = "bun", name = "Bun" },
+		{ id = "afro", name = "Afro" },
+	} :: { LookOption },
+	Hats = { -- (shared/StyleLooks.luau's hats)
+		{ id = "none", name = "No hat" },
+		{ id = "cap", name = "Backwards cap" },
+		{ id = "beanie", name = "Beanie" },
+		{ id = "hardhat", name = "Hard hat" },
+		{ id = "cowboy", name = "Cowboy hat" },
+		{ id = "helmet", name = "Bike helmet" },
+	} :: { LookOption },
+	Tops = { -- tee and long: sleeves of their own; the others StyleLooks' jackets
+		{ id = "tee", name = "T-shirt" },
+		{ id = "long", name = "Long sleeves" },
+		{ id = "hoodie", name = "Hoodie" },
+		{ id = "track", name = "Track jacket" },
+		{ id = "bomber", name = "Bomber jacket" },
+		{ id = "puffer", name = "Puffer jacket" },
+		{ id = "leather", name = "Leather jacket" },
+	} :: { LookOption },
+	Extras = {
+		{ id = "none", name = "Nothing" },
+		{ id = "glasses", name = "Glasses" },
+		{ id = "sunglasses", name = "Sunglasses" },
+		{ id = "moustache", name = "Moustache" },
+		{ id = "beard", name = "Beard" },
+	} :: { LookOption },
+}
+
+-- 9.1, the drive pedals (the owner: "Add a drive pedal to the game … just visible pedals on PC, and on mobile as driving
+-- buttons"): GAS (tall and narrow) and BRAKE (wider and shorter) at the lower right while you drive your car
+-- (client/DrivePedals.luau, the pure rules shared/PedalRules.luau, the input client/Drive.luau setPedal). On a touch
+-- screen they are held to drive (GAS forward; BRAKE brakes, then backs up, as S does; the thumbstick steers); with a
+-- keyboard or a gamepad they show your feet (W / S, R2 / L2 part way) and a mouse may hold them too.
+--   On             off: no pedals anywhere (the seat, the keys and the thumbstick drive as before)
+--   Gas / Brake    { w, h } px at scale 1 (rubber Ribs across each: how many)
+--   Gap            px between the two at scale 1; Clear: px they keep from everything else (screen px)
+--   Margin         screen px from the screen's edges: Touch at the bottom right of a touch screen, Desk on a computer
+--   Touch          a touch screen's scale: the HUD's (Ui.scaleFor) between Min and Max, then Shrink smaller at a time when
+--                  no place is clear, while every side stays MinSide px (a finger's: Ui.MinTouch) or more
+--   Desk           a computer's: the HUD's scale × Scale (compact), Shrink smaller at a time down to Min
+--   TopShare       their top stays under this share of the screen's height (the lower part); ShrinkCost: px of way from
+--                  their spot a smaller scale counts as, for each share of the biggest it loses; Weight: in the last
+--                  resort (no clear place) covering the touch controls counts this many times a HUD group's px
+--   Caption        px at scale 1 under them for a gamepad's R2 / L2 (the platform's picture, else the word)
+--   Press          the press drawn (shared/PedalRules.luau look / ease): Depth px down at scale 1 (also the shadow's lip
+--                  under the face at rest, which the press closes) and Squash the face's share shorter (it tips away),
+--                  Shade the dark veil over it, Accent the red edge's px (resting, pressed), In / Out how fast it goes
+--                  down and comes back (a share a second: quick, no bounce)
+--   Face           the face's transparency: Rest, Pressed (more solid)
+--   Rolling        studs/s: both held, the brake works while the car still rolls faster than this, then it stands
+--   Check / Place  s between the looks at the seat, the HUD and the device / at where they go (the HUD's groups move)
+Config.DrivePedals = {
+	On = true,
+	Gas = { 64, 120 },
+	Brake = { 92, 88 },
+	Ribs = { Gas = 6, Brake = 4 },
+	Gap = 12,
+	Clear = 8,
+	Margin = { Touch = 10, Desk = 16 },
+	Touch = { Min = 0.78, Max = 0.92, Shrink = 0.04, MinSide = 44 },
+	Desk = { Scale = 0.62, Min = 0.4, Shrink = 0.06 },
+	TopShare = 0.3,
+	ShrinkCost = 600,
+	Weight = 4,
+	Caption = 18,
+	Press = { Depth = 7, Squash = 0.1, Shade = 0.35, Accent = { 2, 5 }, In = 26, Out = 16 },
+	Face = { Rest = 0.35, Pressed = 0.12 },
+	Rolling = 1.5,
+	Check = 0.1,
+	Place = 0.5,
+}
+
+-- 9.0.1 (the owner: "on the Mac you can't turn with the touchpad at all"): client/CameraRig.luau's free camera turned
+-- by a trackpad and the keys, as Roblox's own camera does.
+--   Pan       radians a unit of a two-finger swipe (UserInputService.PointerAction's pan) turns it (the mouse's
+--             0.0032 a pixel; Roblox's own camera turns 14 × more a pan unit than a mouse pixel)
+--   PanPitch  × Pan up and down (Roblox's 0.77)
+--   Pinch     × a pinch's scale on the zoom (0.5 … 2; a wheel's notch is 0.1)
+--   Keys      radians a second , / . (and the arrows on foot) turn it (Roblox's 120°)
+Config.CameraTurn = {
+	Pan = 0.045,
+	PanPitch = 0.77,
+	Pinch = 1,
+	Keys = math.rad(120),
 }
 
 return Config

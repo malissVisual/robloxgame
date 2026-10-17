@@ -308,7 +308,7 @@ PlayerData.addMoney(Neo, 5000, "Admin")
 E.flush()
 local grew = Upgrades.buy(Neo, "warehouse")
 E.flush()
-check("8.3: a new player buys the Workshop (the ZDC Warehouse's first level): firstUpgrade, from the purchase's moment (Upgrades.onBought)", grew
+check("8.3: a new player buys the Workshop (the Deliveros Warehouse's first level): firstUpgrade, from the purchase's moment (Upgrades.onBought)", grew
 	and Upgrades.warehouseLevel(Neo) == 2 and Badges.session(Neo).firstUpgrade == "awarded" and calls("award", Neo, "firstUpgrade") == 1)
 
 -- ── A badge already owned ──────────────────────────────────────────────────

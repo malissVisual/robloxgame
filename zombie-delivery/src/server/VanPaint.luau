@@ -299,7 +299,7 @@ function VanPaint.admin(player: Player, what: string): string
 	profile.vanPaint = Rules.empty()
 	VanPaint.repaint(player)
 	pushState(player)
-	return "ADMIN: the paints reset: nothing bought, your van in ZDC cream with the ZDC classic stripe."
+	return "ADMIN: the paints reset: nothing bought, your van in Deliveros cream with the Deliveros classic stripe."
 end
 
 -- ── Joining, leaving, the remote, the prompts ─────────────────────────────
@@ -395,6 +395,23 @@ function VanPaint.start()
 		end
 	end
 	task.spawn(watchPrompts)
+	-- 9.7 runs: the lobby's PAINT shop booth (server/LobbyWorld.luau: its counter's prompt, attribute PaintShop) opens the
+	-- window for anybody with a save, no van needed (the truck wears it in the runs)
+	local world = workspace:FindFirstChild("Sandbox")
+	if world then
+		for _, d in world:GetDescendants() do
+			if d:IsA("ProximityPrompt") and d:GetAttribute("PaintShop") == true then
+				VanPaint.booth(d)
+			end
+		end
+	end
+end
+
+-- 9.7 runs: a PAINT shop booth's prompt opens the window (the lobby's: no van parked there any more).
+function VanPaint.booth(prompt: ProximityPrompt)
+	prompt.Triggered:Connect(function(player: Player)
+		VanPaint.open(player)
+	end)
 end
 
 return VanPaint

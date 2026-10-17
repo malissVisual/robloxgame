@@ -1,6 +1,7 @@
 -- 8.0 SANDBOX, the guide's steps (shared/SandboxSteps.luau; client/SandboxGuide.luau draws them): every row of the
--- owner's table gives its words and its target, a step done once goes quiet (the drive steps' arrow stays while you
--- drive), the path along the roads, the collection's state read. Run with tests/run_tests.py.
+-- owner's table gives its words and its target (9.7 runs: the lobby's: walk to a portal, pick a difficulty, load the
+-- truck, finish or beat the clock; no driving), a step done once goes quiet, the path (straight), the collection's state
+-- read. Run with tests/run_tests.py.
 local Config = require("./Config")
 local SandboxMap = require("./SandboxMap")
 local SandboxSteps = require("./SandboxSteps")
@@ -42,96 +43,93 @@ local function show(step: SandboxSteps.Step): string
 	return `{step.id} | {step.hint} | {step.target}`
 end
 
--- ── The owner's table, row by row ───────────────────────────────────────────
+-- ── The owner's table, row by row (9.7 runs: the lobby's words, no driving) ─
 do
 	local step = SandboxSteps.decide(state({}))
-	check("no move: take a contract at the board (your plot's board)", step.id == "contract" and step.hint == "Take a contract at the board" and step.target == "board", show(step))
+	check("9.7 no run: walk to a portal (the nearest portal's pad)", step.id == "portal" and step.hint == "Walk to a portal: step onto a house's glowing pad" and step.target == "portal"
+		and not step.nav, show(step))
+	step = SandboxSteps.decide(state({ pad = true, padHost = true }))
+	check("9.7 on a portal's pad, the host: pick a difficulty (no 3D target: the panel)", step.id == "pick" and step.target == nil
+		and string.find(step.hint, "Pick a difficulty", 1, true) == 1, show(step))
+	step = SandboxSteps.decide(state({ pad = true }))
+	check("9.7 …on the pad, not the host: stay on it", step.id == "waitPad" and step.target == nil and string.find(step.hint, "Stay on the pad", 1, true) == 1, show(step))
+	step = SandboxSteps.decide(state({ pad = true, stock = 3 }))
+	check("9.7 …the pad wins over the stock", step.id == "waitPad", show(step))
 	step = SandboxSteps.decide(state({ move = true }))
-	check("a move started, not at the house: drive to The Old Farmstead on Pražská (its curb)", step.id == "drive" and step.hint == "Drive to The Old Farmstead on Pražská" and step.target == "curb" and step.nav, show(step))
-	check("… the house's name from SandboxMap", SandboxMap.House.name == "The Old Farmstead")
-	step = SandboxSteps.decide(state({ move = true, seated = true }))
-	check("… driving there too", step.id == "drive", show(step))
-	step = SandboxSteps.decide(state({ move = true, atHouse = true }))
-	check("8.1 walk-in doors: at the house, outside: walk in through the front door (no E)", step.id == "door" and step.hint == "Walk in through the front door" and step.target == "door"
-		and string.find(step.hint, "E at", 1, true) == nil, show(step))
-	step = SandboxSteps.decide(state({ move = true, atHouse = true, inside = true }))
-	check("in the house: carry the furniture out (the hint only, no 3D target inside)", step.id == "inside" and step.hint == "Carry the furniture out to your van (E to pick up)" and step.target == nil, show(step))
-	step = SandboxSteps.decide(state({ move = true, atHouse = true, inside = true, carrying = true }))
+	check("9.7 a run started, outside, nothing loaded: walk in through the front door (no E; no drive: the party lands by it)", step.id == "door"
+		and step.hint == "Walk in through the front door" and step.target == "door" and string.find(step.hint, "E at", 1, true) == nil and not step.nav, show(step))
+	step = SandboxSteps.decide(state({ move = true, inside = true }))
+	check("in the house: carry the loot out to the truck (the hint only, no 3D target inside)", step.id == "inside" and step.hint == "Carry the loot out to the truck (E to pick up)"
+		and step.target == nil, show(step))
+	step = SandboxSteps.decide(state({ move = true, inside = true, carrying = true }))
 	check("… carrying inside: still carry it out", step.id == "inside", show(step))
-	step = SandboxSteps.decide(state({ move = true, atHouse = true, carrying = true }))
-	check("carrying, outside: load it into the van (its back)", step.id == "load" and step.hint == "Load it into the van: walk in or E at the back" and step.target == "van", show(step))
-	step = SandboxSteps.decide(state({ move = true, atHouse = true, carrying = true, vanLoad = 3 }))
-	check("… with things in the van already: load this one first", step.id == "load", show(step))
-	step = SandboxSteps.decide(state({ move = true, atHouse = true, vanLoad = 2 }))
-	check("the van has things, the move is on: drive home to unload (your plot's unload circle)", step.id == "home"
-		and step.hint == "Drive home to your warehouse to unload (or keep loading)" and step.target == "unload" and step.nav, show(step))
-	step = SandboxSteps.decide(state({ move = true, vanLoad = 2, seated = true }))
-	check("… driving home", step.id == "home", show(step))
-	step = SandboxSteps.decide(state({ move = true, delivered = 4 }))
-	check("a trip unloaded, the move still on: back to the house for more, or FINISH", step.id == "back" and step.target == "curb" and step.nav
-		and step.hint == "Drive back to The Old Farmstead on Pražská for more, or FINISH", show(step))
-	step = SandboxSteps.decide(state({ move = true, delivered = 4, atHouse = true }))
-	check("… there again: in through the door", step.id == "door", show(step))
+	step = SandboxSteps.decide(state({ move = true, carrying = true }))
+	check("carrying, outside: load the truck (its back)", step.id == "load" and step.hint == "Load the truck: walk in or E at its back" and step.target == "van", show(step))
+	step = SandboxSteps.decide(state({ move = true, carrying = true, vanLoad = 3 }))
+	check("… with things in the truck already: load this one first", step.id == "load", show(step))
+	step = SandboxSteps.decide(state({ move = true, vanLoad = 2 }))
+	check("9.7 the truck has things, the run is on: finish or beat the clock (the truck's back: FINISH there)", step.id == "finish"
+		and string.find(step.hint, "Finish or beat the clock", 1, true) == 1 and step.target == "van" and not step.nav, show(step))
+	step = SandboxSteps.decide(state({ move = true, vanLoad = 2, inside = true }))
+	check("… back in the house: carry more out", step.id == "inside", show(step))
 	step = SandboxSteps.decide(state({ stock = 3 }))
-	check("stock has pieces, no move: put them on show (an empty stand)", step.id == "show" and step.hint == "Put your pieces on show: E at an empty stand" and step.target == "stand", show(step))
+	check("stock has pieces, no run: put them on show (an empty stand)", step.id == "show" and step.hint == "Put your pieces on show: E at an empty stand" and step.target == "stand", show(step))
 	step = SandboxSteps.decide(state({ stock = 3, freeStands = 2, shown = 1 }))
 	check("… some on show already and stands free: still put the rest on show", step.id == "show", show(step))
 	step = SandboxSteps.decide(state({ shown = 2 }))
-	check("pieces on show: they earn money, take another contract (the board)", step.id == "earn"
-		and step.hint == "Your pieces earn money while you play. Take another contract for more!" and step.target == "board" and step.info, show(step))
+	check("pieces on show: they earn money, walk into another house for more (a portal)", step.id == "earn"
+		and step.hint == "Your pieces earn money while you play. Walk into another house for more!" and step.target == "portal" and step.info, show(step))
 	step = SandboxSteps.decide(state({ shown = 6, stock = 2, freeStands = 0 }))
 	check("… every stand full, more in the stock: they earn (nothing to put up)", step.id == "earn", show(step))
 	step = SandboxSteps.decide(state({ stock = 2, freeStands = 0 }))
-	check("stock but no free stand and nothing on show: take a contract", step.id == "contract", show(step))
+	check("stock but no free stand and nothing on show: walk to a portal", step.id == "portal", show(step))
 	step = SandboxSteps.decide(state({ stock = 2, move = true }))
-	check("a move wins over the stock", step.id == "drive", show(step))
+	check("a run wins over the stock", step.id == "door", show(step))
 	step = SandboxSteps.decide(state({ planning = true, planningMine = true }))
 	check("the planning open (yours): press LAUNCH", step.id == "plan" and step.target == nil and string.find(step.hint, "LAUNCH", 1, true) ~= nil, show(step))
 	step = SandboxSteps.decide(state({ planning = true }))
 	check("… a crew's: the owner launches", step.id == "planCrew" and step.target == nil, show(step))
+	check("9.7: no contract board, no drive steps (contract, drive, home, back gone)", SandboxSteps.Steps.contract == nil and SandboxSteps.Steps.drive == nil
+		and SandboxSteps.Steps.home == nil and SandboxSteps.Steps.back == nil)
+	local navs = 0
 	for id, def in SandboxSteps.Steps do
 		check(`{id}: one sentence in English, its id its key`, def.id == id and #def.hint > 10 and #def.hint <= 80 and string.find(def.hint, "%a") ~= nil, def.hint)
+		navs += if def.nav then 1 else 0
+		local lower = string.lower(def.hint)
+		if string.find(lower, "drive", 1, true) or string.find(lower, "contract", 1, true) then
+			check(`{id}: 9.7 no driving, no contract in its words`, false, def.hint)
+		end
 	end
+	check("9.7: no step's arrow stays while you drive (nobody drives)", navs == 0, navs)
 end
 
--- ── Done once: quiet; the drive steps' arrow stays while you drive ──────────
+-- ── Done once: quiet ────────────────────────────────────────────────────────
 do
 	local done: { [string]: boolean } = {}
 	local last: SandboxSteps.Last = {}
-	local contract = SandboxSteps.Steps.contract
-	local hint, guide = SandboxSteps.visible(contract, done, false)
+	local portal = SandboxSteps.Steps.portal
+	local hint, guide = SandboxSteps.visible(portal, done, false)
 	check("a new step: the hint and the 3D guide", hint and guide)
 	hint, guide = SandboxSteps.visible(SandboxSteps.Steps.inside, done, false)
 	check("in the house: the hint, no 3D guide", hint and not guide)
+	SandboxSteps.doneBy(state({ pad = true }), done, last)
+	check("9.7 on a pad: the portal step is done", done.portal == true and done.pick == nil and done.waitPad == nil)
+	hint, guide = SandboxSteps.visible(portal, done, false)
+	check("… its hint and guide quiet next time", not hint and not guide)
 	SandboxSteps.doneBy(state({ move = true }), done, last)
-	check("a move started: the contract is done", done.contract == true and done.drive == nil)
-	hint, guide = SandboxSteps.visible(contract, done, false)
-	check("… the contract's hint and guide quiet next time", not hint and not guide)
-	SandboxSteps.doneBy(state({ move = true, seated = true }), done, last)
-	check("driving to the house: not done yet", done.drive == nil)
-	SandboxSteps.doneBy(state({ move = true, atHouse = true }), done, last)
-	check("at the house: the drive is done", done.drive == true and done.door == nil)
-	local drive = SandboxSteps.Steps.drive
-	hint, guide = SandboxSteps.visible(drive, done, false)
-	check("a done drive step on foot: quiet", not hint and not guide)
-	hint, guide = SandboxSteps.visible(drive, done, true)
-	check("… driving: the hint quiet, the arrow to the house stays", not hint and guide)
-	SandboxSteps.doneBy(state({ move = true, atHouse = true, inside = true }), done, last)
+	check("9.7 the run started: picking and waiting on the pad done too", done.pick == true and done.waitPad == true and done.door == nil)
+	SandboxSteps.doneBy(state({ move = true, inside = true }), done, last)
 	check("inside: the door is done", done.door == true and done.inside == nil)
-	SandboxSteps.doneBy(state({ move = true, atHouse = true, carrying = true }), done, last)
+	SandboxSteps.doneBy(state({ move = true, carrying = true }), done, last)
 	check("out with a piece: the inside step is done", done.inside == true and done.load == nil)
-	SandboxSteps.doneBy(state({ move = true, atHouse = true, vanLoad = 1 }), done, last)
-	check("a piece into the van: loading is done", done.load == true and done.home == nil)
+	SandboxSteps.doneBy(state({ move = true, vanLoad = 1 }), done, last)
+	check("a piece into the truck: loading is done", done.load == true and done.finish == nil)
 	hint, guide = SandboxSteps.visible(SandboxSteps.Steps.load, done, false)
 	check("… loading quiet next time", not hint and not guide)
-	SandboxSteps.doneBy(state({ move = true, delivered = 3 }), done, last)
-	check("a trip unloaded (delivered went up): home is done", done.home == true and done.back == nil)
-	hint, guide = SandboxSteps.visible(SandboxSteps.Steps.home, done, true)
-	check("… the arrow home stays while driving", not hint and guide)
-	hint, guide = SandboxSteps.visible(SandboxSteps.Steps.back, done, false)
-	check("back to the house the first time: said once", hint and guide)
-	SandboxSteps.doneBy(state({ move = true, delivered = 3, atHouse = true }), done, last)
-	check("… there again: back is done", done.back == true)
+	hint, guide = SandboxSteps.visible(SandboxSteps.Steps.finish, done, true)
+	check("… finish the first time: said, its arrow at the truck", hint and guide)
+	SandboxSteps.doneBy(state({ stock = 1 }), done, last)
+	check("9.7 the run over with something in the truck (it went home): finish is done", done.finish == true)
 	SandboxSteps.doneBy(state({ stock = 4 }), done, last)
 	check("pieces in the stock: putting them on show is not done", done.show == nil)
 	SandboxSteps.doneBy(state({ shown = 1, stock = 3 }), done, last)
@@ -143,7 +141,12 @@ do
 	local fresh: { [string]: boolean } = {}
 	local freshLast: SandboxSteps.Last = {}
 	SandboxSteps.doneBy(state({ planning = true }), fresh, freshLast)
-	check("the planning open: the contract was taken", fresh.contract == true and fresh.plan == nil)
+	check("the planning open: the way to a house was found (the portal step done)", fresh.portal == true and fresh.plan == nil)
+	local empty: { [string]: boolean } = {}
+	local emptyLast: SandboxSteps.Last = {}
+	SandboxSteps.doneBy(state({ move = true }), empty, emptyLast)
+	SandboxSteps.doneBy(state({}), empty, emptyLast)
+	check("… a run that ended with nothing in the truck: finish not done", empty.finish == nil)
 	-- what a save brings along (the first look, or the collection's first state) is not something you did
 	local joined: { [string]: boolean } = {}
 	local joinedLast: SandboxSteps.Last = {}
@@ -158,42 +161,42 @@ do
 	local crew: { [string]: boolean } = {}
 	local crewLast: SandboxSteps.Last = {}
 	SandboxSteps.doneBy(state({ move = true, vanLoad = 3, delivered = 2 }), crew, crewLast)
-	check("joining a move with things in the van already: loading and home not done", crew.load == nil and crew.home == nil)
+	check("joining a run with things in the truck already: loading not done", crew.load == nil)
 	SandboxSteps.doneBy(state({}), crew, crewLast)
 	SandboxSteps.doneBy(state({ move = true }), crew, crewLast)
 	SandboxSteps.doneBy(state({ move = true, vanLoad = 1 }), crew, crewLast)
-	check("… a new move: its first piece loaded counts", crew.load == true)
+	check("… a new run: its first piece loaded counts", crew.load == true)
 end
 
 -- ── The words on a touch screen ─────────────────────────────────────────────
 do
 	local Steps = SandboxSteps.Steps
 	check("8.1 walk-in doors: the front door is walked through on a touch screen too (nothing to tap)", SandboxSteps.text(Steps.door, true) == "Walk in through the front door", SandboxSteps.text(Steps.door, true))
-	check("… pick up", SandboxSteps.text(Steps.inside, true) == "Carry the furniture out to your van (tap to pick up)", SandboxSteps.text(Steps.inside, true))
-	check("… the van's back", SandboxSteps.text(Steps.load, true) == "Load it into the van: walk in or tap at the back")
+	check("… pick up", SandboxSteps.text(Steps.inside, true) == "Carry the loot out to the truck (tap to pick up)", SandboxSteps.text(Steps.inside, true))
+	check("… the truck's back", SandboxSteps.text(Steps.load, true) == "Load the truck: walk in or tap at its back", SandboxSteps.text(Steps.load, true))
 	check("… a computer keeps E (the door: its own words, no key)", SandboxSteps.text(Steps.door, false) == Steps.door.hint and SandboxSteps.text(Steps.load, false) == Steps.load.hint)
-	check("… words without a key unchanged (LAUNCH, FINISH keep their E)", SandboxSteps.text(Steps.plan, true) == Steps.plan.hint and SandboxSteps.text(Steps.back, true) == Steps.back.hint)
+	check("… words without a key unchanged (LAUNCH, FINISH keep their words)", SandboxSteps.text(Steps.plan, true) == Steps.plan.hint and SandboxSteps.text(Steps.finish, true) == Steps.finish.hint
+		and SandboxSteps.text(Steps.portal, true) == Steps.portal.hint)
 end
 
 -- ── At the house ────────────────────────────────────────────────────────────
 do
 	local margin = Config.SandboxGuide.HouseMargin
 	local curb, door = SandboxMap.House.curb, SandboxMap.House.door
-	check("the curb (the van's place) is at the house", SandboxSteps.atHouse(curb.x, curb.z, margin))
+	check("the curb (the truck's place) is at the house", SandboxSteps.atHouse(curb.x, curb.z, margin))
 	check("the front door is at the house", SandboxSteps.atHouse(door.x, door.z, margin))
-	local t = SandboxMap.Turnaround
-	check("the turnaround's north edge is not", not SandboxSteps.atHouse(t.x, t.z - t.r, margin))
 	local plot = SandboxMap.Plots[1]
 	check("your plot is not", not SandboxSteps.atHouse(plot.spawn.x, plot.spawn.z, margin))
-	check("Pražská's middle is not", not SandboxSteps.atHouse(0, 200, margin))
+	local zone = (SandboxMap.zone(SandboxMap.House.id) :: SandboxMap.Zone).rect
+	check("9.7 the far end of its run zone is not", not SandboxSteps.atHouse((zone.x0 + zone.x1) / 2, zone.z1, margin))
+	local spawn = SandboxMap.Lobby.spawn
+	check("9.7 the lobby's spawn is not", not SandboxSteps.atHouse(spawn.x, spawn.z, margin))
 end
 
--- ── The path along the roads ────────────────────────────────────────────────
+-- ── The path (9.7: straight: no road to follow) ─────────────────────────────
 do
 	local out: { number } = {}
 	local direct = Config.SandboxGuide.Direct
-	local row = SandboxMap.Roads[2]
-	local rowZ = (row.z0 + row.z1) / 2
 	local function points(n: number): string
 		local parts = {}
 		for i = 1, n do
@@ -201,36 +204,17 @@ do
 		end
 		return table.concat(parts, " ")
 	end
-	local function onRoad(x: number, z: number): boolean
-		for _, r in SandboxMap.Roads do
-			if x >= r.x0 - 0.01 and x <= r.x1 + 0.01 and z >= r.z0 - 0.01 and z <= r.z1 + 0.01 then
-				return true
-			end
-		end
-		return false
-	end
 	local plot = SandboxMap.Plots[1]
+	local portal = SandboxMap.Lobby.portals[1]
+	local px, pz = (portal.pad.x0 + portal.pad.x1) / 2, (portal.pad.z0 + portal.pad.z1) / 2
+	local n = SandboxSteps.route(plot.spawn.x, plot.spawn.z, px, pz, out, direct)
+	check("from your plot to a portal's pad: straight", n == 2 and out[1] == plot.spawn.x and out[2] == plot.spawn.z and out[3] == px and out[4] == pz, points(n))
+	local zone = SandboxMap.zone(SandboxMap.House.id) :: SandboxMap.Zone
 	local curb = SandboxMap.House.curb
-	local n = SandboxSteps.route(plot.spawn.x, plot.spawn.z, curb.x, curb.z, out, direct)
-	check("from your plot to the house: out to Depot Row, along it, down Pražská", n == 4 and out[3] == plot.spawn.x and out[4] == rowZ
-		and out[5] == 0 and out[6] == rowZ and out[7] == curb.x and out[8] == curb.z, points(n))
-	local inner = true
-	for i = 2, n - 1 do
-		inner = inner and onRoad(out[i * 2 - 1], out[i * 2])
-	end
-	check("… every turn on a road", inner, points(n))
-	n = SandboxSteps.route(curb.x, curb.z, plot.unload.x, plot.unload.z, out, direct)
-	check("from the house home: up Pražská, along Depot Row, in to the unload circle", n == 4 and out[3] == 0 and out[4] == rowZ
-		and out[5] == plot.unload.x and out[6] == rowZ and out[7] == plot.unload.x and out[8] == plot.unload.z, points(n))
+	n = SandboxSteps.route(zone.arrive.x, zone.arrive.z, curb.x, curb.z, out, direct)
+	check("from the run's arrival spot to the truck: straight", n <= 2 and out[n * 2 - 1] == curb.x and out[n * 2] == curb.z, points(n))
 	n = SandboxSteps.route(plot.spawn.x, plot.spawn.z, plot.board.x, plot.board.z, out, direct)
 	check("on your plot to its board: straight", n == 2 and out[3] == plot.board.x and out[4] == plot.board.z, points(n))
-	local other = SandboxMap.Plots[4]
-	n = SandboxSteps.route(plot.spawn.x, plot.spawn.z, other.board.x, other.board.z, out, direct)
-	check("to another plot: along Depot Row", n == 4 and out[4] == rowZ and out[6] == rowZ, points(n))
-	n = SandboxSteps.route(0, 300, curb.x, curb.z, out, direct)
-	check("on Pražská to the house: straight on", n == 2 and out[3] == curb.x and out[4] == curb.z, points(n))
-	n = SandboxSteps.route(120, 200, curb.x, curb.z, out, direct)
-	check("from the meadow: to Pražská first", n == 3 and out[3] == 0 and out[4] == 200, points(n))
 	n = SandboxSteps.route(5, 5, 5, 5, out, direct)
 	check("already there: two points (a path of nothing)", n == 2, points(n))
 	local count = 0
@@ -272,8 +256,8 @@ do
 	local nothing: { [string]: boolean } = {}
 	local NONE = {} -- (a field given as NONE is left out: not known)
 	-- what makes every soft step fit: the warehouse full (4 waiting, 2 free), $2,000 at level 1 (the next level $1,000;
-	-- 8.3 economy: every upgrade's first $1,500, PaintMoney $2,000), a hot Jukebox, the van parked at home and nothing
-	-- painted
+	-- 8.3 economy: every upgrade's first $1,500, PaintMoney $2,000), a hot Jukebox, in the lobby (9.7: its PAINT shop's
+	-- booth there) and nothing painted
 	local function rich(fields: { [string]: any }?): SandboxSteps.State
 		local s: { [string]: any } = {
 			stock = 4,
@@ -318,7 +302,7 @@ do
 	local level2, level3 = wprices[1], wprices[2]
 	check(`the warehouse full, the next level affordable: "Your warehouse is full: grow it at the UPGRADES desk ({UpgradeRules.money(level2)})" (the desk)`,
 		step.id == "grow" and SandboxSteps.words(step, rich()) == `Your warehouse is full: grow it at the UPGRADES desk ({UpgradeRules.money(level2)})` and step.target == "desk", show(step))
-	check(`… its price the next level's (the ZDC Warehouse: level 2 costs {UpgradeRules.money(level2)})`, SandboxSteps.growPrice(rich()) == UpgradeRules.price("warehouse", 0)
+	check(`… its price the next level's (the Deliveros Warehouse: level 2 costs {UpgradeRules.money(level2)})`, SandboxSteps.growPrice(rich()) == UpgradeRules.price("warehouse", 0)
 		and UpgradeRules.price("warehouse", 0) == level2 and level2 <= 2000)
 	check(`… at level 2 (the Workshop) the next one's ({UpgradeRules.money(level3)}) when the money reaches it`, SandboxSteps.growPrice(rich({ levels = { warehouse = 1 }, money = level3 })) == level3
 		and SandboxSteps.words(Steps.grow, rich({ levels = { warehouse = 1 }, money = level3 })) == `Your warehouse is full: grow it at the UPGRADES desk ({UpgradeRules.money(level3)})`)
@@ -346,9 +330,9 @@ do
 	check("… never the warehouse (grow's), nor a locked card (More stands below the Big Warehouse)", SandboxSteps.upgradeFor(rich({ money = 1e9, levels = { lights = 5, engine = 3, danny = 3 } })) == nil)
 	check("… More stands once the warehouse is the Big Warehouse (level 4)", SandboxSteps.upgradeFor(rich({ money = 1e9, levels = { warehouse = 3, lights = 5, engine = 3, danny = 3 } })) == "stands")
 	step = chosen(rich(), { show = true, grow = true, hot = true, upgrade = true })
-	check("then the PAINT shop: \"🎨 Make your van your own: E at its side opens the PAINT SHOP\" (the van's prompt)", step.id == "paint" and step.target == "paint"
-		and SandboxSteps.words(step, rich()) == "🎨 Make your van your own: E at its side opens the PAINT SHOP", show(step))
-	check("… a phone taps it, a computer keeps E", SandboxSteps.text(step, true, SandboxSteps.words(step, rich())) == "🎨 Make your van your own: tap at its side opens the PAINT SHOP"
+	check("then the PAINT shop: \"🎨 Make your truck your own at the PAINT SHOP\" (9.7: the lobby's booth; the truck is seen in the runs)", step.id == "paint" and step.target == "paint"
+		and SandboxSteps.words(step, rich()) == "🎨 Make your truck your own at the PAINT SHOP", show(step))
+	check("… the same words on a phone and a computer (no key in them)", SandboxSteps.text(step, true, SandboxSteps.words(step, rich())) == step.hint
 		and SandboxSteps.text(step, false, SandboxSteps.words(step, rich())) == step.hint)
 	local afterAll = { show = true, grow = true, hot = true, upgrade = true }
 	check(`… at {G.PaintMoney} or more in your pocket`, chosen(rich({ money = G.PaintMoney }), afterAll).id == "paint")
@@ -356,15 +340,15 @@ do
 	check("… after the first warehouse level bought (past the Garage), whatever the money", chosen(rich({ money = 0, levels = { warehouse = 1 } }), afterAll).id == "paint")
 	check("… not with something bought there already, nor before its state came (not known)", chosen(rich({ painted = true }), afterAll).id ~= "paint"
 		and chosen(rich({ painted = NONE }), afterAll).id ~= "paint")
-	check("… not while the van is away from home (its 🎨 prompt is off)", chosen(rich({ vanHome = false }), afterAll).id ~= "paint")
+	check("… not out of the lobby (9.7: in a run; the booth is in the lobby)", chosen(rich({ vanHome = false }), afterAll).id ~= "paint")
 	check("all done: the core's step again (quiet)", chosen(rich(), { show = true, grow = true, hot = true, upgrade = true, paint = true }).id == "show")
 
 	-- the priority: the core loop wins
-	check("a move wins over every soft step", chosen(rich({ move = true })).id == "drive" and chosen(rich({ move = true, vanLoad = 3 })).id == "home"
+	check("a run wins over every soft step", chosen(rich({ move = true })).id == "door" and chosen(rich({ move = true, vanLoad = 3 })).id == "finish"
 		and chosen(rich({ move = true, inside = true })).id == "inside" and chosen(rich({ move = true, carrying = true })).id == "load")
 	check("… the planning too", chosen(rich({ planning = true, planningMine = true })).id == "plan")
 	check("… a core step not done yet (putting the pieces on show)", chosen(rich(), nothing).id == "show")
-	check("… taking a contract not done yet (nothing in the warehouse)", chosen(rich({ stock = 0, shown = 0 }), nothing).id == "contract")
+	check("… walking to a portal not done yet (nothing in the warehouse)", chosen(rich({ stock = 0, shown = 0 }), nothing).id == "portal")
 	check("… but `earn`, which only says something, gives way", chosen(rich({ stock = 2, shown = 4, freeStands = 0 }), nothing).id == "grow"
 		and SandboxSteps.decide(rich({ stock = 2, shown = 4, freeStands = 0 })).id == "earn")
 	check("never while something covers the screen (a grip check, a result card, a window)", chosen(rich({ covered = true })).id == "show")
@@ -419,7 +403,7 @@ do
 
 	-- the ✕
 	local closed: { [string]: boolean } = { show = true }
-	check("the ✕ on a core step is not a dismissal (the guide goes off instead)", not SandboxSteps.dismiss(Steps.contract, closed) and closed.contract == nil)
+	check("the ✕ on a core step is not a dismissal (the guide goes off instead)", not SandboxSteps.dismiss(Steps.portal, closed) and closed.portal == nil)
 	check("the ✕ on a soft step: that step gone", SandboxSteps.dismiss(Steps.grow, closed) and closed.grow == true and chosen(rich(), closed).id == "hot")
 	check("… the hot one: gone for the session", SandboxSteps.dismiss(Steps.hot, closed) and closed.hot == true and closed.hotGone == true)
 	local closedLast: SandboxSteps.Last = { day = 20000, hot = 1 }
@@ -464,16 +448,14 @@ do
 	check("… a state without the market (before 8.3): none hot", summary.hot == 0 and summary.day == nil)
 end
 
--- ── 8.4: Danny for hire (hire him, give him a piece, a heavy piece) ──────────
+-- ── 8.4: Danny (give him a piece, a heavy piece; 10.1 no "hire" step: he is free) ──
 do
 	local Steps = SandboxSteps.Steps
-	local PRICE = 170
-	-- a move with Danny on it, for hire, your money paying him (then the fields given; `false` for the money, his price
-	-- or Danny: not known, left out)
+	-- a move with Danny on it, with you (10.1: always, free), then the fields given (`false` for Danny: not known, left out)
 	local function dannyState(fields: { [string]: any }?): SandboxSteps.State
-		local s: { [string]: any } = { move = true, atHouse = true, money = 2000, helper = "offer", helperPrice = PRICE, heavy = 2 }
+		local s: { [string]: any } = { move = true, atHouse = true, money = 2000, helper = "hired", heavy = 2 }
 		for key, value in fields or {} do
-			if value == false and (key == "money" or key == "helperPrice" or key == "helper") then
+			if value == false and key == "helper" then
 				s[key] = nil
 			else
 				s[key] = value
@@ -484,104 +466,99 @@ do
 	local function chosen(s: SandboxSteps.State, done: { [string]: boolean }?): SandboxSteps.Step
 		return SandboxSteps.choose(s, done or {})
 	end
-	local hire, give, lift = Steps.hire, Steps.give, Steps.lift
+	local give, lift = Steps.give, Steps.lift
 
 	-- the steps and their words (the same on every device; a gamepad's button after them)
-	check("Danny's steps' order: lift, give, hire", table.concat(SandboxSteps.Danny, ",") == "lift,give,hire")
+	check("Danny's steps' order: lift, give (10.1: no \"Hire Danny\" step any more)", table.concat(SandboxSteps.Danny, ",") == "lift,give" and Steps.hire == nil)
 	for _, id in SandboxSteps.Danny do
 		local def = Steps[id]
 		check(`{id}: a soft step (said once, its ✕ dismisses it), not a nav or info one, no "click" or "tap" in its words`, def ~= nil and def.soft and not def.nav
 			and not def.info and string.find(string.lower(def.hint), "click", 1, true) == nil and string.find(string.lower(def.hint), "tap", 1, true) == nil, def and def.hint)
 	end
-	check("their words: \"Hire Danny to carry with you\" (the chevron over him), 8.5 \"Take out your clipboard (Q) and pick a piece for Danny\", \"Heavy piece: press Lift and wait for Danny\"",
-		hire.hint == "Hire Danny to carry with you" and hire.target == "danny" and give.hint == "Take out your clipboard (Q) and pick a piece for Danny" and give.target == nil
+	check("their words: 8.5 \"Take out your clipboard (Q) and pick a piece for Danny\", \"Heavy piece: press Lift and wait for Danny\"",
+		give.hint == "Take out your clipboard (Q) and pick a piece for Danny" and give.target == nil
 		and lift.hint == "Heavy piece: press Lift and wait for Danny" and lift.target == nil, give.hint)
 	check("… his name Config's, the clipboard's key Config's", Config.MoveHelper.Name == "Danny" and Config.MoveHelper.Clipboard.Key == "Q")
-	check("… a computer's and a phone's words as they are (no key: \"pick\" is a click or a tap; Lift its prompt's)", SandboxSteps.onDevice(hire, nil, "keys") == hire.hint
-		and SandboxSteps.onDevice(hire, nil, "touch") == hire.hint and SandboxSteps.onDevice(lift, nil, "touch") == lift.hint)
+	check("… a computer's and a phone's words as they are (Lift its prompt's)", SandboxSteps.onDevice(lift, nil, "keys") == lift.hint
+		and SandboxSteps.onDevice(lift, nil, "touch") == lift.hint)
 	check("… 8.5 give's: the clipboard's key in the device's way (Q on a computer, \"tap 📋\" on a phone: its 📋 button)", SandboxSteps.onDevice(give, nil, "keys") == give.hint
 		and SandboxSteps.onDevice(give, nil, "touch") == "Take out your clipboard (tap 📋) and pick a piece for Danny", SandboxSteps.onDevice(give, nil, "touch"))
-	check("… a gamepad's: SandboxPad's buttons for him (\"(L1)\" at him, 8.5 R1 his clipboard's, in its place), Lift's own on the prompt",
-		SandboxSteps.onDevice(hire, nil, "pad") == "Hire Danny to carry with you (L1)" and SandboxSteps.onDevice(give, nil, "pad") == "Take out your clipboard (R1) and pick a piece for Danny"
+	check("… a gamepad's: 8.5 R1 his clipboard's, in its place; Lift's own on the prompt",
+		SandboxSteps.onDevice(give, nil, "pad") == "Take out your clipboard (R1) and pick a piece for Danny"
 		and SandboxSteps.onDevice(lift, nil, "pad") == lift.hint, SandboxSteps.onDevice(give, nil, "pad"))
+	-- 10.1 the crew's helper (Bruno, Zip …): the words his name's
+	check("10.1 the words name the crew's helper (MoveHelperName): \"… pick a piece for Zip\", \"… wait for Bruno\"",
+		SandboxSteps.words(give, dannyState({ helperName = "Zip" })) == "Take out your clipboard (Q) and pick a piece for Zip"
+		and SandboxSteps.words(lift, dannyState({ helperName = "Bruno" })) == "Heavy piece: press Lift and wait for Bruno"
+		and SandboxSteps.words(give, dannyState({ helperName = "Lucy", clipboard = true })) == "Pick a piece to give it to Lucy"
+		and SandboxSteps.words(give, dannyState()) == give.hint)
+	check("… their detail follows his name (the client makes the words again when another helper comes)",
+		SandboxSteps.detail(give, dannyState({ helperName = "Zip" })) == "Zip" and SandboxSteps.detail(lift, dannyState({ helperName = "Bruno" })) == "Bruno"
+		and SandboxSteps.detail(give, dannyState({ helperName = "Lucy", clipboard = true })) == "clipboard:Lucy" and SandboxSteps.detail(give, dannyState({ helperName = "Danny" })) == nil)
 	-- 8.5 the clipboard out (orders mode): give's words say what to do now ("(R1)" with a gamepad: at a piece)
-	local out = dannyState({ helper = "hired", helperQueue = 0, inside = true, clipboard = true })
+	local out = dannyState({ helperQueue = 0, inside = true, clipboard = true })
 	local outWords = SandboxSteps.words(give, out)
 	check("8.5 the clipboard out: \"Pick a piece to give it to Danny\" (a click or a tap: no key; a gamepad's R1 after it)", outWords == "Pick a piece to give it to Danny"
 		and SandboxSteps.onDevice(give, outWords, "keys") == outWords and SandboxSteps.onDevice(give, outWords, "touch") == outWords
 		and SandboxSteps.onDevice(give, outWords, "pad") == "Pick a piece to give it to Danny (R1)", SandboxSteps.onDevice(give, outWords, "pad"))
 	check("… its detail follows the clipboard (the client makes its words again)", SandboxSteps.detail(give, out) == "clipboard"
-		and SandboxSteps.detail(give, dannyState({ helper = "hired", helperQueue = 0, inside = true })) == nil)
+		and SandboxSteps.detail(give, dannyState({ helperQueue = 0, inside = true })) == nil)
 	check("… still give's step (the same step, other words)", chosen(out).id == "give")
-	check("… the other steps on a device as before (a phone's tap, a gamepad's X)", SandboxSteps.onDevice(Steps.load, nil, "touch") == "Load it into the van: walk in or tap at the back"
-		and SandboxSteps.onDevice(Steps.load, nil, "pad") == "Load it into the van: walk in or X at the back" and SandboxSteps.onDevice(Steps.load, nil, "keys") == Steps.load.hint)
+	check("… the other steps on a device as before (a phone's tap, a gamepad's X)", SandboxSteps.onDevice(Steps.load, nil, "touch") == "Load the truck: walk in or tap at its back"
+		and SandboxSteps.onDevice(Steps.load, nil, "pad") == "Load the truck: walk in or X at its back" and SandboxSteps.onDevice(Steps.load, nil, "keys") == Steps.load.hint)
 
-	-- hire: during a move, for hire, the money pays him
-	check("a move, Danny for hire, the money pays him: \"Hire Danny to carry with you\" before the move's own step", chosen(dannyState()).id == "hire"
-		and chosen(dannyState({ atHouse = false })).id == "hire")
-	check("… decide gives it only with `done` (the core alone without)", SandboxSteps.decide(dannyState()).id == "door" and SandboxSteps.decide(dannyState(), {}).id == "hire")
-	check("… the money just enough", chosen(dannyState({ money = PRICE })).id == "hire")
-	check("… not short of it", chosen(dannyState({ money = PRICE - 1 })).id == "door")
-	check("… not with the money or his price not known", chosen(dannyState({ money = false })).id == "door" and chosen(dannyState({ helperPrice = false })).id == "door")
-	check("… not without a move (no Danny then), nor in the planning (he comes with the move)", chosen(dannyState({ move = false }), { contract = true }).id ~= "hire"
-		and chosen(dannyState({ move = false, planning = true, planningMine = true })).id == "plan")
-	check("… not without Danny on the move", chosen(dannyState({ helper = false })).id == "door")
-	check("… not while you sit (driving), carry a piece", chosen(dannyState({ seated = true })).id == "door" and chosen(dannyState({ carrying = true })).id == "load")
-	check("… never while something covers the screen (his card, the move's cards, a grip check) or something else talks", chosen(dannyState({ covered = true })).id == "door"
-		and chosen(dannyState({ hush = true })).id == "door")
-	check("… done: the move's own step again", chosen(dannyState(), { hire = true }).id == "door")
+	-- 10.1 no hire: Danny with you, his list empty, outside: the move's own step (nothing to pay, nothing to say)
+	check("10.1 Danny with you outside the house: the move's own step (no \"Hire Danny\")", chosen(dannyState()).id == "door" and SandboxSteps.decide(dannyState(), {}).id == "door")
 
-	-- give: hired, his list empty, in the house
-	check("hired, his list empty, in the house: \"Pick a piece to give it to Danny\"", chosen(dannyState({ helper = "hired", helperQueue = 0, inside = true })).id == "give")
-	check("… not outside (the pieces are in the house: the move's step)", chosen(dannyState({ helper = "hired", helperQueue = 0 })).id == "door")
-	check("… not with pieces on his list, nor with his list not known", chosen(dannyState({ helper = "hired", helperQueue = 2, inside = true })).id == "inside"
-		and chosen(dannyState({ helper = "hired", inside = true })).id == "inside")
-	check("… not while you carry one, nor while you wait for him", chosen(dannyState({ helper = "hired", helperQueue = 0, inside = true, carrying = true })).id == "inside"
-		and chosen(dannyState({ helper = "hired", helperQueue = 0, inside = true, waiting = true })).id == "inside")
-	check("… for hire: hire's, not give's", chosen(dannyState({ helperQueue = 0, inside = true })).id == "hire")
+	-- give: his list empty, in the house
+	check("his list empty, in the house: \"Pick a piece to give it to Danny\"", chosen(dannyState({ helperQueue = 0, inside = true })).id == "give")
+	check("… decide gives it only with `done` (the core alone without)", SandboxSteps.decide(dannyState({ helperQueue = 0, inside = true })).id == "inside"
+		and SandboxSteps.decide(dannyState({ helperQueue = 0, inside = true }), {}).id == "give")
+	check("… not outside (the pieces are in the house: the move's step)", chosen(dannyState({ helperQueue = 0 })).id == "door")
+	check("… not with pieces on his list, nor with his list not known", chosen(dannyState({ helperQueue = 2, inside = true })).id == "inside"
+		and chosen(dannyState({ inside = true })).id == "inside")
+	check("… not while you carry one, nor while you wait for him", chosen(dannyState({ helperQueue = 0, inside = true, carrying = true })).id == "inside"
+		and chosen(dannyState({ helperQueue = 0, inside = true, waiting = true })).id == "inside")
+	check("… not without Danny on the move, nor without a move", chosen(dannyState({ helper = false, helperQueue = 0, inside = true })).id == "inside"
+		and chosen(dannyState({ move = false, helperQueue = 0, inside = true }), { portal = true }).id ~= "give")
+	check("… never while something covers the screen (his card, the move's cards, a grip check) or something else talks",
+		chosen(dannyState({ helperQueue = 0, inside = true, covered = true })).id == "inside" and chosen(dannyState({ helperQueue = 0, inside = true, hush = true })).id == "inside")
 
-	-- lift: hired, a heavy piece near (the first time)
-	check("hired, a two-person piece near: \"Heavy piece: press Lift and wait for Danny\" (before give)", chosen(dannyState({ helper = "hired", helperQueue = 0, inside = true, heavyNear = true })).id == "lift")
-	check("… with pieces on his list too", chosen(dannyState({ helper = "hired", helperQueue = 3, inside = true, heavyNear = true })).id == "lift")
-	check("… not for hire (a Lift then drags it alone: no wait for him)", chosen(dannyState({ heavyNear = true, inside = true, money = 0 })).id == "inside")
-	check("… not without one near, nor with none left", chosen(dannyState({ helper = "hired", helperQueue = 3, inside = true })).id == "inside"
-		and chosen(dannyState({ helper = "hired", helperQueue = 3, inside = true, heavyNear = true, heavy = 0 })).id == "inside")
-	check("… not while you wait for him already, nor while you carry", chosen(dannyState({ helper = "hired", helperQueue = 3, inside = true, heavyNear = true, waiting = true })).id == "inside"
-		and chosen(dannyState({ helper = "hired", helperQueue = 3, inside = true, heavyNear = true, carrying = true })).id == "inside")
-	check("… done: give's (his list empty), then the move's", chosen(dannyState({ helper = "hired", helperQueue = 0, inside = true, heavyNear = true }), { lift = true }).id == "give"
-		and chosen(dannyState({ helper = "hired", helperQueue = 0, inside = true, heavyNear = true }), { lift = true, give = true }).id == "inside")
+	-- lift: a heavy piece near (the first time)
+	check("a two-person piece near: \"Heavy piece: press Lift and wait for Danny\" (before give)", chosen(dannyState({ helperQueue = 0, inside = true, heavyNear = true })).id == "lift")
+	check("… with pieces on his list too", chosen(dannyState({ helperQueue = 3, inside = true, heavyNear = true })).id == "lift")
+	check("… not without one near, nor with none left", chosen(dannyState({ helperQueue = 3, inside = true })).id == "inside"
+		and chosen(dannyState({ helperQueue = 3, inside = true, heavyNear = true, heavy = 0 })).id == "inside")
+	check("… not while you wait for him already, nor while you carry", chosen(dannyState({ helperQueue = 3, inside = true, heavyNear = true, waiting = true })).id == "inside"
+		and chosen(dannyState({ helperQueue = 3, inside = true, heavyNear = true, carrying = true })).id == "inside")
+	check("… done: give's (his list empty), then the move's", chosen(dannyState({ helperQueue = 0, inside = true, heavyNear = true }), { lift = true }).id == "give"
+		and chosen(dannyState({ helperQueue = 0, inside = true, heavyNear = true }), { lift = true, give = true }).id == "inside")
 
 	-- done by what the player did (once a session, as the other steps)
 	local done: { [string]: boolean } = {}
 	local last: SandboxSteps.Last = {}
-	SandboxSteps.doneBy(dannyState(), done, last)
-	check("for hire: nothing done", done.hire == nil and done.give == nil and done.lift == nil)
-	SandboxSteps.doneBy(dannyState({ covered = true, window = "MoveHelperCard" }), done, last)
-	check("his card opened while he is for hire (the offer seen): hire done", done.hire == true and done.give == nil)
-	local hired: { [string]: boolean } = {}
-	local hiredLast: SandboxSteps.Last = {}
-	SandboxSteps.doneBy(dannyState({ helper = "hired", helperQueue = 0 }), hired, hiredLast)
-	check("hired: hire done, give not (his list empty)", hired.hire == true and hired.give == nil and hiredLast.queue == 0)
-	SandboxSteps.doneBy(dannyState({ helper = "hired", helperQueue = 1, inside = true }), hired, hiredLast)
-	check("… a piece given him while you play (his list went up): give done", hired.give == true)
+	SandboxSteps.doneBy(dannyState({ helperQueue = 0 }), done, last)
+	check("with you, his list empty: nothing done", done.give == nil and done.lift == nil and done.hire == nil and last.queue == 0)
+	SandboxSteps.doneBy(dannyState({ helperQueue = 1, inside = true }), done, last)
+	check("… a piece given him while you play (his list went up): give done", done.give == true)
 	local saved: { [string]: boolean } = {}
 	local savedLast: SandboxSteps.Last = {}
-	SandboxSteps.doneBy(dannyState({ helper = "hired", helperQueue = 2 }), saved, savedLast)
+	SandboxSteps.doneBy(dannyState({ helperQueue = 2 }), saved, savedLast)
 	check("… a list already there at the first look (a crew mate's): not yours", saved.give == nil)
-	SandboxSteps.doneBy(dannyState({ helper = "hired", helperQueue = 2, covered = true, window = "MoveHelperCard" }), saved, savedLast)
-	check("… his card opened while he is hired (it says how to give him pieces): give done", saved.give == true)
-	SandboxSteps.doneBy(dannyState({ helper = "hired", helperQueue = 0, waiting = true }), saved, savedLast)
+	SandboxSteps.doneBy(dannyState({ helperQueue = 2, covered = true, window = "MoveHelperCard" }), saved, savedLast)
+	check("… his card opened (it says how to give him pieces): give done", saved.give == true)
+	SandboxSteps.doneBy(dannyState({ helperQueue = 0, waiting = true }), saved, savedLast)
 	check("your Lift called him to a heavy piece (you wait for him): lift done", saved.lift == true)
 	local off: { [string]: boolean } = {}
 	local offLast: SandboxSteps.Last = { queue = 1 }
 	SandboxSteps.doneBy(dannyState({ move = false, helper = false }), off, offLast)
-	check("no move: nothing of his, his list forgotten (the next move's first look takes it again)", off.hire == nil and off.give == nil and offLast.queue == nil)
+	check("no move: nothing of his, his list forgotten (the next move's first look takes it again)", off.give == nil and offLast.queue == nil)
 
 	-- the ✕: that step alone, for the session
 	local closed: { [string]: boolean } = {}
-	check("the ✕ on Danny's step: that step gone (the guide stays on), the move's own step", SandboxSteps.dismiss(hire, closed) and closed.hire == true
-		and chosen(dannyState(), closed).id == "door")
-	check("… its details none (its words its own)", SandboxSteps.detail(hire, dannyState()) == nil and SandboxSteps.words(give, dannyState()) == give.hint)
+	check("the ✕ on Danny's step: that step gone (the guide stays on), the move's own step", SandboxSteps.dismiss(give, closed) and closed.give == true
+		and chosen(dannyState({ helperQueue = 0, inside = true }), closed).id == "inside")
+	check("… lift's details none (its words its own)", SandboxSteps.detail(lift, dannyState()) == nil and SandboxSteps.words(lift, dannyState()) == lift.hint)
 	check("Config: a heavy piece \"near\" within a Lift's reach or so", Config.SandboxGuide.HeavyNear >= Config.Moving.Reach.Item and Config.SandboxGuide.HeavyNear <= 20)
 end
 
@@ -627,7 +604,7 @@ do
 		and chosen(selling({ players = NONE })).id ~= "sell")
 	check("… not with a sign up already, nor before the collection's state came (signs not known)", chosen(selling({ signs = 1 })).id ~= "sell"
 		and chosen(selling({ signs = NONE })).id ~= "sell")
-	check("… never in a move or its planning (it never interrupts a move)", chosen(selling({ move = true })).id == "drive"
+	check("… never in a move or its planning (it never interrupts a move)", chosen(selling({ move = true })).id == "door"
 		and chosen(selling({ move = true, atHouse = true, inside = true })).id == "inside" and chosen(selling({ planning = true, planningMine = true })).id == "plan")
 	check("… never while something covers the screen or something else talks (a first-time hint)", chosen(selling({ covered = true })).id ~= "sell"
 		and chosen(selling({ hush = true })).id ~= "sell")

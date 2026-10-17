@@ -43,7 +43,14 @@ end
 --                                      the FOR SALE price picker, the buy question; a window too, the STOCK list's 🏷
 --                                      opens its picker and closing that goes back to the list) and 8.8's AuctionUi (the
 --                                      Auction House's window: it starts nothing while Config.Auction.On is false),
---                                      8.9's VillageTraffic (the D5's cars, this screen's only):
+--                                      8.9's VillageTraffic (the D5's cars, this screen's only), 9.1's DrivePedals (GAS
+--                                      and BRAKE while you drive: a touch screen's driving buttons, a computer's feet),
+--                                      9.x's LootOutline and LootStars (the loot's coloured outlines, its stars and
+--                                      its toasts; the stars step aside under a window), 10.x's SandboxMapUi (the big
+--                                      map, M: a window too, its 🗺 MAP chip), SandboxMiniMap (a run's corner map: it
+--                                      steps aside under a window), 10.1's CrewUi (the CREW window: a window too; the
+--                                      ring over a helper down in a run) and 10.4's RideUi (the van's ride to a run's
+--                                      house and back, over the jump's fade: no window):
 --                                      each started only when it is there; 8.7's TradePrompts (the trade prompts on
 --                                      your own stands hidden, a big sale's chat line) next to CargoPrompts
 -- 8.5.1: Studio kept old scripts after a sync? This side's stamp (client/BuildStamp.luau) against the shared Config's
@@ -127,7 +134,7 @@ if Config.Sandbox.On then
 	-- The sandbox's own modules (other workers write them at the same time): only when they are there, and one that
 	-- fails to load is skipped with a warning.
 	local own: { { name: string, module: any } } = {}
-	for _, name in { "SandboxHud", "WarehouseUi", "SandboxGuide", "UpgradeUi", "CollectionBookUi", "SandboxTasksUi", "MoveHelperCard", "DannyOrders", "OfferCard", "VanPaintUi", "TradeUi", "AuctionUi", "VillageTraffic" } do -- (8.1: the UPGRADES desk's window; 8.2: the collection book, the TASKS panel; 8.3: Danny's command card, a visitor's offer, the PAINT shop; 8.5: Danny's clipboard, orders mode; 8.7: trading between players; 8.8: the Auction House's window, only while Config.Auction.On; 8.9: the D5's cars, Jinočany)
+	for _, name in { "SandboxHud", "WarehouseUi", "SandboxGuide", "UpgradeUi", "CollectionBookUi", "SandboxTasksUi", "MoveHelperCard", "DannyOrders", "OfferCard", "VanPaintUi", "TradeUi", "AuctionUi", "VillageTraffic", "DrivePedals", "RunUi", "LootOutline", "LootStars", "RunDangerUi", "SandboxMapUi", "SandboxMiniMap", "CrewUi", "RideUi" } do -- (10.4: the ride to a run's house and back, RideUi; 8.1: the UPGRADES desk's window; 8.2: the collection book, the TASKS panel; 8.3: Danny's command card, a visitor's offer, the PAINT shop; 8.5: Danny's clipboard, orders mode; 8.7: trading between players; 8.8: the Auction House's window, only while Config.Auction.On; 8.9: the D5's cars, Jinočany; 9.1: the drive pedals; 9.x loot: the outlines, the stars and the toasts; 10.x the map: the big map (M) and a run's minimap, after the TASKS chip its 🗺 MAP chip stands beside)
 		local found = Client:FindFirstChild(name)
 		if found and found:IsA("ModuleScript") then
 			local ok, module = pcall(function(): any
@@ -157,7 +164,8 @@ if Config.Sandbox.On then
 	local PaintUi = ownModule("VanPaintUi") -- (8.3: the PAINT shop's window)
 	local TradeUi = ownModule("TradeUi") -- (8.7: trading between players: the composer, the price picker, the buy question)
 	local AuctionUi = ownModule("AuctionUi") -- (8.8: the Auction House's window: the live lot, the consign picker, the results)
-	local windows = { WarehouseUi, UpgradeUi, BookUi, TasksUi, DannyCard, OfferCard, PaintUi, TradeUi, AuctionUi }
+	local MapUi = ownModule("SandboxMapUi") -- (10.x the big map: a window like the others)
+	local windows = { WarehouseUi, UpgradeUi, BookUi, TasksUi, DannyCard, OfferCard, PaintUi, TradeUi, AuctionUi, ownModule("RunUi"), MapUi, ownModule("CrewUi") } -- (9.7: a run's results card; 10.x: the map; 10.1: the CREW window)
 
 	safely("Drive", Drive.start)
 	safely("ZombieAnimator", require(Client.ZombieAnimator).start)
@@ -266,7 +274,7 @@ if Config.Sandbox.On then
 	CameraRig.windowOpen = function(): boolean
 		return Hud.anyWindowOpen() or AdminPanel.isOpen() or CrewPanel.isOpen() or MovingHud.isOpen() or MoveLobbyUi.isOpen()
 			or QuickChat.isOpen() or ownOpen(WarehouseUi) or ownOpen(UpgradeUi) or ownOpen(BookUi) or ownOpen(TasksUi) or ownOpen(DannyCard) or ownOpen(PaintUi)
-			or ownOpen(OfferCard) or ownOpen(TradeUi) or ownOpen(AuctionUi)
+			or ownOpen(OfferCard) or ownOpen(TradeUi) or ownOpen(AuctionUi) or ownOpen(windows[10]) or ownOpen(MapUi) or ownOpen(windows[12])
 	end
 	CameraRig.mouseNeeded = CameraRig.windowOpen
 	-- 9.0 (the owner: "aiming with the crosshair only when I want to shoot or have pistols; the mouse normally free, so
@@ -287,8 +295,35 @@ if Config.Sandbox.On then
 	if type(Orders) == "table" then
 		Orders.covered = CameraRig.windowOpen
 	end
+	-- 9.x loot: the pieces' stars step aside while a window covers the game (their outlines stay: they are the world's)
+	local Stars = ownModule("LootStars")
+	if type(Stars) == "table" then
+		Stars.covered = CameraRig.windowOpen
+	end
+	-- 10.x the map: a run's minimap steps aside while a window (the big map too) covers the game
+	local Mini = ownModule("SandboxMiniMap")
+	if type(Mini) == "table" then
+		Mini.covered = CameraRig.windowOpen
+	end
+	if type(ownModule("RunDangerUi")) == "table" then -- 10.x danger: the run's danger strip steps aside under a window too
+		ownModule("RunDangerUi").covered = CameraRig.windowOpen
+	end
 	KeyHints.covered = function(): boolean
 		return CameraRig.mouseNeeded() or Hud.resultOpen()
+	end
+	-- 9.1 the drive pedals step aside while a window, a menu or the result card covers the game; a visitor's offer card
+	-- is no reason (they keep clear of each other: client/OfferCard.luau, client/DrivePedals.luau)
+	local Pedals = ownModule("DrivePedals")
+	if type(Pedals) == "table" then
+		Pedals.covered = function(): boolean
+			for _, module in windows do
+				if module ~= OfferCard and ownOpen(module) then
+					return true
+				end
+			end
+			return Hud.anyWindowOpen() or AdminPanel.isOpen() or CrewPanel.isOpen() or MovingHud.isOpen() or MoveLobbyUi.isOpen()
+				or QuickChat.isOpen() or Hud.resultOpen()
+		end
 	end
 
 	-- The State: the HUD (its old money line is hidden: SandboxHud shows the money), the start screen, the key hints and
@@ -317,8 +352,9 @@ if Config.Sandbox.On then
 		Menu.show(play)
 	end)
 	if not ok then
-		-- No start screen: straight into the game.
+		-- No start screen: straight into the game (10.1: the loading screen goes, the server picks the slot played last).
 		warn(`[Client] the start screen failed: {err}`)
+		game:GetService("Players").LocalPlayer:SetAttribute("StartScreen", true)
 		workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
 		play()
 	end

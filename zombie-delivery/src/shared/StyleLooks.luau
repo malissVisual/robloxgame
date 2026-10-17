@@ -510,7 +510,7 @@ local function roundel(out: { Piece }, panel: Panel, blocks: { Box }, d: number,
 	local t = Fit.Thick
 	local ring: Piece = { name = "LogoRing", attach = "Chassis", size = { t, d, d }, at = at, turn = if top then UP else nil, shape = "Cylinder", paint = "trim" }
 	local lift = if top then { at[1], at[2] + 0.006, at[3] } else { at[1] + s * 0.006, at[2], at[3] }
-	local mark: Piece = { name = "LogoFace", attach = "Chassis", size = { t, d * 0.8, d * 0.8 }, at = lift, turn = if top then { 0, 90, 90 } else nil, shape = "Cylinder", paint = "main", text = "ZDC", face = if top or s > 0 then "Right" else "Left" }
+	local mark: Piece = { name = "LogoFace", attach = "Chassis", size = { t, d * 0.8, d * 0.8 }, at = lift, turn = if top then { 0, 90, 90 } else nil, shape = "Cylinder", paint = "main", text = "DELIVEROS", face = if top or s > 0 then "Right" else "Left" }
 	local axes = if top then { 1, 3 } else { 2, 3 }
 	local count = #out
 	if place(out, ring, panel, axes, blocks, panel) then

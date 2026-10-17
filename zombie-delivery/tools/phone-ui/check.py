@@ -39,7 +39,7 @@ another window opening only hides it (the offer waits); smaller phones (667 x 37
 8.3 keys: the sandbox's key hints on every device (the real KeyHints with SandboxPad's actions and PadGlyph's glyphs:
 keyhints.luau, the folder from keyhintsenv.py); the grip check's words and R2's glyph (carrygrip.luau) and the guide's
 words and the gamepad's B held (sandboxguide.luau) on a phone, a computer and a gamepad. 8.4: the guide's steps for
-Danny for hire (hire him, give him a piece, a heavy piece's Lift) in the same scene.
+Danny (give him a piece, a heavy piece's Lift; 10.1 no hire, the crew's helper's name) in the same scene.
 8.3 SANDBOX: the PAINT shop's window (the real VanPaintUi: vanpaint.luau on sandbox_mock.luau) at 844 x 390, 1280 x 800
 and 1920 x 1080: the swatches, the picture's looks, BUY / NEED / LOCKED / WEAR, the tabs, the money, closing, the gamepad.
 8.8 SANDBOX, the auction: the Auction House's window (the real AuctionUi: auction.luau, the folder from auctionenv.py) at
@@ -52,6 +52,21 @@ offer card with a player's offer (OfferCard's queue) and the STOCK list's 🏷 (
 show and no FOR SALE sign, a player's offer: the real SandboxHintsUi beside SandboxHud, DannyOrders, OfferCard, TradeUi):
 sandboxhints.luau: when each comes, once, held back while a window covers the screen, the device's words, their toasts
 at 844 x 390, 667 x 375, 1280 x 800 and 1920 x 1080 clear of the rest; the guide's sell step in sandboxguide.luau.
+9.1 the drive pedals (the real DrivePedals beside the HUD's pieces and the real OfferCard: drivepedals.luau) on phones
+held sideways and upright, tablets and computers: shown only in your own driver's seat with the HUD up, clear of the touch
+controls, the speed and the offer card, held to drive on a touch screen, the feet and a gamepad's R2 / L2 on a computer.
+9.7 runs: the pad panel (the host's difficulty buttons, another player's line) and the run's results card (the real
+RunUi beside SandboxHud and SandboxTasksUi: runs.luau) on phones, a computer and a big screen: on the screen, clear of the
+rest, the words fitting, a finger's size, the requests.
+10.x the map: the big map in the lobby and in a run and a run's minimap (the real SandboxMapUi, SandboxMapDraw,
+SandboxMapData and SandboxMiniMap beside SandboxHud, SandboxTasksUi and RunUi: sandboxmap.luau) on phones, a computer and
+a big screen: on the screen, clear of the rest, nothing on each other, the words fitting, a finger's size, the fog.
+10.x danger: the results card's danger line and the run's danger strip (the real RunDangerUi under a stand-in move panel:
+the keys, the vault, the zombies, the events, the horde's banner) in the runs scene.
+10.1 the helpers' crew: the CREW window and the down ring (the real CrewUi with shared/CrewRules.luau's rows: crew.luau,
+the folder from crewenv.py) at 844 x 390, 667 x 375, 1280 x 800 and 1920 x 1080: whole on the screen, the words fitting,
+a finger's size, PICK and DISCHARGE's requests, the hospital's countdown, who comes; the ring's seconds and dots.
+9.x loot (loot.luau): 10.1 Lucy's sense, the Epic and Legendary pieces through walls while CrewSense is set.
 """
 import argparse
 from pathlib import Path
@@ -257,7 +272,7 @@ local NumberSequence, NumberSequenceKeypoint = mock.NumberSequence, mock.NumberS
     found = '''local __require = require
 local function require(module) if type(module) == "table" and module.fakeModule ~= nil then return module.fakeModule end return __require(module) end
 '''
-    for name in ("SandboxGuide", "MovingHud", "MoveHelperHud", "MoveStoryUi", "Portrait", "CardKit", "TouchLayout", "MoveLayout", "TopBlocks", "PadGlyph"):  # (8.3 keys: PadGlyph)
+    for name in ("SandboxGuide", "MovingHud", "MoveHelperHud", "MoveStoryUi", "Portrait", "CardKit", "TouchLayout", "MoveLayout", "TopBlocks", "PadGlyph", "RunUi"):  # (8.3 keys: PadGlyph; 9.7: RunUi's pad)
         text = (ROOT / f"src/client/{name}.luau").read_text()
         text = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', text)
         (dest / f"{name}.luau").write_text(prefix + (found if name == "SandboxGuide" else "") + text)
@@ -319,7 +334,7 @@ from auctionenv import auction_env  # noqa: E402
 with tempfile.TemporaryDirectory() as folder:
     auction_env(Path(folder))
     subprocess.run([args.luau, "auction.luau"], cwd=folder, check=True)
-# 8.3 Danny for hire: his card (client/MoveHelperCard.luau: HIRE, CLEAR QUEUE, the clicks and taps on him and on the
+# 8.3 Danny's card (client/MoveHelperCard.luau: CLEAR QUEUE, 10.1 👥 CREW, no hire; the clicks and taps on him and on the
 # pieces, the gamepad's prompts) and his status line (client/MoveHelperHud.luau with the card), beside the real
 # SandboxHud and SandboxTasksUi, a stand-in move's panel and Hud's groups: tools/phone-ui/dannycard.luau on a phone
 # (844 x 390), a computer (1280 x 800) and 1920 x 1080 (dannycardenv.py builds the folder; dannycard_preview.py draws
@@ -377,3 +392,58 @@ from keyhintsenv import keyhints_env  # noqa: E402
 with tempfile.TemporaryDirectory() as folder:
     keyhints_env(Path(folder))
     subprocess.run([args.luau, "keyhints.luau"], cwd=folder, check=True)
+# 9.1 the drive pedals (client/DrivePedals.luau with shared/PedalRules.luau: GAS and BRAKE while you drive) beside the
+# HUD's pieces where client/Hud.luau puts them and the real client/OfferCard.luau: tools/phone-ui/drivepedals.luau on
+# phones held sideways and upright, tablets and computers (drivepedalsenv.py builds the folder; drivepedals_preview.py
+# draws the same scenes): when they show, clear of the jump button, the thumbstick, EXIT, the speed and the fuel and a
+# visitor's offer card, a finger's size, held to drive on a touch screen (two touches, sliding), the feet and the mouse
+# on a computer, a gamepad's R2 / L2, the press drawn and eased back, no warnings.
+from drivepedalsenv import drivepedals_env  # noqa: E402
+
+with tempfile.TemporaryDirectory() as folder:
+    drivepedals_env(Path(folder))
+    subprocess.run([args.luau, "drivepedals.luau"], cwd=folder, check=True)
+# 9.7 runs: the pad panel and the run's results card (client/RunUi.luau) beside the real SandboxHud and SandboxTasksUi
+# and Hud's groups: tools/phone-ui/runs.luau (runsenv.py builds the folder) at 844 x 390, 667 x 375, 1280 x 800 and
+# 1920 x 1080: on the screen, clear of the chips, the groups and the touch controls, the words fitting, a finger's size
+# on a phone (the difficulty buttons, OK), the host's pick sent, a locked one said, the card's list scrolling.
+from runsenv import runs_env  # noqa: E402
+
+with tempfile.TemporaryDirectory() as folder:
+    runs_env(Path(folder))
+    subprocess.run([args.luau, "runs.luau"], cwd=folder, check=True)
+# 9.x loot: the stars over the pieces, the toast and the outlines (client/LootStars.luau, client/LootOutline.luau with
+# shared/LootRules.luau and shared/OutlinePick.luau) beside client/Hud.luau's column: tools/phone-ui/loot.luau on phones
+# held sideways (844 x 390, 667 x 375) and computers (1280 x 800, 1920 x 1080) (lootenv.py builds the folder;
+# loot_preview.py draws the same scenes): the nearest few, their words never cut and readable, never through a wall,
+# none under a window or over the piece in your hands, the first sight's sparkle and sound, the toast's words and
+# colours in the column clear of the touch controls, once a piece, its gap, the load's toast, the outlines' colours and
+# the shared budget with the enemies, no warnings.
+from lootenv import loot_env  # noqa: E402
+
+with tempfile.TemporaryDirectory() as folder:
+    loot_env(Path(folder))
+    subprocess.run([args.luau, "loot.luau"], cwd=folder, check=True)
+# 10.x the map: the big map (client/SandboxMapUi.luau with client/SandboxMapDraw.luau, client/SandboxMapData.luau and
+# shared/SandboxMapRules.luau: the lobby's plan with the portals' live states, a run's house with its yard, the loot's
+# fog) and a run's minimap (client/SandboxMiniMap.luau) beside the real SandboxHud, SandboxTasksUi and RunUi:
+# tools/phone-ui/sandboxmap.luau (sandboxmapenv.py builds the folder; sandboxmap_preview.py draws the same scenes) at
+# 844 x 390, 667 x 375, 1280 x 800 and 1920 x 1080: on the screen, nothing on each other, the words fitting, a finger's
+# size, the 🗺 MAP chip, M / ESC / L2 / B, a portal's pick for the guide, the minimap clear of the HUD, no warnings.
+from sandboxmapenv import sandboxmap_env  # noqa: E402
+
+with tempfile.TemporaryDirectory() as folder:
+    sandboxmap_env(Path(folder), args.luau)
+    subprocess.run([args.luau, "sandboxmap.luau"], cwd=folder, check=True)
+
+# 10.1 the helpers' crew: the CREW window (client/CrewUi.luau with shared/CrewRules.luau's rows; the Crew remote) and the
+# ring over a helper down in a run: tools/phone-ui/crew.luau (crewenv.py builds the folder; crew_preview.py draws the
+# same scenes) at 844 x 390, 667 x 375, 1280 x 800 and 1920 x 1080: whole on the screen, its rows whole, the words
+# fitting (what a helper does in two lines), a finger's size on a phone, PICK and DISCHARGE's requests (a double tap
+# once; without the money only its price said), the hospital's countdown and price in place, who comes, the ways it
+# closes; the ring's seconds, dots and words, gone once he is up or out; no warnings.
+from crewenv import crew_env  # noqa: E402
+
+with tempfile.TemporaryDirectory() as folder:
+    crew_env(Path(folder))
+    subprocess.run([args.luau, "crew.luau"], cwd=folder, check=True)

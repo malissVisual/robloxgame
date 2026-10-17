@@ -130,6 +130,6 @@ for _, def in ALL do
 	end
 end
 assert(lowestOf.zdcvan and lowestOf.van and lowestOf.zdcvan >= lowestOf.van - 1e-6,
-	string.format("the ZDC Van's lowest hull is %.2f over its wheels' ground, the Old Van's %.2f: it rides lower", lowestOf.zdcvan or -1, lowestOf.van or -1))
-print(string.format("Ground PASS: %d builds (every car, stage, bike and company vehicle with its full kit): only the wheels touch the ground (the lowest hull %.2f over it: %s; the ZDC Van %.2f, the Old Van %.2f), %d°+ approach and departure, nothing that swings or sways collides, the spawn's rays under every wheel",
+	string.format("the Deliveros Van's lowest hull is %.2f over its wheels' ground, the Old Van's %.2f: it rides lower", lowestOf.zdcvan or -1, lowestOf.van or -1))
+print(string.format("Ground PASS: %d builds (every car, stage, bike and company vehicle with its full kit): only the wheels touch the ground (the lowest hull %.2f over it: %s; the Deliveros Van %.2f, the Old Van %.2f), %d°+ approach and departure, nothing that swings or sways collides, the spawn's rays under every wheel",
 	checked, lowestAll, lowestWho, lowestOf.zdcvan, lowestOf.van, CLIMB + ROOM))

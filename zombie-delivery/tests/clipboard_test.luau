@@ -1,7 +1,7 @@
 --!strict
 -- 8.5 Danny's clipboard, orders mode (shared/ClipboardRules.luau; the owner: "I'll hold a paper in my hand, like a
 -- notepad … a kind of ordering mode and I click on what he should carry"), pure, in the standalone Luau CLI:
---   * when it may be out (Danny hired on your move, alive, the right hand there, on foot, the hands free, the phone away,
+--   * when it may be out (a helper on your move: 10.1 free, every move's; alive, the right hand there, on foot, the hands free, the phone away,
 --     no gun up: the reasons in their order) and the notices for a refusal (a key in brackets: a phone and a gamepad
 --     lose it, SandboxPad.notice);
 --   * the server's assign check (MoveHelperBrain.assignCheck) refuses a piece without it and allows it with it;
@@ -41,23 +41,24 @@ local function can(fields: { [string]: any }?): (boolean, string?)
 	return ClipboardRules.check(c)
 end
 local ok, why = can()
-check("Danny hired, alive, on foot, the hands free: out", ok and why == nil)
-check("Danny not hired (for hire, no Danny, the move over, the hire ended): no (hire)", select(2, can({ hired = false })) == "hire" and not (can({ hired = false })))
+check("a helper on your move (10.1: every move's, free), alive, on foot, the hands free: out", ok and why == nil)
+check("no helper on your move (no move, the move over): no (none; 10.1 was \"hire\")", select(2, can({ hired = false })) == "none" and not (can({ hired = false })))
 check("dead: no (dead); no right hand: no (hand)", select(2, can({ alive = false })) == "dead" and select(2, can({ hand = false })) == "hand")
 check("in a seat: no (seat)", select(2, can({ seated = true })) == "seat")
 check("a piece in your hands: no (carry): you can't carry with it out", select(2, can({ carrying = true })) == "carry")
 check("a trolley, the phone, a gun up: no (push, phone, aim)", select(2, can({ pushing = true })) == "push" and select(2, can({ phone = true })) == "phone"
 	and select(2, can({ aiming = true })) == "aim")
-check("…the hire first, then life, the hand, the seat, the hands", select(2, can({ hired = false, alive = false, seated = true, carrying = true })) == "hire"
+check("…the helper first, then life, the hand, the seat, the hands", select(2, can({ hired = false, alive = false, seated = true, carrying = true })) == "none"
 	and select(2, can({ alive = false, seated = true })) == "dead" and select(2, can({ seated = true, carrying = true })) == "seat")
-check("the notices: hands full (G), a seat, no hire; nothing for death or a missing hand", ClipboardRules.why("carry") == "Put down what you carry first (G): then take out your clipboard."
-	and string.find(ClipboardRules.why("seat") or "", "Get out first", 1, true) ~= nil and string.find(ClipboardRules.why("hire") or "", "hire him first", 1, true) ~= nil
+check("the notices: hands full (G), a seat, no helper (10.1: never \"hire him first\"); nothing for death or a missing hand", ClipboardRules.why("carry") == "Put down what you carry first (G): then take out your clipboard."
+	and string.find(ClipboardRules.why("seat") or "", "Get out first", 1, true) ~= nil and string.find(ClipboardRules.why("none") or "", "your helper", 1, true) ~= nil
+	and ClipboardRules.why("hire") == nil and string.find(ClipboardRules.why("seat", "Zip") or "", "give Zip orders", 1, true) ~= nil
 	and ClipboardRules.why("dead") == nil and ClipboardRules.why("hand") == nil and ClipboardRules.why(nil) == nil, ClipboardRules.why("carry"))
 check("…on a phone and with a gamepad the (G) goes (SandboxPad.notice)", SandboxPad.notice(ClipboardRules.why("carry") or "", "touch") == "Put down what you carry first: then take out your clipboard.")
 
 -- ── The server's check: no clipboard, no orders ─────────────────────────────
 local function assign(fields: { [string]: any }): string
-	local a: Brain.Assign = { crew = true, hired = true, mine = true, state = "home", held = false, his = false, queued = false, count = 0, near = true, clipboard = true }
+	local a: Brain.Assign = { crew = true, mine = true, state = "home", held = false, his = false, queued = false, count = 0, near = true, clipboard = true }
 	for key, value in fields do
 		(a :: any)[key] = value
 	end
@@ -127,13 +128,14 @@ check("the outline: green to give (\"✔ Give to Danny\")", look("add") == "✔ 
 check("…orange on his list, with its number (take it back)", look("remove", 2) == "↩ #2 on his list · take back|back")
 check("…red with the reason: too far, in the van, his list full (6/6)", look("far") == "✖ Too far: get closer|no" and look("van") == "✖ In the van already|no"
 	and look("full", nil, 6) == "✖ His list is full (6/6)|no", look("full", nil, 6))
-check("…held, his, gone, not hired: red", look("held") == "✖ Somebody holds it|no" and look("his") == "✖ Danny has it already|no" and look("gone") == "✖ Not now|no"
-	and look("hire") == "✖ Hire Danny first|no")
+check("…held, his, gone: red (10.1: no \"hire\" any more)", look("held") == "✖ Somebody holds it|no" and look("his") == "✖ Danny has it already|no" and look("gone") == "✖ Not now|no"
+	and (ClipboardRules.look("hire")) == nil and (ClipboardRules.look("add", nil, nil, "Lucy")) == "✔ Give to Lucy")
 check("…not your move's piece: no words", (ClipboardRules.look("piece")) == nil and (ClipboardRules.look("crew")) == nil)
 check("its key: Q on a computer, R1 with a gamepad, 📋 on a touch screen", ClipboardRules.key("keys") == "Q" and ClipboardRules.key("pad") == "R1" and ClipboardRules.key("touch") == "📋"
 	and C.Key == "Q")
-check("the status line: \"Take out your clipboard (Q) to give him pieces\" (R1, 📋)", ClipboardRules.carries("keys") == "Take out your clipboard (Q) to give him pieces"
-	and ClipboardRules.carries("pad") == "Take out your clipboard (R1) to give him pieces" and ClipboardRules.carries("touch") == "Take out your clipboard (📋) to give him pieces")
+check("the status line: \"Take out your clipboard (Q) to give Danny pieces\" (R1, 📋; 10.1 the helper's name)", ClipboardRules.carries("keys") == "Take out your clipboard (Q) to give Danny pieces"
+	and ClipboardRules.carries("pad") == "Take out your clipboard (R1) to give Danny pieces" and ClipboardRules.carries("touch") == "Take out your clipboard (📋) to give Danny pieces"
+	and ClipboardRules.carries("keys", "Zip") == "Take out your clipboard (Q) to give Zip pieces")
 check("the bottom line: \"📋 Pick what Danny carries: E or click · Q put away\" (9.0: E by a piece too; a gamepad's R1 by it and B, a phone's tap 📋)", ClipboardRules.hint("keys") == "📋 Pick what Danny carries: E or click · Q put away"
 	and ClipboardRules.hint("pad") == "📋 Pick what Danny carries: R1 by it · B put away" and ClipboardRules.hint("touch") == "📋 Tap what Danny carries · tap 📋 to put away",
 	ClipboardRules.hint("pad"))
@@ -141,9 +143,10 @@ check("9.0 E gives a piece (client/DannyOrders.luau's prompts): the pieces' own 
 	C.GiveKey == "E" and C.PromptNear >= Config.Moving.Reach.Item and C.Prompts >= 1 and C.Prompts <= 8 and C.GiveKey ~= C.Key)
 check("the buttons: 📋 ORDERS / 📋 PUT AWAY on the status line, 📋 CLIPBOARD / 📋 PUT AWAY on his card", ClipboardRules.orders(false) == "📋 ORDERS"
 	and ClipboardRules.orders(true) == "📋 PUT AWAY" and ClipboardRules.cardButton(false) == "📋 CLIPBOARD" and ClipboardRules.cardButton(true) == "📋 PUT AWAY")
-check("his card's words: the key, then how a piece goes to him (a click, a tap, R1)", string.find(ClipboardRules.cardHint("keys"), "(Q): click a piece to give it to him", 1, true) ~= nil
-	and string.find(ClipboardRules.cardHint("touch"), "tap a piece to give it to him", 1, true) ~= nil
-	and string.find(ClipboardRules.cardHint("pad"), "(R1): R1 by a piece to give it to him", 1, true) ~= nil)
+check("his card's words: the key, then how a piece goes to him (a click, a tap, R1)", string.find(ClipboardRules.cardHint("keys"), "(Q): click a piece to give it to Danny", 1, true) ~= nil
+	and string.find(ClipboardRules.cardHint("touch"), "tap a piece to give it to Danny", 1, true) ~= nil
+	and string.find(ClipboardRules.cardHint("pad"), "(R1): R1 by a piece to give it to Danny", 1, true) ~= nil
+	and string.find(ClipboardRules.cardHint("keys", "Bruno"), "give it to Bruno", 1, true) ~= nil)
 check("Config: the look throttled (0.1 … 0.5 s), the touch button a finger's size, three colours", C.Look >= 0.1 and C.Look <= 0.5 and C.ButtonMin >= 44 and C.Button >= C.ButtonMin
 	and #C.Give == 3 and #C.Back == 3 and #C.No == 3 and C.Flash > 0)
 check("the rate limit: Config.Robust.Limits.Clipboard (a few a second)", Config.Robust.Limits.Clipboard >= 1 and Config.Robust.Limits.Clipboard <= 10)
