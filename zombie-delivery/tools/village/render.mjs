@@ -1,5 +1,6 @@
-// 8.9: renders tools/village's shots (render.html, three.js) in headless Chromium, one PNG a shot.
-// Usage (preview.py runs it): node render.mjs <site dir with render.html and three.module.min.js> <shots.json> <out dir>
+// 8.9: renders shots (render.html, three.js) in headless Chromium, one PNG a shot; tools/countryside/views.py,
+// tools/lobby/views.py and tools/spots/preview.py run it.
+// Usage: node render.mjs <site dir with render.html and three.module.min.js> <shots.json> <out dir>
 // Playwright from NODE_PATH (e.g. /opt/node22/lib/node_modules), Chromium from CHROMIUM (default /opt/pw-browsers/chromium).
 import http from 'node:http';
 import fs from 'node:fs';

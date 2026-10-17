@@ -1,20 +1,16 @@
 #!/usr/bin/env python3
-"""6.13.1: count what the real server/World.luau builds, without Roblox (design/performance/REPORT.md).
+"""The shared preparation of the offline world builds: prepare(game, out) copies tools/perf/world-mock.luau (as
+mock.luau) and every server and shared module of the game (their requires rewritten for the Luau CLI, each on the
+stand-in's environment) into `out`; the caller then writes its own main.luau and runs it there. Used by
+tools/perf/sandbox_count.py (the sandbox's census) and tools/sandbox-map/render.py (the map's export, which
+tools/countryside/views.py and tools/lobby/views.py use too).
 
-Runs World.build() in the Luau CLI against a permissive Roblox stand-in (world-mock.luau: values, instances, tags; the
-people and the animals left out) and prints, for every piece of the city, the parts, the visible ones, the ones that
-throw a shadow, the lights (night lights under client/WorldFx.luau's budget / always on), the SurfaceGuis (and how many
-are drawn at any distance), then the models by streaming mode, the depot's parts, the always-on lights and the
-far-drawn SurfaceGuis by name. Re-run it after adding to the world and compare with the report.
-
-    python3 tools/perf/world_count.py <path to the luau binary> [zombie-delivery dir]
+10.5: its own count of the old city's server/World.luau (world-count.luau, the 6.13.1 performance report) went with
+the city; this file keeps its name for the importers above.
 """
 import os
 import re
 import shutil
-import subprocess
-import sys
-import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -25,10 +21,9 @@ def rel(from_dir, target):
 
 
 def prepare(game, out, people=False):
-    """Copies the stand-in, the counter and every server and shared module (their requires rewritten) into `out`.
+    """Copies the stand-in and every server and shared module (their requires rewritten) into `out`.
     8.2: `people` keeps the real server/Npcs.luau (tools/perf/sandbox_count.py counts Danny's body); else a stub."""
     shutil.copy(os.path.join(HERE, "world-mock.luau"), os.path.join(out, "mock.luau"))
-    shutil.copy(os.path.join(HERE, "world-count.luau"), os.path.join(out, "main.luau"))
     shared_dir = os.path.join(out, "shared")
     for top in ("server", "shared"):
         for dirpath, _, files in os.walk(os.path.join(game, "src", top)):
@@ -61,7 +56,7 @@ def prepare(game, out, people=False):
                 # (no new local in the module: its globals come from the stand-in's environment)
                 header = f'setfenv(1, require("{rel(here, os.path.join(out, "mock"))}").env)\n'
                 open(dst, "w", encoding="utf-8").write(header + text)
-    # The people and the animals: World only places them; their bodies are not the city's parts.
+    # people=False: stubs for the people and the animals (a count without their bodies).
     if people:
         return
     open(os.path.join(out, "server", "Npcs.luau"), "w").write(
@@ -70,20 +65,3 @@ def prepare(game, out, people=False):
     open(os.path.join(out, "server", "Animals.luau"), "w").write(
         "local A = {}\nsetmetatable(A, { __index = function() return function() return nil end end })\nreturn A\n")
 
-
-def main():
-    if len(sys.argv) < 2:
-        print(__doc__)
-        sys.exit(2)
-    luau = os.path.abspath(sys.argv[1])
-    game = os.path.abspath(sys.argv[2]) if len(sys.argv) > 2 else os.path.dirname(os.path.dirname(HERE))
-    with tempfile.TemporaryDirectory() as out:
-        prepare(game, out)
-        result = subprocess.run([luau, "main.luau"], cwd=out, capture_output=True, text=True, timeout=600)
-    sys.stdout.write(result.stdout)
-    sys.stderr.write(result.stderr)
-    sys.exit(result.returncode)
-
-
-if __name__ == "__main__":
-    main()

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""8.2: count what the 8.x SANDBOX puts in the world, without Roblox (design/performance/REPORT.md, section 9).
+"""8.2: count what the 8.x SANDBOX puts in the world, without Roblox (design/performance/REPORT.md).
 
 Two runs of the real server code on the Luau CLI:
   * tools/perf/sandbox-count.luau on tools/perf/world-mock.luau (world_count.py's preparation, the real server/Npcs):

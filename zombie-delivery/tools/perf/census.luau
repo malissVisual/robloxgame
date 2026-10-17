@@ -1,6 +1,6 @@
 -- 8.2: what a piece of the world costs to draw, counted the same way on both Roblox stand-ins (tools/perf/world-mock.luau
 -- and tools/vehicle-preview/roblox-mock.luau): only the class names and the properties are read, never IsA. Used by
--- tools/perf/sandbox_count.py (design/performance/REPORT.md, section 9).
+-- tools/perf/sandbox_count.py (design/performance/REPORT.md).
 --   Census.of(instances)        a row: the counts over a list of instances (Census.Keys)
 --   Census.list(root)           root and everything under it; Census.under(root) its row
 --   Census.detail(instances)    the costly ones by name, one line a kind

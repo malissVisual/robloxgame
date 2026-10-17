@@ -2,10 +2,11 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>Jinočany looks</title>
-<!-- 8.9: tools/village's page: renderShot draws one shot's parts (tools/village/export.luau's SHOT) with three.js in a
-     warm summer afternoon (a perspective camera, the sun from the south-west, soft shadows, a light haze) and returns
-     the PNG. render.mjs drives it in headless Chromium; preview.py lays the sheets out. -->
+<title>3D views</title>
+<!-- 8.9 (made for the Jinočany village's previews, gone in 10.5): renderShot draws one shot's parts (a SHOT: its name,
+     caption, camera and parts) with three.js in a warm summer afternoon (a perspective camera, the sun from the
+     south-west, soft shadows, a light haze) and returns the PNG. render.mjs drives it in headless Chromium for
+     tools/countryside/views.py, tools/lobby/views.py and tools/spots/preview.py. -->
 <style>
 html, body { margin: 0; background: #1d2127; }
 canvas { display: block; }
