@@ -9,11 +9,11 @@
 -- Music: "menu" on the start screen, then "day" (or "night" while the workspace attribute Night is set); the loops
 -- crossfade (Config.Audio).
 -- Effects heard here: the hits of the run's bat (the Hit remote, server/CloseCombat.luau: a hit, a kill, a headshot,
--- each with its soft tick, Config.Shots.Marker.Ticks), explosions (a bloater), money that went down (a purchase), a
--- server's notice (8.9: unless a sound of its own answers it: Sounds.answered, Config.Soundscape.NoticeWait), a piece
--- picked up and put down (7.1: a move's piece has its own, client/MoveSounds.luau), your van's load, a knock at a door
--- and its creak (a character's Gesture "knock"), the ding of a jump far away (a run's fade), every Ui.button's soft
--- click (Ui.onClick). The world's sounds (the footsteps by surface, the van's back, the countryside's ambience) are
+-- each with its soft tick, Config.Shots.Marker.Ticks), explosions (a bloater), the money a kill pays (the Reward
+-- remote's soft coin), money that went down (a purchase), a server's notice (8.9: unless a sound of its own answers it:
+-- Sounds.answered, Config.Soundscape.NoticeWait), a piece picked up and put down (7.1: a move's piece has its own,
+-- client/MoveSounds.luau), your van's load, a knock at a door and its creak (a character's Gesture "knock"), the ding of
+-- a jump far away (a run's fade), every Ui.button's soft click (Ui.onClick). The world's sounds (the footsteps by surface, the van's back, the countryside's ambience) are
 -- client/SoundScape.luau's; the moves' client/MoveSounds.luau's; the sandbox's stands, till and trades
 -- client/SandboxSounds.luau's; the zombies' voices client/ZombieLife.luau's; the start screen's, the character
 -- creator's and the ride's their own modules' (by name).
@@ -323,6 +323,13 @@ local function listenGame()
 			play("purchase", Config.Soundscape.PurchaseVolume)
 		end
 		money = state.money
+	end)
+	local lastCoin = 0
+	Net.get("Reward").OnClientEvent:Connect(function()
+		if os.clock() - lastCoin > 0.2 then -- 5.7: the money a kill pays (server/Zombies.luau's KillReward) clinks, quieter
+			lastCoin = os.clock()
+			play("coin", JUICE.CoinVolume * 0.6, 1.08)
+		end
 	end)
 	local lastNotice = 0
 	Net.get("Notice").OnClientEvent:Connect(function()
