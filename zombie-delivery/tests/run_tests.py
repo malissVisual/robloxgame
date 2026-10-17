@@ -219,7 +219,7 @@ with tempfile.TemporaryDirectory() as tmp:
         + source + "\nend\n")
     # 9.0 (the sandbox's free mouse): the real client/CameraRig.luau as CameraRigClient.luau for tests/camerarig_test.luau:
     # a function of the globals it reads (the test's services, workspace, script, require, Instance, RaycastParams, task
-    # and clock; ClientRuntime.luau's frames, vectors and colours), made afresh for each world (the sandbox, the city).
+    # and clock; ClientRuntime.luau's frames, vectors and colours), made afresh for each world (a computer, a touch screen).
     source = open(os.path.join(os.path.dirname(SHARED), "client", "CameraRig.luau"), encoding="utf-8").read()
     open(os.path.join(tmp, "CameraRigClient.luau"), "w", encoding="utf-8").write(
         "return function(game: any, workspace: any, script: any, require: any, Instance: any, RaycastParams: any, task: any, os: any, "
@@ -736,10 +736,10 @@ def sandbox_hud_check():
     keys = open(os.path.join(root, "src", "client", "KeyHints.luau"), encoding="utf-8").read()
     at = keys.find("local function sandboxLines(")
     chips = re.findall(r'chipText\("([^"]+)", "([^"]+)"', keys[at:keys.index("\nend\n", at)]) if at >= 0 else []
-    city = [f"[{key}] {word}" for key, word in chips if key not in ("W/S", "A/D", "H", "E", "G", "LMB/F", "O", "T", "LMB", "Q", "E/LMB")]  # (8.5: Danny's clipboard, LMB and Q; 9.0: E/LMB)
-    if not chips or city or "if Config.Sandbox.On then\n\t\treturn sandboxLines(" not in keys:
-        bad.append("KeyHints: the sandbox's keys are not the move's and the car's only" + (f" ({', '.join(city)})" if city else ""))
-    print("== sandbox hud: " + (f"the HUD is the game's only (no city module), the key hints show {len(chips)} move and car keys" if not bad else "; ".join(bad)))
+    city = [f"[{key}] {word}" for key, word in chips if key not in ("E", "G", "LMB/F", "O", "T", "Q", "E/LMB")]  # (8.5: Danny's clipboard, Q; 9.0: E/LMB)
+    if not chips or city or "return sandboxLines(character)" not in keys:
+        bad.append("KeyHints: the keys are not the move's only" + (f" ({', '.join(city)})" if city else ""))
+    print("== sandbox hud: " + (f"the HUD is the game's only (no city module), the key hints show {len(chips)} move keys" if not bad else "; ".join(bad)))
     return not bad
 
 if not sandbox_hud_check():

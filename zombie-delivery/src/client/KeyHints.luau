@@ -1,32 +1,23 @@
 --!strict
 -- 6.1, the key hints (the owner's wish: the player sees which keys do what): a quiet strip right under the HUD's top
--- buttons (MAP · PHONE, client/Hud.luau's "HudButtons"), right-aligned, small muted text on no background, one or
--- two short lines of key chips for what the keys do NOW (the real bindings of the client's modules):
---   on foot   [1] Fists [2] Bag [3] Gun (what you have; the one you hold bright) · [E] Use · [G] Put down (cargo in
---             your hands) · [X] Throw (only while a throw is possible: the server's ThrowReady / ThrowTo) · [E] Pick up
---             bag (while yours lies on the ground: BagDown) · [V] Punch / Strike
---   in a seat [W/S] Drive [A/D] Steer · [E] Get out · [F] Shoot (6.12: the driver [H] Horn / Bell / Beep)
--- A keyboard only: hidden on a touch screen and with a gamepad alone. Hidden with the HUD and while a window, the phone,
--- a dialog or the result card covers the game (KeyHints.covered, the bottom bar's rule, set by the client's Main).
--- The KEYS chip (a click, or F1) folds and unfolds it; the choice stays for the session. A courier with fewer than
--- Config.KeyHints.OpenUnder deliveries starts with it open, the others folded. Looked at every Check seconds; the text
--- is set only when it changed.
--- 6.5 (one of everything on screen): folded it is a small "? KEYS [F1]" chip on a charcoal backing, for everyone after
--- the first two deliveries. Unfolded it shows only the keys of the moment: the hands (1 / 2 / 3, V), E, G and X on foot,
--- the driving keys in a seat. [J] Jobs, [M] Map, [Q] Phone, [T] Guns, [Shift] Sprint and [4-8] Items went: the top
--- buttons, the bottom bar's numbers and the phone say them.
--- 8.0 SANDBOX (Config.Sandbox.On): only the move's keys and the car's (sandboxLines): no hands, guns, throws or bags
--- there (client/Main.client.luau does not start them).
--- 8.3 keys (the sandbox; shared/SandboxPad.luau's actions, client/PadGlyph.luau): the strip is for the device used now.
--- A computer: the keys as before. A gamepad used last (a computer's or a console's): its buttons' glyphs (the
--- platform's pictures, UserInputService:GetImageForKeyCode; else the button's word in brackets, "[R2]") before each
--- word, in rows of their own, only what a button does (X Use, B Put down, R2 Grip; in a seat R2/L2 Drive, the left
--- stick Steer, X Get out; the horn, the list and the chat have none), the KEYS chip without its F1. A touch screen:
--- none (its buttons say what they do). It changes at once when the last input's type does (PadGlyph.watch) and at
--- the next look anyway. The city's strip as before (a keyboard only).
--- 8.5 Danny's clipboard (orders mode; shared/SandboxPad.luau's "clipboard", "stow", "dannygive"): while Danny works for
--- your move and your hands are free, [Q] Clipboard (a gamepad's R1); with it out [LMB] Give to Danny (bright: the mode;
--- R1) and [Q] Put away (B). 9.0: [E/LMB] Give to Danny in place of [E] Use (E by a piece gives it: client/DannyOrders.luau).
+-- right anchor (client/Hud.luau's "HudButtons"), right-aligned, small muted text on no background, one or two short
+-- lines of key chips for what the keys do NOW (the real bindings of the client's modules; sandboxLines):
+--   on foot   [E] Use · [G] Put down (something in your arms: Carrying) · [LMB/F] Grip (8.1: a piece with a grip, the
+--             timing check: client/CarryGripUi.luau) · [O] List (on a move: client/MovingHud.luau) · [T] Chat (hold: on
+--             a move, client/QuickChat.luau)
+--   8.5 Danny's clipboard (orders mode; shared/SandboxPad.luau's "clipboard", "stow", "dannygive"): while Danny works for
+--             your move and your hands are free, [Q] Clipboard (a gamepad's R1); with it out [E/LMB] Give to Danny in
+--             place of [E] Use (E by a piece gives it: client/DannyOrders.luau; bright: the mode; R1) and [Q] Put away (B)
+-- Hidden with the HUD and while a window or a dialog covers the game (KeyHints.covered, set by the client's Main). The
+-- KEYS chip (a click, or F1) folds and unfolds it; the choice stays for the session (open at first). Looked at every
+-- Check seconds; the text is set only when it changed. 6.5: folded it is a small "? KEYS [F1]" chip on a charcoal
+-- backing.
+-- 8.3 keys (shared/SandboxPad.luau's actions, client/PadGlyph.luau): the strip is for the device used now. A computer:
+-- the keys. A gamepad used last (a computer's or a console's): its buttons' glyphs (the platform's pictures,
+-- UserInputService:GetImageForKeyCode; else the button's word in brackets, "[R2]") before each word, in rows of their
+-- own, only what a button does (X Use, B Put down, R2 Grip; the list and the chat have none), the KEYS chip without its
+-- F1. A touch screen: none (its buttons say what they do). It changes at once when the last input's type does
+-- (PadGlyph.watch) and at the next look anyway.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -39,29 +30,24 @@ local SandboxPad = require(Shared.SandboxPad) -- 8.3 keys
 local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
 local P = require(script.Parent.HudContract)
-local Holster = require(script.Parent.Holster)
-local Drive = require(script.Parent.Drive)
 local PadGlyph = require(script.Parent.PadGlyph) -- 8.3 keys: the device, the gamepad's glyphs
 
 local KeyHints = {}
 
--- Set by client/Main.client.luau: does a window, the phone or a dialog cover the game now?
+-- Set by client/Main.client.luau: does a window or a dialog cover the game now?
 KeyHints.covered = nil :: (() -> boolean)?
 
 local K = Config.KeyHints
 local TOGGLE = Enum.KeyCode.F1
 local player = Players.LocalPlayer
 
-local open: boolean? = nil -- the session's choice (nil: not chosen yet, from the deliveries)
-local deliveries = 0
-local hasGun = false
-local hasBag = false
+local open = true -- the session's choice (open at first: F1 or a click folds it)
 local root: any = nil
 local lines: { any } = {}
 local MAX_LINES = 5 -- (narrow: the chips flow onto more, shorter lines; more than this folds the strip)
 local chip: any = nil
 local shown = ""
-local device: SandboxPad.Device = "keys" -- 8.3 keys: what the strip is drawn for now (the city's: the keys)
+local device: SandboxPad.Device = "keys" -- 8.3 keys: what the strip is drawn for now
 local padRows: { any } = {} -- 8.3 keys: a gamepad's rows of glyphs and words
 local padShown = false -- (a gamepad's rows drawn: cleared when the keys come back)
 local glyphs: { [string]: string } = {} -- 8.3 keys: a button's picture (asked once a device)
@@ -104,27 +90,10 @@ local function keyboard(): boolean
 	return UserInputService.KeyboardEnabled
 end
 
--- 8.0 SANDBOX: the move's keys and the car's, nothing of the city's:
---   in a seat   [W/S] Drive [A/D] Steer [H] Horn [E] Get out (the driver), [E] Get out (anybody else)
---   on foot     [E] Use · [G] Put down (something in your arms: Carrying) · [LMB/F] Grip (8.1: one press when a
---               timing check shows, a piece with a grip: the character's CarryGrip; client/CarryGripUi.luau) · [O] List
---               (on a move: the player's MoveWith; client/MovingHud.luau) · [T] Chat (hold: on a move or in its
---               planning, MoveLobby; client/QuickChat.luau)
---   9.0 the clipboard out (orders mode): [E/LMB] Give to Danny in place of [E] Use (E by a piece, a click on one), then
---               [Q] Put away
--- (8.3 keys: each with its action, shared/SandboxPad.luau: with a gamepad its buttons, or no chip)
-local function sandboxLines(character: Model, humanoid: Humanoid): { { Chip } }
+-- The game's keys (see the header): on foot, a piece in your arms, Danny's clipboard, a move's list and chat
+-- (8.3 keys: each with its action, shared/SandboxPad.luau: with a gamepad its buttons, or no chip).
+local function sandboxLines(character: Model): { { Chip } }
 	local first: { Chip } = {}
-	if humanoid.SeatPart ~= nil then
-		local car, driving = Drive.seatedCar()
-		if car and driving then
-			add(first, chipText("W/S", "Drive", nil, "drive"))
-			add(first, chipText("A/D", "Steer", nil, "steer"))
-			add(first, chipText("H", "Horn", nil, "horn"))
-		end
-		add(first, chipText("E", "Get out", nil, "getout"))
-		return { first }
-	end
 	local carrying = character:GetAttribute("Carrying") ~= nil
 	local orders = not carrying and player:GetAttribute("MoveHelper") == "hired" and character:GetAttribute("ClipboardHeld") == true
 	if orders then
@@ -153,8 +122,6 @@ local function sandboxLines(character: Model, humanoid: Humanoid): { { Chip } }
 	local onMove = player:GetAttribute("MoveWith") ~= nil
 	if onMove then
 		add(second, chipText("O", "List", nil, "list"))
-	end
-	if onMove or player:GetAttribute("MoveLobby") ~= nil then
 		add(second, chipText("T", "Chat (hold)", nil, "chat"))
 	end
 	return if #second > 0 then { first, second } else { first }
@@ -167,58 +134,10 @@ local function linesNow(): { { Chip } }
 	if not character or not humanoid or humanoid.Health <= 0 then
 		return {}
 	end
-	if Config.Sandbox.On then
-		return sandboxLines(character, humanoid)
-	end
-	local first: { Chip } = {}
-	local second: { Chip } = {}
 	if humanoid.SeatPart ~= nil then
-		-- (6.1 review: only the keys that work in this seat: the driver drives, a bus rider rings the bell)
-		local car, driving = Drive.seatedCar()
-		if typeof(player:GetAttribute("BusLine")) == "string" then
-			table.insert(first, chipText("E", "Stop"))
-		elseif car and driving then
-			table.insert(first, chipText("W/S", "Drive"))
-			table.insert(first, chipText("A/D", "Steer"))
-			-- 6.12: the horn (client/SoundScape.luau): a bike rings its bell, a scooter beeps
-			table.insert(first, chipText("H", if car:GetAttribute("BikeStand") == true then "Beep" elseif car:GetAttribute("Bike") == true then "Bell" else "Horn"))
-			table.insert(first, chipText("E", "Get out"))
-		else
-			table.insert(first, chipText("E", "Get out"))
-		end
-		if hasGun then
-			table.insert(first, chipText("F", "Shoot"))
-		end
-		return { first }
+		return {} -- (no seat of the game's has keys of its own)
 	end
-	local hand = Holster.hand()
-	table.insert(first, chipText("1", "Fists", hand == "fists"))
-	if hasBag then
-		table.insert(first, chipText("2", "Bag", hand == "bag"))
-	end
-	if hasGun then
-		table.insert(first, chipText("3", "Gun", hand == "gun"))
-	end
-	local carrying = character:GetAttribute("Carrying") ~= nil
-	if typeof(player:GetAttribute("BagDown")) == "Vector3" then
-		table.insert(first, chipText("E", "Pick up bag"))
-	else
-		table.insert(first, chipText("E", "Use"))
-	end
-	if carrying then
-		table.insert(first, chipText("G", "Put down"))
-	end
-	-- (6.1 review: not for fragile pieces only: X just says they can't be thrown)
-	if player:GetAttribute("ThrowReady") == "piece" or (typeof(player:GetAttribute("ThrowTo")) == "Vector3" and player:GetAttribute("ThrowFragile") ~= true) then
-		table.insert(first, chipText("X", "Throw"))
-	end
-	if not carrying then
-		table.insert(second, chipText("V", if hand == "gun" then "Strike" else "Punch"))
-	end
-	if hasGun then
-		table.insert(second, chipText("T", "Guns")) -- (6.5 review: the weapon line's T box is gone: the wheel is here)
-	end
-	return { first, second }
+	return sandboxLines(character)
 end
 
 local GAP_TEXT = "  "
@@ -392,9 +311,6 @@ local function roomFor(gui: any): number
 end
 
 local function isOpen(): boolean
-	if open == nil then
-		return deliveries < K.OpenUnder or Config.Sandbox.On -- (8.0 SANDBOX: its keys are new: open until F1 folds them)
-	end
 	return open
 end
 
@@ -410,7 +326,7 @@ local function line(parent: Instance, order: number): any
 	})
 end
 
--- Under the HUD's top buttons (they move with the layout: followed every look).
+-- Under the HUD's top right anchor (it moves with the layout: followed every look).
 local function place(gui: any)
 	local buttons = gui:FindFirstChild("HudButtons")
 	if not buttons or not root then
@@ -485,9 +401,9 @@ end
 
 local function update(gui: any)
 	local covered = KeyHints.covered
-	-- 8.3 keys: the sandbox's strip is for the device used now (a gamepad used last: its glyphs, on a computer or a
-	-- console; a touch screen: none); the city's for a keyboard only, as before
-	local now: SandboxPad.Device = if Config.Sandbox.On then PadGlyph.device() else "keys"
+	-- 8.3 keys: the strip is for the device used now (a gamepad used last: its glyphs, on a computer or a console; a
+	-- touch screen: none)
+	local now: SandboxPad.Device = PadGlyph.device()
 	if now ~= device then
 		device = now
 		table.clear(glyphs) -- (another device: its pictures asked again)
@@ -537,16 +453,6 @@ local function update(gui: any)
 		end
 		padShown = rows ~= nil
 	end
-end
-
--- From the State (client/Main.client.luau): your deliveries (the strip's first look), the gun and the bag you have.
-function KeyHints.setState(state: any)
-	if type(state) ~= "table" then
-		return
-	end
-	deliveries = tonumber(state.deliveries) or 0
-	hasGun = type(state.weapon) == "string"
-	hasBag = type(state.bag) == "string" -- 6.4: any bag (the server's active one)
 end
 
 function KeyHints.start()

@@ -318,7 +318,7 @@ do
 	if connect and type(connect[2]) == "function" then
 		connect[2]({ money = 100 })
 	end
-	check("the State reaches the start screen, the key hints and SandboxHud.setState", called(run, "Menu.setState") and called(run, "KeyHints.setState") and called(run, "SandboxHud.setState"))
+	check("the State reaches the start screen and SandboxHud.setState", called(run, "Menu.setState") and called(run, "SandboxHud.setState"))
 	local notice = run.args["Net.get(Notice).OnClientEvent.Connect"]
 	check("the server's notices go through SandboxHud.notice (8.3: in this device's words)", notice ~= nil and notice[2] == run.modules.SandboxHud.notice and type(notice[2]) == "function")
 	check("toasts for the car and the sounds", run.modules.Drive.notify == run.modules.Hud.toast and run.modules.Sounds.notify == run.modules.Hud.toast)

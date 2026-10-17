@@ -2,16 +2,14 @@
 -- device and the glyphs client/PadGlyph.luau) in the sandbox on every device, run for real on sandbox_mock.luau's
 -- recorder (the folder: tools/phone-ui/keyhintsenv.py) on a computer (1280 × 800), a console and a phone held sideways
 -- (844 × 390):
---   * a computer: the move's keys as before ([E] Use, [G] Put down, [LMB/F] Grip, [O] List, [T] Chat (hold); in the
---     driver's seat [W/S] Drive, [A/D] Steer, [H] Horn, [E] Get out), the KEYS chip with its F1; 9.0 Danny's clipboard
---     out: [E/LMB] Give to Danny in place of [E] Use, [Q] Put away (a gamepad: R1, B);
+--   * a computer: the move's keys ([E] Use, [G] Put down, [LMB/F] Grip, [O] List, [T] Chat (hold)), the KEYS chip with
+--     its F1; 9.0 Danny's clipboard out: [E/LMB] Give to Danny in place of [E] Use, [Q] Put away (a gamepad: R1, B);
 --   * a gamepad used last on that computer: no keyboard key left; each chip its buttons' glyphs (the platform's
---     pictures: X Use, B Put down, R2 Grip; in the seat R2 and L2 Drive, the left stick Steer, X Get out), only what a
---     button does (no Horn, List or Chat), the KEYS chip without F1; a button's word in brackets when the platform gives
---     no picture; the strip follows the gamepad picked up and put down at once (no look needed);
+--     pictures: X Use, B Put down, R2 Grip), only what a button does (no List or Chat), the KEYS chip without F1; a
+--     button's word in brackets when the platform gives no picture; the strip follows the gamepad picked up and put
+--     down at once (no look needed);
 --   * a console (a gamepad, no keyboard): the glyphs; a phone: no strip; a phone with a gamepad used last: the glyphs;
---   * F1 folds it and unfolds it; the city's strip (Config.Sandbox.On false) a keyboard's, a gamepad or not, as before;
---   * no warnings.
+--   * F1 folds it and unfolds it; no warnings.
 local M = require("./sandbox_mock")
 local Config = require("./Config")
 local SandboxPad = require("./SandboxPad")
@@ -48,17 +46,10 @@ local function color(hex)
 	end } })
 end
 M.KeyHintsP = { ink = color("f2f2f0"), ink2 = color("c4c7cb"), surface = color("14171c"), text = M.MUi.label }
-M.KeyHintsHolster = { hand = function()
-	return "fists"
-end }
-M.car, M.driving = nil, false
-M.KeyHintsDrive = { seatedCar = function()
-	return M.car, M.driving
-end }
 local input = M.services.UserInputService
 input.KeyboardEnabled = true
 
--- The HUD's top buttons (client/Hud.luau's "HudButtons") at the top right: the strip right-aligned under them
+-- The HUD's top right anchor (client/Hud.luau's "HudButtons"): the strip right-aligned under it
 local hud = M.gui:FindFirstChild("ZombieDeliveryHud")
 local buttons = M.make("Frame", { Name = "HudButtons", AnchorPoint = M.Vector2.new(1, 0), Position = M.UDim2.new(1, -16, 0, 16), Size = M.UDim2.fromOffset(260, 40) }, hud)
 local character = M.player.Character
@@ -197,6 +188,7 @@ character:SetAttribute("CarryGrip", "both 4 fragile")
 look()
 
 -- ── The same computer, a gamepad picked up: its glyphs at once ─────────────
+local onFoot = joined(textLines())
 gamepad(true)
 check("a gamepad picked up: the strip changes at once (no look): no keyboard key left", #textLines() == 0 and anyKeyText() == nil, anyKeyText())
 check("… X Use, B Put down, R2 Grip as the platform's glyphs; no List or Chat (no button)", joined(padRows()) == "<ButtonX> Use  <ButtonB> Put down  <ButtonR2> Grip", joined(padRows()))
@@ -208,25 +200,18 @@ check("… a glyph the words' height or a little more, a picture fitted in", gly
 check("… the glyphs are shared/SandboxPad.luau's map", SandboxPad.pads("use")[1] == "ButtonX" and SandboxPad.pads("putdown")[1] == "ButtonB" and SandboxPad.pads("grip")[1] == "ButtonR2")
 look()
 check("… the next look: the same (nothing drawn again)", named(root, "PadLine1") == firstRow and named(firstRow, "Pad") == glyph)
-humanoid.SeatPart = M.make("VehicleSeat", { Name = "DriverSeat" })
-M.car, M.driving = M.make("Model", { Name = "Van" }), true
-look()
-check("in the driver's seat: R2 + L2 Drive, the left stick Steer, X Get out (no Horn: no button)",
-	joined(padRows()) == "<ButtonR2><ButtonL2> Drive  <Thumbstick1> Steer  <ButtonX> Get out", joined(padRows()))
 M.padImages = false
 gamepad(true) -- (the platform gives no pictures now: asked again when the device is)
 gamepad(false)
 gamepad(true)
-check("no pictures from the platform: the buttons' words in brackets", joined(padRows()) == "[R2][L2] Drive  [left stick] Steer  [X] Get out", joined(padRows()))
+check("no pictures from the platform: the buttons' words in brackets", joined(padRows()) == "[X] Use  [B] Put down  [R2] Grip", joined(padRows()))
 M.padImages = true
 gamepad(false)
-check("the gamepad put down (the keys used): the keys at once, the gamepad's rows gone", joined(textLines()) == "[W/S] Drive  [A/D] Steer  [H] Horn  [E] Get out" and #padRows() == 0
+check("the gamepad put down (the keys used): the keys at once, the gamepad's rows gone", joined(textLines()) == onFoot and #padRows() == 0
 	and toggle.Text == "KEYS · HIDE  [F1]", joined(textLines()))
 check("… the rows emptied (no glyph left behind)", #all(root, function(o)
 	return o.Name == "Pad" or o.Name == "Word"
 end) == 0)
-humanoid.SeatPart = nil
-M.car, M.driving = nil, false
 
 -- ── F1 folds it ─────────────────────────────────────────────────────────────
 input.InputBegan:Fire({ KeyCode = M.Enum.KeyCode.F1 }, false)
@@ -263,20 +248,6 @@ gamepad(false)
 look()
 check("… the screen touched again: none", not root.Visible)
 
--- ── The city: as before (a keyboard's strip only, a gamepad or not) ─────────
-screen(false, 1280, 800, true)
-Config.Sandbox.On = false
-character:SetAttribute("Carrying", nil)
-character:SetAttribute("CarryGrip", nil)
-M.player:SetAttribute("MoveWith", nil)
-look()
-local city = joined(textLines())
-check("the city on a computer: its keys", root.Visible and string.find(city, "[1] Fists", 1, true) ~= nil and string.find(city, "[E] Use", 1, true) ~= nil and #padRows() == 0, city)
-gamepad(true)
-look()
-check("… with a gamepad: the same keys as before (the city's strip unchanged)", joined(textLines()) == city and #padRows() == 0 and toggle.Text == "KEYS · HIDE  [F1]", joined(textLines()))
-gamepad(false)
-Config.Sandbox.On = true
 look()
 check("no warnings", #M.warnings == 0, M.warnings[1])
 print("ALL KEY HINTS CHECKS PASSED")

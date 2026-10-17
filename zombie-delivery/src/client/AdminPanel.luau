@@ -5,31 +5,18 @@
 -- (Main: CameraRig.mouseNeeded checks AdminPanel.isOpen()), so the mouse wheel scrolls the panel, not the camera.
 -- 3.8 (the contract UI, design/ui-contract/): the charcoal window (Ui.window, its ✕ closes it) with the sections as a
 -- sidebar of flat tabs (the selected one with the red rule).
--- 4.5, the OP admin: a TARGET picker at the top (you and every player in the server, by display name; you by default):
--- every command that changes a profile or a character goes to the target (the server sends the target's UserId on).
+-- 4.5: a TARGET picker at the top (you and every player in the server, by display name; you by default): every command
+-- goes to the target (the server sends the target's UserId on).
 -- The sections:
---   PLAYER           GIVE ALL, unlock everything, max upgrades, heal, 5.4: refuel / empty the tank; money, XP, the driver level, items, guns, cars,
---                    car stages, upgrade tracks, the car gun, paint; RESET MY SAVE (you only, asks twice)
---   OP               the toggles with their ON / OFF state (god, fly, noclip, super jump, car boost, hidden, one-hit
---                    kills; the attributes the server set on the target), the walk 1× / 2× / 4×, bring / go to, clear
---                    the target's wanted
---   WORLD            6.13: the Analytics line (on / off, the counts); 6.13.1: the PERFORMANCE overlay (yours only); the
---                    time of day, enemies near you, a horde, a bandit car, traffic, clear / kill all / FREEZE, teleport the
---                    target to any landmark
---   JOBS & MISSIONS  any special job or ordinary tier, finish the stop / the whole job, 6.14: the streak of good jobs
---                    and the shift (STREAK 0 / 1 / 4, SHIFT 0 / 4 of 5), a GOLDEN ORDER or a REGULAR'S ORDER on the
---                    board now, every business's deliveries at a regulars' tier (or none), the missions (all at 3
---                    stars, reset, 6.15: KILL MISSION ZOMBIES, start any), the challenges, secrets and titles
---   EVENTS           6.15: the live events for the whole server (server/LiveEvents.luau): START BLOOD MOON / RUSH HOUR /
---                    SUPPLY DROP / HORDE (the running one ends first; the Blood Moon turns the clock to the night, rush
---                    hour to the morning), END EVENT, and what runs now with its time left
---   ESTATE           properties, the home, teleport to a property, the company's safe
---   BUDDIES          NPC companions (server/Buddy.luau): + ADD, FOLLOW / STAY / GUARD, DISMISS, how many
---   SANDBOX          8.0, only in the sandbox world (Config.Sandbox.On; then the first tab, open by default): the
---                    owner's quick test tools (shared/SandboxAdmin.luau's buttons, each ("sandbox", id) to the TARGET:
---                    money, the house's move, the warehouse's stock and stands, the van and the teleports) and
---                    🔍 SHOW ZONES (client/SandboxZones.luau: debug marks on your screen only); 8.3: the Badges line
---                    (read-only: which Roblox badges are set up, server/SandboxBadges.luau's AdminBadges attribute)
+--   SANDBOX  the first tab, open by default: the owner's quick test tools (shared/SandboxAdmin.luau's groups and
+--            buttons, each ("sandbox", id) to the TARGET: money, the runs (their difficulty, a run in any house, its
+--            end, the clock, a horde), the warehouse's stock and stands, the book, the teleports, the upgrades, the
+--            warehouse's level, the paints) and 🔍 SHOW ZONES (client/SandboxZones.luau: debug marks on your screen
+--            only); 8.3: the Badges line (read-only: which Roblox badges are set up, server/SandboxBadges.luau's
+--            AdminBadges attribute)
+--   OP       FLY and NOCLIP for the TARGET with their ON / OFF state (the attributes the server set on the target:
+--            client/AdminFly.luau moves the body), and 6.13.1's PERFORMANCE overlay (client/PerfOverlay.luau, yours only:
+--            AdminPanel.onPerformance, set by client/Main.client.luau)
 
 local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
@@ -39,21 +26,16 @@ local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
-local Economy = require(Shared.Economy)
-local Levels = require(Shared.Levels)
-local Map = require(Shared.Map)
 local Net = require(Shared.Net)
-local MissionData = require(Shared.Missions)
-local ChallengeData = require(Shared.Challenges)
-local SandboxAdmin = require(Shared.SandboxAdmin) -- 8.0 SANDBOX
+local SandboxAdmin = require(Shared.SandboxAdmin)
 local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
-local SandboxZones = require(script.Parent.SandboxZones) -- 8.0 SANDBOX: SHOW ZONES
+local SandboxZones = require(script.Parent.SandboxZones) -- SHOW ZONES
 
 local C = Ui.Colors
 local P = Theme.Postage
 local AdminPanel = {}
--- 6.13.1: the WORLD tab's PERFORMANCE toggle (client/PerfOverlay.luau; client/Main.client.luau sets these)
+-- 6.13.1: the OP tab's PERFORMANCE toggle (client/PerfOverlay.luau; client/Main.client.luau sets these)
 AdminPanel.onPerformance = nil :: (() -> ())?
 AdminPanel.performanceOn = nil :: (() -> boolean)?
 
@@ -63,13 +45,8 @@ local remote: RemoteEvent? = nil
 -- The window's parts (one table: the 200-register limit).
 local parts: { [string]: any } = {}
 local tabButtons: { [string]: any } = {}
-local section = if Config.Sandbox.On then "sandbox" else "player" -- (8.0: the sandbox's tools first)
+local section = "sandbox" -- (the game's tools first)
 local targetId = player.UserId -- 4.5: who the commands go to (a player in this server)
-local spawnCount = 1
-local missionProgress: { [string]: number } = {} -- your best ratings (the Missions remote's "state"), for the colours
--- 3.1: your challenges' state (the Challenges remote's "state", asked when the tab opens).
-local challengeState: { done: number, secrets: number, secretsTotal: number, visited: number, placesTotal: number, title: string?, titles: { [string]: boolean } } =
-	{ done = 0, secrets = 0, secretsTotal = 0, visited = 0, placesTotal = 0, title = nil, titles = {} }
 
 -- In a Studio Play test everybody is an admin (Config.Admin.InStudio): the panel opens even before the server's
 -- "Admin" attribute arrives. The server checks every command again anyway.
@@ -146,41 +123,6 @@ local function toggle(parent: any, label: string, on: boolean, onClick: () -> ()
 	return action(parent, `{label}  ·  {if on then "ON" else "OFF"}`, if on then C.yellow else C.grey, onClick)
 end
 
--- A row: a name on the left and small buttons after it (levels, stages, counts).
-local function row(title: string): any
-	local frame = Ui.make("Frame", {
-		Size = UDim2.new(1, -10, 0, 40),
-		BackgroundTransparency = 1,
-		LayoutOrder = nextOrder(),
-	}, parts.content)
-	Ui.list(frame, false, 6)
-	local layout = frame:FindFirstChildOfClass("UIListLayout")
-	if layout then
-		layout.VerticalAlignment = Enum.VerticalAlignment.Center
-	end
-	Ui.label(frame, title, UDim2.fromOffset(190, 40), {
-		LayoutOrder = 0,
-		TextSize = 14,
-		Font = Theme.HeadingFont,
-		TextColor3 = C.dim,
-		TextWrapped = false,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-	})
-	return frame
-end
-
-local function small(parent: any, text: string, color: Color3, onClick: () -> ()): any
-	local button = Ui.button(parent, text, UDim2.fromOffset(if #text > 3 then 72 else 48, 36), color, onClick)
-	button.TextSize = 14
-	button.LayoutOrder = nextOrder()
-	return button
-end
-
-local function leftAligned(button: any)
-	button.TextXAlignment = Enum.TextXAlignment.Left
-	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 6) }, button)
-end
-
 -- A name for the hints: "you" or the target's display name.
 local function whom(): string
 	local who = target()
@@ -189,635 +131,21 @@ end
 
 -- ── Sections ───────────────────────────────────────────────────────────────
 
--- (8.0: SANDBOX first, only in the sandbox world)
-local SECTIONS = SandboxAdmin.tabs({
-	{ "player", "PLAYER" },
+local SECTIONS: { { string } } = {
+	{ "sandbox", "SANDBOX" },
 	{ "op", "OP" },
-	{ "world", "WORLD" },
-	{ "jobs", "JOBS & MISSIONS" },
-	{ "events", "EVENTS" }, -- 6.15
-	{ "estate", "ESTATE" },
-	{ "buddies", "BUDDIES" },
-}, Config.Sandbox.On)
+}
 
 local render: (keepScroll: boolean?) -> ()
 local R: { [string]: () -> () } = {} -- the sections' renderers
 
--- PLAYER: everything to give the target.
-R.player = function()
-	local who = target()
-	local isSelf = who == player
-	heading(`Player · {who.DisplayName}{if isSelf then " (you)" else ""}`, "Every button here goes to the TARGET picked at the top. The target gets a notice from you.")
-	local quick = grid(200)
-	action(quick, "GIVE ALL (+ $1M)", C.yellow, function()
-		send("giveAll")
-	end)
-	action(quick, "UNLOCK EVERYTHING", C.green, function()
-		send("unlockAll")
-	end)
-	action(quick, "MAX UPGRADES + STAGES", C.blue, function()
-		send("maxUpgrades")
-	end)
-	action(quick, "HEAL (AND THE CAR)", C.green, function()
-		send("heal")
-	end)
-	-- 5.4: the car's tank (server/Fuel.luau): full, or empty to try the crawl and the phone's TOW.
-	action(quick, "REFUEL THE CAR", C.green, function()
-		send("refuel", 1)
-	end)
-	action(quick, "EMPTY THE TANK", C.grey, function()
-		send("refuel", 0)
-	end)
-
-	heading("Money")
-	local amounts = grid(150)
-	for _, amount in { 1_000, 10_000, 100_000, 1_000_000 } do
-		action(amounts, "+" .. Ui.money(amount), C.green, function()
-			send("money", amount)
-		end)
-	end
-
-	local level = tonumber(who:GetAttribute("Level")) or 1
-	heading(`XP and driver level · LV {level} · {Levels.rank(level)}`, "+XP adds to the driver XP (a level up as usual). LV sets the XP to exactly what that level needs.")
-	local xp = grid(150)
-	for _, amount in { 100, 1_000, 10_000, 100_000 } do
-		action(xp, `+{amount} XP`, C.blue, function()
-			send("xp", amount)
-		end)
-	end
-	local levels = grid(80)
-	local picks: { number } = {}
-	for _, n in { 1, 2, 3, 4, 5, 6, 8, 10, 12 } do
-		if n < Config.Levels.MaxLevel then
-			table.insert(picks, n)
-		end
-	end
-	table.insert(picks, Config.Levels.MaxLevel)
-	for _, n in picks do
-		action(levels, `LV {n}`, if n == level then C.yellow else C.grey, function()
-			send("setLevel", n)
-		end)
-	end
-
-	heading("Items", "+1, +5, FILL (to its most) or EMPTY.")
-	for _, def in Config.Items do
-		local line = row(`{def.icon} {def.name} (max {def.max})`)
-		small(line, "+1", C.green, function()
-			send("item", { id = def.id, count = 1 })
-		end)
-		small(line, "+5", C.green, function()
-			send("item", { id = def.id, count = 5 })
-		end)
-		small(line, "FILL", C.blue, function()
-			send("item", { id = def.id, count = def.max })
-		end)
-		small(line, "EMPTY", C.grey, function()
-			send("item", { id = def.id, count = -def.max })
-		end)
-	end
-
-	heading("Guns", "Given and put in the hand (yellow = earned from an employer).")
-	local guns = grid(150)
-	for _, def in Config.Weapons do
-		action(guns, def.name, if def.earned then C.yellow else C.blue, function()
-			send("weapon", def.id)
-		end)
-	end
-
-	heading("Spawn a car", "It comes right now on the road next to the target (7.x: the Deliveros Van and the bikes, the only vehicles a player has).")
-	local cars = grid(150)
-	for _, def in Config.Cars do
-		action(cars, def.name, if def.company then C.yellow else C.blue, function()
-			send("car", def.id)
-		end)
-	end
-
-	local staged = false -- (7.x: the ZDC Van has one stage: no rows, no heading)
-	for _, def in Config.Cars do
-		staged = staged or Economy.maxStage(def.id) > 0
-	end
-	if staged then
-		heading("Car stages", "The car at that stage (given first if the target lacks it). The equipped car is rebuilt now, during a job after it.")
-	end
-	for _, def in Config.Cars do
-		local top = Economy.maxStage(def.id)
-		if top > 0 then
-			local line = row(def.name)
-			for stage = 0, top do
-				small(line, `S{stage}`, if stage == top then C.yellow else C.grey, function()
-					send("carStage", { car = def.id, stage = stage })
-				end)
-			end
-		end
-	end
-
-	heading("Upgrade tracks", "One track at a level (0 = none). The car tracks go on the target's equipped car; the gun tracks count for all guns.")
-	for _, def in Config.Upgrades do
-		local line = row(`{def.name}{if def.car then " · car" else " · guns"}`)
-		for lv = 0, def.maxLevel do
-			small(line, tostring(lv), if lv == def.maxLevel then C.yellow else C.grey, function()
-				send("upgrade", { id = def.id, level = lv })
-			end)
-		end
-	end
-
-	heading("Car gun", "The gun on the roof of the target's equipped car (every dealer car, the monster truck, the armored truck).")
-	local carGuns = grid(150)
-	action(carGuns, "No car gun", C.red, function()
-		send("carGun", "none")
-	end)
-	for _, def in Config.CarGuns do
-		action(carGuns, def.name, C.blue, function()
-			send("carGun", def.id)
-		end)
-	end
-
-	heading("Paint", "Given and put on the target's equipped car (yellow = an exclusive reward).")
-	local paints = grid(150)
-	for _, def in Config.Paints do
-		action(paints, def.name, if def.exclusive then C.yellow else C.blue, function()
-			send("paint", def.id)
-		end)
-	end
-
-	-- 4.0.5: start over as a new player (asks twice: it cannot be undone). Only your own save.
-	if isSelf then
-		heading("Start over", "Your save goes back to a new player's: $, level, cars, missions, the map and the tutorial. You are taken out of the game; join again (in Studio: Play again). A Studio test without saving already starts fresh every time.")
-		local reset = grid(200)
-		local armedUntil = 0
-		local button: any
-		button = action(reset, "RESET MY SAVE", C.red, function()
-			if os.clock() < armedUntil then
-				send("resetSave")
-				return
-			end
-			armedUntil = os.clock() + 4
-			button.Text = "SURE? PRESS AGAIN"
-			task.delay(4, function()
-				if button.Parent then
-					button.Text = "RESET MY SAVE"
-				end
-			end)
-		end)
-	end
-end
-
--- The OP toggles: the target's player attributes (the server sets them).
-local FLAGS: { { command: string, attribute: string, label: string } } = {
-	{ command = "god", attribute = "God", label = "GOD MODE" },
-	{ command = "fly", attribute = "AdminFly", label = "FLY" },
-	{ command = "noclip", attribute = "AdminNoclip", label = "NOCLIP" },
-	{ command = "jump", attribute = "AdminJump", label = "SUPER JUMP" },
-	{ command = "carBoost", attribute = "AdminCarBoost", label = "CAR BOOST ×2" },
-	{ command = "hidden", attribute = "AdminHidden", label = "HIDDEN" },
-	{ command = "oneHit", attribute = "AdminOneHit", label = "ONE-HIT KILLS" },
-}
-
-R.op = function()
-	local who = target()
-	heading(
-		`OP tools · {who.DisplayName}`,
-		"FLY: WASD where the camera looks, Space up, Ctrl down, Shift faster (the stick on a phone). NOCLIP: through walls. HIDDEN: zombies and bandits ignore the target. ONE-HIT KILLS: every round kills. GOD: no damage to the target or their car. (The guns have no ammo or reload, so there is nothing to make infinite.)"
-	)
-	local toggles = grid(200)
-	for _, flag in FLAGS do
-		local on = who:GetAttribute(flag.attribute) == true
-		toggle(toggles, flag.label, on, function()
-			send(flag.command, not on)
-		end)
-	end
-	local speed = tonumber(who:GetAttribute("AdminSpeed")) or 1
-	local walk = row("Walking speed")
-	for _, n in { 1, 2, 4 } do
-		small(walk, `{n}×`, if n == speed then C.yellow else C.grey, function()
-			send("speed", n)
-		end)
-	end
-	heading("Players", if who == player then "Pick another player as the TARGET at the top to bring them or go to them." else `BRING: {who.DisplayName} to you. GO TO: you to {who.DisplayName}.`)
-	local moves = grid(200)
-	if who ~= player then
-		action(moves, "BRING TO ME", C.yellow, function()
-			send("bring")
-		end)
-		action(moves, "GO TO THEM", C.blue, function()
-			send("goto")
-		end)
-	end
-	action(moves, "HEAL", C.green, function()
-		send("heal")
-	end)
-	action(moves, "CLEAR WANTED", C.grey, function()
-		send("clearWanted")
-	end)
-end
-
--- WORLD: the clock, the enemies, the traffic, the landmarks.
-R.world = function()
-	-- 6.13: Roblox analytics (server/Analytics.luau): on or off, and what this server logged so far (the attribute
-	-- server/Admin.luau keeps on the admins; REFRESH reads it again)
-	heading("Analytics", tostring(player:GetAttribute("AdminAnalytics") or "No answer from the server yet."))
-	action(grid(150), "REFRESH", C.grey, function()
-		render(true)
-	end)
-	-- 6.13.1: the performance overlay (client/PerfOverlay.luau, for a screenshot from a phone: design/performance/NAVOD.md)
-	heading("Performance", "A small box at the top of your screen: FPS, memory, ping, the parts, shadows and lights around you, streaming. Only you see it. Open the live game on a phone, turn it on, send a screenshot.")
-	local perf = grid(200)
-	local shown = AdminPanel.performanceOn
-	toggle(perf, "PERFORMANCE", shown ~= nil and shown(), function()
-		local flip = AdminPanel.onPerformance
-		if flip then
-			flip()
-		end
-		render(true)
-	end)
-	local night = Config.DayNight
-	heading("Time of day", string.format("The clock runs (a day is %d min). Night from %02d:%02d to %02d:%02d: dark, more zombies, bigger waves, better pay, the lamps and headlights on. 6.16: each button jumps to the hour a look of the day is full (the blue dawn, the golden sunrise and sunset, the clean noon, the violet dusk, the blue night), to preview it.", math.floor(night.DayLength / 60), math.floor(night.NightFrom), math.floor(night.NightFrom % 1 * 60), math.floor(night.NightTo), math.floor(night.NightTo % 1 * 60)))
-	local cells = grid(150)
-	-- 6.16: one button for each look on Config.Atmosphere.Clock (the night once, in the evening), and midnight.
-	local lookNames: { [string]: string } = { night = "Night", dawn = "Dawn", sunrise = "Sunrise", morning = "Morning", noon = "Noon", afternoon = "Afternoon", golden = "Sunset", dusk = "Dusk" }
-	local times: { { hour: number, label: string } } = { { hour = 0, label = "00:00 Midnight" } }
-	for _, key in Config.Atmosphere.Clock do
-		if key.look ~= "night" or key.hour >= 12 then
-			local minutes = math.floor(key.hour * 60 + 0.5)
-			table.insert(times, { hour = key.hour, label = string.format("%02d:%02d %s", minutes // 60, minutes % 60, lookNames[key.look] or key.look) })
-		end
-	end
-	for _, entry in times do
-		local hour = entry.hour
-		local dark = hour >= night.NightFrom or hour < night.NightTo
-		action(cells, entry.label, if dark then P.violet elseif hour >= 7 and hour <= 17 then C.blue else P.bronze, function()
-			send("time", hour)
-		end)
-	end
-	-- 6.16: the weather now, for the whole server (the looks in the rain and the fog; it blends in over a few seconds)
-	local skies = row("Weather (whole server)")
-	for _, state in { "clear", "rain", "fog" } do
-		small(skies, string.upper(state), if state == "clear" then C.blue else C.grey, function()
-			send("weather", state)
-		end)
-	end
-
-	local frozen = workspace:GetAttribute("AdminFrozen") == true
-	heading("Enemies on the map", "KILL ALL kills every enemy and bandit car on the whole map. FREEZE stops them all where they stand (off again when you leave).")
-	local map = grid(200)
-	action(map, "KILL ALL ON THE MAP", C.red, function()
-		send("killAll")
-	end)
-	toggle(map, "FREEZE", frozen, function()
-		send("freeze", not frozen)
-	end)
-	action(map, "CLEAR NEAR ME", C.grey, function()
-		send("clear")
-	end)
-	action(map, "BANDIT CAR", C.red, function()
-		send("banditCar")
-	end)
-	local horde = row("Horde around you")
-	for _, n in { 10, 20, 30 } do
-		small(horde, `×{n}`, C.red, function()
-			send("horde", n)
-		end)
-	end
-	local counts = row("How many of a kind")
-	for _, n in { 1, 3, 5, 10 } do
-		small(counts, `×{n}`, if spawnCount == n then C.yellow else C.grey, function()
-			spawnCount = n
-			render(true)
-		end)
-	end
-	local kinds = {}
-	for kind in Config.Zombies do
-		table.insert(kinds, kind)
-	end
-	table.sort(kinds, function(a, b)
-		return Config.Zombies[a].health < Config.Zombies[b].health
-	end)
-	local spawn = grid(150)
-	for _, kind in kinds do
-		local def = Config.Zombies[kind]
-		action(spawn, def.name, if def.ranged then C.red else C.green, function()
-			send("spawn", { kind = kind, count = spawnCount })
-		end)
-	end
-
-	heading("Traffic", "Civilian cars on the lanes near you.")
-	local traffic = grid(150)
-	action(traffic, "+1 CAR", C.blue, function()
-		send("traffic", 1)
-	end)
-	action(traffic, "+5 CARS", C.blue, function()
-		send("traffic", 5)
-	end)
-
-	heading(`Teleport · {whom()}`, "To the road at the place. A driver's car comes along.")
-	local places = grid(232)
-	local kindColors: { [string]: Color3 } = { shop = C.blue, employer = P.gold, place = P.violet }
-	for _, landmark in Map.Landmarks do
-		leftAligned(action(places, `{landmark.icon} {landmark.name}`, kindColors[landmark.kind] or C.grey, function()
-			send("teleport", landmark.id)
-		end))
-	end
-end
-
--- 6.15, EVENTS: the live events for the whole server (server/LiveEvents.luau checks the id; the workspace attributes
--- say what runs). The section is drawn again when an event starts or ends (see AdminPanel.start).
-R.events = function()
-	local id = workspace:GetAttribute("LiveEvent")
-	local def = if type(id) == "string" then Config.LiveEvents.Events[id] else nil
-	local ends = workspace:GetAttribute("LiveEventEnds")
-	local left = if type(ends) == "number" then math.max(0, math.floor(ends - workspace:GetServerTimeNow())) else 0
-	heading(
-		if def then `Live event · {def.icon} {def.name} · {left // 60}:{string.format("%02d", left % 60)} left` else "Live events · none running",
-		"For the whole server, not the target. START ends a running one first; the Blood Moon turns the clock to the night, rush hour to the morning. Missions are never touched."
-	)
-	local starts = grid(200)
-	local events: { { id: string, color: Color3 } } = {
-		{ id = "bloodmoon", color = C.red },
-		{ id = "rush", color = C.yellow },
-		{ id = "supply", color = C.green },
-		{ id = "horde", color = P.violet },
-	}
-	for _, entry in events do
-		local eventDef = Config.LiveEvents.Events[entry.id]
-		if eventDef then
-			action(starts, `START {eventDef.icon} {eventDef.name}`, entry.color, function()
-				send("liveEvent", entry.id)
-			end)
-		end
-	end
-	action(starts, "END EVENT", C.grey, function()
-		send("liveEvent", "end")
-	end)
-	-- 7.0, MOVES (server/Moving.luau admin): your own house move, the prologue's (Marge's House)
-	heading("Moves · 7.0 prototype", "Your own move in your Deliveros Van: the contract card (as the depot's board opens it), or START at once; HOUSE takes you (and the car you drive) to its door; the FARM row is Walt's Farm's (chapter 1). HORDE now, 1 MIN left, TRIP (the van's load delivered, as at the Wall), DELIVER (that and finished) or END (called off).")
-	local moves = grid(200)
-	action(moves, "🏠 MOVE: CONTRACT CARD", P.gold, function()
-		send("move", "card")
-	end)
-	action(moves, "▶ MOVE: START NOW", C.yellow, function()
-		send("move", "start")
-	end)
-	action(moves, "MOVE: GO TO THE HOUSE", C.blue, function()
-		send("move", "house")
-	end)
-	action(moves, "🧟 MOVE: HORDE NOW", C.red, function()
-		send("move", "horde")
-	end)
-	action(moves, "⏱ MOVE: 1 MIN LEFT", C.grey, function()
-		send("move", "time")
-	end)
-	action(moves, "🧱 MOVE: DELIVER NOW", C.green, function()
-		send("move", "deliver")
-	end)
-	action(moves, "MOVE: END", C.grey, function()
-		send("move", "end")
-	end)
-	-- 7.x farm move: Walt's Farm (chapter 1) and a van trip
-	action(moves, "🐴 FARM: CONTRACT CARD", P.gold, function()
-		send("move", "farmcard")
-	end)
-	action(moves, "▶ FARM: START NOW", C.yellow, function()
-		send("move", "farm")
-	end)
-	action(moves, "FARM: GO TO THE FARM", C.blue, function()
-		send("move", "farmgo")
-	end)
-	action(moves, "🚐 MOVE: TRIP NOW", C.green, function()
-		send("move", "trip")
-	end)
-end
-
--- JOBS & MISSIONS: the jobs, the missions (shared/Missions.luau) and the challenges (shared/Challenges.luau).
-R.jobs = function()
-	heading(`Jobs · {whom()}`, "Starts it now with its vehicle (a running job is cancelled). FINISH THE JOB pays the whole job as delivered. STREAK / SHIFT (6.14) set the streak of good jobs and this session's shift.")
-	local testing = grid(200)
-	action(testing, "FINISH THIS STOP", C.blue, function()
-		send("finishStop")
-	end)
-	action(testing, "FINISH THE JOB", C.yellow, function()
-		send("finishJob")
-	end)
-	-- 4.8: a road event on the running job (it comes as you drive on).
-	for _, kind in { "survivor", "addon", "roadblock" } do
-		action(testing, `EVENT: {string.upper(kind)}`, C.grey, function()
-			send("roadEvent", kind)
-		end)
-	end
-	-- 6.14: a golden order or a regular's order on the board now (server/SpecialOrders.luau), and every business's
-	-- deliveries at a regulars' tier (server/Regulars.luau): REGULARS 0 clears them.
-	action(testing, "★ GOLDEN ORDER NOW", P.gold, function()
-		send("goldenOrder")
-	end)
-	action(testing, "★ REGULAR'S ORDER NOW", C.yellow, function()
-		send("regularOrder")
-	end)
-	action(testing, "REGULARS: NONE", C.grey, function()
-		send("regulars", 0)
-	end)
-	for _, tier in Config.Regulars.Tiers do
-		action(testing, `REGULARS: {string.upper(tier.name)} ({tier.at})`, C.grey, function()
-			send("regulars", tier.at)
-		end)
-	end
-	-- 6.14: the streak of good jobs and this session's shift (the HUD's ON A ROLL and SHIFT chips; at SHIFT 4 / 5 the
-	-- next delivery paid is SHIFT DONE).
-	local grind = grid(150)
-	for _, n in { 0, 1, 4 } do
-		action(grind, `STREAK {n}`, if n == 0 then C.red else C.yellow, function()
-			send("streak", n)
-		end)
-	end
-	local last = Config.Jobs.Shift.Jobs - 1
-	for _, n in { 0, last } do
-		action(grind, `SHIFT {n} / {Config.Jobs.Shift.Jobs}`, if n == 0 then C.grey else C.green, function()
-			send("shift", n)
-		end)
-	end
-	local special = grid(150)
-	for _, def in Config.JobTypes do
-		action(special, def.name, C.yellow, function()
-			send("job", def.id)
-		end)
-	end
-	local ordinary = grid(150)
-	local colors = { C.green, C.yellow, C.red, P.violet }
-	for index, tier in Config.Jobs.Tiers do
-		action(ordinary, `{string.rep("★", tier.stars)} {tier.name}`, colors[index] or C.grey, function()
-			send("job", `ordinary{index}`)
-		end)
-	end
-	action(ordinary, "🚶 On foot", C.green, function()
-		send("job", "foot") -- 5.0: an ON FOOT job (Jobs.adminStart)
-	end)
-
-	local got, most = MissionData.stars(missionProgress, nil)
-	heading(`Missions · your {got} / {most} ★`, "ALL 3 ★: every mission done at 3 stars (no money). RESET: the progress cleared. KILL MISSION ZOMBIES (6.15): every enemy left of the running mission dies and counts (delivered already: it is done). A mission button starts it now (locks ignored; NIGHT ONLY turns the clock to night). The stars shown are yours.")
-	local all = grid(200)
-	action(all, "ALL MISSIONS 3 ★", C.yellow, function()
-		send("missionsAll")
-	end)
-	action(all, "RESET MISSIONS", C.red, function()
-		send("missionsReset")
-	end)
-	action(all, "KILL MISSION ZOMBIES", C.red, function()
-		send("missionKill") -- 6.15 (server/Admin.luau → Jobs.adminKillMission)
-	end)
-	for _, campaign in MissionData.Campaigns do
-		local done, total = MissionData.done(missionProgress, campaign.id)
-		local rgb = campaign.color
-		local color = Color3.fromRGB(rgb[1] or 200, rgb[2] or 200, rgb[3] or 200)
-		heading(`{campaign.icon} {campaign.name} · LV {campaign.level} · {done}/{total}`, campaign.client) -- 6.8: a chapter of six
-		local missions = grid(232)
-		for _, def in MissionData.ofCampaign(campaign.id) do
-			local best = missionProgress[def.id] or 0
-			local twists = ""
-			local twistList: { string } = def.twists or {}
-			for _, twist in twistList do
-				local info = Config.Missions.Twists[twist]
-				twists ..= if info then info.icon else ""
-			end
-			local mark = if best > 0 then " " .. string.rep("★", best) else ""
-			local button = action(missions, `{def.number}. {def.name}{if def.coop then " 👥" else ""} {twists}{mark}`, if best > 0 then C.green else C.panelLight, function()
-				send("missionStart", def.id)
-			end)
-			leftAligned(button)
-			-- The campaign's colour on the button's own border (one UIStroke per button).
-			local border = button:FindFirstChildOfClass("UIStroke")
-			if border then
-				border.Color = color
-				border.Thickness = 1.5
-			end
-		end
-	end
-
-	local state = challengeState
-	heading(
-		`Challenges · your {state.done} / {#ChallengeData.List} · secrets {state.secrets} / {state.secretsTotal} · places {state.visited} / {state.placesTotal}`,
-		"ALL CHALLENGES gives every challenge's money and title, every campaign's reward and Dead End. RESET takes the exclusive guns and paints back too."
-	)
-	local challenges = grid(200)
-	action(challenges, "ALL CHALLENGES", C.yellow, function()
-		send("challengesAll")
-	end)
-	action(challenges, "ALL SECRETS FOUND", C.blue, function()
-		send("secretsAll")
-	end)
-	action(challenges, "RESET CHALLENGES", C.red, function()
-		send("challengesReset")
-	end)
-	heading(`Title · {whom()}`, "Given and shown over the head and on the leaderboard (TOP). The marks are your own titles.")
-	local titles = grid(232)
-	action(titles, "NO TITLE", C.grey, function()
-		send("title", "none")
-	end)
-	for _, title in ChallengeData.allTitles() do
-		local mine = target() == player
-		action(titles, title, if mine and state.title == title then C.yellow elseif mine and state.titles[title] then C.green else C.panelLight, function()
-			send("title", title)
-		end)
-	end
-end
-
--- The real estate (Config.Estate) and the company's safe (Config.Business). The target's attributes Estates
--- ("id,id,…") and Home (server/Estate.luau) mark what they own: yellow = the home, green = owned.
-local ESTATE_KINDS = { mansion = "🏰", villa = "🏡", house = "🏠", garage = "🅿️", office = "🏢" }
-
-R.estate = function()
-	local who = target()
-	local owned: { [string]: boolean } = {}
-	local list = who:GetAttribute("Estates")
-	if type(list) == "string" then
-		for id in string.gmatch(list, "[^,]+") do
-			owned[id] = true
-		end
-	end
-	local home = who:GetAttribute("Home")
-	local slots = tonumber(who:GetAttribute("CarSlots")) or Config.Estate.BaseCarSlots
-	heading(`Real estate · {whom()}`, `Homes, garages and offices for free (green = owned, yellow = the home). Car slots now: {slots}. Players open the list with H or the ESTATE button.`)
-	local all = grid(200)
-	action(all, "GIVE EVERY PROPERTY", C.yellow, function()
-		send("giveEstate", "all")
-	end)
-	action(all, "TAKE THEM ALL AWAY", C.red, function()
-		send("clearEstate")
-	end)
-	action(all, "SPAWN AT THE DEPOT", C.grey, function()
-		send("setHome", "depot")
-	end)
-	heading("Give a property", "Click: it is the target's (no money). A first home becomes the home.")
-	local cells = grid(232)
-	for _, def in Config.Estate.Properties do
-		local color = if home == def.id then C.yellow elseif owned[def.id] then C.green else C.blue
-		leftAligned(action(cells, `{ESTATE_KINDS[def.kind] or "🏠"} {def.name}`, color, function()
-			send("giveEstate", def.id)
-		end))
-	end
-	heading("Set the home", "The target spawns there after every death (and after PLAY). It is given first if not owned.")
-	local homes = grid(232)
-	for _, def in Config.Estate.Properties do
-		if def.kind == "mansion" or def.kind == "villa" or def.kind == "house" then
-			local on = home == def.id
-			action(homes, `{if on then "★ " else ""}{def.name}`, if on then C.yellow else C.panelLight, function()
-				send("setHome", def.id)
-			end)
-		end
-	end
-	heading("Teleport to a property", "Inside at its door (homes, offices), else the road at its plot.")
-	local places = grid(232)
-	for _, def in Config.Estate.Properties do
-		leftAligned(action(places, `{ESTATE_KINDS[def.kind] or "🏠"} {def.name}`, P.violet, function()
-			send("estateTeleport", def.id)
-		end))
-	end
-	heading("Company safe", `The company's earnings wait in the safe (up to {Ui.money(Config.Business.SafeCap)}) until they are COLLECTED at the office computer.`)
-	local safe = grid(200)
-	action(safe, "FILL THE SAFE", C.green, function()
-		send("businessCash")
-	end)
-	action(safe, "+" .. Ui.money(50_000), C.green, function()
-		send("businessCash", 50_000)
-	end)
-	action(safe, "EMPTY THE SAFE", C.grey, function()
-		send("businessCash", -Config.Business.SafeCap)
-	end)
-end
-
--- BUDDIES (server/Buddy.luau): NPC companions that play along with the target.
-R.buddies = function()
-	local who = target()
-	local count = tonumber(who:GetAttribute("AdminBuddies")) or 0
-	local mode = who:GetAttribute("AdminBuddyMode")
-	heading(
-		`Buddies · {whom()} · {count} now`,
-		"NPC companions. FOLLOW: with the owner, on foot and in the car. STAY: they stand where they are (and still fight). GUARD: they hold the spot and fight anything that comes near."
-	)
-	local add = grid(150)
-	action(add, "+ ADD 1", C.yellow, function()
-		send("buddy", 1)
-	end)
-	action(add, "+ ADD 3", C.green, function()
-		send("buddy", 3)
-	end)
-	action(add, "DISMISS ALL", C.red, function()
-		send("buddyDismiss")
-	end)
-	heading("Mode")
-	local modes = grid(150)
-	for _, entry in { { "follow", "FOLLOW" }, { "stay", "STAY" }, { "guard", "GUARD" } } do
-		local id = entry[1]
-		action(modes, entry[2], if mode == id then C.yellow else C.grey, function()
-			send("buddyMode", id)
-		end)
-	end
-end
-
--- 8.0 SANDBOX: the owner's quick test tools in the sandbox world (shared/SandboxAdmin.luau's groups and buttons; the
--- server, server/Admin.luau's "sandbox", checks each again). Every button goes to the TARGET; SHOW ZONES is yours.
+-- SANDBOX: the owner's quick test tools (shared/SandboxAdmin.luau's groups and buttons; the server, server/Admin.luau's
+-- "sandbox", checks each again). Every button goes to the TARGET; SHOW ZONES is yours.
 R.sandbox = function()
 	local plot = target():GetAttribute("Plot")
 	heading(
 		`Sandbox · {whom()}{if type(plot) == "number" then ` · plot {plot}` else " · no plot"}`,
-		"Quick tools for the sandbox world. Every button goes to the TARGET picked at the top; the answer comes in the footer."
+		"Quick tools for the game. Every button goes to the TARGET picked at the top; the answer comes in the footer."
 	)
 	-- 8.3: the Roblox badges, read-only (server/SandboxBadges.luau keeps AdminBadges on the admins; ids: Config.SandboxBadges)
 	heading("Badges", tostring(player:GetAttribute("AdminBadges") or "No answer from the server yet."))
@@ -840,6 +168,36 @@ R.sandbox = function()
 			end)
 		end
 	end
+end
+
+-- The OP toggles: the target's player attributes (the server sets them).
+local FLAGS: { { command: string, attribute: string, label: string } } = {
+	{ command = "fly", attribute = "AdminFly", label = "FLY" },
+	{ command = "noclip", attribute = "AdminNoclip", label = "NOCLIP" },
+}
+
+-- OP: fly and noclip for the TARGET; the performance overlay (yours).
+R.op = function()
+	local who = target()
+	heading(`OP tools · {who.DisplayName}`, "FLY: WASD where the camera looks, Space up, Ctrl down, Shift faster (the stick on a phone). NOCLIP: through walls.")
+	local toggles = grid(200)
+	for _, flag in FLAGS do
+		local on = who:GetAttribute(flag.attribute) == true
+		toggle(toggles, flag.label, on, function()
+			send(flag.command, not on)
+		end)
+	end
+	-- 6.13.1: the performance overlay (client/PerfOverlay.luau, for a screenshot from a phone: design/performance/NAVOD.md)
+	heading("Performance", "A small box at the top of your screen: FPS, memory, ping, the parts, shadows and lights around you, streaming. Only you see it. Open the live game on a phone, turn it on, send a screenshot.")
+	local perf = grid(200)
+	local shown = AdminPanel.performanceOn
+	toggle(perf, "PERFORMANCE", shown ~= nil and shown(), function()
+		local flip = AdminPanel.onPerformance
+		if flip then
+			flip()
+		end
+		render(true)
+	end)
 end
 
 render = function(keepScroll: boolean?)
@@ -1015,7 +373,7 @@ local function build()
 		BorderSizePixel = 0,
 	}, inner)
 
-	-- The sections: a recessed sidebar of tabs (the Dispatch board's filters).
+	-- The sections: a recessed sidebar of tabs.
 	local sidebar = Ui.make("Frame", {
 		Name = "Sidebar",
 		Size = UDim2.new(0, SIDEBAR_WIDTH, 1, -(PICKER_HEIGHT + 1)),
@@ -1038,10 +396,6 @@ local function build()
 		local button = Ui.button(tabs, entry[2], UDim2.new(1, -4, 0, 40), P.lavenderDeep, function()
 			section = id
 			render()
-			if id == "jobs" then
-				Net.get("Missions"):FireServer("open")
-				Net.get("Challenges"):FireServer("open")
-			end
 		end)
 		button.TextSize = 15
 		button.TextXAlignment = Enum.TextXAlignment.Left
@@ -1096,21 +450,9 @@ end
 
 -- The attributes the sections show (on the target): a change re-renders the open panel.
 local WATCHED: { [string]: boolean } = {
-	Level = true,
-	God = true,
 	AdminFly = true,
 	AdminNoclip = true,
-	AdminJump = true,
-	AdminCarBoost = true,
-	AdminHidden = true,
-	AdminOneHit = true,
-	AdminSpeed = true,
-	AdminBuddies = true,
-	AdminBuddyMode = true,
-	Estates = true,
-	Home = true,
-	CarSlots = true,
-	Plot = true, -- 8.0 SANDBOX (server/SandboxPlots.luau)
+	Plot = true, -- server/SandboxPlots.luau
 }
 
 local function watchPlayer(other: Player)
@@ -1165,67 +507,6 @@ function AdminPanel.start()
 				render(true)
 			end
 		end)
-	end)
-	workspace:GetAttributeChangedSignal("AdminFrozen"):Connect(function()
-		if section == "world" then
-			rerender()
-		end
-	end)
-	-- 6.15: EVENTS says what runs: drawn again when a live event starts or ends.
-	workspace:GetAttributeChangedSignal("LiveEvent"):Connect(function()
-		if section == "events" then
-			rerender()
-		end
-	end)
-	-- Your mission ratings (the same "state" the MISSIONS window gets), asked when the JOBS & MISSIONS tab opens.
-	Net.get("Missions").OnClientEvent:Connect(function(kind: any, state: any)
-		if kind ~= "state" or type(state) ~= "table" or type(state.progress) ~= "table" then
-			return
-		end
-		missionProgress = {}
-		for id, stars in state.progress do
-			if type(id) == "string" and type(stars) == "number" then
-				missionProgress[id] = stars
-			end
-		end
-		if section == "jobs" then
-			rerender()
-		end
-	end)
-	-- 3.1: your challenges' state (the same "state" the MISSIONS window's tabs get).
-	Net.get("Challenges").OnClientEvent:Connect(function(kind: any, state: any)
-		if kind ~= "state" or type(state) ~= "table" then
-			return
-		end
-		local function size(set: any): number
-			local n = 0
-			if type(set) == "table" then
-				for _ in set do
-					n += 1
-				end
-			end
-			return n
-		end
-		local titles: { [string]: boolean } = {}
-		if type(state.titles) == "table" then
-			for title, on in state.titles do
-				if type(title) == "string" and on then
-					titles[title] = true
-				end
-			end
-		end
-		challengeState = {
-			done = size(state.done),
-			secrets = size(state.secrets),
-			secretsTotal = tonumber(state.secretsTotal) or 0,
-			visited = size(state.visited),
-			placesTotal = tonumber(state.placesTotal) or 0,
-			title = if type(state.title) == "string" then state.title else nil,
-			titles = titles,
-		}
-		if section == "jobs" then
-			rerender()
-		end
 	end)
 	local playerGui = player:WaitForChild("PlayerGui")
 	local hud = playerGui:FindFirstChild("ZombieDeliveryHud")

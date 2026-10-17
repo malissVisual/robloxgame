@@ -209,9 +209,7 @@ Drive.notify = Hud.toast
 Sounds.notify = Hud.toast
 AdminPanel.onPerformance = PerfOverlay.toggle
 AdminPanel.performanceOn = PerfOverlay.isOn
-QuickChat.covered = function(): boolean
-	return MovingHud.isOpen() or require(Client.MoveStoryUi).isOpen()
-end
+QuickChat.covered = MovingHud.isOpen
 -- Is a sandbox window open (the warehouse's picker, 8.1's UPGRADES desk: module.isOpen, when it has one)?
 local function ownOpen(module: any): boolean
 	local isOpen = module and module.isOpen
@@ -317,7 +315,6 @@ end
 local SandboxHud = ownModule("SandboxHud")
 Net.get("State").OnClientEvent:Connect(function(state)
 	Menu.setState(state)
-	KeyHints.setState(state)
 	local setState = SandboxHud and SandboxHud.setState
 	if type(setState) == "function" then
 		pcall(setState, state)

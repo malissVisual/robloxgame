@@ -1,14 +1,13 @@
 -- 8.0 SANDBOX: the admin panel (client/AdminPanel.luau with the real shared data and shared/SandboxAdmin.luau) run for
--- real on tools/phone-ui/missions_mock.luau's recorder, three times (three copies of the module: AdminPanelOn,
--- AdminPanelOff, AdminPanelGuest; client/SandboxZones.luau recorded as M.MZones):
---   * in the sandbox world (Config.Sandbox.On): SANDBOX is the first tab and the one that opens; its groups and every
---     button of SandboxAdmin.Actions are there, each sends ("sandbox", its id, the TARGET's UserId) on the Admin
---     remote; 🔍 SHOW ZONES toggles SandboxZones (no command) and shows ON; the heading follows the target's Plot;
---     on a phone held sideways (844 × 390) the window fits the screen and every SANDBOX button fits its cell;
---   * outside it: no SANDBOX tab, the panel opens on PLAYER;
+-- real on tools/phone-ui/missions_mock.luau's recorder, twice (two copies of the module: AdminPanelOn, AdminPanelGuest;
+-- client/SandboxZones.luau recorded as M.MZones):
+--   * an admin: two tabs, SANDBOX first and the one that opens; its groups and every button of SandboxAdmin.Actions
+--     are there, each sends ("sandbox", its id, the TARGET's UserId) on the Admin remote; 🔍 SHOW ZONES toggles
+--     SandboxZones (no command) and shows ON; the heading follows the target's Plot; 10.5: OP, its FLY and NOCLIP
+--     (("fly" | "noclip", on, the TARGET)) and the PERFORMANCE overlay (AdminPanel.onPerformance, no command); on a
+--     phone held sideways (844 × 390) the window fits the screen and every SANDBOX button fits its cell;
 --   * a player who is not an admin: P does not open it, the ADMIN button stays hidden.
 local M = require("./missions_mock")
-local Config = require("./Config")
 local SandboxAdmin = require("./SandboxAdmin")
 
 local function check(name, condition, detail)
@@ -112,14 +111,20 @@ local function headings(content)
 	return list
 end
 
--- ── In the sandbox world ────────────────────────────────────────────────────
-Config.Sandbox.On = true
+-- ── An admin ────────────────────────────────────────────────────────────────
 M.player:SetAttribute("Admin", true)
 local Panel = require("./AdminPanelOn")
+local flips = 0
+Panel.onPerformance = function()
+	flips += 1
+end
+Panel.performanceOn = function()
+	return flips % 2 == 1
+end
 Panel.start()
 local gui = newestPanel()
 local tabs = tabsOf(gui)
-check("in the sandbox world SANDBOX is the first tab, before the seven others", #tabs == 8 and tabs[1].Text == "SANDBOX" and tabs[2].Text == "PLAYER", tabs[1] and tabs[1].Text)
+check("two tabs: SANDBOX first, then OP", #tabs == 2 and tabs[1].Text == "SANDBOX" and tabs[2].Text == "OP", tabs[1] and tabs[1].Text)
 pressP()
 check("P opens the panel for an admin", Panel.isOpen())
 local content = contentOf(gui)
@@ -200,24 +205,33 @@ for _, frame in content:GetChildren() do
 	end
 end
 check("844 × 390: every SANDBOX button fits its cell, every cell the content", #tight == 0 and cells == #SandboxAdmin.Actions + 1, table.concat(tight, ", "))
-check("844 × 390: the eight tabs fit the sidebar", #tabs * (40 + 6) <= window.Size.Y.Offset - 51 - 20)
-gui:Destroy()
+check("844 × 390: the two tabs fit the sidebar", #tabs * (40 + 6) <= window.Size.Y.Offset - 51 - 20)
 
--- ── Outside the sandbox world ───────────────────────────────────────────────
-Config.Sandbox.On = false
-local PanelOff = require("./AdminPanelOff")
-PanelOff.start()
-gui = newestPanel()
-tabs = tabsOf(gui)
-check("outside the sandbox world there is no SANDBOX tab", #tabs == 7 and tabs[1].Text == "PLAYER" and withText(named(gui, "Sidebar"), "SANDBOX") == nil)
-pressP()
+-- 10.5 OP: FLY and NOCLIP for the TARGET, the performance overlay (yours, no command)
+tabs[2].Activated:Fire()
 content = contentOf(gui)
-check("…and the panel opens on PLAYER", PanelOff.isOpen() and string.sub(headings(content)[1] or "", 1, 6) == "Player", headings(content)[1])
-check("…with no SANDBOX button anywhere", withText(content, "💰 +$10K") == nil and withText(content, "🔍 SHOW ZONES  ·  OFF") == nil)
+check("OP: its heading names the target", string.sub(headings(content)[1] or "", 1, 8) == "OP tools", headings(content)[1])
+for _, flag in { { "FLY", "fly", "AdminFly" }, { "NOCLIP", "noclip", "AdminNoclip" } } do
+	local button = withText(content, `{flag[1]}  ·  OFF`)
+	check(`OP: {flag[1]} is there, OFF`, button ~= nil)
+	button.Activated:Fire()
+	local last = M.lastSent("Admin")
+	check(`… it sends ("{flag[2]}", true, the TARGET)`, last ~= nil and last.args[1] == flag[2] and last.args[2] == true and last.args[3] == M.player.UserId)
+	M.player:SetAttribute(flag[3], true)
+	M.player.AttributeChanged:Fire(flag[3])
+	M.flush()
+	content = contentOf(gui)
+	check(`… and shows ON once the server set {flag[3]}`, withText(content, `{flag[1]}  ·  ON`) ~= nil)
+end
+sent = #M.sent
+withText(content, "PERFORMANCE  ·  OFF").Activated:Fire()
+content = contentOf(gui)
+check("OP: PERFORMANCE turns the overlay on (AdminPanel.onPerformance, no command) and shows ON", flips == 1 and #M.sent == sent and withText(content, "PERFORMANCE  ·  ON") ~= nil)
+check("no city tab or button anywhere (PLAYER, WORLD, GOD MODE, GIVE ALL)", withText(named(gui, "Sidebar"), "PLAYER") == nil and withText(named(gui, "Sidebar"), "WORLD") == nil
+	and withText(content, "GOD MODE  ·  OFF") == nil and withText(content, "GIVE ALL (+ $1M)") == nil)
 gui:Destroy()
 
 -- ── Not an admin ────────────────────────────────────────────────────────────
-Config.Sandbox.On = true
 M.player:SetAttribute("Admin", nil)
 local Guest = require("./AdminPanelGuest")
 Guest.start()
