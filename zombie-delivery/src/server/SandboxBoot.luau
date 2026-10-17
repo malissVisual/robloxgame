@@ -1,20 +1,15 @@
 --!strict
--- 8.0 SANDBOX: the server's boot in the owner's small test world (Config.Sandbox.On; design/sandbox/KONTRAKT.md), in
--- place of the city's: server/Main.server.luau calls SandboxBoot.start and stops there. Nothing of the city is built
--- or started: no World build, no Alps, no MapStyle, no jobs, job queue, special orders, live events, shops, clerks,
--- bandit cars, animals, traffic, buses, rentals, zip lines, estate, business, missions, challenges, tasks, shift,
--- garages, repair bays, exploring, tutorial, Earl's van, fuel, buddies, loot crates, day and night (the map sets a
--- fixed pleasant day), and no weapons (no Gun, Items, Hand or CloseCombat: every body is holstered). Those modules
--- are still required by the ones that run (Vehicles, Moving, Admin): a module whose start() is not called builds and
--- runs nothing.
+-- The server's boot (8.0 SANDBOX; 10.5: the sandbox is the game, the old city is gone): server/Main.server.luau calls
+-- SandboxBoot.start and stops there. The map sets a fixed pleasant day (server/DayNight.luau is only the lamps' day
+-- look), and there are no weapons of your own (server/Hand.luau and CloseCombat are only a run's bat's: every body is
+-- holstered).
 --
 -- What starts, in this order:
 --   * the folders the game puts things in (Cars, Zombies, Effects: World's build made them) and the map
 --     (server/SandboxWorld.luau: the ground, the roads, the house's outside, the scenery, the lighting);
 --   * 10.1's SaveSlots (the save slots: a join's save loads once the start screen picked one), PlayerData (its own saves,
---     Config.Sandbox.Store), Analytics, Vehicles, CarRighting, Zombies (Zombies.ambient
---     off: no camps, no roamers round the players; only what a move spawns), Npcs (Danny, the greeters), Admin, Crew
---     (the moves' lobby, the crew panel), Transport, KitWear, Horn, 8.5's Clipboard (Danny's clipboard: orders mode);
+--     Config.Sandbox.Store), Analytics, Vehicles, CarRighting, Zombies (only what a run spawns), Npcs (Danny), Admin,
+--     Crew (a run's party, the crew panel), Horn, 8.5's Clipboard (Danny's clipboard: orders mode);
 --   * the plots (server/SandboxPlots.luau), FurnitureMesh (the Blender furniture, before any piece is shown), 8.9.1's
 --     FixtureMesh (the Blender fixtures of the moves' houses), the collection (Collection: its payout loop) and 8.2's
 --     collection book (CollectionBook: its remote, its hook on Collection.add), the warehouses (Warehouse), 8.1's upgrades (Upgrades: its remote, the vans' engines), 8.2's
@@ -381,7 +376,6 @@ local function services()
 	safely("CarRighting", function()
 		require(Server.CarRighting).start()
 	end)
-	Zombies.ambient = false -- no camps, no roamers round the players: only what a move spawns
 	safely("Zombies", Zombies.start)
 	safely("Npcs", function()
 		require(Server.Npcs).start()
@@ -391,12 +385,6 @@ local function services()
 	end)
 	safely("Crew", function()
 		require(Server.Crew).start()
-	end)
-	safely("Transport", function()
-		require(Server.Transport).start()
-	end)
-	safely("KitWear", function()
-		require(Server.KitWear).start()
 	end)
 	safely("Horn", function()
 		require(Server.Horn).start()

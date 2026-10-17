@@ -1670,7 +1670,7 @@ local function stub(name: string, fields: { [string]: any }): any
 		error(`SandboxE2E: unmocked {name}.{tostring(key)}`, 2)
 	end })
 end
-for _, name in { "CarRighting", "Admin", "Transport", "KitWear", "Horn", "SprinterMesh", "Clipboard" } do -- (8.5: Danny's clipboard, its own test)
+for _, name in { "CarRighting", "Admin", "Horn", "SprinterMesh", "Clipboard" } do -- (8.5: Danny's clipboard, its own test)
 	E.fakes[name] = stub(name, { start = noop })
 end
 E.fakes.CourierAvatar = stub("CourierAvatar", { start = noop, setLook = noop }) -- (10.1: SaveSlots puts the slot's courier on)
