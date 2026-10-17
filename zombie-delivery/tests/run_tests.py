@@ -9,7 +9,7 @@ import glob, json, os, re, shutil, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SHARED = os.path.join(os.path.dirname(HERE), "src", "shared")
-PURE = ("Config", "ZombieKinds", "Economy", "Map", "Explore", "Roads", "Icons", "Levels", "TrafficLanes", "Crossings", "SoundSheet", "Cast", "NpcLooks", "Missions", "Challenges", "TutorialSteps", "Melee", "Boarding", "Freight", "Career", "JobRules", "Transport", "KitFit", "RiderPose", "Bag", "Deliveries", "FuelMath", "Residents", "BusLines", "Shortcuts", "RentalDocks", "ZipLines", "Gestures", "StreetProps", "InteractPose", "Armour", "Throws", "RunCycle", "Holding", "Goal", "BodyMotion", "AvatarLook", "ScooterRide", "CurbShape", "Tasks", "SoundPlan", "Style", "StyleLooks", "JobQueue", "JobThumbs", "MissionArt", "AnalyticsPlan", "RenderBudget", "Regulars", "SpecialOrders", "Readiness", "OutlinePick", "LiveEvents", "ShotFeel", "Suspension", "DriveFeel", "ZombieStyle", "CardLayout", "ShopPick", "Skills", "Inventory", "KitArt", "CarUpright", "SpawnSpot", "Gait", "MovingRules", "MoveStory", "MoveHelperBrain", "MoveRoles", "CarryGrip", "ChaletLooks", "AlpineLayout", "SandboxMap", "SandboxAdmin", "CollectionRules", "SandboxSteps", "WarehouseLayout", "SprinterLooks")
+PURE = ("Config", "ZombieKinds", "Economy", "Map", "Explore", "Roads", "Icons", "Levels", "TrafficLanes", "Crossings", "SoundSheet", "Cast", "NpcLooks", "Missions", "Challenges", "TutorialSteps", "Melee", "Boarding", "Freight", "Career", "JobRules", "Transport", "KitFit", "RiderPose", "Bag", "Deliveries", "FuelMath", "Residents", "BusLines", "Shortcuts", "RentalDocks", "ZipLines", "Gestures", "InteractPose", "Armour", "Throws", "RunCycle", "Holding", "Goal", "BodyMotion", "AvatarLook", "ScooterRide", "CurbShape", "Tasks", "SoundPlan", "Style", "StyleLooks", "JobQueue", "JobThumbs", "MissionArt", "AnalyticsPlan", "RenderBudget", "Regulars", "SpecialOrders", "Readiness", "OutlinePick", "LiveEvents", "ShotFeel", "Suspension", "DriveFeel", "ZombieStyle", "CardLayout", "ShopPick", "Skills", "Inventory", "KitArt", "CarUpright", "SpawnSpot", "Gait", "MovingRules", "MoveStory", "MoveHelperBrain", "MoveRoles", "CarryGrip", "ChaletLooks", "AlpineLayout", "SandboxMap", "SandboxAdmin", "CollectionRules", "SandboxSteps", "WarehouseLayout", "SprinterLooks")
 PURE += ("SandboxScenery",)  # 8.0 sandbox, the map (tests/sandboxworld_test.luau)
 PURE += ("PairCarry",)  # 8.1 carrying in two: the leader's steering (tests/paircarry_test.luau)
 PURE += ("UpgradeRules",)  # 8.1 sandbox, the upgrades (tests/upgrades_test.luau)
@@ -142,7 +142,6 @@ with tempfile.TemporaryDirectory() as tmp:
     for module, built in (("Moving", "MovingServer"), ("MoveHelper", "MoveHelperServer"), ("MoveLobby", "MoveLobbyServer"), ("PairHold", "PairHoldServer"), ("Loot", "LootServer"), ("RunDanger", "RunDangerServer"), ("HelperCrew", "HelperCrewServer")):
         source = open(os.path.join(os.path.dirname(SHARED), "server", module + ".luau"), encoding="utf-8").read()
         source = re.sub(r"require\(Shared\.(\w+)\)", lambda m: "E.Net" if m[1] == "Net" else f'require("./{m[1]}")', source)
-        source = source.replace("require(script.Parent.MoveSites)", 'require("./MoveSitesServer")')  # 7.0: the real one (below)
         source = re.sub(r"require\(script\.Parent\.(\w+)\)", lambda m: f'require("./{built_as[m[1]]}")' if m[1] in built_as else f"E.{m[1]}", source)
         open(os.path.join(tmp, built + ".luau"), "w", encoding="utf-8").write(head + source)
     # 8.5.1 (the owner: "Danny STILL goes through the van"): the REAL vehicle factory, server/Vehicles.luau and its art
@@ -211,15 +210,9 @@ with tempfile.TemporaryDirectory() as tmp:
     open(os.path.join(tmp, "CameraRigClient.luau"), "w", encoding="utf-8").write(
         "return function(game: any, workspace: any, script: any, require: any, Instance: any, RaycastParams: any, task: any, os: any, "
         "CFrame: any, Vector3: any, Vector2: any, Color3: any, UDim: any, UDim2: any, Enum: any)\n" + source + "\nend\n")
-    # 7.0, the moves' world: the real server/MoveSites.luau as MoveSitesServer.luau (Moving builds its board, drop-off and
-    # houses with it) on the same recorder, DayNight the recorder's nightLight; shared/MoveSiteLooks.luau (pure) for it
-    # and for tests/movesites_test.luau.
+    # shared/MoveSiteLooks.luau (pure: the dispatch kiosk's look) for tests/movesites_test.luau and the lobby's kiosk.
     looks = open(os.path.join(SHARED, "MoveSiteLooks.luau"), encoding="utf-8").read()
     open(os.path.join(tmp, "MoveSiteLooks.luau"), "w", encoding="utf-8").write(re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', looks))
-    source = open(os.path.join(os.path.dirname(SHARED), "server", "MoveSites.luau"), encoding="utf-8").read()
-    source = re.sub(r"require\(Shared\.(\w+)\)", r'require("./\1")', source)
-    source = source.replace("require(script.Parent.DayNight)", "{ nightLight = M.nightLight }")
-    open(os.path.join(tmp, "MoveSitesServer.luau"), "w", encoding="utf-8").write(head + source)
     # 8.5 Danny's clipboard (orders mode): the real server/Clipboard.luau as ClipboardServer.luau on the same fakes
     # (tests/clipboard_runtime_test.luau runs it beside the real Moving and MoveHelper), its art built by the real
     # server/ModelArt/Builder.luau (ClipboardBuilder.luau) on the same recorder, its shared modules the copies above.
