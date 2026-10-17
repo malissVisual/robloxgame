@@ -56,50 +56,25 @@ PhysicsService:CollisionGroupSetCollidable("EnemyCar", "Corpse", false)
 
 local stateRemote = Net.get("State")
 
+-- The State (the client's money line, its windows and sounds, the start screen): what the sandbox's client reads of
+-- the save. 10.5: only these (the city's garage, guns, kit, jobs, licences, shift … went with it).
 local function sendState(player: Player)
 	local profile = PlayerData.get(player)
 	if not profile then
 		return
 	end
 	stateRemote:FireClient(player, {
-		money = profile.money,
+		money = profile.money, -- (client/SandboxHud.luau, the windows' money, client/Sounds.luau)
 		cars = profile.cars,
-		car = profile.car,
-		bike = profile.bike, -- 5.1: your bike of choice (the BIKES counter, the phone's MY BIKE)
-		lastCar = profile.lastCar, -- 5.1: the car the phone's CALL CAR brings back
-		weapons = profile.weapons,
-		weapon = profile.weapon,
-		upgrades = profile.upgrades,
-		carUpgrades = profile.carUpgrades, -- 3.3: the car tracks per car (the garage shows the equipped car's)
-		carHealth = profile.carHealth, -- 3.4: every parked car's share of health (the I window's cars tab)
-		carGear = profile.carGear, -- 4.6: every car's gear, "owned" or "installed" (Wrench Garage's GEAR tab)
-		items = profile.items,
-		paints = profile.paints,
-		carPaint = profile.carPaint,
-		carGuns = profile.carGuns,
-		rep = profile.rep,
-		deliveries = profile.deliveries,
+		car = profile.car, -- (the van: SandboxBoot's ownVan keeps it the save's one car)
+		xp = profile.xp, -- (client/Sounds.luau's level-up)
+		deliveries = profile.deliveries, -- (the start screen's line, client/Menu.luau)
 		kills = profile.kills,
-		xp = profile.xp,
-		streak = profile.streak, -- 4.7: good jobs in a row (the board, the CAREER window; 6.14: the HUD's ON A ROLL chip)
-		shift = require(Server.Shift).view(player), -- 6.14: this session's shift (the HUD's SHIFT chip, client/GrindChips)
-		licences = profile.licences, -- 4.7: the licences held (tier → true)
-		licenceJobs = profile.licenceJobs, -- 4.7: good jobs counted toward each licence
-		-- 5.0: the personal gear owned (Config.Kit ids → true; shared/Transport.luau). 6.23: with the bags bought this
-		-- game (PlayerData.kitNow: profile.kit + profile.bags), and those bags alone as `bags`
-		kit = PlayerData.kitNow(profile),
-		bags = profile.bags, -- 6.23: the bags bought this game (never saved)
-		-- 6.4: the bag in your hand (the server's answer: the choice, else the best one; nil without a bag)
-		bag = (require(Shared.Transport).activeBag(profile.bags, profile.activeBag) or ({} :: any)).id,
-		style = profile.style, -- 6.12: the cosmetics owned and worn (the phone's STYLE app)
-		regulars = profile.regulars, -- 6.14: the deliveries for each business (the REGULARS app, the job lists' badges)
-		skills = profile.skills, -- 6.20: the skills' ranks (CAREER's SKILLS tab; the points are the level's)
-		phone = profile.phone, -- 5.0: Marge gave the phone (client/Phone.luau shows it)
 	})
 end
 
--- 4.2: the whole profile goes at most every 0.15 s per player. Every kill's money fires Changed, and a horde fight
--- sent the full state many times a second; the burst now goes as one, the last state always arrives.
+-- 4.2: the State goes at most every 0.15 s per player. Every kill's money fires Changed, and a horde fight sent it
+-- many times a second; the burst now goes as one, the last state always arrives.
 local queueState: (Player) -> ()
 do
 	local sentAt: { [Player]: number } = {}
