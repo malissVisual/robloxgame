@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "10.0"
+Config.Version = "10.2"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -3391,11 +3391,104 @@ Config.Shortcuts = {
 }
 
 -- Crews (server/Crew.luau): invite another player into your job (they ride along or follow, share the pay).
+-- 10.1 THE HELPERS' CREW (the owner: "you'll be able to get different employees who can do something different. There
+-- don't have to be many, but Danny will be the base, so I'd cancel having to buy him. Because you'll have to get them
+-- somehow. And maybe when one dies, then … something"): the same table holds the NPC helpers a player has (the rules
+-- shared/CrewRules.luau, tests/crewrules_test.luau; the server server/HelperCrew.luau with its hooks in
+-- server/MoveHelper.luau; the CREW window and the down ring client/CrewUi.luau). Danny is free and everybody's from the
+-- start; the others are rescued in runs. One of them (the run host's pick) comes into a run as its MoveHelper.
+--   Order      the kinds in the CREW window's order (Default first: Danny)
+--   Default    the helper everybody has from the start and who comes when nothing else is picked
+--   Kinds      each kind: Name, Role (the name tag's "<Role> · ZDC Moving", the window's line), Icon, She (her words),
+--              Ability (the window's words), Speed (× the helper's walk: Config.MoveHelper.Speed × Walk), Health,
+--              Carry (Hand: one-hand pieces; Both: the heaviest two-hands piece by its weight 1 … 10, 0 none; Pair:
+--              "with" lifts a piece for two with you, "alone" carries it alone too, false never), Solo (× his carry's
+--              drag when he carries a piece for two alone), Guard (Gus: Damage a hit, Reach studs, Every s between hits,
+--              Range studs round him or his boss he goes after a zombie in, Leash studs from his boss at most, Follow
+--              studs he walks behind his boss), Sense (Lucy: studs the party sees Epic and Legendary loot through walls
+--              in; the players' and the run's inside attribute CrewSense), Look (shared/NpcLooks.luau's Look over the
+--              mover's: shirt, pants, hat, hatColor, apron, vest, shortSleeves, boots, shoes), Hello (his first words of
+--              a move), Freed (his words when the party unties him), Up (his words when revived)
+--   Rescue     a run's trapped helper: Chance (a run's odds of one, by its difficulty), Hold (s E is held to untie him),
+--              Reach (the prompt's studs), Bonus (the money each party player who has him already gets instead, by the
+--              difficulty), Away (studs from the house's way in the chair stands at least), Help (s between his
+--              "Help!" while a party player is within Call studs), Follow (the freed one walks after the party: Near
+--              studs he stops at, Far studs or another world and he is put by them, Every s between his looks, Speed)
+--   Down       a helper at 0 health in a run: Seconds to revive him (hold E for Revive s within Reach studs), up again
+--              with Health × his full health; nobody did: out of the run and to hospital
+--   Hospital   Seconds out of the crew after a run's out (the save's crew.hospital: os.time() until); discharging him
+--              early costs Base + PerMinute × the minutes left, to Round dollars
+--   Lobby      your picked helper waits at your warehouse: Stand (studs across and out from its door), Reach (the
+--              "Crew" prompt's studs: it opens the CREW window), Every (s between the server's looks at the stands)
+--   Window     the CREW window (client/CrewUi.luau): Width (px at scale 1), Row (a helper's row's height), TouchScale
+--   Ring       the down ring over a helper (client/CrewUi.luau): Size (px), Range (studs it shows within), Every (s)
+--   Flag       the save's mark: profile.crew is read only from a real save written with it
+-- The Crew remote (Config.Robust.Limits.Crew): client → server { kind = "state" } | { kind = "pick", id } |
+-- { kind = "discharge", id }; server → client { kind = "state", rows, pick, comes, money } | { kind = "open" }.
+export type CrewKind = {
+	Name: string,
+	Role: string,
+	Icon: string,
+	She: boolean,
+	Ability: string,
+	Speed: number,
+	Health: number,
+	Carry: { Hand: boolean, Both: number, Pair: string | boolean },
+	Solo: number,
+	Sense: number,
+	Guard: { Damage: number, Reach: number, Every: number, Range: number, Leash: number, Follow: number }?,
+	Look: { [string]: any },
+	Hello: string,
+	Freed: string,
+	Up: string,
+}
 Config.Crew = {
 	MaxMembers = 3,
 	InviteRange = 60, -- studs to the player you invite (or use the crew button from anywhere)
 	InviteTimeout = 30,
 	RiderRange = 250, -- a rider who got out stays on the owner's job (paid, credited) within this of the owner
+	-- 10.1 the helpers' crew (see above)
+	Order = { "danny", "bruno", "zip", "gus", "lucy" } :: { string },
+	Default = "danny",
+	Kinds = {
+		danny = { Name = "Danny", Role = "Mover", Icon = "🧑‍🔧", She = false, Ability = "Carries what you give him; lifts the heavy pieces with you",
+			Speed = 1, Health = 100, Carry = { Hand = true, Both = 10, Pair = "with" }, Solo = 1, Sense = 0,
+			Look = { shirt = { 230, 120, 40 }, pants = { 60, 60, 70 }, hat = "cap", hatColor = { 230, 120, 40 }, shortSleeves = true, boots = true },
+			Hello = "Danny from Deliveros. Where do we start, boss?", Freed = "Thanks, boss!", Up = "Thanks! Back on my feet!" },
+		bruno = { Name = "Bruno", Role = "Strong", Icon = "💪", She = false, Ability = "Carries two-person pieces alone, slowly",
+			Speed = 0.9, Health = 160, Carry = { Hand = true, Both = 10, Pair = "alone" }, Solo = 1.6, Sense = 0,
+			Look = { shirt = { 158, 42, 40 }, pants = { 46, 46, 52 }, hat = "beanie", hatColor = { 36, 36, 40 }, apron = { 112, 76, 46 }, shortSleeves = true, boots = true },
+			Hello = "Bruno here. Point me at the heavy stuff.", Freed = "Finally! I'm Bruno - leave the heavy stuff to me.", Up = "Takes more than that to stop Bruno!" },
+		zip = { Name = "Zip", Role = "Quick", Icon = "⚡", She = false, Ability = "Fast with one-hand and small pieces; no heavy or two-person ones",
+			Speed = 1.4, Health = 80, Carry = { Hand = true, Both = 3, Pair = false }, Solo = 1, Sense = 0,
+			Look = { shirt = { 250, 204, 48 }, pants = { 52, 92, 160 }, hat = "cap", hatColor = { 40, 170, 230 }, shortSleeves = true, boots = false, shoes = { 240, 240, 240 } },
+			Hello = "Zip's here! Small stuff? I'm on it!", Freed = "Woo, free! I'm Zip - I'll run the small stuff out for you!", Up = "Okay, okay, I'm up!" },
+		gus = { Name = "Gus", Role = "Guard", Icon = "🛡", She = false, Ability = "Carries nothing: walks with you and fights the zombies",
+			Speed = 1.1, Health = 220, Carry = { Hand = false, Both = 0, Pair = false }, Solo = 1, Sense = 0,
+			Guard = { Damage = 30, Reach = 5, Every = 0.9, Range = 36, Leash = 45, Follow = 7 },
+			Look = { shirt = { 70, 84, 62 }, pants = { 50, 56, 46 }, hat = "helmet", hatColor = { 64, 74, 56 }, vest = { 38, 42, 38 }, boots = true, shoes = { 30, 28, 26 } },
+			Hello = "Gus. Stay close - I've got your back.", Freed = "Thanks. Name's Gus. Nothing gets past me now.", Up = "I'm good. Where are they?" },
+		lucy = { Name = "Lucy", Role = "Finder", Icon = "🔍", She = true, Ability = "Carries small pieces; shows the party Epic and Legendary loot through walls",
+			Speed = 1.1, Health = 90, Carry = { Hand = true, Both = 2, Pair = false }, Solo = 1, Sense = 160,
+			Look = { shirt = { 120, 84, 176 }, pants = { 48, 50, 62 }, hat = "beanie", hatColor = { 214, 70, 140 }, apron = { 214, 186, 120 }, shortSleeves = true },
+			Hello = "Lucy here. I can smell the good stuff from here!", Freed = "You found me! I'm Lucy - I'll find the treasures for you.", Up = "Phew! Thank you!" },
+	} :: { [string]: CrewKind },
+	Rescue = {
+		Chance = { easy = 0.15, normal = 0.25, hard = 0.4, insane = 0.5, nightmare = 0.65 } :: { [string]: number },
+		Hold = 3,
+		Reach = 8,
+		Bonus = { easy = 150, normal = 250, hard = 400, insane = 600, nightmare = 900 } :: { [string]: number },
+		Away = 12,
+		Help = 9,
+		Call = 45,
+		Follow = { Near = 6, Far = 70, Every = 0.25, Speed = 14 },
+	},
+	Down = { Seconds = 15, Revive = 3, Reach = 8, Health = 0.5 },
+	Hospital = { Seconds = 240, Base = 50, PerMinute = 50, Round = 10 },
+	Lobby = { Stand = { 16, 9 } :: { number }, Reach = 10, Every = 1 },
+	Window = { Width = 680, Row = 78, TouchScale = 0.78 },
+	Ring = { Size = 92, Range = 90, Every = 0.2 },
+	Flag = "crewKept",
 }
 
 -- 4.5: the admin's test buddies (server/Buddy.luau, shared/BuddyBrain.luau): NPC couriers that follow their owner on
@@ -5698,7 +5791,7 @@ Config.Robust = {
 		SandboxTasks = 4, -- 8.2: the SandboxTasks remote's state / claim (server/SandboxTasks.luau)
 		Auction = 4, -- 8.8: the Auction remote's state / consign / withdraw (the server's step: design/auction/PLAN.md)
 		AuctionBid = 3, -- 8.8: and its bids (one step a tap)
-		MoveHelper = 4, -- 8.3: Danny's HIRE, CLEAR QUEUE and STOP (the Moving remote's "helper": server/MoveHelper.luau)
+		MoveHelper = 4, -- 8.3: Danny's CLEAR QUEUE and STOP (the Moving remote's "helper": server/MoveHelper.luau; 10.1 no HIRE)
 		MoveHelperAssign = 5, -- 8.3: a piece clicked into (or out of) Danny's list (the Moving remote's ("helper", "assign"))
 		Clipboard = 4, -- 8.5: Danny's clipboard out or away (the Clipboard remote: server/Clipboard.luau)
 		MoveHelperOrder = 3, -- 8.6: an order to Danny, PUT IT DOWN / GET OUT (the Moving remote's ("helper", "putdown" | "getout"))
@@ -5708,6 +5801,7 @@ Config.Robust = {
 		TradeOffer = 0.2, -- 8.7: and a new offer to a player on top: one every 5 s at most (no offer spam)
 		Slots = 4, -- 10.1: the Slots remote's list / play / new (the start screen's save slots: server/SaveSlots.luau)
 		Runs = 4, -- 9.7: the Runs remote's state / difficulty / vote / leave (a run's pad and the run: server/Runs.luau)
+		Crew = 4, -- 10.1: the Crew remote's state / pick / discharge (the CREW window: server/HelperCrew.luau)
 	},
 }
 
@@ -6854,11 +6948,14 @@ Config.MoveStory = {
 -- carries with you. 8.3 for hire (the owner: "I have to PAY for him when I want help … you click on something, and that
 -- assigns it to him, and the rest you carry yourself"; "he must sit in my car with me"): he waits by the van until a
 -- crew player hires him for the move (Hire), then carries the pieces the crew clicks (Queue) to the van, lifts the
--- two-person ones with you and rides in the van's passenger seat.
---   Solo / Duo         a crew of one / of two players has him by the van for hire (Duo: off); once hired he stays with
---                      any crew until the move ends (or his hirer leaves it)
---   Name / Title       his name tag
---   Health / Respawn   his health; at 0 he drops what he holds and is back at the van Respawn s later
+-- two-person ones with you and rides in the van's passenger seat. 10.1 (Config.Crew): no hire any more: he is free and
+-- every player's from the start, with every run's party (its host's pick of their crew comes, Danny or one of
+-- the helpers rescued in runs, each a MoveHelper of his own kind: shared/CrewRules.luau, server/HelperCrew.luau).
+--   Solo / Duo         the city's moves (Config.Sandbox.On false): a crew of one / of two players has him (Duo: off); 10.1
+--                      the sandbox's runs: every party has its host's helper; once with a move he stays with any crew
+--   Name / Title       his name tag (10.1: Danny's; the crew's kinds have their own names, the title "<Role> · Title")
+--   Health / Respawn   his health; at 0 he drops what he holds and is back at the van Respawn s later (10.1: in a run he
+--                      goes down instead: Config.Crew.Down, revived by the party or out to hospital)
 --   Speed              × the walk (Config.Movement.Walk), and × the carry's (MovingRules.speedFactor) with a piece:
 --                      slower than a player; Sprint: × the walk on his way to your lift (8.3: and to the van's seat)
 --   KeepUp / Flee      × the pair's carry speed (his speed's word for "with you"); × the walk running away
@@ -7030,17 +7127,12 @@ Config.MoveStory = {
 --                      the last resort, he fades over (a door's own walk-through is not a fade-over)
 --   CallLeave / CallIdle   your call ends when you walk CallLeave studs past the Lift's reach, or he stood ready
 --                      CallIdle s and you never lifted (Lift again, G or the STOP button end it too)
---   8.3 for hire (shared/MoveHelperBrain.luau's hirePrice, hireCheck, assignCheck, nextQueued, pickSeat, getOut;
---   server/MoveHelper.luau's hire, list and ride; client/MoveHelperCard.luau his card and the clicks on the pieces;
---   the rate limits Config.Robust.Limits.MoveHelper (HIRE, CLEAR QUEUE, STOP) and MoveHelperAssign (a piece clicked)):
---   Hire               the hire, for one move, paid by the crew player who hires him (PlayerData.spend, the analytics
---                      reason HelperHire): Base + PerPiece × the house's pieces (the bigger the house, the more he
---                      saves you), to Round dollars, Min … Max. The tuning: the sandbox starts you with $500 and a
---                      first haul on show earns about $40 – 50 a minute (8.3 economy), so the Old Farmstead's big
---                      house (36 – 43 pieces: $230 – 270) is a real choice on the first move and five or six minutes of
---                      the warehouse's income later; a smaller house (20 or so pieces: about $150) costs less, Max at
---                      most. Danny's training (Config.SandboxUpgrades danny) makes him faster, not cheaper. No
---                      refund: a hire lasts the move (CLEAR QUEUE stops him working; nothing more is charged)
+--   8.3 his list (shared/MoveHelperBrain.luau's assignCheck, nextQueued, pickSeat, getOut; server/MoveHelper.luau's list
+--   and ride; client/MoveHelperCard.luau his card and the clicks on the pieces; the rate limits
+--   Config.Robust.Limits.MoveHelper (CLEAR QUEUE, STOP) and MoveHelperAssign (a piece clicked)). 10.1: no hire any more
+--   (8.3 – 10.0 he cost $100 – 400 a move, Hire): Danny is free and every player's from the start, and the run host's
+--   pick of their crew comes into a run instead of him (Config.Crew: Bruno, Zip, Gus, Lucy, each a MoveHelper with
+--   his own carry, speed and look)
 --   Queue              the pieces on his list at most (a click on one more: "his list is full"); he carries them in
 --                      the order they were clicked, the rest is yours
 --   RideReach          studs from his spot at the van's passenger door (RideStand) where he starts getting in (your seat
@@ -7211,8 +7303,7 @@ Config.MoveHelper = {
 	CallBlink = 15,
 	CallLeave = 4,
 	CallIdle = 25,
-	-- 8.3 for hire
-	Hire = { Base = 50, PerPiece = 5, Round = 10, Min = 100, Max = 400 },
+	-- 8.3 his list (10.1: no hire, Config.Crew)
 	Queue = 6,
 	RideReach = 1.2,
 	RideStand = 2.8, -- 8.5 getting in like a player
@@ -7513,8 +7604,63 @@ Config.Collection = {
 -- The Runs remote (Config.Robust.Limits.Runs): client → server { kind = "state" } | { kind = "difficulty", id } (the
 -- host on the pad) | { kind = "vote" } (to finish) | { kind = "leave" } (out of your run alone); server → client
 -- { kind = "pad", ... } | { kind = "pad" } (off a pad), { kind = "run", ... } | { kind = "run" } (not in a run),
--- { kind = "result", ... } (the results card), { kind = "unlocked", id } (a difficulty opened).
+-- { kind = "result", ... } (the results card), { kind = "unlocked", id } (a difficulty opened). 10.x danger: server →
+-- client { kind = "danger", ... } (the run's keys, vault, zombies and its events: client/RunDangerUi.luau).
+-- 10.x DANGER (the owner: "both: on the easier difficulties only a timer and traps, on the harder ones zombies too ... it
+-- has to be designed to be fun"; the pure rules shared/DangerRules.luau, tests/danger_test.luau; the server
+-- server/RunDanger.luau, tests/danger_runtime_test.luau; the HUD client/RunDangerUi.luau):
+--   Danger         per difficulty id: Locks (inside doorways locked, each its key hidden in a searchable piece of a room
+--                  you can get to first), Vault (the vault's pieces: 0 none; its gold key hidden like the others, deeper
+--                  when it can be), Legendary (the chance a vault piece comes Legendary, else Vault.Floor), Creak /
+--                  Puddle / Plaster (the hazards of each kind at most: as many as the house has open floor for), Harm (×
+--                  a creak's knock and the plaster's damage), Inside / Yard (zombies in the house and in its yard from the
+--                  start), Wave (zombies in the yard once Zombies.WaveAt of the clock is gone, marching at the door, "A
+--                  horde is coming!"), Speed (× their speed), Boss (the boss by the vault), Weapon (every party member
+--                  gets the run's bat: Weapon), Kinds (the zombies' kinds' weights: Config.Zombies' kinds)
+--   Locks          Hold, Reach: the locked door's Unlock prompt; Lift: tiers a locked room's pieces come up (server/
+--                  Loot.luau boost); Swing s, Open degrees: the leaf swinging open; its colours (RGB)
+--   Search         a searchable piece's Search prompt (F, the gamepad's Y): Hold s, Reach studs; Items: the pieces that
+--                  are searched (things with drawers, doors, lids or cushions; never a collectible)
+--   Rooms          a room id's name (a key's: "Bedroom key")
+--   Vault          the vault: a steel and glass case round each of its pieces (Margin studs out, Lid over its top), its
+--                  Open prompt (Hold, Reach) at the case's lock; Floor: the least rarity of its pieces; Entry: × a piece's
+--                  chance of the vault in a room you come in by (the vault deeper in the house); Sink s: the case
+--                  sinking away when it opens; its colours
+--   Hazard         Every s between two looks at the party's feet; Grid, Radius: the planning grid's cells and a body's
+--                  room (shared/HouseRoute.luau); Tries per hazard; Gap studs: from a doorway, a piece, the way in, each
+--                  other, the walls, a fixture; Reach: a piece's reach kept walkable. Creak: a cracked patch of boards
+--                  (Size studs): carrying over it you stumble and drop the piece (Knock: as hp of a bite,
+--                  MovingRules.hitDamage: a fragile piece takes more); Rearm s per player. Puddle: you slide Slide studs /
+--                  s along your walk (the Knock remote); Danny walks round both. Plaster: a cracked ceiling patch over a
+--                  dusty floor (Size); a player within Trigger studs starts it: it shakes Warn s, then drops (Damage on
+--                  everybody under it, × Harm), Rearm s to the next
+--   Zombies        Aggro / YardAggro: studs a zombie in the house / in the yard notices you at while calm (Config.Horde
+--                  .Roam.aggro elsewhere: the yard's under its YardAway, so the party arrives unseen); Away / YardAway /
+--                  Truck / Edge: studs a new zombie keeps from the players (and the way in) / the yard's players and
+--                  the arrival / the truck / the zone's edge; Tries; Grid, Radius: their way inside (HouseRoute);
+--                  Steer, Again: a new way every Steer s at most or when its goal moved Again studs; Block s: the pieces
+--                  standing looked at again; WaveAt (of the clock), WaveFar (studs from the door at least); Boss: its
+--                  kind, name (over its head), Health, Scale, Guard (studs round the vault it keeps to while calm)
+--   Weapon         the run's melee weapon: Kind (Config.Melee.Kinds: server/CloseCombat.luau swings it), Name (its Tool)
+--   DangerHud      client/RunDangerUi.luau: Width px, Event s a line shows, Banner s the horde's banner, Every s, Hint
+--                  studs (⚠ a hazard near), TouchScale (the banner's least scale on a phone)
 export type RunDifficulty = { id: string, name: string, time: number, color: { number } }
+export type RunDanger = {
+	Locks: number,
+	Vault: number,
+	Legendary: number,
+	Creak: number,
+	Puddle: number,
+	Plaster: number,
+	Harm: number,
+	Inside: number,
+	Yard: number,
+	Wave: number,
+	Speed: number,
+	Boss: boolean,
+	Weapon: boolean,
+	Kinds: { [string]: number },
+}
 Config.Runs = {
 	Difficulties = {
 		{ id = "easy", name = "Easy", time = 1.3, color = { 120, 214, 120 } },
@@ -7553,6 +7699,59 @@ Config.Runs = {
 	},
 	Panel = { Width = 380, TouchScale = 0.8 },
 	Result = { Width = 420, Rows = 8, TouchScale = 0.8 },
+	-- 10.x DANGER (the block above Config.Runs): per difficulty, what a run's house holds besides the loot
+	Danger = {
+		easy = { Locks = 1, Vault = 0, Legendary = 0, Creak = 2, Puddle = 1, Plaster = 0, Harm = 1, Inside = 0, Yard = 0, Wave = 0, Speed = 1, Boss = false, Weapon = false, Kinds = {} },
+		normal = { Locks = 1, Vault = 1, Legendary = 0, Creak = 2, Puddle = 2, Plaster = 1, Harm = 1.15, Inside = 0, Yard = 0, Wave = 0, Speed = 1, Boss = false, Weapon = false, Kinds = {} },
+		hard = { Locks = 2, Vault = 1, Legendary = 0, Creak = 3, Puddle = 2, Plaster = 2, Harm = 1.3, Inside = 3, Yard = 3, Wave = 0, Speed = 1, Boss = false, Weapon = true, Kinds = { walker = 1 } },
+		insane = { Locks = 2, Vault = 2, Legendary = 0, Creak = 3, Puddle = 3, Plaster = 3, Harm = 1.45, Inside = 5, Yard = 4, Wave = 8, Speed = 1.2, Boss = false, Weapon = true,
+			Kinds = { walker = 0.65, runner = 0.25, bloater = 0.1 } },
+		nightmare = { Locks = 2, Vault = 2, Legendary = 0.35, Creak = 4, Puddle = 3, Plaster = 4, Harm = 1.6, Inside = 7, Yard = 6, Wave = 12, Speed = 1.3, Boss = true, Weapon = true,
+			Kinds = { walker = 0.5, runner = 0.25, brute = 0.15, bloater = 0.1 } },
+	} :: { [string]: RunDanger },
+	Locks = { Hold = 0.5, Reach = 8, Lift = 1, Swing = 0.7, Open = 100, Leaf = { 104, 70, 44 } :: { number }, Iron = { 58, 58, 64 } :: { number }, Brass = { 214, 170, 70 } :: { number } },
+	Search = {
+		Hold = 1,
+		Reach = 7,
+		Items = { "wardrobe", "dresser", "nightstand", "desk", "toy_box", "shoe_cabinet", "toolbox", "tool_chest", "bookshelf", "painted_cupboard", "carved_chest",
+			"tackle_box", "cool_box", "gun_cabinet", "plate_dresser", "jam_shelf", "grain_crate", "fridge", "box", "dishes_box", "laundry_basket", "coal_scuttle",
+			"log_basket", "boot_rack", "sofa", "armchair", "heart_chair", "bed", "kids_bed", "bunk_bed", "flour_sacks", "feed_sacks", "fruit_crates", "apple_crate" } :: { string },
+	},
+	Rooms = {
+		hall = "Hall", corridor = "Corridor", living = "Living Room", kitchen = "Kitchen", bedroom = "Bedroom", kids = "Kids' Room", bath = "Bathroom",
+		garage = "Garage", guest = "Guest Room", study = "Study", main = "Main Room", bunks = "Bunk Room", store = "Store", gunroom = "Gun Room",
+		workroom = "Workroom", millers = "Miller's Room",
+	} :: { [string]: string },
+	Vault = { Hold = 1, Reach = 8, Floor = "epic", Entry = 0.5, Margin = 0.4, Lid = 0.6, Sink = 0.8, Steel = { 70, 74, 82 } :: { number }, Glass = { 170, 214, 236 } :: { number }, Gold = { 255, 196, 60 } :: { number } },
+	Hazard = {
+		Every = 0.1,
+		Grid = 1,
+		Radius = 1.25,
+		Tries = 40,
+		Gap = { Door = 4, Piece = 2.5, Entry = 9, Each = 3, Wall = 1.5, Fixture = 1, Reach = 3 },
+		Creak = { Size = { 4, 4 } :: { number }, Knock = 20, Rearm = 2.5, Color = { 96, 66, 42 } :: { number }, Crack = { 34, 24, 18 } :: { number } },
+		Puddle = { Size = { 5, 3.5 } :: { number }, Slide = 24, Rearm = 1.2, Color = { 120, 172, 204 } :: { number } },
+		Plaster = { Size = { 5, 5 } :: { number }, Trigger = 5, Warn = 1.3, Damage = 12, Rearm = 10, Chunk = { 3, 0.6, 3 } :: { number }, Color = { 222, 216, 202 } :: { number } },
+	},
+	Zombies = {
+		Aggro = 30,
+		YardAggro = 32,
+		Away = 16,
+		YardAway = 36,
+		Truck = 14,
+		Edge = 8,
+		Tries = 40,
+		Grid = 1,
+		Radius = 1,
+		Steer = 0.6,
+		Again = 3,
+		Block = 2,
+		WaveAt = 0.5,
+		WaveFar = 45,
+		Boss = { Kind = "brute", Name = "THE LANDLORD", Health = 420, Scale = 1.35, Guard = 12, Color = { 220, 70, 90 } :: { number } },
+	},
+	Weapon = { Kind = "bat", Name = "Bat" },
+	DangerHud = { Width = 360, Event = 4, Banner = 3.2, Every = 0.2, Hint = 10, TouchScale = 0.8 },
 }
 
 -- 9.x LOOT (the owner: "like Dungeon Quest: you go into a house and you get loot there ... outlines with their own colour
@@ -7662,7 +7861,7 @@ Config.Loot = {
 --   SoftSeconds   s a soft step shows before it counts as done (said long enough)
 --   SoftGap       s after a soft step ended (done, dismissed, covered) before the next one may show
 --   PaintMoney    $ from which the PAINT shop's step may show (else once a warehouse level is bought)
---   8.4, Danny for hire's steps (hire him, give him a piece, a heavy piece: SandboxSteps.Danny; said once as a soft step):
+--   8.4, Danny's steps (give him a piece, a heavy piece: SandboxSteps.Danny; said once as a soft step; 10.1 no hire):
 --   HeavyNear     studs: a two-person piece of your move this near you (its Lift shown) says "press Lift and wait for
 --                 Danny" (looked for at most once a second, only while that step may still show)
 --   8.9, trading between players' step ("🏷 Sell to players: set a price on a piece on show", the last soft step):
@@ -8089,6 +8288,111 @@ Config.SandboxLeaders = {
 		Range = 260,
 	},
 	AllTime = { On = true, Store = "Sandbox_TopCollection", Every = 120, Studio = false },
+}
+
+-- 10.x THE MAP (the owner: "I need you to add a way to look at the map"): the sandbox's big map and its minimap
+-- (client/SandboxMapUi.luau, client/SandboxMiniMap.luau, drawn by client/SandboxMapDraw.luau from what
+-- client/SandboxMapData.luau reads of the world; the pure rules shared/SandboxMapRules.luau, tests/sandboxmaprules_test.luau).
+-- In the lobby a plan of it from SandboxMap.Lobby (the plaza, the hedge, the plots and your warehouse, the shops and
+-- desks, the six portals with their live state, the players, you); in a run the house's floor plan (its interior's
+-- MapPlan: server/HouseInterior.luau) over a strip of its front yard with the truck, who is where, the loot under fog
+-- and the danger markers (the CollectionService tags Danger: none there, none drawn).
+--   Key / Button   M opens and closes it; the gamepad's Button (on foot: L2 is the brake only in a seat; the D-pad is
+--                  the HUD's three chips', Select Roblox's): SandboxPad.chip("map"); a touch screen's 🗺 MAP chip
+--   Every          s between two looks at the markers while the big map is open (its plan is drawn once an open)
+--   Window         the window: Width × Height px at its scale (a computer: the HUD's, at least LeastScale; a touch
+--                  screen: TouchScale), Margin (TouchMargin) px to the screen's edge, Header px, a side column Side
+--                  (TouchSide) px when the map keeps most of the window, Pad px
+--   Text           px at scale 1: Title, Label, Small; never under Least (a phone's too)
+--   Inside / Below / Above   studs: a point is in a run's house within its box + Inside, from Below under its floor
+--                  to Above over its ceiling
+--   Yard           the strip of the front yard under the plan: Depth studs past the truck's far end (Truck studs long),
+--                  Half studs each side of the door at least (the plan's width when wider)
+--   Fog            a piece shows once you saw it: within See studs of your eyes (Eye studs over your root), no wall in
+--                  between (a ray against the house's shell), looked at every Every s, Most pieces a look at most (the
+--                  nearest first); it stays until carried out (in the truck, home or lost)
+--   Pulse          the uncarried pieces of From's tier and up pulse (Seconds a beat)
+--   Zombies        studs: the zombies within this of you show (a run's), the others not
+--   Names          most names on a portal's line before "+n" (the side column's HOUSES); MapNames on the map, where a
+--                  portal's line keeps LineEm × its text size px (its words cut at their end past it) on a lobby drawn
+--                  at LongScale px a stud or more; a smaller one's (a phone's) says only its state (FREE, STARTING IN 7,
+--                  IN USE · HARD): its labels would cover each other, the side column says who
+--   Mini           the minimap in a run (its plan, you, your party, the loot you saw near you): Size px at the HUD's
+--                  scale (a computer: the bottom right corner), TouchSize px on a touch screen (its top right), shrunk by
+--                  Step to Least to keep clear of the HUD (else none); Scale px a stud (TouchScale on a touch screen);
+--                  Margin px to the edges (Top px under Roblox's top bar on a touch screen); Every s a look; hidden with
+--                  the HUD, under a window and during a grip check
+--   Danger         the tags another worker's runs put on the house's dangers (none: nothing drawn): their icon; RunLock
+--                  (a locked doorway: its attribute Open), RunKey, RunVault (Open), RunHazard (its Kind: Hazards), RunRescue
+--   Colors         { r, g, b } of the drawing
+Config.SandboxMapUi = {
+	Key = "M",
+	Button = "ButtonL2",
+	Every = 0.2,
+	Window = { Width = 1180, Height = 760, Margin = 24, TouchMargin = 8, Header = 44, Side = 260, TouchSide = 200, Pad = 10, TouchScale = 0.9, LeastScale = 0.8 },
+	Text = { Title = 18, Label = 13, Small = 12, Least = 11 },
+	Inside = 4,
+	Below = 6,
+	Above = 8,
+	Yard = { Depth = 6, Truck = 22, Half = 20 },
+	Fog = { See = 40, Eye = 1.5, Every = 0.25, Most = 16 },
+	Pulse = { From = "epic", Seconds = 0.7 },
+	Zombies = 60,
+	Names = 3,
+	MapNames = 2,
+	LineEm = 17,
+	LongScale = 1.2,
+	Mini = { Size = 190, TouchSize = 140, Least = 96, Step = 8, Scale = 2.4, TouchScale = 2, Margin = 16, Top = 8, Every = 0.15 },
+	Danger = {
+		RunLock = { icon = "🔒", open = "🔓", name = "LOCKED DOOR" },
+		RunKey = { icon = "🔑", name = "KEY" },
+		RunVault = { icon = "🏦", open = "💰", name = "VAULT" },
+		RunHazard = { icon = "⚠", name = "HAZARD" },
+		RunRescue = { icon = "🆘", name = "TRAPPED HELPER" },
+	} :: { [string]: { icon: string, open: string?, name: string } },
+	Hazards = { fire = "🔥", gas = "☣", electric = "⚡", spark = "⚡", water = "💧", flood = "💧", hole = "🕳", spikes = "⚠", trap = "⚠", zombie = "🧟" } :: { [string]: string },
+	Colors = {
+		Back = { 16, 19, 23 },
+		Meadow = { 74, 112, 62 },
+		Hedge = { 38, 70, 34 },
+		Plaza = { 178, 170, 156 },
+		Water = { 76, 140, 190 },
+		Tree = { 54, 96, 48 },
+		Lamp = { 240, 232, 200 },
+		Plot = { 122, 124, 122 },
+		Warehouse = { 86, 92, 100 },
+		Yours = { 255, 206, 92 },
+		Desk = { 228, 170, 82 },
+		Paint = { 214, 72, 120 },
+		Leaders = { 226, 196, 92 },
+		Dispatch = { 215, 74, 70 },
+		Auction = { 150, 112, 200 },
+		Wall = { 40, 44, 52 },
+		Floor = { 198, 186, 164 },
+		Fixture = { 112, 104, 94 },
+		Door = { 226, 216, 196 },
+		Exit = { 126, 196, 120 },
+		Glass = { 150, 190, 220 },
+		Grass = { 84, 120, 70 },
+		Road = { 86, 90, 96 },
+		Truck = { 242, 242, 240 },
+		You = { 255, 255, 255 },
+		Party = { 255, 210, 90 },
+		Player = { 140, 200, 255 },
+		Helper = { 240, 132, 44 },
+		Zombie = { 215, 74, 70 },
+	} :: { [string]: { number } },
+	Rooms = {
+		hall = { 196, 186, 166 },
+		living = { 204, 180, 140 },
+		kitchen = { 206, 196, 166 },
+		bedroom = { 184, 176, 200 },
+		kids = { 176, 200, 182 },
+		bath = { 168, 200, 210 },
+		garage = { 156, 156, 152 },
+		store = { 186, 168, 136 },
+		workroom = { 176, 168, 156 },
+	} :: { [string]: { number } },
 }
 
 -- 8.3 SANDBOX, the market (the owner: selling should be a decision, not a reflex). shared/Market.luau has the rules

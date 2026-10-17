@@ -10,7 +10,8 @@
 --     the owner, loads a piece at the back.
 --   * Bob calls the van to the house's door (the first call, no Driver needed), Ann's call after his is refused: once a
 --     move.
---   * Nobody carries a two-person piece alone: Bob's Lift on the sofa (Danny is not on a crew's move) drags it at
+--   * Nobody carries a two-person piece alone: Bob's Lift on the sofa (10.1: the run's helper, Ann's Danny, is with
+--     the party, but asked not to answer a Lift here: Config.MoveHelper.WaitForHelper off for it) drags it at
 --     Moving.Speed.Drag (the Mover's Alone walk no more); Ann's Help lift makes it the pair's walk.
 --   * No Guard's damage on a zombie by the house, no Driver's cut of a hit on the van with Ann at its wheel.
 --   * The end: nobody holds a role.
@@ -246,7 +247,9 @@ local sofa = newItem(3)
 local sofaRoot = sofa.PrimaryPart
 local liftAt = #E.messages
 E.place(bob, sofaRoot.Position + V3(0, 0, -3))
+Config.MoveHelper.WaitForHelper = false -- (10.1: Danny comes with every run's party; here nobody calls him)
 trigger(promptIn(sofa, "Lift"), bob)
+Config.MoveHelper.WaitForHelper = true
 local bobBody = bob.Character
 local walk = Config.Movement.Walk
 check("Bob's Lift on the sofa alone: dragged at Drag (no Mover's Alone walk, held up)", bobBody:GetAttribute("MoveCarry") == 3

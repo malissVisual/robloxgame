@@ -3,12 +3,12 @@
 -- server/Moving.luau and server/MoveHelper.luau on tests/runtime/MovingRuntime.luau's fakes (as
 -- tests/movehelper_runtime_test.luau: his walk a straight step a tick, a carried piece moved with its carrier here).
 --   * the bubble's words (the crew's MoveHelperBubble, MoveHelperAlert) always the same action's as the status line's
---     MoveHelperDoing (MoveHelperBrain.doing / bubble), for hire, waiting, going for a piece, carrying it, carrying with
+--     MoveHelperDoing (MoveHelperBrain.doing / bubble), waiting (10.1: free, never "for hire"), going for a piece, carrying it, carrying with
 --     you, at a two-person piece (orange), in the van, getting out, staying out; the orders that apply
 --     (MoveHelperOrders) with them; all gone when the move ends
 --   * PUT IT DOWN ("helper", "putdown"): a piece in his arms set down where he stands, its condition kept, off his
 --     list ("Setting it down."); a two-person piece he holds with you: both ends down, your hands free, his hold off;
---     nothing in his hands: refused ("Danny isn't carrying anything."); not hired: refused
+--     nothing in his hands: refused ("Danny isn't carrying anything.")
 --   * GET OUT ("helper", "getout"): seated, out at once as a player gets out (8.5 boardOut: the door open, the slide
 --     out, on his feet at his spot by the door), "Hopping out, boss."; while the owner stays at the wheel he does not
 --     get back in (seconds later still out); the owner out of the seat and in again: in he gets; refused when he is not
@@ -154,7 +154,7 @@ local function agreed(): string?
 	end
 	for action in Brain.Doing do
 		for _, full in { false, true } do
-			local text, alert = Brain.bubble(action, name, full, danny.price)
+			local text, alert = Brain.bubble(action, name, full)
 			if Brain.doing(action, name, full) == line and text == bubble and (sol:GetAttribute("MoveHelperAlert") == true) == alert then
 				return action
 			end
@@ -166,7 +166,7 @@ local function stateNow(spot: number): string
 	return danny.s.move.things[spot].state
 end
 
--- The move; Danny for hire: his bubble says so, no orders ---------------------------------------------------------------------
+-- The move; Danny with you from the start (10.1: free): his bubble says he waits, no orders ---------------------------------
 
 local started = Moving.admin(sol, "start")
 check("a solo move starts", string.find(started, "started", 1, true) ~= nil, started)
@@ -174,19 +174,13 @@ local truck = E.cars[sol]
 truck.model:SetAttribute("BackOpen", true)
 Moving.step()
 danny = MoveHelper.find(sol)
-check("Danny comes, for hire", danny ~= nil and danny.body ~= nil and danny.hirer == nil)
-check("8.6 his bubble for the crew: \"🧑‍🔧 For hire · $100\" (the status line: for hire, $100), the same action as the status line's, no orders",
-	sol:GetAttribute("MoveHelperBubble") == "🧑‍🔧 For hire · $100" and sol:GetAttribute("MoveHelperPrice") == 100 and agreed() == "offer"
+check("10.1 Danny comes, free: Sol's from the start", danny ~= nil and danny.body ~= nil and danny.hirer == sol)
+check("8.6 his bubble for the crew: \"💤 Waiting by the van\" (10.1 no price), the same action as the status line's, no orders",
+	sol:GetAttribute("MoveHelperBubble") == "💤 Waiting by the van" and sol:GetAttribute("MoveHelperPrice") == nil and agreed() == "wait"
 	and sol:GetAttribute("MoveHelperOrders") == nil and sol:GetAttribute("MoveHelperAlert") == nil, sol:GetAttribute("MoveHelperBubble"))
 check("8.6 …a player not of the crew gets none of it", rex:GetAttribute("MoveHelperBubble") == nil and rex:GetAttribute("MoveHelperOrders") == nil)
-local noticeAt = #E.messages
-E.request(sol, "helper", "putdown")
-check("8.6 PUT IT DOWN before the hire: refused (\"Hire Danny first\")", told(sol, "Hire Danny first: then he takes your orders.", noticeAt), E.lastNotice(sol))
-E.request(sol, "helper", "hire")
 run(0.3)
-check("hired: \"💤 Waiting by the van\", the status line's waiting", danny.hirer == sol and sol:GetAttribute("MoveHelperBubble") == "💤 Waiting by the van"
-	and agreed() == "wait", sol:GetAttribute("MoveHelperBubble"))
-noticeAt = #E.messages
+local noticeAt = #E.messages
 E.request(sol, "helper", "putdown")
 check("8.6 PUT IT DOWN with nothing in his hands: refused, \"Danny isn't carrying anything.\"", told(sol, "Danny isn't carrying anything.", noticeAt)
 	and danny.hirer == sol, E.lastNotice(sol))
@@ -228,7 +222,7 @@ check("8.6 PUT IT DOWN: the Lamp on the ground where he stands (a step in front 
 	and danny.s.move.things[1].condition == condition and danny.body.model:GetAttribute("Carrying") == nil,
 	`{stateNow(1)} {V3(lampAt.X - standing.X, 0, lampAt.Z - standing.Z).Magnitude} {danny.s.move.things[1].condition}`)
 check("8.6 …\"Setting it down.\", the crew told: off his list (your word beats the list)", E.saidSince(Brain.Lines.putDown, said)
-	and told(sol, "Danny set the Lamp down here: off his list.", noticeAt) and #danny.queue == 0 and lamp:GetAttribute("DannyQueue") == nil, E.lastNotice(sol))
+	and told(sol, "Danny set the Lamp down here: off the list.", noticeAt) and #danny.queue == 0 and lamp:GetAttribute("DannyQueue") == nil, E.lastNotice(sol))
 run(4)
 check("8.6 …and it stays there: he never picks it up again by himself (nothing on his list: he waits), no orders now",
 	stateNow(1) == "ground" and Rules.holding(danny.s.move, danny.id) == nil and danny.action == "wait" and sol:GetAttribute("MoveHelperOrders") == nil
@@ -407,11 +401,11 @@ do
 	local downTold = 0
 	for index = noticeAt + 1, #E.messages do
 		local m = E.messages[index]
-		if m.player == sol and m.remote == "Notice" and m.kind == "Danny is down: he is back at the van soon." then
+		if m.player == sol and m.remote == "Notice" and m.kind == "Danny is down: get them up, or wait a moment." then
 			downTold += 1
 		end
 	end
-	check("8.6 …an order while he is down (lying there, or his body gone): refused, \"Danny is down: he is back at the van soon.\"", downTold == 2
+	check("8.6 …an order while he is down (lying there, or his body gone): refused, \"Danny is down: get them up, or wait a moment.\"", downTold == 2
 		and danny.body == nil, downTold)
 end
 

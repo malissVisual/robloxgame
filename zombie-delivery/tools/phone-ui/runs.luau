@@ -12,6 +12,11 @@
 --   * the results card: its head, the pieces (each its rarity's stripe and stars, its value, whose warehouse) in a list
 --     that scrolls when they are many, the total, yours, a difficulty opened; on the screen whole (a phone too: the list
 --     shorter), its words fitting, OK a finger's size, OK and RunUi.close() close it; a resize scales both; no warnings.
+--     10.x danger: its line for the run's danger (the vault opened, the zombies stopped).
+--   * 10.x danger, the run's danger strip (the real client/RunDangerUi.luau): under the move's panel (a stand-in in
+--     client/TopBlocks.luau, as client/MovingHud.luau puts it), on the screen, clear of the HUD's chips and groups and
+--     the touch controls; the difficulty, the keys found, the vault, the zombies; an event's line; the horde's banner on
+--     the screen; away under a window (RunDangerUi.covered) and when the run ends ({ kind = "danger" }).
 local M = require("./sandbox_mock")
 local Config = require("./Config")
 local TouchLayout = require("./TouchLayout")
@@ -186,7 +191,7 @@ for n = 1, 12 do
 end
 local RESULT = { kind = "result", house = "sandbox_house", name = "The Old Farmstead", difficulty = "normal", phase = "done",
 	why = "Finished at the truck by Ann: what was in the truck went home", pieces = PIECES, count = #PIECES, value = 5700, mine = 8, mineValue = 3900,
-	total = 40, me = 14, opened = "hard", openedName = "Hard" }
+	total = 40, me = 14, opened = "hard", openedName = "Hard", danger = { vault = true, stopped = 7, zombies = true } }
 
 local function panelChecks(label, host)
 	local panel = M.gui:FindFirstChild("RunUi") and M.gui:FindFirstChild("RunUi"):FindFirstChild("PadPanel")
@@ -222,6 +227,8 @@ local function cardChecks(label)
 		and named(named(list, "Piece5"), "Stars").Text == "★")
 	check(`{label}: … the total, yours, Hard opened`, string.find(named(card, "Total").Text, "12 PIECES HOME", 1, true) ~= nil
 		and string.find(named(card, "Yours").Text, "YOURS: 8", 1, true) ~= nil and string.find(named(card, "Unlocked").Text, "HARD", 1, true) ~= nil)
+	check(`{label}: … 10.x the run's danger: the vault opened, the zombies stopped`, named(card, "Danger") ~= nil
+		and string.find(named(card, "Danger").Text, "VAULT OPENED ✓", 1, true) ~= nil and string.find(named(card, "Danger").Text, "ZOMBIES STOPPED: 7", 1, true) ~= nil)
 	if M.touch then
 		check(`{label}: … OK a finger's size`, #smallButtons(card) == 0, smallButtons(card)[1])
 	end
@@ -268,6 +275,60 @@ for _, s in { { true, 844, 354, "a phone (844 × 390)" }, { true, 667, 339, "a s
 	M.flush()
 	RunUi.close()
 	check(`{label}: RunUi.close() (ESC) closes it too`, not RunUi.isOpen())
+end
+
+-- ── 10.x danger: the run's danger strip, the horde's banner ─────────────────
+do
+	local RunDangerUi = require("./RunDangerUi")
+	local TopBlocks = require("./TopBlocks")
+	RunDangerUi.start()
+	local holder = M.make("ScreenGui", { Name = "MoveStandIn" }, M.gui)
+	local panel = M.make("Frame", { Name = "MovePanel", Size = M.UDim2.fromOffset(MoveLayout.PANEL_W, MoveLayout.PANEL_H), Position = M.UDim2.new(0.5, 0, 0, 8),
+		AnchorPoint = M.Vector2.new(0.5, 0) }, holder)
+	local scale = M.make("UIScale", { Name = "Scale", Scale = 1 }, panel)
+	TopBlocks.set("MovePanel", panel)
+	local VIEW = { kind = "danger", house = "lone_house", difficulty = "hard", name = "Hard", weapon = true, hazards = 5, zombies = 3, stopped = 2,
+		keys = { { name = "Bedroom key", room = "Bedroom", found = true, by = "Ann", open = false }, { name = "Garage key", room = "Garage", found = false, open = false } },
+		vault = { open = false, key = false, pieces = 1 } }
+	for _, s in { { true, 844, 354, "a phone (844 × 390)" }, { true, 667, 339, "a small phone (667 × 375)" }, { false, 1280, 764, "a computer (1280 × 800)" },
+		{ false, 1920, 1044, "a big screen (1920 × 1080)" } } do
+		screen(s[1], s[2], s[3])
+		local label = s[4]
+		scale.Scale = M.MUi.scaleFor(M.Vector2.new(M.width, M.height))
+		remote.OnClientEvent:Fire(VIEW)
+		M.flush()
+		local strip = named(M.gui:FindFirstChild("RunDangerUi"), "DangerStrip")
+		local b = box(strip)
+		check(`{label}: the danger strip there, on the screen, under the move's panel`, strip ~= nil and strip.Visible and inside(b) and b.y0 >= box(panel).y1 - 0.5, strip and show(b))
+		for name, other in blocks() do
+			check(`{label}: … clear of {name}`, not overlap(b, other), `{show(b)} on {show(other)}`)
+		end
+		check(`{label}: … its words fit`, #badTexts(strip) == 0, badTexts(strip)[1])
+		local top = named(strip, "Top").Text
+		check(`{label}: … the difficulty, the keys found, the vault, the zombies, the bat`, string.find(top, "HARD", 1, true) ~= nil and string.find(top, "KEYS 1/2", 1, true) ~= nil
+			and string.find(top, "VAULT LOCKED", 1, true) ~= nil and string.find(top, "🧟 3", 1, true) ~= nil and string.find(top, "🏏", 1, true) ~= nil)
+		check(`{label}: … its line: the locked doors`, string.find(named(strip, "Line").Text, "🔑 Bedroom", 1, true) ~= nil and string.find(named(strip, "Line").Text, "🔒 Garage", 1, true) ~= nil)
+		remote.OnClientEvent:Fire({ kind = "danger", event = "🔑 Garage key found by Bob", sound = "task_done" })
+		M.flush()
+		check(`{label}: … an event's line ("🔑 Garage key found by Bob")`, named(strip, "Line").Text == "🔑 Garage key found by Bob")
+		remote.OnClientEvent:Fire({ kind = "danger", event = "🧟 A horde is coming! Get the loot into the truck and hold the door.", sound = "horde_siren", banner = true })
+		M.flush()
+		local banner = named(M.gui:FindFirstChild("RunDangerUi"), "HordeBanner")
+		check(`{label}: … the horde's banner, on the screen`, banner ~= nil and banner.Visible and inside(box(banner)) and string.find(banner.Text, "horde", 1, true) ~= nil,
+			banner and show(box(banner)))
+		RunDangerUi.covered = function(): boolean
+			return true
+		end
+		remote.OnClientEvent:Fire(VIEW)
+		M.flush()
+		check(`{label}: … away under a window (RunDangerUi.covered)`, not strip.Visible and not banner.Visible)
+		RunDangerUi.covered = nil
+		remote.OnClientEvent:Fire({ kind = "danger" })
+		M.flush()
+		check(`{label}: … gone when the run ends`, not strip.Visible and RunDangerUi.view() == nil)
+	end
+	TopBlocks.set("MovePanel", nil)
+	holder:Destroy()
 end
 
 -- a resize while both are up: their scale follows

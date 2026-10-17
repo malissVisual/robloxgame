@@ -19,7 +19,7 @@
 --     s, the new van taken over), FINISH: paid for the three trips at the farm's pay (× its pay), chapter 1 done in the
 --     crew's saves (7.2 review: not for Cy, who joined without the prologue), the interior gone, the van's back its own
 --     again.
---   * Danny on a solo farm move: two ways; 8.3 hired and given the branding iron, with the van at the barn he goes in
+--   * Danny on a solo farm move: two ways; 8.3 given the branding iron, with the van at the barn he goes in
 --     and out by the barn doors for it (the nearest way he may take); 7.x Danny, a partner: he takes the far end of a pair piece
 --     and comes out of the farmhouse's front door with Sol, then the hay wagon's (bigDoor) out of the barn doors to the
 --     van's hitch.
@@ -603,15 +603,14 @@ local danny = MoveHelper.find(sol)
 local solBuild = built[#built]
 check("a solo farm move: Danny comes, with both ways (the front door, the barn doors)", danny ~= nil and #danny.ways == 2 and solBuild.plan.kind == "farm")
 E.cars[sol].model:SetAttribute("BackOpen", true)
--- (8.3 Danny for hire: Sol hires him and gives him the branding iron, from beside it inside, then waits outside)
-E.request(sol, "helper", "hire")
+-- (8.3: Sol gives him the branding iron, from beside it inside, then waits outside; 10.1 he is hers from the start)
 local solIron = solBuild.pieces[ironSpot.id]
 local outsideSol = E.rootOf(sol).Position
 E.place(sol, solIron.PrimaryPart.Position + V3(3, 0, 0))
 sol.Character:SetAttribute("ClipboardHeld", true) -- (8.5 orders mode: his clipboard out, server/Clipboard.luau's)
 E.request(sol, "helper", "assign", solIron)
 E.place(sol, outsideSol)
-check("8.3 Sol hires Danny and gives him the branding iron", danny.hirer == sol and danny.queue[1] == ironSpot.id, danny.queue[1])
+check("8.3 Sol (10.1: Danny hers from the start, free) gives him the branding iron", danny.hirer == sol and danny.queue[1] == ironSpot.id, danny.queue[1])
 local solOrigin = solBuild.origin
 local solBarnEntry = (solOrigin * HouseLayout.entries(solBuild.plan)[2]).Position
 local solFrontEntry = (solOrigin * solBuild.plan.entry).Position

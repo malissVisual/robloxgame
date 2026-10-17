@@ -214,6 +214,11 @@ local function hired(): boolean
 	return player:GetAttribute("MoveHelper") == "hired"
 end
 
+-- 10.1 his name (the crew's helper's: MoveHelperName), Danny's without one.
+local function nameNow(): string
+	return Brain.nameOf(player:GetAttribute("MoveHelperName"))
+end
+
 function DannyOrders.on(): boolean
 	local character = player.Character
 	return character ~= nil and character:GetAttribute("ClipboardHeld") == true
@@ -295,7 +300,7 @@ end
 -- The server's answer for a piece, guessed from what this client sees (MoveHelperBrain.assignCheck): its words and tone.
 local function lookOf(model: Model): (string?, string)
 	if model == MoveHelperCard.body() then
-		return `📋 Orders for {H.Name}`, "back" -- 8.6 (a click opens his orders menu: MoveHelperCard.target)
+		return `📋 Orders for {nameNow()}`, "back" -- 8.6 (a click opens his orders menu: MoveHelperCard.target)
 	end
 	local prompt = MoveHelperCard.promptOf(model)
 	local root, mine = model.PrimaryPart, myRoot()
@@ -312,7 +317,6 @@ local function lookOf(model: Model): (string?, string)
 	end
 	local verdict = Brain.assignCheck({
 		crew = true,
-		hired = hired(),
 		mine = true,
 		state = state,
 		held = held,
@@ -322,7 +326,7 @@ local function lookOf(model: Model): (string?, string)
 		near = mine ~= nil and math.sqrt(dx * dx + dz * dz) <= H.ClickReach,
 		clipboard = true,
 	})
-	return ClipboardRules.look(verdict, if type(queued) == "number" then queued else nil, if type(count) == "number" then count else nil)
+	return ClipboardRules.look(verdict, if type(queued) == "number" then queued else nil, if type(count) == "number" then count else nil, nameNow())
 end
 
 -- The piece pointed at now: a gamepad's R1 piece, a touch screen's tapped one (a moment), else under the crosshair or
@@ -484,7 +488,7 @@ local function keepGives(show: boolean)
 		end
 		local p = prompt :: ProximityPrompt
 		giveOn[p] = piece
-		local action = if spot.back then "Take back" else `Give to {H.Name}`
+		local action = if spot.back then "Take back" else `Give to {nameNow()}`
 		if p.ActionText ~= action then
 			p.ActionText = action
 		end
@@ -683,7 +687,7 @@ end
 
 -- The line's words for the device now, and their width at scale 1.
 local function setWords()
-	local text = ClipboardRules.hint(PadGlyph.device())
+	local text = ClipboardRules.hint(PadGlyph.device(), nameNow())
 	if text == words then
 		return
 	end

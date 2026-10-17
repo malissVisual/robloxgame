@@ -64,6 +64,7 @@ function render(scene, fonts) {
       el.style.transformOrigin = '0 0';
     }
     if (n.vis === false) el.style.display = 'none';
+    if (n.rot) el.style.rotate = `${n.rot}deg`; // 10.x the map: a GuiObject's Rotation (about its middle, as Roblox turns it)
     el.style.zIndex = String(n.z ?? 1);
     const bg = n.bg || d.bg;
     const bgT = n.bgT ?? d.bgT ?? 1;
@@ -101,6 +102,10 @@ function render(scene, fonts) {
       const justify = n.xa === 'Left' ? 'flex-start' : n.xa === 'Right' ? 'flex-end' : 'center';
       box.style.cssText = `position:absolute;left:${padL}px;right:${padR}px;top:0;bottom:0;display:flex;align-items:center;justify-content:${justify};` +
         `font-family:${FONTS};font-weight:${weight(n.font)};font-size:${ts}px;line-height:1.15;color:${rgba(tc, n.tt || 0)};`;
+      if (n.stroke && (n.tst ?? 1) < 1) { // 10.x the map: a TextStroke (a dark edge round the words)
+        const s = rgba(n.stroke, n.tst);
+        box.style.textShadow = `-1px -1px 0 ${s}, 1px -1px 0 ${s}, -1px 1px 0 ${s}, 1px 1px 0 ${s}, 0 0 2px ${s}`;
+      }
       const span = document.createElement('span');
       span.textContent = n.text;
       span.style.cssText = n.wrap ? `white-space:normal;text-align:${n.xa === 'Left' ? 'left' : n.xa === 'Right' ? 'right' : 'center'};` :

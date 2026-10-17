@@ -52,7 +52,7 @@ local SANDBOX = {
 	"EnemyOutline", "ZombieLife", "ZombieFx", "CarSway", "TyreFx", "CrashFx", "MovingHud", "MoveHelperHud", "DannyBubble",
 	"MoveLobbyUi", "QuickChat", "CarryGripUi", "WalkDoors", "CargoPrompts", "TradePrompts", -- (8.3: WalkDoors, the doors' leaves swing and the trip's camera; 8.6: DannyBubble, what Danny does over his head; 8.7: TradePrompts)
 }
-local OWN = { "SandboxHud", "WarehouseUi", "SandboxGuide", "UpgradeUi", "CollectionBookUi", "SandboxTasksUi", "MoveHelperCard", "DannyOrders", "OfferCard", "VanPaintUi", "TradeUi" } -- (8.7: TradeUi, trading between players; 8.1: UpgradeUi, the UPGRADES desk's window; 8.2: CollectionBookUi, the collection book; SandboxTasksUi, the TASKS chip and panel; 8.3: MoveHelperCard, Danny's card: his hire, his list; 8.5: DannyOrders, Danny's clipboard, orders mode; OfferCard, a visitor's offer; VanPaintUi, the PAINT shop's window)
+local OWN = { "SandboxHud", "WarehouseUi", "SandboxGuide", "UpgradeUi", "CollectionBookUi", "SandboxTasksUi", "MoveHelperCard", "DannyOrders", "OfferCard", "VanPaintUi", "TradeUi" } -- (8.7: TradeUi, trading between players; 8.1: UpgradeUi, the UPGRADES desk's window; 8.2: CollectionBookUi, the collection book; SandboxTasksUi, the TASKS chip and panel; 8.3: MoveHelperCard, Danny's card: his list (10.1 no hire); 8.5: DannyOrders, Danny's clipboard, orders mode; OfferCard, a visitor's offer; VanPaintUi, the PAINT shop's window)
 local LAST = { "SandboxSounds", "SandboxLight" } -- 8.1: the sandbox's sounds, after its own modules (client/SandboxSounds.luau); 8.3: the eyes (client/SandboxLight.luau)
 
 -- The city's systems the sandbox must never require (the phone, the board, the windows, the maps, the tutorial, the
@@ -351,7 +351,7 @@ do
 	end
 	check("ESC closes the crew panel, folds the planning, closes the move's cards, the quick chat and the warehouse's picker", called(run, "CrewPanel.close") and called(run, "MoveLobbyUi.minimize") and called(run, "MovingHud.closeAll") and called(run, "QuickChat.close") and called(run, "WarehouseUi.close"))
 	check("… and the UPGRADES window (8.1 review)", called(run, "UpgradeUi.close"))
-	check("… and 8.3 Danny's card (his hire, his list: a window like the others, with its onOpen)", called(run, "MoveHelperCard.close") and type(run.modules.MoveHelperCard.onOpen) == "function")
+	check("… and 8.3 Danny's card (his list, 10.1 no hire: a window like the others, with its onOpen)", called(run, "MoveHelperCard.close") and type(run.modules.MoveHelperCard.onOpen) == "function")
 	check("… and 8.3 the PAINT shop's window (a window like the others, with its onOpen)", called(run, "VanPaintUi.close") and type(run.modules.VanPaintUi.onOpen) == "function")
 	check("… and 8.3 a visitor's offer card (a window like the others, with its onOpen; it waits while the camera's windowOpen says another is open)", called(run, "OfferCard.close")
 		and type(run.modules.OfferCard.onOpen) == "function" and run.modules.OfferCard.covered == run.modules.CameraRig.windowOpen)
@@ -389,7 +389,7 @@ do -- 8.1 review: the UPGRADES window alone frees the mouse too (on PC the camer
 	check("the open UPGRADES window frees the mouse (CameraRig.windowOpen)", run.modules.CameraRig.windowOpen() == true)
 end
 
-do -- 8.3 Danny's card (his hire, his list) alone: open, it frees the mouse (its buttons are clicked); it closes the other windows
+do -- 8.3 Danny's card (his list; 10.1 no hire) alone: open, it frees the mouse (its buttons are clicked); it closes the other windows
 	local run = boot(true, { MoveHelperCard = "ok", WarehouseUi = "ok" }, true)
 	check("8.3 Danny's open card frees the mouse (CameraRig.windowOpen)", run.modules.CameraRig.windowOpen() == true)
 	local onOpen = run.modules.MoveHelperCard.onOpen
@@ -469,6 +469,26 @@ do -- 9.1 the drive pedals: started with the sandbox's own modules; they step as
 	check("… the result card open: they step aside", covered3() == true)
 end
 
+do -- 10.1 the CREW window (CrewUi): one of the sandbox's own modules, a window like the others; never in the city
+	local alone = boot(true, { CrewUi = "ok" }, true)
+	check("10.1 the CREW window (CrewUi) starts with the sandbox's own modules", called(alone, "CrewUi.start"))
+	check("… open, it frees the mouse (CameraRig.windowOpen counts it)", alone.modules.CameraRig.windowOpen() == true)
+	local run = boot(true, { CrewUi = "ok", WarehouseUi = "ok" }, true)
+	local onOpen = run.modules.CrewUi.onOpen
+	if type(onOpen) == "function" then
+		table.clear(run.calls)
+		run.modules.Hud.closeWindows = run.modules.Hud.onCloseWindows
+		onOpen()
+	end
+	check("… opening it closes the other windows (the picker) but not itself", type(onOpen) == "function" and called(run, "WarehouseUi.close") and not called(run, "CrewUi.close"))
+	local shut = boot(true, { CrewUi = "ok" }, false)
+	check("… shut: the mouse stays the camera's", shut.modules.CameraRig.windowOpen() == false)
+	table.clear(shut.calls)
+	shut.modules.Hud.onCloseWindows()
+	check("… ESC closes it", called(shut, "CrewUi.close"))
+	check("… and the city never requires it", boot(false, { CrewUi = "ok" }).required.CrewUi == nil)
+end
+
 do -- 9.x loot: the outlines and the stars start with the sandbox's own modules; the stars step aside under a window
 	local run = boot(true, { LootOutline = "ok", LootStars = "ok", WarehouseUi = "ok" }, true)
 	check("9.x loot: the outlines (LootOutline) and the stars (LootStars) start with the sandbox's own modules", called(run, "LootOutline.start") and called(run, "LootStars.start"))
@@ -477,6 +497,29 @@ do -- 9.x loot: the outlines and the stars start with the sandbox's own modules;
 	check("… and the city never requires them", (function(): boolean
 		local city = boot(false, { LootOutline = "ok", LootStars = "ok" })
 		return city.required.LootOutline == nil and city.required.LootStars == nil
+	end)())
+end
+
+do -- 10.x the map: the big map (a window like the others) and a run's minimap start with the sandbox's own modules
+	local run = boot(true, { SandboxMapUi = "ok", SandboxMiniMap = "ok", VanPaintUi = "ok" }, true)
+	check("10.x the map: the big map (SandboxMapUi) and the minimap (SandboxMiniMap) start with the sandbox's own modules",
+		called(run, "SandboxMapUi.start") and called(run, "SandboxMiniMap.start"))
+	check("… the open big map frees the mouse (CameraRig.windowOpen)", run.modules.CameraRig.windowOpen() == true)
+	local onOpen = run.modules.SandboxMapUi.onOpen
+	if type(onOpen) == "function" then
+		table.clear(run.calls)
+		run.modules.Hud.closeWindows = run.modules.Hud.onCloseWindows
+		onOpen()
+	end
+	check("… opening it closes the PAINT shop's window but not itself", type(onOpen) == "function" and called(run, "VanPaintUi.close") and not called(run, "SandboxMapUi.close"))
+	run.modules.Hud.onCloseWindows()
+	check("… ESC (the HUD's close) closes it like the others", called(run, "SandboxMapUi.close"))
+	check("… the minimap with Main's covered check (a window open, the big map too: none)", run.modules.SandboxMiniMap.covered == run.modules.CameraRig.windowOpen)
+	local alone = boot(true, { SandboxMapUi = "ok" }, false)
+	check("… the big map shut: the mouse stays the camera's", alone.modules.CameraRig.windowOpen() == false)
+	check("… and the city never requires them", (function(): boolean
+		local city = boot(false, { SandboxMapUi = "ok", SandboxMiniMap = "ok" })
+		return city.required.SandboxMapUi == nil and city.required.SandboxMiniMap == nil
 	end)())
 end
 

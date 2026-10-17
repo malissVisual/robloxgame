@@ -317,6 +317,39 @@
 > own Roblox avatar or a courier made here (the skin, eight hair styles and ten colours, five hats, seven tops, the
 > trousers, glasses or a beard, a name Roblox filters, 🎲 RANDOM) in a turning 3D preview; everybody sees it on your
 > body (`server/CourierAvatar.luau` setLook). See **The start: intro, save slots, your courier (10.1)**.
+>
+> **10.2** (the owner: "both: on the easier difficulties only a timer and traps, on the harder ones zombies too … it
+> has to be designed to be fun"; "add a way to look at the map"; "different employees who can do something different
+> … Danny will be the base, so cancel having to buy him … and when one dies, something"). **The danger in a run**
+> (`shared/DangerRules.luau`, `server/RunDanger.luau`, `client/RunDangerUi.luau`, `Config.Runs.Danger` by difficulty):
+> **locked rooms** from Easy (two from Hard), their keys ("Bedroom key") hidden in searchable furniture of a room you
+> can already reach (hold **F** · Search; found for the whole party), a locked room's pieces a tier up, its doorway a
+> wall for Danny and the zombies until it opens; **the vault** from Normal (the best piece or two in a steel and glass
+> case, Epic or better, Legendary at a chance on Nightmare; its own gold key, hidden deeper); **hazards** on open floor,
+> never in a doorway or on a way out (creaky boards: carry over them and you stumble and drop the piece; puddles: you
+> slide; a cracked ceiling that shakes and sheds dust before the plaster falls); **zombies** from Hard (the game's own,
+> in the house and the yard; faster on Insane with a horde at half time; on Nightmare THE LANDLORD by the vault; a bite
+> drops what you carry; the truck is nobody's target), from Hard everybody's **bat** (the city's strike; picking a piece
+> up puts it away), a death drops the piece and you are back by the truck; the danger strip and the results card's
+> "Vault opened ✓/✗ · Zombies stopped". **The map** (M; a gamepad's L2; the 🗺 MAP chip; on a phone the minimap too):
+> in the lobby the plaza, your warehouse in gold, the shops and the six portals with their live state (FREE, STARTING IN
+> 7 with who is on the pad, IN USE with the difficulty and the party; click one and the guide leads there); in a run the
+> house's floor plan (`MapPlan`, published once by `server/HouseInterior.luau`), the yard and the truck, you, the party,
+> the helpers, the zombies near you, the dangers (🔒 🔑 🏦 ⚠ 🆘) and the loot you have seen in its tier's colour (the
+> rest in the fog; an Epic or Legendary nobody carries pulses), the clock and the truck's load; a corner minimap in a
+> run (`client/SandboxMapUi.luau`, `SandboxMiniMap`, `SandboxMapDraw`, `SandboxMapData`, `shared/SandboxMapRules.luau`,
+> `Config.SandboxMapUi`). **The helpers' crew** (`Config.Crew`, `shared/CrewRules.luau`, `server/HelperCrew.luau`,
+> `client/CrewUi.luau`): Danny is free and every player's from the start (no hire, no price; he waits by your warehouse,
+> his Crew prompt opens the CREW window, and he comes into every run); four more can join your crew, each with his own
+> look and way of working: **Bruno** carries a two-person piece alone, slowly; **Zip** runs one-hand and small pieces
+> out fast; **Gus** carries nothing but walks with you and fights the zombies; **Lucy** carries small pieces and shows
+> the party the Epic and Legendary loot through walls. You get them by **rescuing** them: some run houses hold one tied
+> to a chair (more often on the harder difficulties; hold E to untie him), and he joins the crew of everybody in the
+> party who lacks him (the others get a money bonus). One helper comes into a run: the host's pick in CREW. A helper at
+> 0 health in a run goes **down** (a ring and a countdown); any party player holds E within 15 s to revive him at half
+> health, else he is out of the run and **in hospital** for 4 minutes (CREW shows the time left and can discharge him
+> early for money). Nobody is ever lost for good; the crew is saved with its flag (`crewKept`). Previews: `design/map/`,
+> `design/crew/`.
 
 The active Roblox game in this repository (Merge Blades is preserved in `../archive/merge-blades`). **You run a delivery company** in a world
 gone wrong: take a job, carry the cargo to your vehicle with your own hands (or lead the horses on a rope), drive it

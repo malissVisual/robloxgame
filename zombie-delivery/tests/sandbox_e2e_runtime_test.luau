@@ -15,7 +15,7 @@
 --   2. PLAY: 9.7 no van in the lobby (the truck waits at a run's house; CAR says so).
 --   3. 9.7 the portals: Ann onto the farmstead's pad (the pad panel: she the host, the countdown, Easy and Normal open,
 --      Hard locked), her pick; the countdown over: her run (her truck parked at the curb, locked, she faded over to the
---      house's front yard, the portal IN USE), Danny for hire. Bob onto the farmstead's pad: IN USE; onto the Pond
+--      house's front yard, the portal IN USE), Danny with her (10.1 free). Bob onto the farmstead's pad: IN USE; onto the Pond
 --      Cabin's: his own run at the same time. 8.8 no roles: none on the move; the van's Loads hold no time (step 6).
 --   4. The truck at the chalet's curb, the back doors open, the front door's walk-in zone: the dwell, the fade, inside
 --      (8.3: the chalet's leaves open before the fade, the move FadeOut + Margin s after it, the arrival a step past the
@@ -87,6 +87,12 @@ local Plan = require("./AnalyticsPlan")
 local StockPlan = require("./StockPlan")
 local Market = require("./Market") -- (8.3: the day's hot and cold kinds)
 local SoundPlan = require("./SoundPlan") -- (8.3: "in the house" for the eyes and the sounds)
+-- 10.x danger: the runs' hazards are tests/danger_test.luau's and tests/danger_runtime_test.luau's: none on this loop's
+-- straight walks (a creaky patch under a carried piece drops it, the plaster knocks it); its locks, vault and zombies
+-- stay (H.choose leaves their pieces be)
+for _, level in Config.Runs.Danger do
+	level.Creak, level.Puddle, level.Plaster = 0, 0, 0
+end
 
 local failures = 0
 local todos: { string } = {}
@@ -158,6 +164,7 @@ local MoveHelper = E.module("MoveHelper")
 local SandboxPlots = E.module("SandboxPlots")
 local Vehicles = E.fakes.Vehicles
 H.Runs = E.module("Runs") -- 9.7: the runs (the portals' pads, the parties)
+H.Danger = E.module("RunDanger") -- 10.x: a run's danger (its vault's sealed pieces, its locked rooms: tests/danger_*_test.luau)
 MoveHelper.useMover(E.mover) -- (no pathfinding in the CLI: Danny walks straight)
 
 local queued: { any } = {}
@@ -600,13 +607,36 @@ function H.pieceOf(player: any, spot: number): any
 	end
 	return nil
 end
--- A piece at home in the player's house that `fits` (by its def): the first in the state's order → item, model, def.
+-- 10.x danger: is the piece at `spot` of the player's run in its vault (sealed) or in a room behind a door still locked?
+function H.dangerous(player: any, spot: number): boolean
+	local st = H.Danger.stateFor(player)
+	if not st then
+		return false
+	end
+	if st.sealed[spot] then
+		return true
+	end
+	local room: string? = nil
+	for _, planned in st.s.plan.spots do
+		if planned.id == spot then
+			room = planned.room
+		end
+	end
+	for _, lock in st.locks do
+		if not lock.open and table.find(lock.plan.behind, room) then
+			return true
+		end
+	end
+	return false
+end
+-- A piece at home in the player's house that `fits` (by its def): the first in the state's order → item, model, def
+-- (10.x: never one in the run's vault or behind a locked door).
 function H.choose(player: any, fits: (any, any) -> boolean): (any, any, any)
 	for _, item in H.stateOf(player).items do
 		local model = H.pieceOf(player, item.spot)
 		local id = model and model:GetAttribute("FurnitureId")
 		local def = id and FurnitureLooks.Items[id]
-		if item.state == "home" and def and fits(item, def) then
+		if item.state == "home" and def and fits(item, def) and not H.dangerous(player, item.spot) then
 			return item, model, def
 		end
 	end
@@ -863,11 +893,11 @@ do
 		and view.run.mine == true and view.hordeAt == nil and math.abs(view.endsAt - E.now - F.Time) < 2, view.endsAt - E.now)
 	check("…8.8: no role on the move (no MoveRole; the state's team: only the van's call, not made yet)", ann:GetAttribute("MoveRole") == nil
 		and view.team.role == nil and view.team.called == false)
-	check("…Danny comes with her crew of one, for hire (8.3), his id for his card", MoveHelper.find(ann) ~= nil and MoveHelper.find(ann).hirer == nil
-		and ann:GetAttribute("MoveHelperId") == MoveHelper.find(ann).id)
+	check("…Danny comes with her crew of one, free (10.1: hers from the start, no hire), his id for his card", MoveHelper.find(ann) ~= nil
+		and MoveHelper.find(ann).hirer == ann and MoveHelper.find(ann).kind == "danny" and ann:GetAttribute("MoveHelperId") == MoveHelper.find(ann).id)
 	E.fire(ann, "Moving", "helper", "van")
-	check("…the old orders are gone (WAIT AT VAN: nothing): not hired, he leaves her pieces to her, his price on her status line",
-		ann:GetAttribute("MoveHelper") == "offer" and type(ann:GetAttribute("MoveHelperPrice")) == "number" and #MoveHelper.find(ann).queue == 0, ann:GetAttribute("MoveHelper"))
+	check("…the old orders are gone (WAIT AT VAN: nothing): he leaves her pieces to her, no price on her status line",
+		ann:GetAttribute("MoveHelper") == "hired" and ann:GetAttribute("MoveHelperPrice") == nil and #MoveHelper.find(ann).queue == 0, ann:GetAttribute("MoveHelper"))
 	check("…the analytics: FirstContract once, MoveStarted (solo)", H.steps(11).FirstContract == 1 and #H.events("MoveStarted", ann) == 1)
 	-- Bob: the farmstead's pad IN USE; the Pond Cabin's: his own run at the same time
 	local inUseAt = #E.sent
@@ -1329,10 +1359,12 @@ do
 	local was = H.profileOf(ann).money
 	local weekly = H.task(ann, "w_income")
 	local weeklyWas = if weekly then weekly.progress else 0
-	E.advance(60)
+	-- (60 s, or as long as two whole dollars take: 10.x the run's vault and locked rooms leave her the plainer pieces)
+	local wait = math.max(60, math.ceil(120 / math.max(rate, 1e-3) / Config.Collection.Tick) * Config.Collection.Tick)
+	E.advance(wait)
 	local got = H.paid(ann, "CollectionIncome", incomeAt)
-	check("…60 s on the clock: paid as CollectionIncome at that rate (whole dollars; the payout every " .. Config.Collection.Tick .. " s)",
-		got > 0 and got >= math.floor(rate * 50 / 60) - 1 and got <= rate * 70 / 60 + 1 and H.profileOf(ann).money - was == got, `{got} at {rate}/min`)
+	check(`…{wait} s on the clock: paid as CollectionIncome at that rate (whole dollars; the payout every {Config.Collection.Tick} s)`,
+		got > 0 and got >= math.floor(rate * (wait - 10) / 60) - 1 and got <= rate * (wait + 10) / 60 + 1 and H.profileOf(ann).money - was == got, `{got} at {rate}/min`)
 	local only = true
 	for index = incomeAt + 1, #money do
 		if money[index].player == ann then

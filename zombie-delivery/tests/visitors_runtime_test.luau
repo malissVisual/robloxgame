@@ -46,6 +46,9 @@ local born: { [any]: any } = {} -- where each came into the world
 local spawn = Npcs.spawn
 Npcs.spawn = function(look: any, at: any): any
 	local model = spawn(look, at)
+	if type(look) == "table" and type(look.title) == "string" and string.find(look.title, Config.MoveHelper.Title, 1, true) then
+		return model -- (10.1 a helper of the crew: the one by Ann's warehouse door, server/HelperCrew.luau's; no visitor)
+	end
 	table.insert(bodies, model)
 	born[model] = model.PrimaryPart.Position
 	return model

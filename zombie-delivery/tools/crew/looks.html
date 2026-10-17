@@ -1,0 +1,234 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Crew looks</title>
+<style>
+@font-face { font-family: Gotham; src: url(montserrat-500.woff2); font-weight: 500; }
+@font-face { font-family: Gotham; src: url(montserrat-700.woff2); font-weight: 700; }
+html,body{margin:0;background:#0e1014;overflow:hidden}
+canvas#out{display:block}
+</style>
+</head>
+<body>
+<canvas id="out"></canvas>
+<script type="module">
+// 10.1 the helpers' crew: draws looks_preview.py's helpers (shared/CrewRules.luau look) as Roblox's classic R15 block
+// body dressed the way server/Npcs.luau's dress() does it (the shirt on the torso and the upper arms, the forearms the
+// skin with short sleeves, the shins the shoes with boots, the vest, the apron and its skirt, the collar, the belt, the
+// hair, the cap and its visor, the beanie, the helmet: the same sizes and places, the front towards the camera), each
+// with its name tag over the head (the name, the title in gold), and under each his icon, role, health, pace and what
+// he does. Not Roblox's renderer.
+import * as THREE from './three.module.min.js';
+
+const W = 1800, H3 = 680, FOOT = 300;
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1);
+renderer.setSize(W, H3);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const box = new THREE.BoxGeometry(1, 1, 1);
+const ball = new THREE.SphereGeometry(0.5, 40, 24);
+// the classic head: a rounded cylinder 1.2 studs every way (its mesh is smaller than its box: the hats go round it)
+const head = new THREE.CapsuleGeometry(0.56, 0.12, 10, 32);
+const srgb = c => new THREE.Color().setRGB(c[0] / 255, c[1] / 255, c[2] / 255, THREE.SRGBColorSpace);
+const darker = (c, t) => [c[0] * (1 - t), c[1] * (1 - t), c[2] * (1 - t)];
+
+// One block (a body part, a piece of clothing): size, centre, colour, roughness; `parent` the figure.
+function part(parent, size, at, color, opts = {}) {
+  const m = new THREE.Mesh(opts.head ? head : opts.sphere ? ball : box, new THREE.MeshStandardMaterial({ color: srgb(color), roughness: opts.rough ?? 0.7, metalness: 0 }));
+  m.scale.set(size[0], size[1], size[2]);
+  m.position.set(at[0], at[1], at[2]);
+  if (opts.tilt) m.rotation.x = opts.tilt;
+  m.castShadow = true;
+  m.receiveShadow = true;
+  parent.add(m);
+  return m;
+}
+
+// The classic R15 block body (studs; feet on y = 0; the front +Z), dressed as server/Npcs.luau's dress() does.
+function figure(look) {
+  const g = new THREE.Group();
+  const skin = look.skin || [241, 194, 160];
+  const shirt = look.shirt || [90, 110, 140];
+  const pants = look.pants || [60, 60, 66];
+  const shoes = look.shoes || [46, 38, 32];
+  for (const side of [-1, 1]) {
+    part(g, [1, 0.3, 1], [side * 0.5, 0.15, 0], shoes); // the foot
+    part(g, [1, 0.9, 1], [side * 0.5, 0.75, 0], look.boots ? shoes : pants); // the lower leg (boots: the shoes')
+    part(g, [1, 0.8, 1], [side * 0.5, 1.6, 0], pants); // the upper leg
+    part(g, [1, 0.3, 1], [side * 1.5, 2.15, 0], skin); // the hand
+    part(g, [1, 0.7, 1], [side * 1.5, 2.65, 0], look.shortSleeves ? skin : shirt); // the forearm
+    part(g, [1, 1.0, 1], [side * 1.5, 3.5, 0], shirt); // the upper arm
+  }
+  const lowerY = 2.2, lower = [2, 0.4, 1];
+  part(g, lower, [0, lowerY, 0], pants);
+  const torsoY = 3.2, s = [2, 1.6, 1];
+  part(g, s, [0, torsoY, 0], shirt);
+  // the clothes on the torso: the vest, the apron, the collar; on the lower torso the belt and the apron's skirt
+  if (look.vest) part(g, [s[0] * 1.04, s[1] * 0.92, s[2] * 1.12], [0, torsoY - s[1] * 0.03, 0], look.vest);
+  if (look.apron) {
+    part(g, [s[0] * 0.7, s[1] * 0.8, 0.06], [0, torsoY - s[1] * 0.08, s[2] * 0.53], look.apron, { rough: 0.55 });
+    part(g, [lower[0] * 0.8, lower[1] * 1.6, 0.06], [0, lowerY - lower[1] * 0.35, lower[2] * 0.55], look.apron, { rough: 0.55 });
+  }
+  part(g, [s[0] * 0.42, s[1] * 0.08, s[2] * 0.9], [0, torsoY + s[1] * 0.48, 0], darker(shirt, 0.15));
+  part(g, [lower[0] * 1.04, lower[1] * 0.22, lower[2] * 1.08], [0, lowerY + lower[1] * 0.32, 0], [40, 30, 24], { rough: 0.5 });
+  // the head, the face, the hair and the hat
+  const h = 1.2, headY = 4.65;
+  part(g, [1, 1, 1], [0, headY, 0], skin, { rough: 0.6, head: true });
+  for (const side of [-1, 1]) part(g, [0.12, 0.18, 0.04], [side * 0.2, headY + 0.06, 0.55], [30, 26, 24]);
+  part(g, [0.32, 0.05, 0.04], [0, headY - 0.24, 0.54], [120, 60, 50]);
+  const hat = look.hat || 'none';
+  const hatColor = look.hatColor || [60, 60, 66];
+  if (look.hair && hat !== 'helmet' && hat !== 'beanie') {
+    part(g, [h * 1.04, h * 0.62, h * 1.06], [0, headY + h * 0.24, -h * 0.06], look.hair, { sphere: true, rough: 0.5 });
+  }
+  if (hat === 'cap') {
+    part(g, [h * 1.06, h * 0.5, h * 1.06], [0, headY + h * 0.32, 0], hatColor, { sphere: true, rough: 0.85 });
+    part(g, [h * 0.8, 0.06, h * 0.5], [0, headY + h * 0.3, h * 0.62], darker(hatColor, 0.2), { tilt: -0.14 });
+  } else if (hat === 'beanie') {
+    part(g, [h * 1.08, h * 0.7, h * 1.08], [0, headY + h * 0.28, -0.02], hatColor, { sphere: true, rough: 0.95 });
+  } else if (hat === 'helmet') {
+    part(g, [h * 1.18, h * 0.72, h * 1.22], [0, headY + h * 0.3, -0.03], hatColor, { sphere: true, rough: 0.4 });
+  }
+  return g;
+}
+
+function wrap(ctx, text, maxWidth) {
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const word of words) {
+    const next = line ? `${line} ${word}` : word;
+    if (ctx.measureText(next).width > maxWidth && line) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = next;
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+window.renderCrew = function (data) {
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x1a1f26);
+  const camera = new THREE.PerspectiveCamera(26, W / H3, 0.1, 200);
+  camera.position.set(0, 4.4, 24);
+  camera.lookAt(0, 2.9, 0);
+  scene.add(new THREE.HemisphereLight(0xdfe8f5, 0x3a3226, 1.1));
+  const sun = new THREE.DirectionalLight(0xfff1dc, 2.2);
+  sun.position.set(8, 16, 12);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  Object.assign(sun.shadow.camera, { left: -16, right: 16, top: 10, bottom: -4, near: 1, far: 50 });
+  scene.add(sun);
+  const fill = new THREE.DirectionalLight(0xb8cff0, 0.6);
+  fill.position.set(-10, 6, 8);
+  scene.add(fill);
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(80, 40), new THREE.MeshStandardMaterial({ color: 0x5b5f66, roughness: 0.95 }));
+  floor.rotation.x = -Math.PI / 2;
+  floor.receiveShadow = true;
+  scene.add(floor);
+  // the warehouse's back wall and its stripes (where they wait in the lobby)
+  const wall = new THREE.Mesh(new THREE.PlaneGeometry(80, 20), new THREE.MeshStandardMaterial({ color: 0x8a9096, roughness: 0.9 }));
+  wall.position.set(0, 10, -6);
+  wall.receiveShadow = true;
+  scene.add(wall);
+  const stripe = new THREE.Mesh(new THREE.PlaneGeometry(80, 0.5), new THREE.MeshStandardMaterial({ color: 0xd74a46, roughness: 0.8 }));
+  stripe.position.set(0, 2.6, -5.98);
+  scene.add(stripe);
+
+  const crew = data.crew;
+  const gap = 5.6;
+  const spots = [];
+  crew.forEach((c, i) => {
+    const x = (i - (crew.length - 1) / 2) * gap;
+    const f = figure(c.look);
+    f.position.set(x, 0, 0);
+    f.rotation.y = -x * 0.025; // (each turned a little towards the middle)
+    scene.add(f);
+    spots.push(new THREE.Vector3(x, 4.65 + 0.6 + 0.9, 0));
+  });
+  renderer.render(scene, camera);
+
+  const out = document.getElementById('out');
+  out.width = W;
+  out.height = 110 + H3 + FOOT;
+  const ctx = out.getContext('2d');
+  ctx.fillStyle = '#0e1014';
+  ctx.fillRect(0, 0, out.width, out.height);
+  ctx.fillStyle = '#f2f2f0';
+  ctx.font = '700 30px Gotham';
+  ctx.fillText(data.title, 40, 52);
+  ctx.fillStyle = '#c4c7cb';
+  ctx.font = '500 17px Gotham';
+  ctx.fillText(data.subtitle, 40, 84);
+  ctx.drawImage(renderer.domElement, 0, 110);
+  // the name tags (server/Npcs.luau nameTag: the name 20 px white, the title 15 px gold, both stroked), on the head's
+  // point + 0.9 studs
+  ctx.textAlign = 'center';
+  crew.forEach((c, i) => {
+    const p = spots[i].clone().project(camera);
+    const x = (p.x + 1) / 2 * W, y = 110 + (1 - p.y) / 2 * H3;
+    ctx.lineJoin = 'round';
+    ctx.font = '700 22px Gotham';
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = 'rgba(0,0,0,0.65)';
+    ctx.strokeText(c.look.name, x, y - 22);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(c.look.name, x, y - 22);
+    ctx.font = '500 16px Gotham';
+    ctx.strokeText(c.look.title, x, y);
+    ctx.fillStyle = 'rgb(255,214,110)';
+    ctx.fillText(c.look.title, x, y);
+  });
+  // under each: icon, name and role, health and pace, what he does, what he carries
+  const col = W / crew.length;
+  crew.forEach((c, i) => {
+    const cx = col * i + col / 2;
+    const top = 110 + H3 + 26;
+    ctx.fillStyle = 'rgba(26,30,36,1)';
+    const x0 = col * i + 14, w = col - 28;
+    ctx.beginPath();
+    ctx.roundRect(x0, top - 18, w, FOOT - 30, 12);
+    ctx.fill();
+    ctx.fillStyle = `rgb(${c.look.shirt.join(',')})`;
+    ctx.fillRect(x0, top - 18, w, 6);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#f2f2f0';
+    ctx.font = '700 24px Gotham';
+    ctx.fillText(`${c.icon} ${c.look.name}`, cx, top + 20);
+    ctx.fillStyle = 'rgb(240,132,44)';
+    ctx.font = '700 15px Gotham';
+    ctx.fillText(c.role.toUpperCase() + (c.id === 'danny' ? ' · FREE, FROM THE START' : ' · RESCUE IN A RUN'), cx, top + 46);
+    ctx.fillStyle = '#9aa0a8';
+    ctx.font = '700 14px Gotham';
+    ctx.fillText(`♥ ${c.health} health · ×${c.speed.toFixed(1)} pace`, cx, top + 70);
+    ctx.fillStyle = '#c4c7cb';
+    ctx.font = '500 16px Gotham';
+    let y = top + 100;
+    for (const line of wrap(ctx, c.ability, w - 30)) {
+      ctx.fillText(line, cx, y);
+      y += 22;
+    }
+    ctx.fillStyle = '#8e949c';
+    ctx.font = '500 13px Gotham';
+    y += 6;
+    for (const line of wrap(ctx, c.carry, w - 30)) {
+      ctx.fillText(line, cx, y);
+      y += 18;
+    }
+  });
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#6f757d';
+  ctx.font = '500 12px Gotham';
+  ctx.fillText('Block stand-in of the classic R15 body, dressed as server/Npcs.luau dress() does it; colours from Config.Crew.Kinds (shared/CrewRules.luau look). Not Roblox\'s renderer.', 40, out.height - 12);
+};
+window.ready = true;
+</script>
+</body>
+</html>

@@ -1565,6 +1565,8 @@ E.real = {
 	SaveSlots = true, -- 10.1: the save slots (E.join picks slot 1 on the start screen: CONTINUE)
 	LobbyWorld = true, Runs = true, -- 9.7: the lobby (SandboxWorld builds it) and the runs (the portals' pads, the parties)
 	Loot = true, -- 9.x loot: every piece of the house gets its rarity, stars and value (Moving's hook)
+	RunDanger = true, -- 10.x danger: a run's locks and keys, its vault, its hazards (Runs starts it; Zombies is the fake's)
+	HelperCrew = true, -- 10.1 the helpers' crew (MoveHelper's hooks, the lobby's stands, the Crew remote)
 }
 E.fakes = {}
 
