@@ -34,6 +34,7 @@ PURE += ("CountryLooks",)  # 9.4 sandbox, the countryside's art kit (tests/count
 PURE += ("HouseRoute",)  # 9.0 Danny's way inside a house, on its plan's grid (tests/houseroute_test.luau, tests/dannynav_runtime_test.luau; 9.3 his walk along it, audited against the built parts: tests/movehelper_stuck_runtime_test.luau)
 PURE += ("PedalRules",)  # 9.1 the drive pedals: the input, the press, where they go (tests/drivepedals_test.luau)
 PURE += ("RunRules",)  # 9.7 runs: the difficulties and their unlocks, the pads, the votes, whose stock (tests/runrules_test.luau)
+PURE += ("LootRules",)  # 9.x loot: a house's pieces' rarities by the difficulty, the stars, the toasts (tests/loot_test.luau)
 luau = sys.argv[1] if len(sys.argv) > 1 else shutil.which("luau") or "luau"
 
 ok = True
@@ -140,8 +141,10 @@ with tempfile.TemporaryDirectory() as tmp:
     # soldier at the Wall, Marge at the kiosk; Moving requires it; tests/movegreeters_runtime_test.luau drives it).
     # 8.1 carrying in two: the real server/PairHold.luau as PairHoldServer.luau the same way (Danny's hold and a crew
     # mate's at a piece's far end; MoveHelper and Moving require it).
-    built_as = {"MoveHelper": "MoveHelperServer", "MoveLobby": "MoveLobbyServer", "MoveGreeters": "MoveGreetersServer", "PairHold": "PairHoldServer"}
-    for module, built in (("Moving", "MovingServer"), ("MoveHelper", "MoveHelperServer"), ("MoveLobby", "MoveLobbyServer"), ("MoveGreeters", "MoveGreetersServer"), ("PairHold", "PairHoldServer")):
+    # 9.x loot: the real server/Loot.luau as LootServer.luau the same way (Moving tags every piece with it: its rarity,
+    # stars and value; tests/loot_runtime_test.luau).
+    built_as = {"MoveHelper": "MoveHelperServer", "MoveLobby": "MoveLobbyServer", "MoveGreeters": "MoveGreetersServer", "PairHold": "PairHoldServer", "Loot": "LootServer"}
+    for module, built in (("Moving", "MovingServer"), ("MoveHelper", "MoveHelperServer"), ("MoveLobby", "MoveLobbyServer"), ("MoveGreeters", "MoveGreetersServer"), ("PairHold", "PairHoldServer"), ("Loot", "LootServer")):
         source = open(os.path.join(os.path.dirname(SHARED), "server", module + ".luau"), encoding="utf-8").read()
         source = re.sub(r"require\(Shared\.(\w+)\)", lambda m: "E.Net" if m[1] == "Net" else f'require("./{m[1]}")', source)
         source = source.replace("require(script.Parent.MoveSites)", 'require("./MoveSitesServer")')  # 7.0: the real one (below)

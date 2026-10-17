@@ -1563,6 +1563,7 @@ E.real = {
 	VillageWorld = true, -- 8.9: Jinočany's village on the map (SandboxWorld builds it)
 	FixtureMesh = true, -- 8.9.1: the houses' fixtures in the owner's Blender model (no import here: the parts' look)
 	LobbyWorld = true, Runs = true, -- 9.7: the lobby (SandboxWorld builds it) and the runs (the portals' pads, the parties)
+	Loot = true, -- 9.x loot: every piece of the house gets its rarity, stars and value (Moving's hook)
 }
 E.fakes = {}
 

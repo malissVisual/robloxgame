@@ -1976,15 +1976,9 @@ Config.Cosmetics = {
 	},
 }
 
--- Supply crates lying around the world: drive or walk into one.
-Config.Loot = {
-	Count = 16,
-	Respawn = 40,
-	MoneyMin = 25,
-	MoneyMax = 90,
-	ItemChance = 0.4,
-	Reach = 9,
-}
+-- Supply crates lying around the world: drive or walk into one. Their numbers (Count, Respawn, MoneyMin, MoneyMax,
+-- ItemChance, Reach: server/Items.luau) are Config.Loot's first six; 9.x: Config.Loot is defined further down, with the
+-- houses' loot (its rarities by the difficulty) beside them.
 
 -- The bandits' pickup: chases you along the roads, two gunners in the bed shoot at your car.
 Config.BanditCar = {
@@ -7558,6 +7552,86 @@ Config.Runs = {
 	},
 	Panel = { Width = 380, TouchScale = 0.8 },
 	Result = { Width = 420, Rows = 8, TouchScale = 0.8 },
+}
+
+-- 9.x LOOT (the owner: "like Dungeon Quest: you go into a house and you get loot there ... outlines with their own colour
+-- by how rare it is, and stars by rarity, so it has value"). Every carryable piece of a house has a rarity, one of
+-- Config.Collection's tiers (common … legendary), decided by the server as the house's pieces are made (server/Loot.luau;
+-- its pure rules shared/LootRules.luau, tests/loot_test.luau). A piece's own rarity is where it starts (CollectionRules
+-- .rarityOf: a collectible's own, uncommon … legendary; the furniture's by its value), and the contract's difficulty
+-- (contract.difficulty; nil or unknown: Default) rolls on it. The house's seed and the difficulty decide the dice: the
+-- same house at the same difficulty always holds the same loot (giving up and taking it again rolls nothing new).
+--   Order        the difficulties, the easiest first (the lobby's portals: "easy" … "nightmare")
+--   Default      a contract without one (and the city's moves): Normal, the rarities as before 9.x
+--   Difficulty   per difficulty: Down, the chance a piece comes a tier under its own (never under Common; a collectible
+--                never under Least); Up, the chance a roll lifts it a tier, Again the chance of each tier more, Most tiers
+--                a roll lifts at most (and never past Legendary); Rolls, the rolls a piece gets (the best kept: the extra
+--                rolls); Floor (a tier's id), the least the house's best piece comes as (its best lifted to it when the
+--                dice gave none that rare). Over the six places' layouts (48 houses × 8 seeds of dice), a haul's income
+--                on show against Normal: Easy × 0.95, Hard × 1.1 (an Epic or better in a third of the houses), Insane
+--                × 1.36 (85 %), Nightmare × 1.5 (every house; a Legendary in about one house of three);
+--                tests/loot_test.luau checks the order and the floor
+--   Lift / Drop  × its catalogue value a tier over (Lift) or under (Drop) its own, a whole number of $ (a tier is worth
+--                more on show and sold too: Config.Collection's income and sell); its own tier: its value as before
+--   Least        the least a collectible comes as
+--   Salt         the dice's own salt (with the house's seed and the difficulty)
+--   Tag          the CollectionService tag on every piece's model with a rarity (a house's pieces, server/Loot.luau;
+--                the pieces on the warehouse's stands, server/Warehouse.luau); the model's attributes: Rarity (the tier's
+--                id), Stars (1 … 5: its rank) and Value ($ it is worth in the warehouse)
+-- The stock keeps a piece's rarity (shared/CollectionRules.luau Entry.rarity: a piece without one is its own rarity, as
+-- every piece was before 9.x), so the stands, selling, the book, the trades and the auction all see the same rarity
+-- and value (CollectionRules.pieceRarity / valueOf).
+-- The client only shows them (client/LootOutline.luau, client/LootStars.luau):
+--   Outline      a Roblox Highlight on the pieces within Range studs of the camera in the tier's colour (FillTransparency
+--                Fill, OutlineTransparency Edge, DepthMode Occluded: never through a wall), the rarest first, then the
+--                nearest (shared/OutlinePick.luau loot); Count at most, and never past Roblox's 31 less
+--                Config.Outline.Spare less the enemies outlined now (one budget with client/EnemyOutline.luau: the
+--                enemies first). One outlined keeps it out to HoldRange × Range and counts HoldRange times nearer (no
+--                blinking); picked every Every s; a phone: DeviceBudget's share. Common false: a Common wears none
+--                (most of a house is Common: their outlines would spend the budget and drown the colours that mean
+--                something; its ★ still shows near); true: Faint, a pale grey-white edge
+--   Stars        a small BillboardGui over each of the Count nearest pieces within Range studs: ★ × Stars in the tier's
+--                colour (Text px) on the HUD's charcoal pill (Tall px high, Pad px round the words), fading out from Fade
+--                to Range studs, AlwaysOnTop false (never through a wall); within Near studs also the tier's name and its
+--                value ("★★★ RARE · $450", Detail px); Lift studs over the piece's top; looked at every Every s; none
+--                while a window is open
+--   Toast        your own pick-up or load of a piece of From's tier or better: "+ RARE Grandma's Clock ★★★ $450" in the
+--                tier's colour under the HUD's toasts (client/Hud.luau's column), once a piece, Gap s apart at least,
+--                Seconds on screen, Most at once; Width px at most (the name shortened), Text px
+--   Sparkle      an Epic or Legendary piece in a house, first seen within See studs (a ray from the camera: not
+--                through a wall): a sparkle in its colour for Seconds s and a sound of the sheets (Sounds: { name,
+--                volume, pitch } by tier: no new audio)
+-- (Config.Loot's first six are the city's supply crates' numbers, as they were before 9.x: see "Supply crates" above.)
+Config.Loot = {
+	Count = 16,
+	Respawn = 40,
+	MoneyMin = 25,
+	MoneyMax = 90,
+	ItemChance = 0.4,
+	Reach = 9,
+	-- 9.x the houses' loot
+	Order = { "easy", "normal", "hard", "insane", "nightmare" } :: { string },
+	Default = "normal",
+	Difficulty = {
+		easy = { Down = 0.15, Up = 0, Again = 0, Most = 1, Rolls = 1 },
+		normal = { Down = 0, Up = 0, Again = 0, Most = 1, Rolls = 1 },
+		hard = { Down = 0, Up = 0.12, Again = 0, Most = 1, Rolls = 1 },
+		insane = { Down = 0, Up = 0.14, Again = 0.3, Most = 2, Rolls = 2 },
+		nightmare = { Down = 0, Up = 0.2, Again = 0.35, Most = 2, Rolls = 2, Floor = "epic" },
+	} :: { [string]: { Down: number, Up: number, Again: number, Most: number, Rolls: number, Floor: string? } },
+	Lift = 1.5,
+	Drop = 0.8,
+	Least = "uncommon",
+	Salt = 9817,
+	Tag = "LootPiece",
+	Outline = { Count = 20, Range = 60, HoldRange = 1.15, Every = 0.25, Fill = 0.88, Edge = 0.1, Common = false, Faint = { 232, 234, 238 } :: { number } },
+	Stars = { Count = 8, Range = 40, Fade = 24, Near = 10, Text = 13, Detail = 12, Tall = 22, Pad = 8, Lift = 0.8, Every = 0.2 },
+	Toast = { From = "uncommon", Gap = 0.6, Seconds = 2.6, Most = 2, Width = 340, Text = 14 },
+	Sparkle = {
+		See = 30,
+		Seconds = 1.6,
+		Sounds = { epic = { "ding", 0.5, 1.3 }, legendary = { "stored_fanfare", 0.6, 1.1 } } :: { [string]: { any } },
+	},
 }
 
 -- 8.0 SANDBOX, the guide (client/SandboxGuide.luau, its steps shared/SandboxSteps.luau): a thin hint line at the top in

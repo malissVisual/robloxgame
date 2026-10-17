@@ -469,6 +469,17 @@ do -- 9.1 the drive pedals: started with the sandbox's own modules; they step as
 	check("… the result card open: they step aside", covered3() == true)
 end
 
+do -- 9.x loot: the outlines and the stars start with the sandbox's own modules; the stars step aside under a window
+	local run = boot(true, { LootOutline = "ok", LootStars = "ok", WarehouseUi = "ok" }, true)
+	check("9.x loot: the outlines (LootOutline) and the stars (LootStars) start with the sandbox's own modules", called(run, "LootOutline.start") and called(run, "LootStars.start"))
+	local covered = run.modules.LootStars.covered
+	check("… the stars with Main's covered check (a window open: none)", covered == run.modules.CameraRig.windowOpen)
+	check("… and the city never requires them", (function(): boolean
+		local city = boot(false, { LootOutline = "ok", LootStars = "ok" })
+		return city.required.LootOutline == nil and city.required.LootStars == nil
+	end)())
+end
+
 do -- none of the sandbox's own modules there yet (the other workers' branches not merged)
 	local run = boot(true, {})
 	local ok, where = same(starts(run), concat(SANDBOX, LAST))

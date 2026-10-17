@@ -93,7 +93,7 @@ end
 -- ── A collection ───────────────────────────────────────────────────────────
 
 function SandboxLeadersRules.isLegendary(entry: { item: string }): boolean
-	return CollectionRules.rarityOf(CollectionRules.defOf(entry.item)) == Config.SandboxLeaders.Legendary
+	return CollectionRules.pieceRarity(entry) == Config.SandboxLeaders.Legendary -- (9.x loot: its own roll)
 end
 
 function SandboxLeadersRules.summary(entries: { CollectionRules.Entry }): Summary

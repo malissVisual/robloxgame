@@ -59,7 +59,7 @@ local WIN = BOOK.Window
 local K = Theme.Contract
 local C = CardKit.Color
 
-export type Found = { n: number, best: number, bought: boolean? } -- (8.7 review: bought, only ever bought from a player)
+export type Found = { n: number, best: number, bought: boolean?, top: string? } -- (8.7 review: bought, only ever bought from a player; 9.x loot: top, the rarest found)
 export type State = { book: { [string]: Found }, paid: { [string]: boolean } }
 export type Layout = {
 	touch: boolean,
@@ -134,9 +134,10 @@ local function emojiOf(item: string): string
 	return if def and type(def.icon) == "string" then def.icon else "📦"
 end
 
-local function tierOf(item: string): any
+-- (9.x loot: a page found shows the rarest of it found, shared/CollectionBookRules.luau pageRarity)
+local function tierOf(item: string, found: Found?): any
 	local tiers = Config.Collection.Tiers
-	return tiers[Rules.rarityOf(item)] or tiers.common
+	return tiers[Rules.pageRarity(item, found :: any)] or tiers.common
 end
 
 local function rgb(c: { number }): Color3
@@ -424,7 +425,7 @@ local function stateKey(state: State, layout: Layout): string
 	for _, item in Rules.Pieces do
 		local found = state.book[item]
 		if found then
-			table.insert(parts, `{item}:{found.n}:{found.best}{if found.bought then ":bought" else ""}`)
+			table.insert(parts, `{item}:{found.n}:{found.best}{if found.bought then ":bought" else ""}:{found.top or ""}`) -- (9.x loot: its rarest found)
 		end
 	end
 	for _, milestone in Rules.Milestones do
@@ -534,7 +535,7 @@ end
 
 local function drawCard(parent: any, item: string, index: number, layout: Layout, found: Found?)
 	local col, line = (index - 1) % layout.cols, (index - 1) // layout.cols
-	local tier = tierOf(item)
+	local tier = tierOf(item, found)
 	local accent = rgb(tier.color)
 	local w = layout.tileW
 	local frame = Ui.make("Frame", {
@@ -578,6 +579,8 @@ local function drawCard(parent: any, item: string, index: number, layout: Layout
 	end
 	if found then
 		Ui.make("Frame", { Name = "RarityBar", Size = UDim2.new(1, 0, 0, 3), Position = UDim2.new(0, 0, 1, -3), BackgroundColor3 = accent, BorderSizePixel = 0, ZIndex = 3 }, picture)
+		local stars = string.rep("★", tier.rank) -- (9.x loot: its stars, as over the piece in the world)
+		Ui.label(picture, stars, UDim2.fromOffset(CardKit.width(stars, 10, Theme.HeadingFont) + 4, 13), { Name = "Stars", Position = UDim2.new(1, -5, 1, -5), AnchorPoint = Vector2.new(1, 1), Font = Theme.HeadingFont, TextSize = 10, TextColor3 = accent, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 3 })
 		Ui.label(frame, nameOf(item), UDim2.fromOffset(inner, 16), { Name = "PieceName", Position = UDim2.fromOffset(8, y), Font = Theme.HeadingFont, TextSize = 13, TextColor3 = K.text, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = left })
 		y += 17
 		local count = if found.n > 999 then "×999+" else `×{found.n}`
@@ -585,7 +588,7 @@ local function drawCard(parent: any, item: string, index: number, layout: Layout
 		Ui.label(frame, string.upper(tier.name), UDim2.fromOffset(inner - countW - 4, 13), { Name = "Rarity", Position = UDim2.fromOffset(8, y), Font = Theme.HeadingFont, TextSize = 10, TextColor3 = accent, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = left })
 		Ui.label(frame, count, UDim2.fromOffset(countW, 13), { Name = "Count", Position = UDim2.new(1, -8, 0, y), AnchorPoint = Vector2.new(1, 0), Font = Theme.HeadingFont, TextSize = 11, TextColor3 = K.secondary, TextWrapped = false, TextXAlignment = right })
 		y += 16
-		local value = Ui.money(Rules.valueOf(item))
+		local value = Ui.money(Rules.pageValue(item, found :: any)) -- (9.x loot: at its rarest found)
 		local valueW = math.ceil(CardKit.width(value, 12, Theme.HeadingFont))
 		Ui.label(frame, `Best {percent(found.best)}`, UDim2.fromOffset(inner - valueW - 4, 14), { Name = "Best", Position = UDim2.fromOffset(8, y), Font = Theme.Font, TextSize = 11, TextColor3 = K.secondary, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = left })
 		Ui.label(frame, value, UDim2.fromOffset(valueW, 14), { Name = "Value", Position = UDim2.new(1, -8, 0, y), AnchorPoint = Vector2.new(1, 0), Font = Theme.HeadingFont, TextSize = 12, TextColor3 = C.money, TextWrapped = false, TextXAlignment = right })
@@ -730,7 +733,7 @@ local function setState(raw: any)
 		for _, item in Rules.Pieces do
 			local found = raw.book[item]
 			if type(found) == "table" and type(found.n) == "number" and found.n >= 1 and type(found.best) == "number" then
-				book[item] = { n = math.floor(found.n), best = math.clamp(found.best, 0, 1), bought = if found.bought == true then true else nil }
+				book[item] = { n = math.floor(found.n), best = math.clamp(found.best, 0, 1), bought = if found.bought == true then true else nil, top = if type(found.top) == "string" then found.top else nil } -- (9.x loot: top)
 			end
 		end
 	end

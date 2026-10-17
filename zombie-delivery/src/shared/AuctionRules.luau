@@ -317,6 +317,7 @@ function AuctionRules.lotOf(entry: CollectionRules.Entry, seller: number?, selle
 	lot.uid = entry.uid
 	lot.seller = seller
 	lot.sellerName = sellerName
+	lot.rarity = CollectionRules.pieceRarity(entry) -- (9.x loot: its own roll; its worth is its value at that rarity)
 	lot.income = math.floor(CollectionRules.income(entry, 1, market) * 100 + 0.5) / 100
 	lot.market = Market.tag(market, entry.item)
 	return lot
@@ -604,7 +605,7 @@ function AuctionRules.consignable(entry: { item: string, condition: number }): (
 	if not def then
 		return false, "This piece can't go to auction."
 	end
-	if not AuctionRules.allowed(CollectionRules.rarityOf(def)) then
+	if not AuctionRules.allowed(CollectionRules.pieceRarity(entry)) then -- (9.x loot: its own roll)
 		return false, `Only {rarityWords()} pieces go to auction.`
 	end
 	if CollectionRules.broken(entry) then

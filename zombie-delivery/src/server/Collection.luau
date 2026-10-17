@@ -5,9 +5,12 @@
 -- save keeps the collection (profile.collection = { entries = { Entry }, nextUid }: server/PlayerData.luau reads it
 -- with CollectionRules.fromSave, only from a save written with its flag).
 --
---   Collection.add(player, entry)              one piece into your stock: entry = { item, variant?, condition, name? }
---                                              → its uid (nil: refused, and why: no save yet, an unknown item, the
---                                              stock full at Config.Collection.MaxStock)
+--   Collection.add(player, entry)              one piece into your stock: entry = { item, variant?, condition, name?,
+--                                              rarity? } → its uid (nil: refused, and why: no save yet, an unknown
+--                                              item, the stock full at Config.Collection.MaxStock); 9.x loot: `rarity`
+--                                              the server's roll in its house (server/Loot.luau through the move's trip
+--                                              home), kept with the piece (CollectionRules.keepRarity: none, or its
+--                                              item's own, reads as its own rarity)
 --   Collection.stock(player)                   { Entry } everything you own (on show or not; copies)
 --   Collection.display(player, uid, stand)     put a piece of your stock on display stand `stand` (an index of your
 --                                              warehouse's stands, CollectionRules.standsFor; one piece a stand; a
@@ -28,7 +31,8 @@
 --                                              the seller's piece still on stand `stand`, room in the buyer's stock, the
 --                                              buyer's money), then the seller's stands counted at the old rates, the
 --                                              piece out of the seller's collection and into the buyer's stock (a new uid
---                                              of the buyer's, not on show, no sign; got now), the price from the buyer
+--                                              of the buyer's, not on show, no sign; got now; 9.x its loot rarity kept:
+--                                              the same rarity and value at the buyer's), the price from the buyer
 --                                              ("PlayerBuy"), to the seller ("PlayerSale") less the fee ("TradeFee"); the
 --                                              onTransferred listeners, both changed; 8.7 review: both saved at once, the
 --                                              buyer's first (below) → the buyer's new entry (a copy), nil and why
@@ -408,7 +412,7 @@ end
 
 -- ── The API ────────────────────────────────────────────────────────────────
 
-function Collection.add(player: Player, entry: { item: string, variant: number?, condition: number, name: string? }): (string?, string?)
+function Collection.add(player: Player, entry: { item: string, variant: number?, condition: number, name: string?, rarity: string? }): (string?, string?)
 	local profile = PlayerData.get(player)
 	if not profile then
 		return nil, "Your save isn't loaded yet."
@@ -440,9 +444,10 @@ function Collection.add(player: Player, entry: { item: string, variant: number?,
 		name = name,
 		stand = nil,
 		got = os.time(),
+		rarity = Rules.keepRarity(def.id, raw.rarity), -- (9.x loot: its house's roll; none: its own)
 	})
 	local piece = table.clone(collection.entries[#collection.entries]) -- (8.2: for Collection.onAdded)
-	noteAdded(player, Rules.rarityOf(def))
+	noteAdded(player, Rules.pieceRarity(piece))
 	PlayerData.saveSoon(player) -- (8.3 saves: a trip's pieces home are saved a moment later, one save for the van)
 	changed(player)
 	for _, fn in addedListeners do -- (8.2: the collection book)
@@ -493,7 +498,7 @@ function Collection.display(player: Player, uid: string, stand: number): (boolea
 	end
 	settle(player)
 	entry.stand = stand
-	PlayerData.track("event", player, "CollectionDisplayed", math.floor(Rules.income(entry, boostOf(player), marketOf(player)) + 0.5), Rules.rarityOf(Rules.defOf(entry.item)))
+	PlayerData.track("event", player, "CollectionDisplayed", math.floor(Rules.income(entry, boostOf(player), marketOf(player)) + 0.5), Rules.pieceRarity(entry))
 	changed(player)
 	return true, nil
 end
@@ -540,7 +545,7 @@ function Collection.sell(player: Player, uid: string, expect: number?): (number?
 	PlayerData.addMoney(player, price, "CollectionSale", entry.item)
 	for _, fn in paidTo do task.spawn(fn, player, "sale", price, { hot = if tag == "hot" then 1 else 0 }) end -- 8.2: Collection.onPaid
 	remote:FireClient(player, { kind = "sold", name = entry.name, money = price })
-	PlayerData.track("event", player, "CollectionSold", price, Rules.rarityOf(Rules.defOf(entry.item)), tag)
+	PlayerData.track("event", player, "CollectionSold", price, Rules.pieceRarity(entry), tag)
 	changed(player)
 	return price, nil
 end
@@ -568,7 +573,7 @@ function Collection.sellAt(player: Player, uid: string, price: number, reason: s
 	PlayerData.addMoney(player, price, reason, entry.item)
 	for _, fn in paidTo do task.spawn(fn, player, "sale", price, { hot = if tag == "hot" then 1 else 0 }) end
 	remote:FireClient(player, { kind = "sold", name = entry.name, money = price })
-	PlayerData.track("event", player, "CollectionSold", price, Rules.rarityOf(Rules.defOf(entry.item)), tag)
+	PlayerData.track("event", player, "CollectionSold", price, Rules.pieceRarity(entry), tag)
 	changed(player)
 	return price, nil
 end
@@ -656,6 +661,7 @@ function Collection.transfer(seller: Player, buyer: Player, uid: string, stand: 
 		stand = nil,
 		got = os.time(),
 		sale = nil,
+		rarity = Rules.keepRarity(entry.item, entry.rarity), -- (9.x loot: its rarity and value go with it)
 	}
 	table.insert(to.entries, piece)
 	PlayerData.spend(buyer, price, "PlayerBuy", entry.item)
@@ -890,7 +896,7 @@ local function fillBest(player: Player): (number?, string?)
 			taken[place.stand] = true
 			count += 1
 			gained += Rules.income(entry, boost, market)
-			rarest = rarer(rarest, Rules.rarityOf(Rules.defOf(entry.item)))
+			rarest = rarer(rarest, Rules.pieceRarity(entry))
 		end
 	end
 	if count == 0 then
@@ -969,7 +975,7 @@ local function sellMany(player: Player, filter: any, expect: number?, uids: any)
 			local tag = Market.tag(market, entry.item)
 			hot += if tag == "hot" then 1 else 0
 			cold += if tag == "cold" then 1 else 0
-			rarest = rarer(rarest, Rules.rarityOf(Rules.defOf(entry.item)))
+			rarest = rarer(rarest, Rules.pieceRarity(entry))
 			mixed = mixed or (item ~= nil and item ~= entry.item)
 			item = entry.item
 		else
