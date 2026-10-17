@@ -1253,7 +1253,12 @@ end
 do
 	-- a second run: the farmstead again (refilled: something came home), one more piece, FINISH
 	local seedWas = S.annMove
+	local rideAt = #E.sent
 	local run = H.run({ ann }, House.id)
+	local ride = E.lastKind(ann, "Runs", "ride", rideAt)
+	check("10.3 the ride there: her client told before the jump (to the farmstead, its difficulty, nobody else, Config.Runs.Ride.To s)", ride ~= nil
+		and ride.to == House.name and ride.back == false and type(ride.difficulty) == "string" and #ride.party == 0 and ride.seconds == Config.Runs.Ride.To,
+		ride and ride.to)
 	annVan = Vehicles.get(ann)
 	check("(Ann's second run: the farmstead again, a new move; her truck back at its curb)", run ~= nil and H.stateOf(ann).id ~= seedWas and annVan ~= nil
 		and H.flat(annVan.chassis.Position, V3(House.curb.x, 0, House.curb.z)) < 0.5)
@@ -1269,7 +1274,11 @@ do
 	local done = E.lastKind(ann, "SandboxTasks", "done", tripAt)
 	check("8.2 tasks: \"trips\" 2" .. (if trips and trips.target == 2 then ", done: her client told" else ""), trips ~= nil and trips.progress == math.min(2, trips.target)
 		and (trips.target ~= 2 or (done ~= nil and trips.done)), trips and `{trips.progress}/{trips.target}`)
+	local homeAt = #E.sent
 	H.backHome()
+	local back = E.lastKind(ann, "Runs", "ride", homeAt)
+	check("10.3 the ride back: to the depot (Config.Runs.Ride.Home), no difficulty, Config.Runs.Ride.Back s", back ~= nil and back.back == true
+		and back.to == Config.Runs.Ride.Home and back.difficulty == nil and back.seconds == Config.Runs.Ride.Back, back and back.to)
 end
 
 -- ── 8. The warehouse: the picker, a display, the stand's model ───────────

@@ -47,6 +47,9 @@
 --                                      for `player` alone, at the difficulty `admin` picked, locks ignored) | "difficulty"
 --                                      (its id) | "end" (`player`'s run) → what to say
 --   Runs.step()                        one look at the pads (the loop's; the tests')
+-- 10.3 the ride (the owner: "there is no driving the car any more, so every time you go to a place, an animation of
+-- you driving there"): before every jump to a house and back to the lobby, each player gets { kind = "ride", to, back,
+-- difficulty?, party?, seconds } (Config.Runs.Ride): client/RideUi.luau shows the van on its way over the fade.
 -- 10.x danger (server/RunDanger.luau: the locks and keys, the vault, the hazards, the zombies, the bat): started with the
 -- runs (Runs.start); the results card's `danger` ({ vault = true / false / nil: none, stopped = zombies killed }) is
 -- RunDanger.result's (the blocks marked "10.x danger").
@@ -247,10 +250,32 @@ local function spread(spot: SandboxMap.Spot, count: number): { CFrame }
 	return out
 end
 
+-- 10.3: the ride's card (client/RideUi.luau) for `player` on their way to `to` (a house's name; back: the lobby), sent
+-- before the jump's fade: the run's difficulty and who else rides along (a run's party; on the way back, nobody).
+local function ride(player: Player, to: string, back: boolean, run: Run?)
+	local others: { string } = {}
+	if run and not back then
+		for _, p in run.party do
+			if p ~= player then
+				table.insert(others, p.DisplayName)
+			end
+		end
+	end
+	send(player, {
+		kind = "ride",
+		to = to,
+		back = back,
+		difficulty = if run and not back then run.difficulty else nil,
+		party = others,
+		seconds = if back then R.Ride.Back else R.Ride.To,
+	})
+end
+
 local function backTo(house: string, players: { Player })
 	local portal = SandboxMap.portal(house)
 	local spot = if portal then portal.back else L.spawn
 	for n, frame in spread(spot, #players) do
+		ride(players[n], R.Ride.Home, true, nil) -- 10.3
 		jump(players[n], frame)
 	end
 end
@@ -433,6 +458,7 @@ function Runs.begin(house: string, party: { Player }, difficulty: string, admin:
 		local p = party[n]
 		padKey[p] = ""
 		send(p, { kind = "pad" })
+		ride(p, H.name, false, run) -- 10.3: the van on its way there, over the fade
 		jump(p, frame)
 	end
 	sendRun(run)
