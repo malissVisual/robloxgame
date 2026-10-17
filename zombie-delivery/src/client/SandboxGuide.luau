@@ -407,7 +407,8 @@ end
 -- The van the move fills (yours, or on a crew the owner's: the player attribute MoveWith): looked up at most once a
 -- second, kept while it stays.
 local function van(): Model?
-	local owner = if move and not mine and type(player:GetAttribute("MoveWith")) == "number" then player:GetAttribute("MoveWith") else player.UserId
+	local round = move and type(move.run) == "table" and move.run.round == true -- (10.5 rounds: always your own van)
+	local owner = if move and not mine and not round and type(player:GetAttribute("MoveWith")) == "number" then player:GetAttribute("MoveWith") else player.UserId
 	local known = world.van
 	if known and known.Parent and known:GetAttribute("OwnerId") == owner then
 		return known
@@ -1103,6 +1104,7 @@ local function look()
 		pad = (require(script.Parent.RunUi) :: any).pad()
 	end)
 	state.pad = type(pad) == "table" and not state.move
+	state.round = Config.Rounds.On -- 10.5 rounds: their words, no portal to walk to
 	state.padHost = state.pad == true and pad.mine == true
 	state.hush = asks and (os.clock() < softAfter or ask(nil, "busy") == true) -- (a first-time hint talks)
 	SandboxSteps.doneBy(state, done, last)

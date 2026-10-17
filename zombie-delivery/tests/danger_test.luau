@@ -24,6 +24,19 @@ local HouseRoute = require("./HouseRoute")
 local LootRules = require("./LootRules")
 local FurnitureLooks = require("./FurnitureLooks")
 
+-- 10.5: the game has no zombies any more (the owner: "zombies I don't want in the game at all": Config.Runs.Danger has
+-- none at any difficulty, no bat, no boss; tests/roundrules_test.luau checks so). Their code and rules stay: this test
+-- turns them on as they were before 10.5.
+for id, were in {
+	hard = { Inside = 3, Yard = 3, Wave = 0, Speed = 1, Boss = false, Weapon = true, Kinds = { walker = 1 } },
+	insane = { Inside = 5, Yard = 4, Wave = 8, Speed = 1.2, Boss = false, Weapon = true, Kinds = { walker = 0.65, runner = 0.25, bloater = 0.1 } },
+	nightmare = { Inside = 7, Yard = 6, Wave = 12, Speed = 1.3, Boss = true, Weapon = true, Kinds = { walker = 0.5, runner = 0.25, brute = 0.15, bloater = 0.1 } },
+} :: { [string]: { [string]: any } } do
+	for key, value in were do
+		(Config.Runs.Danger[id] :: any)[key] = value
+	end
+end
+
 local failures = 0
 local function check(name: string, ok: boolean, detail: any?)
 	if ok then
