@@ -364,7 +364,6 @@ local function moveInto(index: number, house: any, seed: number): (any, any, any
 	local truck = E.cars[p]
 	truck.chassis.CFrame = CF(house.curb.x, 2, house.curb.z) * M.CFrame.Angles(0, math.rad(house.curb.yaw), 0)
 	truck.model:SetAttribute("BackOpen", true)
-	E.request(p, "helper", "hire")
 	run(0.6)
 	return p, danny, b
 end

@@ -204,10 +204,9 @@ local b = built[#built]
 check(`{house.name}: a run into it`, started == nil and b ~= nil and b.plan.kind == "big", started)
 Moving.step()
 danny = MoveHelper.find(sol)
-E.request(sol, "helper", "hire")
 run(0.6)
 local lead = E.leadClient(sol) -- 9.2 Sol's client/PairLead.luau
-check("Danny comes, Sol hires him, his grid the house's plan", danny ~= nil and danny.hirer == sol and danny.route ~= nil)
+check("Danny comes, Sol's from the start (10.1 free), his grid the house's plan", danny ~= nil and danny.hirer == sol and danny.route ~= nil)
 local plan, origin = b.plan, b.origin
 local grid = HouseRoute.grid(plan) :: HouseRoute.Grid -- (the test's own: the walls)
 local y = origin.Position.Y + 3

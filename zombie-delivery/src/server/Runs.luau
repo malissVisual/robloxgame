@@ -19,8 +19,9 @@
 --     house's clock × the difficulty's time; the inside's RunDifficulty attribute is Moving's), the map's house model
 --     gets the attribute RunDifficulty too (traps, zombies and the loot's rarity read it: a later worker's), the truck
 --     gets its prompts (the host's "Finish the run", the others' "Vote to finish") and everybody fades over to the
---     house's front yard (SandboxMap.Zones' arrive, Apart studs across), its door before them. A hired Danny is the
---     move's (server/MoveHelper.luau: he waits by the truck at the house and goes with the run).
+--     house's front yard (SandboxMap.Zones' arrive, Apart studs across), its door before them. The host's helper is
+--     the move's (server/MoveHelper.luau: he waits by the truck at the house and goes with the run; 10.1 free, the
+--     host's pick of their crew: server/HelperCrew.luau, which also traps a helper in some runs' houses to rescue).
 --   * In the run: FINISH (the host: the truck's prompt, the move's panel) ends it; so does everybody else's vote
 --     (RunRules.voteDone over the party but the host); the clock ends it too (Moving's tick). LEAVE THE RUN (the Runs
 --     remote's "leave": the move's list) takes one player back alone (their loaded pieces still count at the end); the

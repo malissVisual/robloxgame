@@ -46,7 +46,8 @@ end
 --                                      8.9's VillageTraffic (the D5's cars, this screen's only), 9.1's DrivePedals (GAS
 --                                      and BRAKE while you drive: a touch screen's driving buttons, a computer's feet),
 --                                      9.x's LootOutline and LootStars (the loot's coloured outlines, its stars and
---                                      its toasts; the stars step aside under a window):
+--                                      its toasts; the stars step aside under a window), 10.1's CrewUi (the CREW
+--                                      window: a window too; the ring over a helper down in a run):
 --                                      each started only when it is there; 8.7's TradePrompts (the trade prompts on
 --                                      your own stands hidden, a big sale's chat line) next to CargoPrompts
 -- 8.5.1: Studio kept old scripts after a sync? This side's stamp (client/BuildStamp.luau) against the shared Config's
@@ -130,7 +131,7 @@ if Config.Sandbox.On then
 	-- The sandbox's own modules (other workers write them at the same time): only when they are there, and one that
 	-- fails to load is skipped with a warning.
 	local own: { { name: string, module: any } } = {}
-	for _, name in { "SandboxHud", "WarehouseUi", "SandboxGuide", "UpgradeUi", "CollectionBookUi", "SandboxTasksUi", "MoveHelperCard", "DannyOrders", "OfferCard", "VanPaintUi", "TradeUi", "AuctionUi", "VillageTraffic", "DrivePedals", "RunUi", "LootOutline", "LootStars" } do -- (8.1: the UPGRADES desk's window; 8.2: the collection book, the TASKS panel; 8.3: Danny's command card, a visitor's offer, the PAINT shop; 8.5: Danny's clipboard, orders mode; 8.7: trading between players; 8.8: the Auction House's window, only while Config.Auction.On; 8.9: the D5's cars, Jinočany; 9.1: the drive pedals; 9.x loot: the outlines, the stars and the toasts)
+	for _, name in { "SandboxHud", "WarehouseUi", "SandboxGuide", "UpgradeUi", "CollectionBookUi", "SandboxTasksUi", "MoveHelperCard", "DannyOrders", "OfferCard", "VanPaintUi", "TradeUi", "AuctionUi", "VillageTraffic", "DrivePedals", "RunUi", "LootOutline", "LootStars", "CrewUi" } do -- (10.1: the CREW window, the down ring; 8.1: the UPGRADES desk's window; 8.2: the collection book, the TASKS panel; 8.3: Danny's command card, a visitor's offer, the PAINT shop; 8.5: Danny's clipboard, orders mode; 8.7: trading between players; 8.8: the Auction House's window, only while Config.Auction.On; 8.9: the D5's cars, Jinočany; 9.1: the drive pedals; 9.x loot: the outlines, the stars and the toasts)
 		local found = Client:FindFirstChild(name)
 		if found and found:IsA("ModuleScript") then
 			local ok, module = pcall(function(): any
@@ -160,7 +161,7 @@ if Config.Sandbox.On then
 	local PaintUi = ownModule("VanPaintUi") -- (8.3: the PAINT shop's window)
 	local TradeUi = ownModule("TradeUi") -- (8.7: trading between players: the composer, the price picker, the buy question)
 	local AuctionUi = ownModule("AuctionUi") -- (8.8: the Auction House's window: the live lot, the consign picker, the results)
-	local windows = { WarehouseUi, UpgradeUi, BookUi, TasksUi, DannyCard, OfferCard, PaintUi, TradeUi, AuctionUi, ownModule("RunUi") } -- (9.7: a run's results card)
+	local windows = { WarehouseUi, UpgradeUi, BookUi, TasksUi, DannyCard, OfferCard, PaintUi, TradeUi, AuctionUi, ownModule("RunUi"), ownModule("CrewUi") } -- (9.7: a run's results card; 10.1: the CREW window)
 
 	safely("Drive", Drive.start)
 	safely("ZombieAnimator", require(Client.ZombieAnimator).start)
@@ -269,7 +270,7 @@ if Config.Sandbox.On then
 	CameraRig.windowOpen = function(): boolean
 		return Hud.anyWindowOpen() or AdminPanel.isOpen() or CrewPanel.isOpen() or MovingHud.isOpen() or MoveLobbyUi.isOpen()
 			or QuickChat.isOpen() or ownOpen(WarehouseUi) or ownOpen(UpgradeUi) or ownOpen(BookUi) or ownOpen(TasksUi) or ownOpen(DannyCard) or ownOpen(PaintUi)
-			or ownOpen(OfferCard) or ownOpen(TradeUi) or ownOpen(AuctionUi) or ownOpen(windows[10])
+			or ownOpen(OfferCard) or ownOpen(TradeUi) or ownOpen(AuctionUi) or ownOpen(windows[10]) or ownOpen(windows[11])
 	end
 	CameraRig.mouseNeeded = CameraRig.windowOpen
 	-- 9.0 (the owner: "aiming with the crosshair only when I want to shoot or have pistols; the mouse normally free, so

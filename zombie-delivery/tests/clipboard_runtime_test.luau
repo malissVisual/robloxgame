@@ -4,16 +4,16 @@
 -- MovingRuntime.luau's fakes (tests/run_tests.py builds them). The recorder's SetAttribute fires the instance's
 -- AttributeChanged here, as Roblox does (server/Clipboard.luau listens to it; Moving and MoveHelper listen to none), and
 -- a seat's SeatPart change is fired by the test (Roblox's property signal).
---   * Out only while Danny works for your move: refused with no move, while he is for hire (a notice: hire him first);
---     out once hired: a model "Clipboard" in your character (a board, a sheet of paper, a clip, lines) welded to the
+--   * Out only while a helper works for your move: refused with no move (a notice: your helper comes with you into a
+--     run); 10.1 out from the move's start (free, no hire): a model "Clipboard" in your character (a board, a sheet of paper, a clip, lines) welded to the
 --     right hand, massless, never colliding, touched or hit by rays; the character attribute ClipboardHeld.
 --   * The assign remote (Danny's list): refused while the clipboard is away (a notice, nothing on his list, a piece of
 --     his list never taken back), allowed with it out; the rate limit kept (MoveHelperAssign) and its own
 --     (Config.Robust.Limits.Clipboard). 9.0: with it out the server's piece prompts stay as they are (each client hides
 --     its own player's: client/DannyOrders.luau; E sends this same assign).
 --   * Away by itself: a pick (you can't carry with it: the pick puts it away), a seat, death, the phone, a gun up, the
---     move's end, the hire over (its hirer, a crew mate, left the move: Danny let go); refused while you carry or sit.
---   * A crew mate may hold it too (Danny hired by another of the crew); garbage requests; leaving.
+--     move's end; refused while you carry or sit.
+--   * A crew mate may hold it too (Danny with the whole crew); garbage requests; leaving.
 local E = require("./MovingRuntime")
 local M = E.Mock
 
@@ -146,20 +146,16 @@ end
 
 local noticeAt = #E.messages
 ask(ann, true)
-check("no move, no Danny: the clipboard stays away, a notice says why (hire him first)", away(ann) and told(ann, "hire him first", noticeAt), E.lastNotice(ann))
+check("no move, no Danny: the clipboard stays away, a notice says why (your helper comes into a run)", away(ann) and told(ann, "your helper", noticeAt), E.lastNotice(ann))
 local started = Moving.admin(ann, "start")
 local truck = E.cars[ann]
 truck.model:SetAttribute("BackOpen", true)
 Moving.step()
 local danny = MoveHelper.find(ann)
-check("a move: Danny comes for hire", string.find(started, "started", 1, true) ~= nil and danny ~= nil and ann:GetAttribute("MoveHelper") == "offer", started)
-noticeAt = #E.messages
+check("10.1 a move: Danny comes, free, Ann's from the start", string.find(started, "started", 1, true) ~= nil and danny ~= nil and danny.hirer == ann
+	and ann:GetAttribute("MoveHelper") == "hired", started)
 ask(ann, true)
-check("…for hire: still away (\"hire him first\")", away(ann) and told(ann, "hire him first", noticeAt))
-E.request(ann, "helper", "hire")
-check("Ann hires him", danny.hirer == ann and ann:GetAttribute("MoveHelper") == "hired")
-ask(ann, true)
-check("hired: the clipboard out (ClipboardHeld, a model \"Clipboard\" in her character)", held(ann))
+check("…the clipboard out at once (ClipboardHeld, a model \"Clipboard\" in her character)", held(ann))
 local model = ann.Character:FindFirstChild("Clipboard")
 local names: { [string]: boolean } = {}
 local welded, light, ghost = true, true, true
@@ -286,12 +282,10 @@ run(0.5)
 check("8.5 the move's end: Danny gone, the clipboard with him", MoveHelper.find(ann) == nil and ann:GetAttribute("MoveHelper") == nil and away(ann))
 noticeAt = #E.messages
 ask(ann, true)
-check("…no move: refused (\"hire him first\")", away(ann) and told(ann, "hire him first", noticeAt))
+check("…no move: refused (your helper comes into a run)", away(ann) and told(ann, "your helper", noticeAt))
 
--- ── The hire over (Danny let go): a crew mate hired him and left ─────────────
+-- ── A crew mate: the clipboard theirs too; off the move, theirs goes ─────────
 
-local duo = H.Duo
-H.Duo = true
 Moving.admin(ann, "start")
 truck = E.cars[ann]
 truck.model:SetAttribute("BackOpen", true)
@@ -299,24 +293,20 @@ Moving.step()
 E.crew[ann] = { bob }
 Moving.step()
 danny = MoveHelper.find(ann)
-check("a second move, Bob in Ann's crew: Danny for hire for both", danny ~= nil and ann:GetAttribute("MoveHelper") == "offer" and bob:GetAttribute("MoveHelper") == "offer")
-E.wallet[bob] = 300
-E.request(bob, "helper", "hire")
+check("a second move, Bob in Ann's crew: Danny with both (10.1 free: Ann's, he stays when the crew grows)", danny ~= nil and danny.hirer == ann
+	and ann:GetAttribute("MoveHelper") == "hired" and bob:GetAttribute("MoveHelper") == "hired")
 ask(ann, true)
 ask(bob, true)
-check("Bob hires him: Ann may hold the clipboard too (any of the crew), and Bob", danny.hirer == bob and ann:GetAttribute("MoveHelper") == "hired" and held(ann) and held(bob))
+check("Ann and Bob may both hold the clipboard (any of the crew)", held(ann) and held(bob))
 E.crew[ann] = {}
 Moving.step()
-check("8.5 fire: Bob leaves the move, his hire with him (Danny for hire again): Ann's clipboard goes", danny.hirer == nil and ann:GetAttribute("MoveHelper") == "offer" and away(ann),
-	ann:GetAttribute("MoveHelper"))
-check("…and Bob's (off the move: no Danny of his)", bob:GetAttribute("MoveHelper") == nil and away(bob))
-H.Duo = duo
+check("8.5 Bob leaves the move: his clipboard goes (off the move: no helper of his); Ann's stays", bob:GetAttribute("MoveHelper") == nil and away(bob)
+	and ann:GetAttribute("MoveHelper") == "hired" and held(ann), ann:GetAttribute("MoveHelper"))
 
 -- ── Leaving ─────────────────────────────────────────────────────────────────
 
-E.request(ann, "helper", "hire")
 ask(ann, true)
-check("Ann hires him herself: out", danny.hirer == ann and held(ann))
+check("Ann's clipboard out", danny.hirer == ann and held(ann))
 local character = ann.Character
 E.leave(ann)
 check("Ann leaves the game: it goes with her (nothing kept for her)", not Clipboard.out(ann) and character:GetAttribute("ClipboardHeld") == nil and character:FindFirstChild("Clipboard") == nil)

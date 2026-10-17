@@ -25,6 +25,9 @@
 --     with a seed and no house's flag: the farmstead's (its seed was rolled for the one house there was).
 --   * 9.7 runs: the difficulties open (runUnlocked) the same way: written with its flag, read back on another server;
 --     a real save from before 9.7 (no flag), junk, a lock-only record, a new player: Easy and Normal (Config.Runs.Open).
+--   * 10.1 the helpers' crew (crew: who you have, your pick, who is in hospital until when) the same way: written with
+--     its flag (crewKept), read back on another server, junk cleaned (Danny always first); a real save from before 10.1
+--     (no flag: nothing of the 8.3 – 10.0 hire was ever saved), a lock-only record, a new player: Danny alone, picked.
 --   * Size: the biggest realistic sandbox save, measured.
 --   * The shutdown (BindToClose): every player saved at once, in parallel, waited for (a failed try too); a store that
 --     never answers is given up on at CloseWait.
@@ -767,6 +770,80 @@ do
 	check("… a new player: Open; the save the flag", (PlayerData.get(fresh) :: any).runUnlocked == R.Open)
 	E.leave(fresh)
 	check("… a new player's save: the flag, Open", E.saves.Player_239[R.Flag] == true and E.saves.Player_239.runUnlocked == R.Open)
+end
+
+-- ── 10.1: the helpers' crew (crew) ─────────────────────────────────────────
+-- (shared/CrewRules.luau fromSave, clean: tests/crewrules_test.luau; the crew in a run: tests/crew_runtime_test.luau)
+do
+	local Flag = Config.Crew.Flag
+	local function crewOf(player: any): any
+		return (PlayerData.get(player) :: any).crew
+	end
+	local function same2(a: any, b: any): boolean
+		return type(a) == "table" and type(b) == "table" and table.concat(a, ",") == table.concat(b, ",")
+	end
+	local until_ = 1900000000
+	local kept = save83(900)
+	kept.crew, kept[Flag] = { have = { "danny", "bruno", "lucy" }, pick = "lucy", hospital = { bruno = until_ } }, true
+	E.saves.Player_240 = kept
+	local C1 = E.join(240, "Cora")
+	local c1 = crewOf(C1)
+	check("10.1: a save with its crew and the flag: read (Danny, Bruno, Lucy; Lucy picked; Bruno in hospital)", c1 ~= nil and same2(c1.have, { "danny", "bruno", "lucy" })
+		and c1.pick == "lucy" and c1.hospital.bruno == until_)
+	table.insert(c1.have, "gus") -- (Gus rescued in a run)
+	c1.pick, c1.hospital = "gus", {}
+	E.leave(C1)
+	local w = E.saves.Player_240
+	check("… the leave save writes it back with its flag", w[Flag] == true and type(w.crew) == "table" and same2(w.crew.have, { "danny", "bruno", "lucy", "gus" })
+		and w.crew.pick == "gus" and next(w.crew.hospital) == nil)
+	local C2 = E.join(240, "Cora")
+	check("… joining another server: the same crew (Gus kept, picked; in Config.Crew.Order)", same2(crewOf(C2).have, { "danny", "bruno", "gus", "lucy" }) and crewOf(C2).pick == "gus")
+	E.leave(C2)
+	local before = save83(900) -- (a real save from before 10.1: no flag; nothing of the hire was ever saved)
+	before.crew = { have = { "danny", "bruno" }, pick = "bruno" } -- (a stray crew without the flag: not read)
+	E.saves.Player_241 = before
+	local C3 = E.join(241, "Cyd")
+	check("10.1 the migration: a real save from before the crew (no flag): Danny alone, free, picked; loaded and not kicked", PlayerData.get(C3) ~= nil
+		and same2(crewOf(C3).have, { "danny" }) and crewOf(C3).pick == "danny" and next(crewOf(C3).hospital) == nil)
+	E.leave(C3)
+	check("… written back with the flag (read from now on), its money as it was", E.saves.Player_241[Flag] == true and same2(E.saves.Player_241.crew.have, { "danny" })
+		and E.saves.Player_241.money == 900)
+	local bad = {}
+	for index, value in {
+		{ have = { "zed", "bruno", "bruno", 5 }, pick = "zed", hospital = { bruno = -4, zed = 10 } },
+		{ have = "danny", pick = 3 },
+		"crew",
+		true,
+		{ have = { "lucy" }, pick = "lucy", hospital = { lucy = 1.5, danny = until_ } },
+	} :: { any } do
+		local junkSave = save83(100)
+		junkSave.crew, junkSave[Flag] = value, true
+		E.saves.Player_242 = junkSave
+		local J = E.join(242, "Jax")
+		local cj = PlayerData.get(J) and crewOf(J)
+		local ok = cj ~= nil and cj.have[1] == "danny" and table.find(cj.have, cj.pick) ~= nil
+		if index == 1 then
+			ok = ok and same2(cj.have, { "danny", "bruno" }) and cj.pick == "danny" and next(cj.hospital) == nil
+		elseif index == 5 then
+			ok = ok and same2(cj.have, { "danny", "lucy" }) and cj.pick == "lucy" and cj.hospital.lucy == nil and cj.hospital.danny == until_
+		else
+			ok = ok and same2(cj.have, { "danny" })
+		end
+		if not ok then
+			table.insert(bad, `{index}`)
+		end
+		E.leave(J)
+	end
+	check("10.1: junk crews cleaned (unknown kinds, twice, a string, a boolean; Danny always first, a pick of the crew, whole hospital times of its own): loaded and not kicked",
+		#bad == 0, table.concat(bad, "; "))
+	E.saves.Player_243 = { crew = { have = { "danny", "gus" }, pick = "gus" }, [Flag] = true, lock = { job = "another-server", at = 0 } }
+	local L1 = E.join(243, "Lev")
+	check("… a lock-only record (no money: a new player's): Danny alone", same2(crewOf(L1).have, { "danny" }) and crewOf(L1).pick == "danny")
+	E.leave(L1)
+	local fresh = E.join(244, "Mia")
+	check("… a new player: Danny alone, free, picked", same2(crewOf(fresh).have, { "danny" }) and crewOf(fresh).pick == "danny")
+	E.leave(fresh)
+	check("… a new player's save: the flag, Danny", E.saves.Player_244[Flag] == true and same2(E.saves.Player_244.crew.have, { "danny" }))
 end
 
 -- ── Size: the biggest realistic sandbox save ───────────────────────────────

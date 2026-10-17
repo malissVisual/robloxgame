@@ -4,22 +4,20 @@
 -- 7.0 review: it sits under the move's panel where it really is (client/TopBlocks.luau "MovePanel", its height
 -- measured, not assumed), follows it and the screen's size, and is a top-centre block itself ("MoveHelper": the quick
 -- chat's lines and the HUD's chips go under or beside it). On a touch screen its button is at least Ui.MinTouch high.
--- 8.3 Danny for hire (the owner: "I have to PAY for him when I want help … click on something, and that assigns it to
--- him"): the strip is his STATUS LINE, two lines of words and one button (shared/MoveHelperBrain.luau's words; the
--- player attributes MoveHelper "offer" | "hired", MoveHelperPrice, MoveHelperQueue, MoveHelperDoing):
---   * for hire: "🧑‍🔧 DANNY · FOR HIRE" over "Carries what you click · $170 this move" (8.3 review: in this device's
---     words, client/PadGlyph.luau: "tap" on a touch screen, "give him" with a gamepad), HIRE $170;
---   * hired: "🧑‍🔧 DANNY · 2 pieces to carry" over what he does, LIST;
+-- 8.3 Danny's list (the owner: "… click on something, and that assigns it to him"): the strip is his STATUS LINE, two
+-- lines of words and one button (shared/MoveHelperBrain.luau's words; the player attributes MoveHelper "hired",
+-- MoveHelperQueue, MoveHelperDoing; 10.1 MoveHelperName: his name, the crew's helper's; no "for hire" any more: free):
+--   * "🧑‍🔧 DANNY · 2 pieces to carry" over what he does, LIST (8.3 review: in this device's words, client/PadGlyph.luau:
+--     "tap" on a touch screen, "give him" with a gamepad);
 --   * you wait for him at a two-person piece (your player attribute MoveHelperCall = its name): orange, "⏳ WAITING FOR
 --     DANNY…" ("💪 ON THREE… LIFT!" once he is at its other end: MoveHelperReady, your lift check open), STOP (G on a
 --     keyboard too): the Moving remote's ("helper", "stop"); the server decides. 8.3 review: how to stop it in this
 --     device's words: "G: stop" on a computer, "tap STOP" on a touch screen, with a gamepad the piece's own "Stop
 --     waiting" prompt ("X: stop", SandboxPad's "use") while he comes (nothing once he is there: its prompt is Lift
 --     again). Drawn again when the device changes.
---   With his card (client/MoveHelperCard.luau calls MoveHelperHud.useCard: the sandbox) HIRE and LIST open the card (a
---   tap on the line too): its HIRE spends the money, its CLEAR QUEUE empties his list. Without it (the city: client/
---   Main.client.luau starts the card only in the sandbox) HIRE sends ("helper", "hire") itself and LIST is CLEAR
---   (("helper", "clear")). Presentation only.
+--   With his card (client/MoveHelperCard.luau calls MoveHelperHud.useCard: the sandbox) LIST opens the card (a tap on
+--   the line too): its CLEAR QUEUE empties his list. Without it (the city: client/Main.client.luau starts the card only
+--   in the sandbox) LIST is CLEAR (("helper", "clear")). Presentation only.
 -- 8.4 (a small phone, 667 × 375: the strip's left end lay on the sandbox's money block and its 📋 TASKS chip): under
 -- the panel it keeps clear of the HUD's chips at the top left (client/SandboxHud.luau's MoneyBlock, client/
 -- SandboxTasksUi.luau's chip in its ScreenGui "SandboxTasksChip": the shown ones) and the touch controls
@@ -29,8 +27,8 @@
 -- 8.5 Danny's clipboard, orders mode (client/DannyOrders.luau calls MoveHelperHud.useOrders: the sandbox): hired, the
 -- button is 📋 ORDERS (it takes the clipboard out; "📋 PUT AWAY", orange, while it is out: shared/ClipboardRules.luau
 -- orders) in LIST's place, his card a tap on the line as before; the words say how a piece goes to him
--- (ClipboardRules.carries: "Take out your clipboard (Q) to give him pieces", the device's key) for hire (the price is
--- HIRE's) and while his list is empty and the clipboard away. The city's line as before (no clipboard there).
+-- (ClipboardRules.carries: "Take out your clipboard (Q) to give Danny pieces", the device's key) while his list is
+-- empty and the clipboard away. The city's line as before (no clipboard there).
 -- 8.6 the crew's orders (the owner: "… to be able to tell him … get out of the car"): while Danny is in the van, getting
 -- in or on his way to it (the server's MoveHelperOrders holds "getout") the button is 🚪 GET OUT, lit: the Moving
 -- remote's ("helper", "getout"), the server decides. A driver reaches nothing else (his card shuts and the clipboard
@@ -40,7 +38,7 @@
 -- anything but idle, MoveHelperBrain.idle), the title says what his bubble says (MoveHelperBrain.title) and the second
 -- line what he does; how to give him pieces only while he is idle.
 --   MoveHelperHud.start(), MoveHelperHud.strip()   the strip (nil before Danny first comes)
---   MoveHelperHud.useCard(open)                    8.3 HIRE and LIST open his card (open: the card's opener)
+--   MoveHelperHud.useCard(open)                    8.3 LIST opens his card (open: the card's opener)
 --   MoveHelperHud.cardOpen(open)                   8.4 his card opened or closed (client/MoveHelperCard.luau)
 --   MoveHelperHud.useOrders(toggle)                8.5 hired, the button is 📋 ORDERS (toggle: the clipboard out / away)
 --   MoveHelperHud.setOrders(on)                    8.5 the clipboard out or away now (client/DannyOrders.luau)
@@ -50,7 +48,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local Config = require(Shared.Config)
 local Net = require(Shared.Net)
 local Brain = require(Shared.MoveHelperBrain)
 local SandboxPad = require(Shared.SandboxPad) -- 8.3 review: a gamepad button's word
@@ -69,7 +66,7 @@ local K = Theme.Contract
 local ORANGE = Color3.fromRGB(240, 132, 44) -- the movers' colour (client/MovingHud.luau's)
 local WIDTH, GAP = MoveLayout.PANEL_W, 6
 local STATUS_ROW = 32 -- 8.3 the status line's row (its two lines of words, its button)
-local ACTION_W = 92 -- 8.3 HIRE / LIST / STOP
+local ACTION_W = 92 -- 8.3 LIST / STOP (10.1: no HIRE)
 local PAD = 6
 local CHIP_GUIS = { SandboxHud = "MoneyBlock", SandboxTasksChip = "" } -- 8.4: the HUD's chips (a ScreenGui: its piece, "" every piece)
 
@@ -98,13 +95,13 @@ local function getOut(): boolean
 	return hired() and table.find(Brain.orderList(player:GetAttribute("MoveHelperOrders")), "getout") ~= nil
 end
 
-local function priceNow(): number
-	local price = player:GetAttribute("MoveHelperPrice")
-	return if type(price) == "number" then price else 0
+-- 10.1 his name (the crew's helper's: MoveHelperName), Danny's without one.
+local function nameNow(): string
+	return Brain.nameOf(player:GetAttribute("MoveHelperName"))
 end
 
--- The button: STOP while you wait; with the card HIRE / LIST open it; without it HIRE and CLEAR go to the server. 8.5
--- hired, with the clipboard (the sandbox): 📋 ORDERS takes it out or puts it away.
+-- The button: STOP while you wait; with the card LIST opens it; without it CLEAR goes to the server. 8.5 with the
+-- clipboard (the sandbox): 📋 ORDERS takes it out or puts it away.
 local function act()
 	if waiting() then
 		remote:FireServer("helper", "stop")
@@ -130,10 +127,8 @@ local function act()
 	local open = openCard
 	if open then
 		open()
-	elseif hired() then
-		remote:FireServer("helper", "clear")
 	else
-		remote:FireServer("helper", "hire")
+		remote:FireServer("helper", "clear")
 	end
 end
 
@@ -206,7 +201,7 @@ local function build(): Frame?
 		Font = Theme.HeadingFont,
 		TextSize = 12,
 		TextColor3 = K.charcoal,
-		Text = "HIRE",
+		Text = "LIST",
 	}, frame)
 	Ui.corner(action, 6)
 	status.action = action
@@ -345,9 +340,9 @@ end
 local function carriesWords(): string
 	local device = PadGlyph.device()
 	if orders then
-		return ClipboardRules.carries(device)
+		return ClipboardRules.carries(device, nameNow())
 	end
-	return if device == "touch" then "Carries what you tap" elseif device == "pad" then "Carries what you give him" else "Carries what you click"
+	return if device == "touch" then "Carries what you tap" elseif device == "pad" then `Carries what you give {nameNow()}` else "Carries what you click"
 end
 
 local function refresh()
@@ -362,15 +357,15 @@ local function refresh()
 		return
 	end
 	place() -- (it shows it: 8.4, unless his card stands in for it)
-	local name = string.upper(Config.MoveHelper.Name)
+	local name = string.upper(nameNow())
 	local doing = player:GetAttribute("MoveHelperDoing")
 	local piece = waiting()
 	if piece then
 		-- you wait for him at your end of a two-person piece (then he is there: your lift): STOP (G) ends it
 		local ready = player:GetAttribute("MoveHelperReady") == true
 		paint(frame, if ready then "💪 ON THREE… LIFT!" else `⏳ WAITING FOR {name}…`,
-			(if ready then `{Config.MoveHelper.Name} is at the other end of the {piece}` else `Stay at your end of the {piece}`) .. stopWords(ready), "STOP", true, false)
-	elseif hired() then
+			(if ready then `{nameNow()} is at the other end of the {piece}` else `Stay at your end of the {piece}`) .. stopWords(ready), "STOP", true, false)
+	else
 		-- (8.5: with the clipboard the button is 📋 ORDERS, orange while it is out; his list empty and the clipboard
 		-- away, the words say how a piece goes to him; 8.6 while he is in the van, getting in or on his way to it: 🚪 GET
 		-- OUT, lit: the one order a driver can reach, the clipboard and his card are for on foot)
@@ -380,13 +375,9 @@ local function refresh()
 		-- list empty and he busy, the title says what the bubble says; the words how to give him pieces only while idle)
 		local bubble = player:GetAttribute("MoveHelperBubble")
 		local how = not out and orders ~= nil and not ordersOn and (type(count) ~= "number" or count <= 0) and Brain.idle(bubble)
-		paint(frame, `🧑‍🔧 {name} · {Brain.title(count, bubble)}`, if how then carriesWords() elseif type(doing) == "string" then doing else "",
+		paint(frame, `{Brain.iconOf(player:GetAttribute("MoveHelperKind"))} {name} · {Brain.title(count, bubble)}`, if how then carriesWords() elseif type(doing) == "string" then doing else "",
 			if out then Brain.orderWords("getout") elseif orders then ClipboardRules.orders(ordersOn) elseif openCard then "LIST" else "CLEAR", false,
 			out or (orders ~= nil and ordersOn))
-	else
-		local price = Brain.money(priceNow())
-		-- (8.5: with the clipboard its words alone, the price HIRE's)
-		paint(frame, `🧑‍🔧 {name} · FOR HIRE`, if orders then carriesWords() else `{carriesWords()} · {price} this move`, `HIRE {price}`, false, true)
 	end
 end
 
@@ -394,7 +385,7 @@ function MoveHelperHud.strip(): Frame?
 	return strip
 end
 
--- 8.3 Danny's card is there (client/MoveHelperCard.luau's start): HIRE, LIST and a tap on the line open it.
+-- 8.3 Danny's card is there (client/MoveHelperCard.luau's start): LIST and a tap on the line open it.
 function MoveHelperHud.useCard(open: () -> ())
 	openCard = open
 	refresh()
@@ -409,7 +400,7 @@ function MoveHelperHud.cardOpen(open: boolean)
 	end
 end
 
--- 8.5 Danny's clipboard is there (client/DannyOrders.luau's start): hired, the button is 📋 ORDERS.
+-- 8.5 Danny's clipboard is there (client/DannyOrders.luau's start): the button is 📋 ORDERS.
 function MoveHelperHud.useOrders(toggle: () -> ())
 	orders = toggle
 	refresh()
@@ -424,7 +415,7 @@ function MoveHelperHud.setOrders(on: boolean)
 end
 
 function MoveHelperHud.start()
-	for _, name in { "MoveHelper", "MoveHelperDoing", "MoveHelperCall", "MoveHelperReady", "MoveHelperPrice", "MoveHelperQueue", "MoveHelperOrders", "MoveHelperBubble" } do
+	for _, name in { "MoveHelper", "MoveHelperDoing", "MoveHelperCall", "MoveHelperReady", "MoveHelperName", "MoveHelperKind", "MoveHelperQueue", "MoveHelperOrders", "MoveHelperBubble" } do
 		player:GetAttributeChangedSignal(name):Connect(refresh)
 	end
 	-- 7.0 review: the panel moved, resized, showed or hid (client/TopBlocks.luau), the screen changed size

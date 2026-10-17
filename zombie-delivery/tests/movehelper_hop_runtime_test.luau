@@ -322,8 +322,7 @@ end
 check("8.3 …a Jump waypoint in his way is never his: not in his path, never walked to (he walks the rest of it)", computed > 0 and #walks > 0
 	and not hopped and not walkedToHop and #danny.path > 0, `{computed} paths, {#walks} walks`)
 check("8.3 …every walk of his asks Npcs.walkTo for no jump (jump = false)", #walks > 0 and jumpy == 0, jumpy)
-E.request(ann, "helper", "hire") -- (8.3 Danny for hire: a two-person Lift calls him once he is hired)
-check("8.3 Ann hires him (her Lift calls him from now on)", danny.hirer == ann)
+check("10.1 Danny is Ann's from the start (her Lift calls him)", danny.hirer == ann)
 
 -- The real Dining Table, lifted together ---------------------------------------------------------------------------------------
 
@@ -348,10 +347,10 @@ local tableAt = V3(exitAt.X, ground + carried.PrimaryPart.Size.Y / 2, exitAt.Z +
 carried:PivotTo(M.CFrame.lookAt(tableAt, tableAt + V3(0, 0, -1)))
 local inHall = V3(exitAt.X, ground + 3, exitAt.Z + 14 + carried.PrimaryPart.Size.Z / 2 + 1.5)
 E.rootOf(ann).CFrame = M.CFrame.lookAt(inHall, inHall + V3(0, 0, -1)) -- (facing the table and the front door beyond it)
-danny.body.root.CFrame = M.CFrame.new(inHall + V3(0, 0, 5)) -- (in the hall behind her, as he was before 8.3's hire)
+danny.body.root.CFrame = M.CFrame.new(inHall + V3(0, 0, 5)) -- (in the hall behind her)
 trigger(promptIn(carried, "Lift"), ann)
 hold()
--- (8.3 Danny hired: Ann's Lift calls him and she waits; his walk goes nowhere here, so CallBlink s later he fades
+-- (8.3: Ann's Lift calls him and she waits; his walk goes nowhere here, so CallBlink s later he fades
 -- over as the last resort, and up it goes together)
 local lifted = run(H.CallBlink + 3, function()
 	hold()

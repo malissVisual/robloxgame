@@ -3,7 +3,7 @@
 -- server/MoveHelper.luau and server/PairHold.luau on tests/runtime/MovingRuntime.luau's fakes, Config.MoveHelper.HoldLead
 -- as the game has it (the runtime's default: off). Danny's hold is played as Roblox's constraints do it: each of his
 -- steps his root goes toward where his hold aims it at the hold's top speed × dt at most (AlignPosition.MaxVelocity;
--- this mover has no `keep`, so server/MoveHelper.luau's keepAt steps him). Sol hires him (8.3 Danny for hire), lifts the
+-- this mover has no `keep`, so server/MoveHelper.luau's keepAt steps him). Danny is Sol's from the start (10.1 free), she lifts the
 -- sofa, he walks over to its far end.
 --   * the 8.2 hold (his top speed from the carry's walk alone, MoveHelperBrain.holdSpeed(walk)): Sol faster than that
 --     (a sprint: what nothing on her client stops if anything raises her walk) leaves him further behind every step:
@@ -153,8 +153,7 @@ check("a solo move starts", string.find(started, "started", 1, true) ~= nil, sta
 Moving.step()
 danny = MoveHelper.find(sol)
 check("Danny comes", danny ~= nil and danny.body ~= nil)
-E.request(sol, "helper", "hire") -- (8.3 Danny for hire: a two-person Lift calls him once he is hired)
-check("Sol hires him", danny.hirer == sol)
+check("Danny is Sol's from the start (10.1 free)", danny.hirer == sol)
 local body = danny.body
 local site = workspace:FindFirstChild("Moves"):FindFirstChild("Move_marge")
 E.place(sol, outside)

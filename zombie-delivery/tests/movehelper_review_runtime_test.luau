@@ -148,7 +148,7 @@ local function shutSince(truck: any, from: number): boolean
 	return false
 end
 
--- The move, Danny hired --------------------------------------------------------------------------------------------------------
+-- The move, Danny with Player1 (10.1 free) --------------------------------------------------------------------------------------------------------
 
 local started = Moving.admin(one, "start")
 check("a move starts for Player1 (UserId -1)", string.find(started, "started", 1, true) ~= nil, started)
@@ -156,8 +156,7 @@ local truck = E.cars[one]
 truck.model:SetAttribute("BackOpen", true)
 Moving.step()
 danny = MoveHelper.find(one)
-E.request(one, "helper", "hire")
-check("Danny comes and is hired by Player1", danny ~= nil and danny.hirer == one and danny.body ~= nil)
+check("Danny comes, Player1's from the start (10.1 free)", danny ~= nil and danny.hirer == one and danny.body ~= nil)
 local site = workspace:FindFirstChild("Moves"):FindFirstChild("Move_marge")
 local enter = promptIn(site, "Enter house")
 E.place(one, outside)

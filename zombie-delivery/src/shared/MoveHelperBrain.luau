@@ -9,32 +9,28 @@
 -- end); your two-person lift (8.3: your call, he walks over); the piece in his arms to the van; the van's back for
 -- whoever comes with a piece; the next piece of his list.
 --
--- 8.3 Danny for hire (the owner: "make it so I click on the helper, but I have to PAY for him when I want help. It
--- doesn't work well when he does 4 things. Instead: you go into the house, click on something, and that assigns it to
--- him, and the rest you carry yourself"; and "he must sit in my car with me"): at a move's start he waits by the van,
--- not working; a crew player hires him for that move (hireCheck, hirePrice: Config.MoveHelper.Hire, the money's
--- PlayerData.spend on the server); then the crew clicks pieces into his list (assignCheck: a click again takes one
--- back; Config.MoveHelper.Queue at most) and he carries them in order (nextQueued): a light one to the van alone, a
--- two-person one he waits at for you ("needs"); everything else is yours. A two-person Lift calls him while he is hired
--- (decide's "come"; inPlace; approach: a fade-over only as the last resort). When you sit at the van's wheel he walks
+-- 8.3 Danny's list (the owner: "It doesn't work well when he does 4 things. Instead: you go into the house, click on
+-- something, and that assigns it to him, and the rest you carry yourself"; and "he must sit in my car with me"): the crew
+-- clicks pieces into his list (assignCheck: a click again takes one back; Config.MoveHelper.Queue at most) and he carries
+-- them in order (nextQueued): a light one to the van alone, a two-person one he waits at for you ("needs"); everything
+-- else is yours. A two-person Lift calls him (decide's "come"; inPlace; approach: a fade-over only as the last resort).
+-- (8.3 - 10.0 he was for hire first, $100 - 400 a move; 10.1, Config.Crew: free and every player's from the start, and a
+-- run's host may bring another helper of their crew instead: shared/CrewRules.luau, each kind his own carry.) When you sit at the van's wheel he walks
 -- to its passenger door and rides with you (pickSeat, "ride", "seat"), out again when you get out (getOut). 8.5 his
 -- way to that door goes round the van, never through it (roundVan), and he fades into the seat only when the van is
 -- far off or out of his reach a long while (rideBlink). 8.5.1 (the owner: "Danny STILL goes through it"): every way of
 -- his outside keeps off the van's outline (crossesVan: round it with roundVan), and he is never left inside it
 -- (outOfVan).
 --
---   MoveHelperBrain.wanted(players, hired)     does a crew of this many players have him (Solo, Duo; a hired Danny stays
---                                              with any crew of one or more)
---   MoveHelperBrain.hirePrice(pieces)          8.3 the hire for a move of a house with this many pieces: Hire.Base +
---                                              Hire.PerPiece each, to Hire.Round dollars, Hire.Min … Hire.Max
---   MoveHelperBrain.hireCheck(crew, hired, money, price)   8.3 a HIRE checked: (true, nil) or (false, why: "crew" not
---                                              the move's crew, "hired" he works for this move already, "money" not enough)
---   MoveHelperBrain.assignCheck(a)             8.3 a click on a piece checked (an Assign: crew, hired, mine, state, held,
---                                              his, queued, count, near): "add" | "remove" | why: "crew" | "hire" |
---                                              "piece" (not this move's) | "far" | "van" (in the van) | "gone" (home
---                                              already, lost) | "held" (somebody holds it) | "his" (in his arms) | "full";
---                                              8.5 "clipboard": hired, but the player's clipboard is not out (orders
---                                              mode: shared/ClipboardRules.luau; a click on his list's piece too);
+--   MoveHelperBrain.wanted(players, every?)    does a crew of this many players have him (Solo, Duo: the city's; 10.1
+--                                              `every`, the sandbox's runs: every crew of one or more; 8.3 - 10.0 a
+--                                              hired one stayed with any crew)
+--   MoveHelperBrain.assignCheck(a)             8.3 a click on a piece checked (an Assign: crew, mine, state, held, his,
+--                                              queued, count, near): "add" | "remove" | why: "crew" | "piece" (not this
+--                                              move's) | "far" | "van" (in the van) | "gone" (home already, lost) |
+--                                              "held" (somebody holds it) | "his" (in his arms) | "full"; 8.5
+--                                              "clipboard": the player's clipboard is not out (orders mode:
+--                                              shared/ClipboardRules.luau; a click on his list's piece too);
 --                                              9.0 "reach": no spot beside it he can walk to (shared/HouseRoute.luau)
 --   MoveHelperBrain.keepQueued(state, held)    8.3 is a piece of his list still his to carry (home or on the ground,
 --                                              nobody holding it)?
@@ -43,15 +39,20 @@
 --                                              you): (spot?, pair, full: some left, none fits)
 --   MoveHelperBrain.queueText(count)           8.3 "Nothing to carry" | "1 piece to carry" | "3 pieces to carry"
 --   MoveHelperBrain.idle(text)                 9.0 is he idle by his MoveHelperDoing line or MoveHelperBubble (waiting by
---                                              the van, the van full, for hire, staying out; nothing)
+--                                              the van, the van full, staying out, 10.1 Gus walking with you; nothing)
 --   MoveHelperBrain.title(count, bubble)       9.0 his status line's title words: his list's, or while it is empty and
 --                                              he is busy, his bubble's ("Carrying: Sofa with you": never "Nothing to
 --                                              carry" over a carry in two)
---   MoveHelperBrain.status(hired, price, count, doing)   8.3 his status in a line: "For hire · $170 this move", or "2
---                                              pieces to carry · Carrying the Lamp to the van" (9.0 his list empty and
---                                              he busy: what he does alone, "Carrying the Sofa with you")
---   MoveHelperBrain.money(n)                   8.3 "$1,234" (shared/UpgradeRules.luau's: the hire's words)
---   MoveHelperBrain.markText(index, needs)     8.3 the marker over a piece of his list: "🧑‍🔧 Danny · 2", "🙋 Danny needs you"
+--   MoveHelperBrain.status(count, doing)       8.3 his status in a line: "2 pieces to carry · Carrying the Lamp to the van"
+--                                              (9.0 his list empty and he busy: what he does alone, "Carrying the Sofa
+--                                              with you")
+--   MoveHelperBrain.money(n)                   8.3 "$1,234" (shared/UpgradeRules.luau's)
+--   MoveHelperBrain.markText(index, needs, name?)   8.3 the marker over a piece of his list: "🧑‍🔧 Danny · 2", "🙋 Danny
+--                                              needs you" (10.1 `name`: the helper's, Bruno's …)
+--   MoveHelperBrain.nameOf(raw)                10.1 the helper's name from the crew's attribute MoveHelperName (Danny's
+--                                              without one): the clients' words for him
+--   MoveHelperBrain.iconOf(raw)                10.1 his kind's icon from the crew's attribute MoveHelperKind ("💪" Bruno's;
+--                                              Danny's "🧑‍🔧" without one)
 --   MoveHelperBrain.pickSeat(taken)            8.3 the van's passenger seat he takes: the first one nobody sits in (nil:
 --                                              all taken, he follows the van on foot)
 --   MoveHelperBrain.getOut(driving, still, carOk)   8.3 seated in the van: out when nobody drives it and it stands, or at
@@ -83,7 +84,7 @@
 --                                              they are in different worlds
 --   MoveHelperBrain.routeVia(..., list, allowed?)   7.x farm move: the same through the best of several doors (a farm's
 --                                              front door, its barn doors; only the `allowed` indexes): (studs, index)
---   MoveHelperBrain.pickLift(list)             the crew's two-person lift he comes to (hired): a pair piece a crew
+--   MoveHelperBrain.pickLift(list)             the crew's two-person lift he comes to: a pair piece a crew
 --                                              player drags alone, the nearest within HelpFar, not one he gave up on
 --   MoveHelperBrain.shouldFlee(threat, fleeing, holding)   a zombie near: run (never while holding the other end of
 --                                              your piece: the player leads); on until none is within SafeRange
@@ -170,12 +171,13 @@
 --   MoveHelperBrain.doing(action, name, full)  what he does, in words (client/MoveHelperHud.luau's line)
 -- 8.6 (the owner: "Somewhere I'd like to see an indicator of what Danny is doing right now, and to be able to tell
 -- him, for example, put it down on the ground, or get out of the car"):
---   MoveHelperBrain.bubble(action, name, full, price)   the same action's words over his head (client/DannyBubble.luau):
---                                              (an icon and short words, "📦 Carrying: Sofa → van", "🧑‍🔧 For hire ·
---                                              $100"; alert: the movers' orange, he needs you or is in trouble). One
---                                              table (Doing) holds both: the bubble and the status line never disagree
+--   MoveHelperBrain.bubble(action, name, full)   the same action's words over his head (client/DannyBubble.luau):
+--                                              (an icon and short words, "📦 Carrying: Sofa → van"; alert: the movers'
+--                                              orange, he needs you or is in trouble). One table (Doing) holds both: the
+--                                              bubble and the status line never disagree. 10.1: "revive" (down in a run:
+--                                              hold E by him), "out" (out of the run: in hospital), "guard" / "fight" (Gus)
 --   MoveHelperBrain.listChip(count)            the bubble's counter: "list: 3" (nil: his list is empty)
---   MoveHelperBrain.orderCheck(kind, o)        an order of the crew checked (an Order): "ok" | why: "hire" | "down" |
+--   MoveHelperBrain.orderCheck(kind, o)        an order of the crew checked (an Order): "ok" | why: "down" |
 --                                              "empty" (PUT IT DOWN with nothing in his hands) | "notin" (GET OUT, him
 --                                              not in the van, not getting in, not on his way to it) | "leaving"
 --                                              (getting out already) | "moving" (the van rolls) | "unknown"
@@ -183,7 +185,8 @@
 --                                              none): his card's buttons, the orders menu, the status line's GET OUT
 --   MoveHelperBrain.orderList(text)            that text as a list (unknown kinds dropped)
 --   MoveHelperBrain.orderWords(kind)           a button's words: "⬇ PUT IT DOWN", "🚪 GET OUT"
---   MoveHelperBrain.orderWhy(why)              a refusal's notice ("Danny isn't carrying anything."), nil: none
+--   MoveHelperBrain.orderWhy(why, name?)       a refusal's notice ("Danny isn't carrying anything."), nil: none (10.1
+--                                              `name`: the helper's)
 --   MoveHelperBrain.Lines                      what he says (a speech bubble over his head; plain text)
 --   MoveHelperBrain.line(key, sandbox)         his line for `key` (8.0 SANDBOX: SandboxLines' where the test world has
 --                                              no Wall and no depot)
@@ -213,7 +216,6 @@ export type Queued = { spot: number, class: string, fits: boolean }
 -- 8.3 a click on a piece, as the server sees it (assignCheck).
 export type Assign = {
 	crew: boolean, -- the player is of the move's crew
-	hired: boolean, -- Danny works for this move
 	mine: boolean, -- the piece is this move's (its model is the move's own)
 	state: string, -- the piece's: home | carried | ground | truck | delivered | lost
 	held: boolean, -- somebody holds it (a player, or Danny)
@@ -232,7 +234,6 @@ export type Doors = { outX: number, outZ: number, inX: number, inZ: number } -- 
 export type Doorway = { x: number, z: number, half: number, dirX: number, dirZ: number, depth: number }
 
 export type Input = {
-	hired: boolean, -- 8.3 somebody of the crew hired him for this move
 	dead: boolean,
 	holding: string?, -- nil, "hand" (a piece in his arms alone: one-hand or two-hands) or "pair" (the other end of yours)
 	seated: boolean, -- 8.3 he sits in the van (a passenger)
@@ -262,33 +263,12 @@ end
 
 -- ── Who has him ────────────────────────────────────────────────────────────
 
-function MoveHelperBrain.wanted(players: number, hired: boolean?): boolean
+function MoveHelperBrain.wanted(players: number, every: boolean?): boolean
+	if every then
+		return players >= 1 -- (10.1 the sandbox's runs: the host's helper with every party; 8.3 - 10.0 a hired one)
+	end
 	local c = cfg()
-	if hired then
-		return players >= 1 -- (8.3 paid for the move: he stays whoever joins)
-	end
 	return (players == 1 and c.Solo == true) or (players == 2 and c.Duo == true)
-end
-
--- ── 8.3 the hire ───────────────────────────────────────────────────────────
-
-function MoveHelperBrain.hirePrice(pieces: any): number
-	local h = cfg().Hire
-	local n = if finite(pieces) then math.max(0, math.floor(pieces)) else 0
-	local raw = h.Base + h.PerPiece * n
-	local step = math.max(1, h.Round)
-	return math.clamp(math.floor(raw / step + 0.5) * step, h.Min, h.Max)
-end
-
-function MoveHelperBrain.hireCheck(crew: boolean, hired: boolean, money: any, price: number): (boolean, string?)
-	if not crew then
-		return false, "crew"
-	elseif hired then
-		return false, "hired"
-	elseif not finite(money) or money < price then
-		return false, "money"
-	end
-	return true, nil
 end
 
 -- ── 8.3 his list ───────────────────────────────────────────────────────────
@@ -302,8 +282,6 @@ function MoveHelperBrain.assignCheck(a: Assign): string
 		return "crew"
 	elseif not a.mine then
 		return "piece"
-	elseif not a.hired then
-		return "hire"
 	elseif not a.clipboard then
 		return "clipboard" -- (8.5: orders only with the clipboard out: never a piece given by a stray click)
 	elseif a.queued then
@@ -343,10 +321,7 @@ function MoveHelperBrain.queueText(count: any): string
 	return if n == 1 then "1 piece to carry" else `{n} pieces to carry`
 end
 
-function MoveHelperBrain.status(hired: boolean, price: any, count: any, doing: string?): string
-	if not hired then
-		return `For hire · {UpgradeRules.money(price)} this move`
-	end
+function MoveHelperBrain.status(count: any, doing: string?): string
 	local list = MoveHelperBrain.queueText(count)
 	if type(doing) ~= "string" or doing == "" then
 		return list
@@ -360,9 +335,9 @@ end
 
 -- 9.0 (the owner's screenshot: his status line "DANNY · Nothing to carry" over "Take out your clipboard (Q) to give him
 -- pieces" while his bubble said "🤝 Carrying: Sofa with you"): is he idle by what the crew's attributes say (his
--- MoveHelperDoing line or his MoveHelperBubble: waiting by the van, the van full, for hire, staying out of the van;
--- nothing at all)?
-local IDLE = { "wait", "full", "offer", "stay" }
+-- MoveHelperDoing line or his MoveHelperBubble: waiting by the van, the van full, staying out of the van, 10.1 Gus
+-- walking with you; nothing at all)?
+local IDLE = { "wait", "full", "stay", "guard" }
 function MoveHelperBrain.idle(text: any): boolean
 	if type(text) ~= "string" or text == "" then
 		return true
@@ -378,7 +353,7 @@ function MoveHelperBrain.idle(text: any): boolean
 	return false
 end
 
--- 9.0 his status line's title words while hired: his list ("2 pieces to carry"); his list empty while he is busy (his
+-- 9.0 his status line's title words: his list ("2 pieces to carry"); his list empty while he is busy (his
 -- bubble, MoveHelperBubble: anything but idle), the bubble's own words without its icon ("Carrying: Sofa with you").
 function MoveHelperBrain.title(count: any, bubble: any): string
 	local empty = not finite(count) or count < 1
@@ -388,8 +363,18 @@ function MoveHelperBrain.title(count: any, bubble: any): string
 	return string.match(bubble :: string, "^%S+%s+(.+)$") or bubble :: string
 end
 
-function MoveHelperBrain.markText(index: number, needs: boolean?): string
-	local name = cfg().Name
+-- 10.1 the helper's name as the crew's attribute MoveHelperName says it (the clients' words), Danny's without one.
+function MoveHelperBrain.nameOf(raw: any): string
+	return if type(raw) == "string" and raw ~= "" then raw else cfg().Name
+end
+
+function MoveHelperBrain.iconOf(raw: any): string
+	local kind = if type(raw) == "string" then (Config.Crew.Kinds :: any)[raw] else nil
+	return if kind then kind.Icon else "🧑‍🔧"
+end
+
+function MoveHelperBrain.markText(index: number, needs: boolean?, who: string?): string
+	local name = who or cfg().Name
 	if needs then
 		return `🙋 {name} needs you`
 	end
@@ -1015,10 +1000,10 @@ function MoveHelperBrain.fleeTo(x: number, z: number, zx: number, zz: number): (
 end
 
 -- The priorities, in order: down; the other end of your piece (zombies or not: you lead); 8.3 in the van's seat (he
--- rides; out when you get out); running from a zombie; hired: your call (a two-person Lift; his own piece set down or
--- loaded first), your two-person piece dragged alone; the piece in his arms to the van; hired: into the van when you
--- sit at its wheel; not hired: waiting by the van (for hire); the van's back for whoever comes with a piece; the next
--- piece of his list (a two-person one: he waits at it for you) while the van stands by the house; waiting at the van.
+-- rides; out when you get out); running from a zombie; your call (a two-person Lift; his own piece set down or loaded
+-- first), your two-person piece dragged alone; the piece in his arms to the van; into the van when you sit at its wheel;
+-- the van's back for whoever comes with a piece; the next piece of his list (a two-person one: he waits at it for you)
+-- while the van stands by the house; waiting at the van. (10.1: no hire any more, nothing waits for one.)
 function MoveHelperBrain.decide(i: Input): (string, number?)
 	if i.dead then
 		return "down", nil
@@ -1028,16 +1013,14 @@ function MoveHelperBrain.decide(i: Input): (string, number?)
 		return "seat", nil
 	elseif MoveHelperBrain.shouldFlee(i.threat, i.fleeing, i.holding) then
 		return "flee", nil
-	elseif i.hired and i.call ~= nil then
+	elseif i.call ~= nil then
 		return "come", i.call
-	elseif i.hired and i.lift ~= nil then
+	elseif i.lift ~= nil then
 		return "help", i.lift
 	elseif i.holding == "hand" then
 		return "deliver", nil
-	elseif i.hired and i.ride then
+	elseif i.ride then
 		return "ride", nil
-	elseif not i.hired then
-		return "wait", nil
 	elseif i.open then
 		return "open", nil
 	elseif i.queued ~= nil and i.atHouse then
@@ -1085,7 +1068,6 @@ end
 
 -- 8.6 what the server knows of him when an order comes (server/MoveHelper.luau fills it).
 export type Order = {
-	hired: boolean, -- somebody of the crew hired him for this move
 	down: boolean, -- down (or no body yet)
 	holding: string?, -- nil, "hand" (a piece in his arms alone) or "pair" (the other end of a piece a player carries)
 	seated: boolean, -- in the van's passenger seat
@@ -1101,8 +1083,6 @@ local ORDERS = { "putdown", "getout" }
 function MoveHelperBrain.orderCheck(kind: string, o: Order): string
 	if kind ~= "putdown" and kind ~= "getout" then
 		return "unknown"
-	elseif not o.hired then
-		return "hire"
 	elseif o.down then
 		return "down"
 	elseif kind == "putdown" then
@@ -1152,17 +1132,16 @@ function MoveHelperBrain.orderWords(kind: string): string
 end
 
 local ORDER_WHY: { [string]: string } = {
-	hire = "Hire %s first: then he takes your orders.",
-	down = "%s is down: he is back at the van soon.",
+	down = "%s is down: get them up, or wait a moment.",
 	empty = "%s isn't carrying anything.",
 	notin = "%s isn't in the van.",
 	leaving = "%s is getting out already.",
 	moving = "Stop the van first: then %s can get out.",
 }
 
-function MoveHelperBrain.orderWhy(why: string): string?
+function MoveHelperBrain.orderWhy(why: string, name: string?): string?
 	local text = ORDER_WHY[why]
-	return if text then string.format(text, cfg().Name) else nil
+	return if text then string.format(text, name or cfg().Name) else nil
 end
 
 -- ── Words ──────────────────────────────────────────────────────────────────
@@ -1184,11 +1163,15 @@ local DOING: { [string]: Doing } = {
 	come = { line = "Coming to lift the %s with you", icon = "🏃", short = "Coming to lift: %s" }, -- 8.3 your call
 	ready = { line = "At the %s: on three!", icon = "💪", short = "At the %s: on three!", alert = true },
 	needs = { line = "Waiting for you at the %s", icon = "⏳", short = "Needs you: %s", alert = true }, -- 8.3 his list's two-person piece
-	offer = { line = "Waiting by the van for hire", icon = "🧑‍🔧", short = "For hire" },
 	ride = { line = "Getting in the van", icon = "🚐", short = "Getting in the van" },
 	seat = { line = "Riding in the van", icon = "🪑", short = "Riding" },
 	alight = { line = "Getting out of the van", icon = "🚪", short = "Getting out of the van" }, -- 8.5 (his way out at its door)
 	stay = { line = "Staying out of the van (your order)", icon = "✋", short = "Staying out of the van" }, -- 8.6 GET OUT
+	-- 10.1 the crew (Config.Crew): down in a run (hold E by the helper within Down.Seconds), out of it (in hospital); Gus
+	revive = { line = "Down! Hold E close by to revive", icon = "🆘", short = "Down! Hold E to revive", alert = true },
+	out = { line = "Out of the run: in hospital", icon = "🏥", short = "Out: in hospital", alert = true },
+	guard = { line = "Walking with you, on guard", icon = "🛡", short = "On guard" },
+	fight = { line = "Fighting a zombie", icon = "👊", short = "Fighting!", alert = true },
 }
 MoveHelperBrain.Doing = DOING :: { [string]: Doing } -- (read only: the tests go through every action)
 
@@ -1210,13 +1193,9 @@ function MoveHelperBrain.doing(action: string, name: string?, full: boolean?): s
 	return named(words(action, full).line, name)
 end
 
-function MoveHelperBrain.bubble(action: string, name: string?, full: boolean?, price: number?): (string, boolean)
+function MoveHelperBrain.bubble(action: string, name: string?, full: boolean?): (string, boolean)
 	local w = words(action, full)
-	local short = named(w.short, name)
-	if action == "offer" and price then
-		short = `{short} · {UpgradeRules.money(price)}`
-	end
-	return `{w.icon} {short}`, w.alert == true
+	return `{w.icon} {named(w.short, name)}`, w.alert == true
 end
 
 function MoveHelperBrain.listChip(count: any): string?
@@ -1225,8 +1204,7 @@ function MoveHelperBrain.listChip(count: any): string?
 end
 
 MoveHelperBrain.Lines = {
-	hello = "Danny from the depot. Need a hand? Hire me!",
-	hired = "You got it, boss! Show me what to carry.", -- 8.3 the hire
+	hello = "Danny from the depot. Where do we start, boss?", -- (10.1: no hire; a crew's kind has his own: Config.Crew)
 	queued = "Got it, I'll take that one.",
 	cleared = "Okay, my list is empty.",
 	empty = "All done. Anything else, boss?",
@@ -1255,7 +1233,7 @@ MoveHelperBrain.Lines = {
 
 -- 8.0 SANDBOX (Config.Sandbox.On): the lines that would name the city's depot or the Wall.
 MoveHelperBrain.SandboxLines = {
-	hello = "Danny from ZDC. Need a hand? Hire me!",
+	hello = "Danny from ZDC. Where do we start, boss?",
 	full = "Van's full, boss - drive it home?",
 } :: { [string]: string }
 

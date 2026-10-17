@@ -1,23 +1,24 @@
 --!strict
--- 8.3 Danny's card and his list's clicks (the owner: "make it so I click on the helper, but I have to PAY for him when I
--- want help … you go into the house, click on something, and that assigns it to him, and the rest you carry
--- yourself"). server/MoveHelper.luau decides everything; his words are shared/MoveHelperBrain.luau's:
+-- 8.3 Danny's card and his list's clicks (the owner: "… you go into the house, click on something, and that assigns it
+-- to him, and the rest you carry yourself"). server/MoveHelper.luau decides everything; his words are
+-- shared/MoveHelperBrain.luau's. 10.1: no hire any more (free: every move's helper is yours, Danny or the crew's pick:
+-- his name the attribute MoveHelperName's), and the card's 👥 CREW opens the CREW window (client/CrewUi.luau: the Crew
+-- remote's { kind = "open" }, the server decides):
 --   * Opening the card: on a computer a click on his body (the crosshair's middle while the camera holds the mouse, else
 --     the mouse's point), on a touch screen a tap on him (UserInputService.TouchTapInWorld; Config.MoveHelper.TapSlop
---     studs beside his body count, ClickReach studs at most), on a gamepad the prompt on him ("Hire Danny" while he is
---     for hire, then "Talk to Danny": a ProximityPrompt this client makes on his root, shown only while a gamepad is in
---     use, on shared/SandboxPad.luau's "danny" button: L1); the button of his status line (client/MoveHelperHud.luau, wired by useCard). Never while your
+--     studs beside his body count, ClickReach studs at most), on a gamepad the prompt on him ("Talk to Danny": a
+--     ProximityPrompt this client makes on his root, shown only while a gamepad is in use, on shared/SandboxPad.luau's
+--     "danny" button: L1); the button of his status line (client/MoveHelperHud.luau, wired by useCard). Never while your
 --     hands are full, you wait for him or a grip check shows (a left click is the check's press then:
 --     client/CarryGripUi.luau active). His body is found by your player attribute MoveHelperId (his body's
 --     MoveHelper): only his move's crew has it.
---   * The card: "🧑‍🔧 DANNY", his status (MoveHelperBrain.status), ✕; for hire: "Hire Danny for this move · $170", what
---     he does for you, and HIRE · $170 (the Moving remote's ("helper", "hire"): the server checks the crew and the
---     money and takes it); hired: "2 pieces to carry", how to give him pieces, and CLEAR QUEUE (("helper", "clear")).
---     A tap on its button sends once and the card closes. A gamepad's selection starts on HIRE for hire, on ✕ once he
---     is hired (8.3 review: an A pressed by habit never clears his list) and stays inside the card (a SelectionGroup);
+--   * The card: "🧑‍🔧 DANNY", his status (MoveHelperBrain.status), 👥 CREW (10.1), ✕; "2 pieces to carry", how to give
+--     him pieces, and CLEAR QUEUE (("helper", "clear")). A tap on its button sends once and the card closes. A
+--     gamepad's selection starts on ✕ (8.3 review: an A pressed by habit never clears his list) and stays inside the
+--     card (a SelectionGroup);
 --     as it closes it is let go when it sits in the card or in no window (the HUD's groups, the chips, nothing shown:
 --     client/PadGlyph.luau's chips need no selection).
---   * His list (hired): a click on a piece of your move (a tap on a touch screen) sends ("helper", "assign", its model):
+--   * His list: a click on a piece of your move (a tap on a touch screen) sends ("helper", "assign", its model):
 --     onto his list, or off it again (the server checks and says so in a toast; its marker over the piece is the
 --     server's). On a gamepad the prompt "Give to Danny" ("Take back from Danny" for a piece of his list) on the nearest
 --     piece of your move within reach, on SandboxPad's "dannygive" button (R1: free in the sandbox, no throw or holster
@@ -25,7 +26,7 @@
 --     carry"): only while your clipboard is out (your character's ClipboardHeld: server/Clipboard.luau; client/
 --     DannyOrders.luau takes it out and shows the mode) does a click, a tap or R1 give him a piece: without it a click
 --     on a piece does nothing for him (no stray orders) and the gamepad's prompt is off; with it a click never opens his
---     card (nothing else fires), only the pieces. Hired, the card's button row is 📋 CLIPBOARD (out; "📋 PUT AWAY" while
+--     card (nothing else fires), only the pieces. The card's button row is 📋 CLIPBOARD (out; "📋 PUT AWAY" while
 --     it is out: the Clipboard remote, the card closes) beside CLEAR QUEUE, its words how (ClipboardRules.cardHint).
 --   * Where (MoveHelperCard.layout, pure): beside his head as it was on the screen when it opened (right of him, else
 --     left, over, under), clear of the HUD's groups (client/Hud.luau's), the sandbox's chips (client/SandboxHud.luau's
@@ -43,8 +44,8 @@
 --     tap beside it, walking away from him, a seat, him gone close it. A tap beside it is only that: its own
 --     TouchTapInWorld (as the finger lifts) is swallowed SWALLOW s, never a piece given or his card again. Walking away:
 --     8.3 review: past Config.MoveHelper.CardReach studs (at least ClickReach: a click on him never opens a card that
---     shuts at once), or CardSlack studs farther than you were when it opened (the status line's HIRE / LIST open it
---     from anywhere).
+--     shuts at once), or CardSlack studs farther than you were when it opened (the status line's LIST opens it from
+--     anywhere).
 --   * 8.6 the crew's orders (the owner: "… to be able to tell him, for example, put it down on the ground, or get out of
 --     the car"): the server's MoveHelperOrders says which apply now (shared/MoveHelperBrain.luau orders: PUT IT DOWN
 --     while he carries, GET OUT while he is in the van, getting in or on his way to it); each shows as a button
@@ -134,7 +135,11 @@ local SWALLOW = 0.5 -- s: 8.3 review: a tap that closed the card is not a tap in
 local PIECE_REACH = 12 -- studs: the gamepad's "Give to Danny" on the nearest piece this near
 local TALK_PAD = SandboxPad.pads("danny")[1] or "ButtonL1" -- (shared/SandboxPad.luau: L1 his)
 local GIVE_PAD = SandboxPad.pads("dannygive")[1] or "ButtonR1"
-local PICK = { ["Pick up"] = true, Lift = true, ["Lift with " .. H.Name] = true, ["Pick up with " .. H.Name] = true } -- (a piece's own prompt)
+local CREW_W = 74 -- 10.1 the card's 👥 CREW button (the CREW window)
+-- (a piece's own prompt: Pick up, Lift; "Lift with <his name>" at his call: 10.1 any helper's name)
+local function isPick(text: string): boolean
+	return text == "Pick up" or text == "Lift" or string.sub(text, 1, 10) == "Lift with " or string.sub(text, 1, 13) == "Pick up with "
+end
 -- the HUD's groups (client/CarryGripUi.luau's list) and the sandbox's chips' ScreenGuis
 local HUD_GROUPS = { "LeftStack", "TopStack", "HudButtons", "RightStack", "Hint", "Fire", "BottomBar", "KeyHints" }
 local CHIP_GUIS = { SandboxHud = "MoneyBlock", SandboxTasksChip = "" } -- (a ScreenGui: its piece, "" every piece)
@@ -149,7 +154,7 @@ local openToken = 0
 local swallowUntil = 0 -- 8.3 review: os.clock() until which a tap in the world is the tap that closed the card
 local anchorAt: { x: number, y: number }? = nil -- his head's point when it opened
 local found: Model? = nil -- his body (found by MoveHelperId)
-local prompt: ProximityPrompt? = nil -- the gamepad's "Hire Danny" / "Talk to Danny" on him
+local prompt: ProximityPrompt? = nil -- the gamepad's "Talk to Danny" on him
 local give: ProximityPrompt? = nil -- the gamepad's "Give to Danny" on the nearest piece
 local giveTo: Model? = nil -- …that piece
 local tappedPiece: Model? = nil -- 8.5 the piece a click or a tap last gave (client/DannyOrders.luau outlines it a moment)
@@ -320,6 +325,11 @@ local function hired(): boolean
 	return player:GetAttribute("MoveHelper") == "hired"
 end
 
+-- 10.1 his name (the crew's helper's: MoveHelperName), Danny's without one.
+local function nameNow(): string
+	return Brain.nameOf(player:GetAttribute("MoveHelperName"))
+end
+
 -- 8.5 orders mode: your clipboard out (the server's ClipboardHeld on your character).
 local function orders(): boolean
 	local character = player.Character
@@ -337,7 +347,7 @@ end
 -- A piece's own prompt (its Pick up / Lift, tagged MovePrompt) when it is your move's: shown to you (MovingHud's rule).
 local function piecePrompt(model: Instance): ProximityPrompt?
 	for _, d in model:GetDescendants() do
-		if d:IsA("ProximityPrompt") and PICK[d.ActionText] then
+		if d:IsA("ProximityPrompt") and isPick(d.ActionText) then
 			local owner = d:GetAttribute("MoveOwner")
 			if type(owner) == "number" and (owner == player.UserId or player:GetAttribute("MoveWith") == owner) then
 				return d
@@ -519,11 +529,6 @@ local function send(kind: string)
 	MoveHelperCard.close()
 end
 
-local function priceNow(): number
-	local price = player:GetAttribute("MoveHelperPrice")
-	return if type(price) == "number" then price else 0
-end
-
 local function build(): Frame?
 	local made = parts.card
 	if made and made.Parent then
@@ -559,7 +564,7 @@ local function build(): Frame?
 	Ui.corner(card, 10)
 	Ui.make("UIStroke", { Name = "Edge", Color = ORANGE, Thickness = 2 }, card)
 	parts.scale = Ui.make("UIScale", { Name = "Scale", Scale = 1 }, card)
-	parts.title = Ui.label(card, `🧑‍🔧 {string.upper(H.Name)}`, UDim2.fromOffset(CARD_W - 2 * PAD - CLOSE - GAP, TITLE_H), {
+	parts.title = Ui.label(card, `{Brain.iconOf(player:GetAttribute("MoveHelperKind"))} {string.upper(nameNow())}`, UDim2.fromOffset(CARD_W - 2 * PAD - CLOSE - GAP, TITLE_H), {
 		Name = "Title",
 		Position = UDim2.fromOffset(PAD, PAD),
 		Font = Theme.HeadingFont,
@@ -595,6 +600,29 @@ local function build(): Frame?
 		MoveHelperCard.close()
 	end)
 	parts.close = close
+	-- 10.1 👥 CREW: the CREW window (your crew, who comes into your runs; the server opens it: the Crew remote)
+	local crew = Ui.make("TextButton", {
+		Name = "Crew",
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, -(PAD + CLOSE + GAP), 0, PAD),
+		Size = UDim2.fromOffset(CREW_W, CLOSE),
+		BackgroundColor3 = K.raised,
+		BorderSizePixel = 0,
+		AutoButtonColor = true,
+		Font = Theme.HeadingFont,
+		TextSize = 12,
+		TextColor3 = K.text,
+		Text = "👥 CREW",
+	}, card)
+	Ui.corner(crew, 6)
+	crew.Activated:Connect(function()
+		if not opened then
+			return
+		end
+		Net.get("Crew"):FireServer({ kind = "open" })
+		MoveHelperCard.close()
+	end)
+	parts.crew = crew
 	parts.line = Ui.label(card, "", UDim2.fromOffset(CARD_W - 2 * PAD, LINE_H), {
 		Name = "Line",
 		Font = Theme.HeadingFont,
@@ -620,15 +648,15 @@ local function build(): Frame?
 		Font = Theme.HeadingFont,
 		TextSize = 16,
 		TextColor3 = K.charcoal,
-		Text = "HIRE",
+		Text = "CLEAR QUEUE",
 	}, card)
 	Ui.corner(main, 8)
 	parts.edge = Ui.make("UIStroke", { Name = "Edge", ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.rule, Thickness = 1, Transparency = 1 }, main)
 	main.Activated:Connect(function()
-		send(if hired() then "clear" else "hire")
+		send("clear")
 	end)
 	parts.main = main
-	-- 8.5 hired: 📋 CLIPBOARD (the clipboard out; 📋 PUT AWAY while it is) beside CLEAR QUEUE, the card closes
+	-- 8.5 📋 CLIPBOARD (the clipboard out; 📋 PUT AWAY while it is) beside CLEAR QUEUE, the card closes
 	local clip = Ui.make("TextButton", {
 		Name = "Clip",
 		Size = UDim2.fromOffset((CARD_W - 2 * PAD - GAP) / 2, BUTTON_H),
@@ -690,7 +718,7 @@ local function build(): Frame?
 	return card
 end
 
--- 8.6 the orders that apply now (the server's; hired only), in the row's order.
+-- 8.6 the orders that apply now (the server's), in the row's order.
 local function ordersNow(): { string }
 	if not hired() then
 		return {}
@@ -705,17 +733,16 @@ local function ordersNow(): { string }
 	return out
 end
 
--- The card's own words and colours: his status, for hire (the price, HIRE) or hired (his list, how to give him pieces
--- with this input: 8.5 the clipboard's, 📋 CLIPBOARD, CLEAR QUEUE).
+-- The card's own words and colours: his status, his list, how to give him pieces with this input (8.5 the clipboard's,
+-- 📋 CLIPBOARD, CLEAR QUEUE). (10.1: no "for hire" and no HIRE any more.)
 local function paint()
 	if not parts.card then
 		return
 	end
-	local isHired = hired()
 	local count = player:GetAttribute("MoveHelperQueue")
 	local doing = player:GetAttribute("MoveHelperDoing")
-	local price = Brain.money(priceNow())
-	parts.doing.Text = Brain.status(isHired, priceNow(), count, if type(doing) == "string" then doing else nil)
+	local name = nameNow()
+	parts.doing.Text = Brain.status(count, if type(doing) == "string" then doing else nil)
 	-- 8.6 the orders that apply now: in the card a row in place of its list's words and hint (raised, an orange edge; the
 	-- status over it keeps the count), in the orders menu its only row (orange: the menu's actions) or "Nothing to order
 	-- right now"
@@ -727,29 +754,21 @@ local function paint()
 		parts.orderEdge[kind].Transparency = if menu then 1 else 0
 	end
 	parts.none.Visible = menu and #now == 0
-	parts.title.Text = if menu then `📋 {string.upper(H.Name)} · ORDERS` else `🧑‍🔧 {string.upper(H.Name)}`
+	parts.title.Text = if menu then `📋 {string.upper(name)} · ORDERS` else `{Brain.iconOf(player:GetAttribute("MoveHelperKind"))} {string.upper(name)}`
+	parts.crew.Visible = not menu -- 10.1
 	parts.line.Visible, parts.hint.Visible, parts.main.Visible = not menu and #now == 0, not menu and #now == 0, not menu
-	parts.clip.Visible = isHired and not menu -- 8.5
-	if isHired then
-		parts.line.Text = Brain.queueText(count)
-		-- 8.5 orders mode: a piece goes to him only with the clipboard out (its key on this device)
-		parts.hint.Text = ClipboardRules.cardHint(PadGlyph.device())
-		parts.main.Text = "CLEAR QUEUE"
-		parts.main.BackgroundColor3 = K.raised
-		parts.main.TextColor3 = K.text
-		parts.edge.Transparency = 0
-		local out = orders()
-		parts.clip.Text = ClipboardRules.cardButton(out)
-		parts.clip.BackgroundColor3 = if out then K.raised else ORANGE
-		parts.clip.TextColor3 = if out then K.text else K.charcoal
-	else
-		parts.line.Text = `Hire {H.Name} for this move · {price}`
-		parts.hint.Text = "He carries the pieces you give him and lifts the heavy ones with you."
-		parts.main.Text = `HIRE · {price}`
-		parts.main.BackgroundColor3 = ORANGE
-		parts.main.TextColor3 = K.charcoal
-		parts.edge.Transparency = 1
-	end
+	parts.clip.Visible = not menu -- 8.5
+	parts.line.Text = Brain.queueText(count)
+	-- 8.5 orders mode: a piece goes to him only with the clipboard out (its key on this device)
+	parts.hint.Text = ClipboardRules.cardHint(PadGlyph.device(), name)
+	parts.main.Text = "CLEAR QUEUE"
+	parts.main.BackgroundColor3 = K.raised
+	parts.main.TextColor3 = K.text
+	parts.edge.Transparency = 0
+	local out = orders()
+	parts.clip.Text = ClipboardRules.cardButton(out)
+	parts.clip.BackgroundColor3 = if out then K.raised else ORANGE
+	parts.clip.TextColor3 = if out then K.text else K.charcoal
 end
 
 -- What it keeps clear of, in its ScreenGui's px.
@@ -810,7 +829,7 @@ local function place()
 	local tall, close, button, order, middle = cardHeight(touch, scale, menu, rows)
 	local wide = if menu then MENU_W else CARD_W
 	card.Size = UDim2.fromOffset(wide, tall)
-	-- (8.5 hired: 📋 CLIPBOARD left, CLEAR QUEUE right, half the row each)
+	-- (8.5: 📋 CLIPBOARD left, CLEAR QUEUE right, half the row each)
 	local half = (CARD_W - 2 * PAD - GAP) / 2
 	local split = parts.clip.Visible
 	parts.main.Size = UDim2.fromOffset(if split then half else CARD_W - 2 * PAD, button)
@@ -819,7 +838,10 @@ local function place()
 	parts.scale.Scale = scale
 	local head = math.max(TITLE_H + DOING_H, close)
 	parts.close.Size = UDim2.fromOffset(close, close)
-	local wordsW = wide - 2 * PAD - close - GAP
+	local crewW = math.max(CREW_W, close) -- 10.1 (as tall as ✕, at least as wide: a finger's size on a touch screen)
+	parts.crew.Size = UDim2.fromOffset(crewW, close)
+	parts.crew.Position = UDim2.new(1, -(PAD + close + GAP), 0, PAD)
+	local wordsW = wide - 2 * PAD - close - GAP - (if menu then 0 else crewW + GAP)
 	parts.title.Size = UDim2.fromOffset(wordsW, TITLE_H)
 	parts.doing.Size = UDim2.fromOffset(wordsW, DOING_H)
 	local top = PAD + head + GAP
@@ -932,9 +954,9 @@ function MoveHelperCard.open(at: { x: number, y: number }?, asMenu: boolean?)
 	if hook then
 		hook() -- (client/Main.client.luau: the other windows close)
 	end
-	-- (8.3 review: hired, ✕ first: an A by habit never clears his list; 8.6 the orders menu: its first order, asked for)
+	-- (8.3 review: ✕ first: an A by habit never clears his list; 8.6 the orders menu: its first order, asked for)
 	local first = ordersNow()[1]
-	Ui.gamepadFocus(if menu then (if first then parts.order[first] else parts.close) elseif hired() then parts.close else parts.main)
+	Ui.gamepadFocus(if menu then (if first then parts.order[first] else parts.close) else parts.close)
 	-- walking away from him (8.3 review: past CardReach, or CardSlack studs farther than you were as it opened: the
 	-- status line opens it from anywhere), a seat, him gone: it closes (a look every quarter second while it is open)
 	local from = apart()
@@ -972,7 +994,7 @@ local function onCard(x: number, y: number): boolean
 	return x >= at.X and x <= at.X + size.X and y >= at.Y and y <= at.Y + size.Y
 end
 
--- A click or a tap in the world (a ray): on him, his card. 8.5 orders mode (your clipboard out, he is hired): on a
+-- A click or a tap in the world (a ray): on him, his card. 8.5 orders mode (your clipboard out, a helper with you): on a
 -- piece of your move, onto his list or off it (the server decides); 8.6 on him (or the piece in his arms): his orders
 -- menu (MoveHelperCard.target); without the clipboard a piece is nothing to him (no stray orders).
 local function clicked(origin: Vector3, direction: Vector3)
@@ -1027,7 +1049,7 @@ local function keepPrompt()
 		made = fresh
 	end
 	local p = made :: ProximityPrompt
-	local words = if not hired() then `Hire {H.Name}` elseif orders() then `Orders for {H.Name}` else `Talk to {H.Name}`
+	local words = if orders() then `Orders for {nameNow()}` else `Talk to {nameNow()}`
 	if p.ActionText ~= words then
 		p.ActionText = words
 	end
@@ -1048,7 +1070,7 @@ local function nearestPiece(): Model?
 	for _, tagged in CollectionService:GetTagged("MovePrompt") do
 		local root = tagged.Parent
 		local model = root and root.Parent
-		if not tagged:IsA("ProximityPrompt") or not PICK[tagged.ActionText] or not root or not root:IsA("BasePart") or not model or not model:IsA("Model") then
+		if not tagged:IsA("ProximityPrompt") or not isPick(tagged.ActionText) or not root or not root:IsA("BasePart") or not model or not model:IsA("Model") then
 			continue
 		end
 		if type(model:GetAttribute("MoveSpot")) ~= "number" or (not tagged.Enabled and model:GetAttribute("DannyQueue") == nil) or piecePrompt(model) == nil then
@@ -1097,7 +1119,7 @@ local function keepGive()
 	end
 	giveTo = piece
 	local p = made :: ProximityPrompt
-	local words = if piece:GetAttribute("DannyQueue") ~= nil then `Take back from {H.Name}` else `Give to {H.Name}`
+	local words = if piece:GetAttribute("DannyQueue") ~= nil then `Take back from {nameNow()}` else `Give to {nameNow()}`
 	if p.ActionText ~= words then
 		p.ActionText = words
 	end
@@ -1123,13 +1145,13 @@ function MoveHelperCard.start()
 			MoveHelperCard.open(nil)
 		end
 	end)
-	for _, name in { "MoveHelper", "MoveHelperDoing", "MoveHelperId", "MoveHelperCall", "MoveHelperPrice", "MoveHelperQueue", "MoveHelperOrders" } do
+	for _, name in { "MoveHelper", "MoveHelperDoing", "MoveHelperId", "MoveHelperCall", "MoveHelperName", "MoveHelperQueue", "MoveHelperOrders" } do
 		player:GetAttributeChangedSignal(name):Connect(function()
 			if type(player:GetAttribute("MoveHelper")) ~= "string" then
 				MoveHelperCard.close()
 			elseif opened then
 				paint()
-				place() -- (8.5: hired, its button row splits for 📋 CLIPBOARD; 8.6 the orders row comes and goes)
+				place() -- (8.5: its button row splits for 📋 CLIPBOARD; 8.6 the orders row comes and goes)
 				local selected = Ui.gamepadSelection()
 				local card = parts.card
 				if selected and card and selected:IsDescendantOf(card) and not selected.Visible then

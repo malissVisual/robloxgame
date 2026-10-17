@@ -17,12 +17,17 @@
 --   * Performance: the pieces are a list kept by the tag's added / removed signals (the models that stream in and out
 --     too), their root looked up once; picked again every Outline.Every s (no GetDescendants, nothing per frame); a pool
 --     of Highlights made as needed, never destroyed, an unused one disabled with no Adornee.
+--   * 10.1 Lucy the finder (Config.Crew.Kinds.lucy, server/HelperCrew.luau): while she is in your run your player
+--     attribute CrewSense holds her Sense (studs). The Epic and Legendary pieces within it of you are picked first
+--     (wherever they are: past Outline.Range too) and drawn through the walls (DepthMode AlwaysOnTop); every other
+--     outline stays Occluded, as do those once she is gone.
 --   LootOutline.start()          listens (once; client/Main.client.luau starts it in the sandbox)
 --   LootOutline.drawn()          the pieces wearing an outline now
 --   LootOutline.squeeze(enemies) the least of the loot's outlines off until the budget holds `enemies` enemies too
 --   LootOutline.setOn(on) / isOn() / toggle()   on or off on this client (off: every loot outline off at once)
 
 local CollectionService = game:GetService("CollectionService")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
@@ -36,6 +41,7 @@ local EnemyOutline = require(script.Parent.EnemyOutline)
 local LootOutline = {}
 
 local O = Config.Loot.Outline
+local EPIC = LootRules.rank("epic") -- 10.1 Lucy's sense: this rank and up through walls
 
 type Slot = { highlight: Highlight, piece: Piece? }
 type Piece = {
@@ -43,6 +49,7 @@ type Piece = {
 	rarity: string, -- the model's Rarity attribute (read again when it changes)
 	entry: OutlinePick.LootEntry, -- what OutlinePick sees of it (kept, filled again every pick)
 	slot: Slot?, -- its outline, while it has one
+	sensed: boolean, -- 10.1 Lucy's sense: drawn through walls
 }
 
 local pieces: { Piece } = {}
@@ -86,6 +93,7 @@ local function release(slot: Slot)
 	end
 	slot.highlight.Enabled = false
 	slot.highlight.Adornee = nil
+	slot.highlight.DepthMode = Enum.HighlightDepthMode.Occluded
 end
 
 -- A free Highlight: an unused one, or a new one while the pool is under the shared budget.
@@ -117,6 +125,10 @@ end
 local function paint(slot: Slot, piece: Piece)
 	local color = colorOf(piece.rarity)
 	local highlight = slot.highlight
+	local depth = if piece.sensed then Enum.HighlightDepthMode.AlwaysOnTop else Enum.HighlightDepthMode.Occluded
+	if highlight.DepthMode ~= depth then
+		highlight.DepthMode = depth -- (10.1 Lucy's sense: through walls; else never)
+	end
 	if highlight.OutlineColor ~= color then
 		highlight.OutlineColor = color
 		highlight.FillColor = color
@@ -141,13 +153,27 @@ local function rarityOf(model: Model): string
 	return if type(raw) == "string" then raw else "common"
 end
 
--- Every Outline.Every s: the rarest, then the nearest pieces within range wear the outlines (what the enemies leave).
+-- 10.1 Lucy's sense: your CrewSense (studs) and where you are (nil: no sense now).
+local function sense(): (number, Vector3?)
+	local player = Players.LocalPlayer
+	local studs = player:GetAttribute("CrewSense")
+	if type(studs) ~= "number" or studs <= 0 then
+		return 0, nil
+	end
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	return studs, if root and root:IsA("BasePart") then root.Position else nil
+end
+
+-- Every Outline.Every s: the rarest, then the nearest pieces within range wear the outlines (what the enemies leave);
+-- 10.1 within Lucy's sense the Epic and Legendary ones first, wherever they are.
 local function pick()
 	local camera = workspace.CurrentCamera
 	if not camera then
 		return
 	end
 	local eye = camera.CFrame.Position
+	local studs, me = sense()
 	table.clear(entries)
 	table.clear(order)
 	for _, piece in pieces do
@@ -155,6 +181,10 @@ local function pick()
 		local entry = piece.entry
 		entry.distance = if root then (root.Position - eye).Magnitude else math.huge
 		entry.rank = LootRules.rank(piece.rarity)
+		piece.sensed = root ~= nil and me ~= nil and entry.rank >= EPIC and (root.Position - me).Magnitude <= studs
+		if piece.sensed then
+			entry.distance = 0 -- (within her sense: picked first of its rank, past the range too)
+		end
 		table.insert(entries, entry)
 		table.insert(order, piece)
 	end
@@ -183,7 +213,7 @@ local function add(instance: Instance)
 		return
 	end
 	local model = instance :: Model
-	local piece: Piece = { model = model, rarity = rarityOf(model), entry = { distance = math.huge, rank = 1, outlined = false }, slot = nil }
+	local piece: Piece = { model = model, rarity = rarityOf(model), entry = { distance = math.huge, rank = 1, outlined = false }, slot = nil, sensed = false }
 	byModel[model] = piece
 	table.insert(pieces, piece)
 	model:GetAttributeChangedSignal("Rarity"):Connect(function()

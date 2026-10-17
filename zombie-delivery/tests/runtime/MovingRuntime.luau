@@ -13,8 +13,8 @@
 -- before Moving.start (tests/sandboxmove_runtime_test.luau). Its fakes: SandboxPlots (Runtime.plots: player → a
 -- SandboxMap plot) and Collection (Runtime.collected: every Collection.add, its uid back unless Runtime.refuse); the
 -- test sets server/SandboxBoot.luau's hook Moving.parkVan itself (Runtime.makeCar: a fake car).
--- 8.3 Danny for hire: PlayerData.spend takes from Runtime.wallet (player → money; Runtime.startMoney when not set) and
--- records it (Runtime.spent); a car (not a bike) has its driver's seat and one passenger seat (Seat:Sit puts a humanoid
+-- 8.3: PlayerData.spend takes from Runtime.wallet (player → money; Runtime.startMoney when not set) and records it
+-- (Runtime.spent; 10.1 the crew's discharge, no hire any more), saveSoon records the player (Runtime.savedSoon); a car (not a bike) has its driver's seat and one passenger seat (Seat:Sit puts a humanoid
 -- in it: its Occupant, SeatPart, Sit and a SeatWeld), its doors (the driver's on the left, the passenger's on the
 -- right) and its size; Vehicles.speed is the car's `speed` (0 unless the test sets it). 8.5 Danny getting in and out
 -- like a player: Vehicles.swingDoor records each door swing (Runtime.doorSwings); RunService's Heartbeat (his pose every
@@ -534,9 +534,13 @@ local function moneyOf(player: any): number
 	local money = Runtime.wallet[player]
 	return if type(money) == "number" then money else Runtime.startMoney
 end
+Runtime.savedSoon = {} -- 10.1: { player } every PlayerData.saveSoon (the crew's rescue, the hospital)
 Runtime.PlayerData = stub("PlayerData", {
-	addMoney = function(player: any, amount: number, reason: string)
-		table.insert(Runtime.money, { player = player, amount = amount, reason = reason })
+	addMoney = function(player: any, amount: number, reason: string, sku: string?)
+		table.insert(Runtime.money, { player = player, amount = amount, reason = reason, sku = sku })
+	end,
+	saveSoon = function(player: any)
+		table.insert(Runtime.savedSoon, player)
 	end,
 	spend = function(player: any, amount: number, reason: string?, sku: string?): boolean
 		local money = moneyOf(player)

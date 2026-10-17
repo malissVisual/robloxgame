@@ -176,8 +176,8 @@
 --     the pick without the grip) and the pick hands him its far end at once (MoveHelper.joinLift). Moving.helperLiftFrame
 --     says where you will hold it, Moving.helperMark words its prompt ("Lift with Danny" while he waits at a two-person
 --     piece of his list), Moving.helperCallOff closes its open lift check when the call ends before the lift. A piece
---     you pick up leaves his list (onPick: MoveHelper.taken). Without Danny hired (a crew of players, him for hire, him
---     down): today's rules. 8.3 review: a crew mate's Lift on the piece somebody waits at with him is refused (who
+--     you pick up leaves his list (onPick: MoveHelper.taken). Without Danny (a crew of players in the city, him down):
+--     today's rules. (10.1: no hire any more: the move's helper is free and with you from the start.) 8.3 review: a crew mate's Lift on the piece somebody waits at with him is refused (who
 --     waits: MoveHelper.call's "busy"); the lift check his arrival opens, left unanswered, closes without a knock.
 --   Moving.start()            builds the board, the drop-off and the doors, wires the hooks (after Main's own)
 --   Moving.busy(player)       why `player` can't take a job, a mission or a rental now (on a move), or nil
@@ -193,7 +193,7 @@
 --   Moving.step()             one tick of every move (the loop's; tests/moving_runtime_test.luau runs the real module)
 --   Moving.doors()            8.1 walk-in doors: one look at every move's doors (the loop's, between two ticks)
 --   Moving.helperTake / helperDrop / helperLoad / helperHurt   7.0: the depot's helper's hands (server/MoveHelper.luau:
---                             Danny comes to a crew of one, 8.3 for hire; MoveHelper.sync in the tick); 8.3 helperLiftFrame /
+--                             Danny comes to a crew of one, 10.1 free; MoveHelper.sync in the tick); 8.3 helperLiftFrame /
 --                             helperCalled / helperMark / helperCallOff: his side of your call (after onHelp)
 --   8.1 grip: the carry's timing checks (shared/CarryGrip.luau, client/CarryGripUi.luau): the grip hook (setHands: the
 --                             character attribute CarryGrip, the steady walk; the lift moment in onPick / onHelp opens
@@ -1486,7 +1486,7 @@ local function rewire(s: Session, item: Item)
 	table.clear(item.health)
 	local thing = s.move.things[item.spot]
 	item.pick.Enabled = thing.state == "home" or thing.state == "ground"
-	item.help.Enabled = thing.state == "carried" and thing.class == "pair" and thing.helper == nil
+	item.help.Enabled = thing.state == "carried" and thing.class == "pair" and thing.helper == nil and playerById(thing.carrier) ~= nil -- (10.1: never on Bruno's)
 	item.help:SetAttribute("MoveSkip", thing.carrier)
 	if thing.state ~= "carried" then
 		return
@@ -2105,6 +2105,8 @@ end
 -- He takes `spot`: a one-hand thing into his arms (in front of his chest, like a player's), or the other end of a pair
 -- thing a player lifted (their walk: two people's now). Never a pair thing alone. (ok, why)
 -- 7.x Danny, a partner: a "both" thing into his arms too, or the other side of one a player carries (the pair's walk).
+-- 10.1 the crew (server/HelperCrew.luau): a helper whose model says CrewSolo (Bruno) picks a pair thing up alone, as
+-- his own (its carrier: in his arms, his carry the drag's slow walk; nobody's Help on it: rewire), never its far end.
 function Moving.helperTake(s: Session, spot: number, npc: Model): (boolean, string?)
 	local who = helperIdOf(npc)
 	local item = s.items[spot]
@@ -2114,7 +2116,8 @@ function Moving.helperTake(s: Session, spot: number, npc: Model): (boolean, stri
 	if s.ended or not who or not item or not thing or not root or not humanoid then
 		return false, "gone"
 	end
-	if thing.class == "pair" or (thing.class == "both" and thing.state == "carried") then -- (7.x: a both thing's other side)
+	local solo = thing.class == "pair" and thing.state ~= "carried" and npc:GetAttribute("CrewSolo") == true -- 10.1 Bruno
+	if not solo and (thing.class == "pair" or (thing.class == "both" and thing.state == "carried")) then -- (7.x: a both thing's other side)
 		local ok, why = Rules.help(s.move, spot, who, true)
 		if not ok then
 			return false, why
@@ -2126,7 +2129,7 @@ function Moving.helperTake(s: Session, spot: number, npc: Model): (boolean, stri
 		end
 		s.dirty = true
 		return true, nil
-	elseif thing.class ~= "hand" and thing.class ~= "both" then -- (7.x: a both thing alone too)
+	elseif not solo and thing.class ~= "hand" and thing.class ~= "both" then -- (7.x: a both thing alone too)
 		return false, "single"
 	end
 	local ok, why = Rules.pick(s.move, spot, who)
@@ -2134,7 +2137,7 @@ function Moving.helperTake(s: Session, spot: number, npc: Model): (boolean, stri
 		return false, why
 	end
 	item.model.Parent = folder
-	weldTo(item, root, root.CFrame * holdOffset(thing, Rules.mode(thing), root, humanoid)) -- (7.x: "hand" or "both")
+	weldTo(item, root, root.CFrame * holdOffset(thing, if solo then "both" else Rules.mode(thing), root, humanoid)) -- (7.x: "hand" or "both"; 10.1 a pair thing alone in his arms)
 	item.lastAt, item.lastTime, item.apartSince, item.fallFrom = nil, 0, nil, nil
 	rewire(s, item)
 	s.dirty = true
@@ -2216,7 +2219,7 @@ function Moving.helperLoad(s: Session, npc: Model): (boolean, string?)
 	local c = Rules.counts(s.move)
 	say(s.owner, `{npc.Name} loaded {labelOf(thing)} · {c.out}/{c.total} out · truck {math.floor(Rules.fill(s.move.packing) * 100 + 0.5)}% full`)
 	s.dirty = true
-	local hired = MoveHelper.find(s.owner) -- (9.7 runs: his loads go into his hirer's stock)
+	local hired = MoveHelper.find(s.owner) -- (9.7 runs: his loads go into his boss's stock: 10.1 the move's owner, the host)
 	SB.loaded(s, spot, if hired then hired.hirer else nil)
 	SB.tell("load", s, nil, { item = thing.item, spot = spot }) -- 8.2: the listeners (Moving.onLoad: Danny's, no player)
 	return true, nil
@@ -2351,7 +2354,7 @@ function WalkIn.ready(leaves: { Instance }, clock: number, since: number): boole
 	return clock - since >= T.Doors.Dwell and clock - opened >= T.Doors.Open
 end
 
--- Danny (server/MoveHelper.luau), hired (for hire he touches nothing, by the van), near a door opens it too, whichever
+-- Danny (server/MoveHelper.luau; 10.1 any helper of the crew), near a door opens it too, whichever
 -- way he faces (he goes through it his own way): the front door, the back door, inside and out.
 function WalkIn.helper(s: Session, clock: number)
 	local h = MoveHelper.find(s.owner)
@@ -3097,8 +3100,10 @@ function Moving.helperMark(s: Session, spot: number, how: string?)
 		return
 	end
 	local verb = if thing.class == "pair" then "Lift" else "Pick up"
-	item.pick.ActionText = if how == "wait" then "Stop waiting" elseif how == "ask" then `{verb} with {Config.MoveHelper.Name}` else verb
-	item.pick.ObjectText = if how == "wait" then `Waiting for {Config.MoveHelper.Name}…` else labelOf(thing)
+	local helper = MoveHelper.find(s.owner) -- (10.1 the crew's helper: his own name)
+	local name = if helper then helper.name else Config.MoveHelper.Name
+	item.pick.ActionText = if how == "wait" then "Stop waiting" elseif how == "ask" then `{verb} with {name}` else verb
+	item.pick.ObjectText = if how == "wait" then `Waiting for {name}…` else labelOf(thing)
 end
 
 -- The call is off once he was in place (G, walked away, him down): `player`'s lift check on it, still open, closes
@@ -4622,7 +4627,7 @@ end
 -- Crew.ownerOf), its truck the host's van parked at the house's curb (Runs parks it there before Moving.startRun: no
 -- driving). Nothing is unloaded at a plot: at the run's end (the host's FINISH, the party's vote, the clock, GIVE UP,
 -- the host gone) everything in the truck goes home at once (SB.unloadAll), each piece into the stock of whoever loaded
--- it last (SB.loaded: Danny's loads his hirer's; one who left the game: the host's), and Runs shows the results card
+-- it last (SB.loaded: the helper's loads the host's; one who left the game: the host's), and Runs shows the results card
 -- (Moving.onRunEnd) and takes the party back to the lobby.
 --   Moving.startRun(host, house, difficulty)   the run's move: its contract (the house's, the host's card's seed for it
 --                             while unspent, else a new one; its clock RunRules.time; contract.difficulty) started

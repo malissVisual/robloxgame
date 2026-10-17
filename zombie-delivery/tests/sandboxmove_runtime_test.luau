@@ -13,7 +13,8 @@
 --   * 8.8 no roles (tests/noroles_runtime_test.luau has the crew's): Ann has none on the move (no MoveRole, the state's
 --     team only says the van was called), the van's Load holds no time.
 --   * Load at the back doors, and from inside the walk-in bay (its own Load, the back shut), every piece inside the
---     bay; Danny on a solo move (8.3: for hire, not hired: a two-person Lift is dragged alone).
+--     bay; Danny on a solo move (10.1: free, with you from the start; a two-person Lift without his answer, Config.MoveHelper
+--     WaitForHelper off for it, is dragged alone).
 --   * 9.7 no unloading at a plot during a run; FINISH at the truck: everything in it goes home at once into the
 --     loader's stock (Collection.add with its item, variant, condition, name), no pay, as one trip (Moving.onTrip),
 --     Moving.onRunEnd's facts (the pieces, their values, whose stock), Moving.onFinish's; FINISH with nothing loaded:
@@ -309,9 +310,9 @@ end
 check("nobody on the porch, no Marge's text (no story)", not porch and E.last(ann, "Tutorial", "message") == nil)
 local danny = MoveHelper.find(ann)
 check("Danny joins a crew of one", danny ~= nil and danny.body ~= nil)
-check("8.3 …for hire (nobody hired him: he waits by the van, his price on the status line; the sandbox's words, 8.3 review: every device's, pick him, no click)", danny.hirer == nil
-	and ann:GetAttribute("MoveHelper") == "offer" and ann:GetAttribute("MoveHelperPrice") == danny.price
-	and string.find(E.lastNotice(ann), "pick him to hire him", 1, true) ~= nil and string.find(string.lower(E.lastNotice(ann) or ""), "click", 1, true) == nil, E.lastNotice(ann))
+check("10.1 …free: Ann's from the start (no price on the status line; the sandbox's words: his clipboard, every device's, no click)", danny.hirer == ann
+	and ann:GetAttribute("MoveHelper") == "hired" and ann:GetAttribute("MoveHelperPrice") == nil and string.find(E.lastNotice(ann), "Danny is with you", 1, true) ~= nil
+	and string.find(E.lastNotice(ann), "clipboard", 1, true) ~= nil and string.find(string.lower(E.lastNotice(ann) or ""), "click", 1, true) == nil, E.lastNotice(ann))
 check("8.0.1: Danny says hello without the city's depot; his full van's line names no Wall", E.saidSince(Brain.line("hello", true) :: string, 0)
 	and not E.saidSince(Brain.Lines.hello, 0) and string.find(Brain.line("full", true) :: string, "Wall", 1, true) == nil)
 
@@ -421,8 +422,10 @@ E.place(ann, outside)
 trigger(enter, ann)
 local sofa = newItem(3)
 E.place(ann, sofa.PrimaryPart.Position + V3(1, 0, 0))
-trigger(promptIn(sofa, "Lift"), ann) -- (8.3 Danny not hired: today's rule, the sofa dragged alone; his call is movehelper_runtime_test's)
-check("8.3 Danny not hired: a two-person Lift is a drag alone as before (no call, WaitForHelper or not)", Config.MoveHelper.WaitForHelper and ann.Character:GetAttribute("MoveCarry") == 3
+Config.MoveHelper.WaitForHelper = false -- (10.1: Danny is always with you; his call is movehelper_runtime_test's: here the sofa is dragged alone)
+trigger(promptIn(sofa, "Lift"), ann)
+Config.MoveHelper.WaitForHelper = true
+check("a two-person Lift without his call (WaitForHelper off): a drag alone (no call)", ann.Character:GetAttribute("MoveCarry") == 3
 	and ann:GetAttribute("MoveHelperCall") == nil and MoveHelper.find(ann).call == nil)
 step()
 E.place(ann, origin.Position + V3(0, 3, 1))

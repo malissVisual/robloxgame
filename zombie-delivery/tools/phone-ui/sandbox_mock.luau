@@ -85,8 +85,13 @@ end
 function M.textWidth(text, size, font)
 	local bold = font == nil or string.find(tostring(font and font.Name), "Bold") ~= nil or string.find(tostring(font and font.Name), "Black") ~= nil
 	local total = 0
+	local joined = false
 	for _, code in utf8.codes(text) do
-		if code ~= 0xFE0F then -- (an emoji's variation selector has no width)
+		if code == 0x200D then
+			joined = true -- (10.1: a zero-width joiner: the emoji after it is drawn into the one before, "🧑‍🔧" one wide)
+		elseif joined then
+			joined = false
+		elseif code ~= 0xFE0F then -- (an emoji's variation selector has no width)
 			total += charWidth(utf8.char(code), bold)
 		end
 	end

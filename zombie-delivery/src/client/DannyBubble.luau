@@ -4,13 +4,12 @@
 -- BillboardGui this client makes in its PlayerGui, adorned to his head: nobody else sees it). Its words are the
 -- server's (your player attribute MoveHelperBubble: shared/MoveHelperBrain.luau's bubble, made from the same action as
 -- the status line's MoveHelperDoing, so the two never disagree: "📦 Carrying: Sofa → van", "⏳ Waiting at: Piano (needs
--- you)", "🧑‍🔧 For hire · $100"; MoveHelperAlert: the movers' orange, he needs you or is in trouble), and "list: 3"
--- beside them while his list holds pieces (MoveHelperQueue, hired). His body by your MoveHelperId (his body's
--- MoveHelper), as his card finds it.
+-- you)"; MoveHelperAlert: the movers' orange, he needs you or is in trouble; 10.1 "🆘 Down! Hold E to revive" in a
+-- run), and "list: 3" beside them while his list holds pieces (MoveHelperQueue). His body by your MoveHelperId (his
+-- body's MoveHelper), as his card finds it. (10.1: any helper of the crew, Bruno's, Lucy's …: no "for hire" any more.)
 --   * Where: over his name tag ("Danny / ZDC Moving", server/Npcs.luau's on his head), or over his speech while he
 --     talks (it takes the tag's place there): its bottom Config.MoveHelper.Bubble.Gap px over theirs at every distance
---     (all three are a fixed size on the screen: DannyBubble.lift). For hire it stands in for the server's "Hire Danny ·
---     $X" sign over him (hidden on this screen only: the bubble says the same; everybody else still sees the sign).
+--     (all three are a fixed size on the screen: DannyBubble.lift).
 --   * Readable but small: Bubble.Text px words in the HUD's charcoal pill (Theme), Bubble.Wide px at most (cut with
 --     "…"); from Bubble.Near studs (the camera's) it fades out to nothing at Bubble.Far, its MaxDistance
 --     (DannyBubble.fade); AlwaysOnTop only within Bubble.Top studs (near, a piece or the van never hides it; farther,
@@ -230,28 +229,6 @@ local function fadeTo(alpha: number)
 	parts.count.TextTransparency = alpha
 end
 
--- The server's "Hire Danny · $X" sign over him: hidden on this screen while the bubble says it (`hide`), shown again
--- once it does not (the one hidden, wherever he is now: off your move, the bubble goes).
-local hidden: BillboardGui? = nil
-local function hireSign(model: Model?, hide: boolean)
-	local was = hidden
-	if not hide then
-		hidden = nil
-		if was and was.Parent and not was.Enabled then
-			was.Enabled = true
-		end
-		return
-	end
-	local root = if model then model.PrimaryPart else nil
-	local sign = if root then root:FindFirstChild("HireSign") else nil
-	if sign and sign:IsA("BillboardGui") then
-		if sign.Enabled then
-			sign.Enabled = false
-		end
-		hidden = sign
-	end
-end
-
 -- One look: his body and head, the stack under the bubble (his speech, else his name tag), the distance.
 local function step()
 	local gui = build()
@@ -267,7 +244,6 @@ local function step()
 		if gui.Enabled then
 			gui.Enabled = false
 		end
-		hireSign(model, false)
 		return
 	end
 	local part = head :: BasePart
@@ -299,7 +275,6 @@ local function step()
 	if gui.Enabled ~= on then
 		gui.Enabled = on
 	end
-	hireSign(model, true)
 end
 
 function DannyBubble.start()

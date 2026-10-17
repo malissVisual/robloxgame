@@ -149,8 +149,7 @@ local started = Moving.admin(sol, "start")
 check("a solo move starts", string.find(started, "started", 1, true) ~= nil, started)
 Moving.step()
 danny = MoveHelper.find(sol)
-E.request(sol, "helper", "hire")
-check("Danny comes, Sol hires him", danny ~= nil and danny.body ~= nil and danny.hirer == sol)
+check("Danny comes, Sol's from the start (10.1 free)", danny ~= nil and danny.body ~= nil and danny.hirer == sol)
 local body = danny.body
 local truck = E.cars[sol]
 local cargoDoor = truck.chassis:FindFirstChild("CargoDoor")

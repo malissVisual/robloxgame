@@ -15,7 +15,7 @@
 --   2. PLAY: 9.7 no van in the lobby (the truck waits at a run's house; CAR says so).
 --   3. 9.7 the portals: Ann onto the farmstead's pad (the pad panel: she the host, the countdown, Easy and Normal open,
 --      Hard locked), her pick; the countdown over: her run (her truck parked at the curb, locked, she faded over to the
---      house's front yard, the portal IN USE), Danny for hire. Bob onto the farmstead's pad: IN USE; onto the Pond
+--      house's front yard, the portal IN USE), Danny with her (10.1 free). Bob onto the farmstead's pad: IN USE; onto the Pond
 --      Cabin's: his own run at the same time. 8.8 no roles: none on the move; the van's Loads hold no time (step 6).
 --   4. The truck at the chalet's curb, the back doors open, the front door's walk-in zone: the dwell, the fade, inside
 --      (8.3: the chalet's leaves open before the fade, the move FadeOut + Margin s after it, the arrival a step past the
@@ -863,11 +863,11 @@ do
 		and view.run.mine == true and view.hordeAt == nil and math.abs(view.endsAt - E.now - F.Time) < 2, view.endsAt - E.now)
 	check("…8.8: no role on the move (no MoveRole; the state's team: only the van's call, not made yet)", ann:GetAttribute("MoveRole") == nil
 		and view.team.role == nil and view.team.called == false)
-	check("…Danny comes with her crew of one, for hire (8.3), his id for his card", MoveHelper.find(ann) ~= nil and MoveHelper.find(ann).hirer == nil
-		and ann:GetAttribute("MoveHelperId") == MoveHelper.find(ann).id)
+	check("…Danny comes with her crew of one, free (10.1: hers from the start, no hire), his id for his card", MoveHelper.find(ann) ~= nil
+		and MoveHelper.find(ann).hirer == ann and MoveHelper.find(ann).kind == "danny" and ann:GetAttribute("MoveHelperId") == MoveHelper.find(ann).id)
 	E.fire(ann, "Moving", "helper", "van")
-	check("…the old orders are gone (WAIT AT VAN: nothing): not hired, he leaves her pieces to her, his price on her status line",
-		ann:GetAttribute("MoveHelper") == "offer" and type(ann:GetAttribute("MoveHelperPrice")) == "number" and #MoveHelper.find(ann).queue == 0, ann:GetAttribute("MoveHelper"))
+	check("…the old orders are gone (WAIT AT VAN: nothing): he leaves her pieces to her, no price on her status line",
+		ann:GetAttribute("MoveHelper") == "hired" and ann:GetAttribute("MoveHelperPrice") == nil and #MoveHelper.find(ann).queue == 0, ann:GetAttribute("MoveHelper"))
 	check("…the analytics: FirstContract once, MoveStarted (solo)", H.steps(11).FirstContract == 1 and #H.events("MoveStarted", ann) == 1)
 	-- Bob: the farmstead's pad IN USE; the Pond Cabin's: his own run at the same time
 	local inUseAt = #E.sent
