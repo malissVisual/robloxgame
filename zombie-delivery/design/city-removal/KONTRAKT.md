@@ -101,3 +101,30 @@ check), or change the few that name your files. Keep those edits small: the lead
   - luau-lsp on the files you changed is clean (if you can run it);
   - commit on your branch, and report what you deleted, what you changed, the tests you changed and why, and the
     Config sections and shared modules you no longer use.
+
+## Wave 2 (after the three workers' merge, `beac80be`)
+
+The game now has 228 scripts (about 127,000 lines). The city's code that is left sits in modules the game still
+loads:
+- `server/PlayerData` → `Career` → `Missions`, `Transport`, `Cast`, `Map`, `Economy`; `PlayerData` → `Deliveries`
+  (`Residents`, `Roads`, `Map`), `Levels`;
+- `server/Vehicles` (5,300 lines: driving, the city's cars, gear, rentals, repairs, chauffeurs);
+- `server/Zombies` → `GunModels`, `Economy`;
+- `shared/ItemLooks` → `GunModels`, `CargoLooks`, `KitArt` (weapons, cargo, kit looks);
+- `client/ZombieLife` → `Map` (a night factor that is always 0);
+- `Icons` (city icons), `KitFit`, `Bag`, `NpcLooks`, `AnalyticsPlan`'s city funnel.
+
+| Owner | Files |
+| --- | --- |
+| **core** | `src/server/**`, `tests/runtime/**`; the shared modules `Economy`, `Career`, `Missions`, `Transport`, `Cast`, `Deliveries`, `Residents`, `Roads`, `Levels`, `GunModels`, `Map`, `AnalyticsPlan`, `NpcLooks` and the server-only ones; the tests of those |
+| **looks** | `src/client/**`, `src/first/**`, `tools/phone-ui/**`; the shared modules `ItemLooks`, `CargoLooks`, `KitArt`, `KitFit`, `Bag`, `Icons`, `StyleBuild`, `StyleLooks`, `CharacterLooks`, `FurnitureLooks` (only to drop what it needs from `Bag`, nothing else) and the client-only ones; the tests of those |
+| **lead** | `Config.luau`, `Net.luau`, every other shared module, `README.md`, `AGENTS.md`, `COLLAB.md`, `art/`, `design/`, `tools/` except the two workers' checks |
+
+`looks` stops requiring `GunModels` and `Map`; `core` deletes them once nothing does. The rest of the contract above
+holds:
+- delete what the game no longer reaches;
+- prove it dead first;
+- keep the save byte-compatible;
+- leave a feature that is only switched off;
+- don't edit `Config.luau` (list the sections you stop reading);
+- keep the checks green.
