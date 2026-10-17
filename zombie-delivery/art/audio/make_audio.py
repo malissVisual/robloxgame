@@ -19,6 +19,8 @@ borrowed. Writes six files for Roblox (one upload each, the game plays regions o
   sfx5.ogg   8.9: the newest features' (Danny's clipboard taken out and put away, a piece ticked onto his list and
              crossed off, a soft "nope", his orders' chirp and his whistle; a trade's coins, an offer's desk bell, a price
              tag; the auction's gavel, its "sold!" bell and a bid's tick)
+  sfx6.ogg   10.1: the start's (the intro's van driving in and off, the DELIVEROS wordmark's jingle; the start screen's
+             pick, the game's start, START OVER's question, BACK; the character creator's swoosh, a choice, the dice)
 and regions.json + src/shared/SoundSheet.luau (the regions, the stand-ins (FALLBACK), the sheets' lengths; the asset ids
 stay to be filled in).
 Run: python3 art/audio/make_audio.py   (from zombie-delivery/)
@@ -31,7 +33,7 @@ import argparse, hashlib, json, math, os, subprocess, sys, wave
 import numpy as np
 
 ARGS = argparse.ArgumentParser(description="Synthesizes the game's sound sheets.")
-ARGS.add_argument("--sheets", default="", help="comma-separated sheets to encode again although their .ogg exists (sfx, music, sfx2, sfx3, sfx4, sfx5) or 'all'")
+ARGS.add_argument("--sheets", default="", help="comma-separated sheets to encode again although their .ogg exists (sfx, music, sfx2, sfx3, sfx4, sfx5, sfx6) or 'all'")
 REWRITE = {s.strip() for s in ARGS.parse_args().sheets.split(",") if s.strip()}
 
 SR = 44100
@@ -1128,6 +1130,105 @@ put5("sold_bell", lowpass(mix(at(hand_bell(1318, 1.4), 0, 1.6), at(hand_bell(131
 put5("bid_tick", mix(modes6(((1850, 0.4, 0.012), (3600, 0.15, 0.006)), 0.08), tick6(0.01, 2000, 7000, 0.0015) * 0.4,
                      thump(500, 300, 0.05, 0.008) * 0.2), -27)
 
+# ── 10.1: the start's sounds (sfx6.ogg) ──────────────────────────────────────────
+# The intro (src/first/Loading.client.luau): the Deliveros van driving in (its engine settling, the tyres, a soft
+# brake and the body settling), the DELIVEROS wordmark's pop and jingle (a bright arpeggio up to a sparkling chord,
+# timed so the chord lands with the slogan) and the van driving off. The start screen (client/Menu.luau) and the
+# character creator (client/CharacterCreator.luau): a save picked, the game starting, START OVER's question, BACK, the
+# creator opening, a choice ticked, the dice of 🎲 RANDOM. A sheet of its own (sfx5 is uploaded: its bytes stay), its
+# own random generator: every sheet above comes out as before. Fitted (fit): the ticks -26, the swoosh and BACK -24,
+# the choices -22, the van -20 / -21, the game's start -17, the jingle -16; each one's last 30 ms faded (put6).
+rng7 = np.random.default_rng(10100)
+def noise7(sec): return rng7.standard_normal(samples(sec))
+def tick7(sec=0.015, lo=1800, hi=7000, decay=0.0025):
+    return bandpass(noise7(sec), lo, hi) * env(samples(sec), 0.0003, decay)
+SFX6 = {}
+def put6(name, sig, lufs):
+    """Fitted (fit), its last 30 ms faded out."""
+    y = np.asarray(sig, dtype=float)
+    SFX6[name] = fit(y * np.clip((len(y) - np.arange(len(y))) / samples(0.03), 0, 1), lufs)
+def engine7(sec, f0, f1, curve, shape):
+    """A van's engine: the harmonics of a firing pitch gliding f0 → f1 (u ** curve), the middle ones strongest (its
+    buzz), its putter (a wobble at half the pitch), the loudness `shape` (an array as long as the sound), low-passed like
+    a van heard from outside."""
+    x = t(sec); u = x / sec
+    f = f0 + (f1 - f0) * u ** curve
+    ph = 2 * np.pi * np.cumsum(f) / SR
+    body = sum(a * np.sin(k * ph + rng7.uniform(0, 2 * np.pi)) for k, a in ((1, 0.55), (2, 0.8), (3, 0.75), (4, 0.6), (5, 0.45), (6, 0.35), (8, 0.2), (10, 0.1)))
+    putter = 1 + 0.25 * np.sin(ph / 2)
+    return lowpass(body * putter * shape, 1500)  # (its buzz up to the mids: a laptop's or a phone's speaker plays no bass)
+def sweep7(sec, lo0, lo1, width):
+    """Air moving: noise in a band whose low edge glides lo0 → lo1 (in a few steps, cross-faded)."""
+    n = samples(sec); out = np.zeros(n); steps = 8; seg = n // steps
+    for i in range(steps):
+        lo = lo0 + (lo1 - lo0) * i / (steps - 1)
+        piece = bandpass(noise7(sec), lo, lo * width)
+        w = np.zeros(n); a = max(0, (i - 1) * seg); b = min(n, (i + 2) * seg)
+        w[a:b] = np.hanning(b - a)
+        out += piece * w
+    return out
+def chime7(midi, sec, decay=0.6, amp=1.0):
+    """A bright mallet: a round pluck under a bell's ring."""
+    f = note(midi)
+    return (pluck(f, sec, decay * 0.6) * 0.7 + bell(f, sec, decay, ((1, 1), (2.0, 0.3), (3.0, 0.1), (4.2, 0.05)))) * amp
+
+# The van drives in (1.6 s): its engine comes up and settles to an idle as it slows (the intro's Quint ease: fast,
+# then gently), the tyres on the road, a short soft brake and the body settling on its springs.
+n = samples(1.6); u = np.arange(n) / n
+shape = np.clip(u / 0.25, 0, 1) ** 1.5 * (1 - 0.55 * np.clip((u - 0.55) / 0.35, 0, 1))
+tyres = bandpass(noise7(1.6), 300, 2400) * (np.clip(u / 0.3, 0, 1) * (1 - np.clip((u - 0.5) / 0.3, 0, 1))) * 0.6
+brake = at(glide6(2500, 2280, 0.16) * 0.06, 1.12, 1.6)
+settle = at(thump(130, 70, 0.25, 0.06) * 0.35, 1.3, 1.6)
+put6("intro_drive", mix(engine7(1.6, 96, 62, 0.6, shape), tyres, sweep7(1.6, 500, 300, 4) * shape * 0.12, brake, settle), -20)
+
+# The wordmark (2.4 s): a round pop as it springs up (a soft thump, a bright puff, a quick rising "boing"), C5 E5 G5 C6
+# up in quick steps, then the chord C6 E6 G6 ringing over a warm low C, sparkles falling over its tail.
+pop = mix(thump(190, 60, 0.25, 0.05) * 0.6, tick7(0.03, 2000, 9000, 0.008) * 0.5, glide6(320, 760, 0.12) * env(samples(0.12), 0.002, 0.08) * 0.5)
+logo = [at(pop, 0, 2.4)]
+for i, m in enumerate((72, 76, 79, 84)):
+    logo.append(at(chime7(m, 0.7, 0.35, 0.55 + 0.1 * i), 0.05 + 0.12 * i, 2.4))
+for m, a in ((84, 0.7), (88, 0.55), (91, 0.45)):
+    logo.append(at(chime7(m, 1.6, 0.9, a), 0.62, 2.4))
+logo.append(at(pluck(note(48), 1.4, 0.6) * 0.5, 0.62, 2.4))
+for _ in range(14):
+    when = rng7.uniform(0.7, 1.9); f = rng7.uniform(2600, 5200)
+    logo.append(at(bell(f, 0.4, 0.12) * rng7.uniform(0.05, 0.14) * (1.9 - when) / 1.2, when, 2.4))
+put6("intro_logo", lowpass(mix(*logo), 12000), -16)
+
+# The van drives off (0.9 s): the engine revving up as it pulls away, the air rushing, all of it going further off.
+n = samples(0.9); u = np.arange(n) / n
+shape = np.clip(u / 0.15, 0, 1) * (1 - 0.8 * np.clip((u - 0.45) / 0.55, 0, 1))
+put6("intro_leave", mix(engine7(0.9, 64, 120, 1.4, shape), sweep7(0.9, 400, 1400, 3) * shape * 0.25), -21)
+
+# A save picked (0.35 s): G5 then C6, a soft step up.
+put6("menu_select", mix(at(chime7(79, 0.3, 0.18, 0.8), 0, 0.35), at(chime7(84, 0.28, 0.2), 0.07, 0.35)), -22)
+# The game starts (1.4 s): air rushing up, then a bright C major chord on a soft low thump.
+whoosh = sweep7(0.5, 300, 3500, 2.5) * hump(samples(0.5), 0.7, 0.3) * 0.5
+stab = [at(whoosh, 0, 1.4), at(thump(150, 60, 0.3, 0.07) * 0.5, 0.34, 1.4)]
+for m, a in ((72, 0.6), (76, 0.5), (79, 0.5), (84, 0.6)):
+    stab.append(at(chime7(m, 1.05, 0.55, a), 0.34, 1.4))
+put6("menu_start", lowpass(mix(*stab), 11000), -17)
+# START OVER's question (0.5 s): two low soft tones going down, E4 then C4.
+def low7(midi, sec):
+    x = t(sec); f = note(midi)
+    return lowpass((np.sin(2 * np.pi * f * x) + 0.3 * np.sin(6 * np.pi * f * x)) * env(len(x), 0.006, 0.12), 1800)
+put6("menu_warn", mix(at(low7(64, 0.25), 0, 0.5), at(low7(60, 0.3), 0.15, 0.5)), -22)
+# BACK (0.25 s): C6 then G5, a soft step down.
+put6("menu_back", mix(at(chime7(84, 0.18, 0.12, 0.7), 0, 0.25), at(chime7(79, 0.2, 0.14, 0.8), 0.06, 0.25)), -24)
+# The creator opens (0.5 s): a soft airy swoosh up and a quiet E6 as it lands.
+put6("creator_open", mix(sweep7(0.5, 600, 2400, 2.5) * hump(samples(0.5), 0.45, 0.4) * 0.6, at(chime7(88, 0.3, 0.2, 0.3), 0.2, 0.5)), -24)
+# A choice ticked (0.09 s): a small round pop (the creator plays it a little higher or lower by the choice).
+x = t(0.09); f = 900 + 500 * (1 - np.exp(-x / 0.012))
+put6("creator_pick", mix(np.sin(2 * np.pi * np.cumsum(f) / SR) * env(len(x), 0.001, 0.025), tick7(0.01, 2500, 8000, 0.0015) * 0.3), -26)
+# 🎲 RANDOM (0.8 s): two plastic dice rattling on a table, slowing down, then a little chime as they settle.
+dice = []
+for i, when in enumerate((0.0, 0.07, 0.13, 0.19, 0.25, 0.3, 0.35, 0.4)):
+    f = rng7.uniform(2200, 4200); amp = 1 - i * 0.09
+    hit = mix(modes6(((f, 0.4, 0.01), (f * 1.6, 0.2, 0.006)), 0.05), tick7(0.008, 3000, 9000, 0.0012) * 0.5, thump(420, 280, 0.04, 0.008) * 0.25)
+    dice.append(at(hit * amp, when, 0.8))
+dice.append(at(chime7(88, 0.35, 0.22, 0.4), 0.5, 0.8))
+put6("creator_dice", mix(*dice), -22)
+
 # ── Write the sheets ──────────────────────────────────────────────────────────
 REGIONS_PATH = os.path.join(HERE, "regions.json")
 OLD = json.load(open(REGIONS_PATH)) if os.path.exists(REGIONS_PATH) else {}
@@ -1144,7 +1245,7 @@ def build_sheet(items, gap):
     return regions, pcm, pos / SR
 SHEETS = [("sfx", list(SFX.items()), 0.3), ("music", [(k, v[0]) for k, v in MUSIC.items()], 0.5),
           ("sfx2", list(SFX2.items()), 0.3), ("sfx3", list(SFX3.items()), 0.3), ("sfx4", list(SFX4.items()), 0.3),
-          ("sfx5", list(SFX5.items()), 0.3)]
+          ("sfx5", list(SFX5.items()), 0.3), ("sfx6", list(SFX6.items()), 0.3)]
 # Stand-ins (SoundSheet.Fallback, client/Sounds.luau): what plays while a sheet is not uploaded yet (its id empty): a
 # sound of an older sheet (a stand-in of a stand-in works too). A sound not here stays silent until its sheet is up; a
 # loop stands in only for a loop (tests/audio_test.luau checks every one resolves without its own sheet).
@@ -1174,6 +1275,11 @@ FALLBACK = {
     "clip_out": "ui_open", "clip_away": "ui_click", "pen_tick": "grip_tick", "pen_untick": "ui_click", "soft_nope": "notify",
     "order_chirp": "ui_open", "coin_kaching": "sale_register", "offer_ding": "ding", "gavel_knock": "knock",
     "sold_bell": "ding", "bid_tick": "grip_tick",
+    # 10.1 (sfx6): the wordmark's jingle the old level-up, a pick the UI's open, the game's start the task's sting, the
+    # question the notify, BACK the click, the creator's swoosh the UI's open, a choice and the dice the grip's tick;
+    # silent until it is up: the van driving in and off
+    "intro_logo": "level_up", "menu_select": "ui_open", "menu_start": "task_done", "menu_warn": "notify",
+    "menu_back": "ui_click", "creator_open": "ui_open", "creator_pick": "grip_tick", "creator_dice": "grip_tick",
 }
 built ={name: build_sheet(items, gap) for name, items, gap in SHEETS}
 # 6.12: an uploaded sheet keeps its .ogg byte for byte unless it is named (--sheets): check first, write nothing on a
@@ -1203,13 +1309,13 @@ for name, (regions, pcm, _) in built.items():
     subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", wav, "-c:a", "libvorbis", "-q:a", "5",
                     "-fflags", "+bitexact", "-flags:a", "+bitexact", ogg], check=True)
     os.remove(wav)
-sfx_regions, music_regions, sfx2_regions, sfx3_regions, sfx4_regions, sfx5_regions = (built[n][0] for n in ("sfx", "music", "sfx2", "sfx3", "sfx4", "sfx5"))
-json.dump({"sfx": sfx_regions, "music": music_regions, "sfx2": sfx2_regions, "sfx3": sfx3_regions, "sfx4": sfx4_regions, "sfx5": sfx5_regions,
+sfx_regions, music_regions, sfx2_regions, sfx3_regions, sfx4_regions, sfx5_regions, sfx6_regions = (built[n][0] for n in ("sfx", "music", "sfx2", "sfx3", "sfx4", "sfx5", "sfx6"))
+json.dump({"sfx": sfx_regions, "music": music_regions, "sfx2": sfx2_regions, "sfx3": sfx3_regions, "sfx4": sfx4_regions, "sfx5": sfx5_regions, "sfx6": sfx6_regions,
            "looped": sorted(LOOPED), "pcm_sha256": hashes}, open(REGIONS_PATH, "w"), indent=2)
 
 # Keep the asset ids already pasted into SoundSheet (a re-run must not wipe them; upload the new files and update).
 sheet_path = os.path.join(ROOT, "src", "shared", "SoundSheet.luau")
-old_ids = {"SfxId": "", "MusicId": "", "Sfx2Id": "", "Sfx3Id": "", "Sfx4Id": "", "Sfx5Id": ""}
+old_ids = {"SfxId": "", "MusicId": "", "Sfx2Id": "", "Sfx3Id": "", "Sfx4Id": "", "Sfx5Id": "", "Sfx6Id": ""}
 if os.path.exists(sheet_path):
     import re
     for key in old_ids:
@@ -1217,7 +1323,7 @@ if os.path.exists(sheet_path):
         if m:
             old_ids[key] = m.group(1)
 # (a sheet written anew is a new file: its old id would play the old sounds; it must be uploaded again)
-for name, key in (("sfx", "SfxId"), ("music", "MusicId"), ("sfx2", "Sfx2Id"), ("sfx3", "Sfx3Id"), ("sfx4", "Sfx4Id"), ("sfx5", "Sfx5Id")):
+for name, key in (("sfx", "SfxId"), ("music", "MusicId"), ("sfx2", "Sfx2Id"), ("sfx3", "Sfx3Id"), ("sfx4", "Sfx4Id"), ("sfx5", "Sfx5Id"), ("sfx6", "Sfx6Id")):
     if plan[name] == "write" and old_ids[key]:
         print(f"note: {name}.ogg was written anew: upload it and replace SoundSheet.{key} (it still holds the old upload)")
 lua = ["--!strict",
@@ -1237,13 +1343,18 @@ lua = ["--!strict",
        "-- 8.9: art/audio/sfx5.ogg holds the newest features' sounds (Danny's clipboard, his orders' chirp and his whistle,",
        "-- a trade's coins, an offer's bell, a price tag, the auction's gavel, its \"sold!\" bell and a bid's tick) (Sfx5);",
        "-- until its id is pasted, those play a stand-in or stay silent (art/audio/NAHRAT-SFX5.md says how to upload it).",
+       "-- 10.1: art/audio/sfx6.ogg holds the start's sounds (the intro's van driving in and off, the DELIVEROS wordmark's",
+       "-- jingle; the start screen's pick, the game's start, START OVER's question, BACK; the character creator's swoosh,",
+       "-- a choice's tick, the dice) (Sfx6); until its id is pasted, those play a stand-in or stay silent",
+       "-- (art/audio/NAHRAT-SFX6.md says how to upload it).",
        "", "local SoundSheet = {}", "",
        f'SoundSheet.SfxId = "{old_ids["SfxId"]}" -- "rbxassetid://…" of art/audio/sfx.ogg',
        f'SoundSheet.MusicId = "{old_ids["MusicId"]}" -- "rbxassetid://…" of art/audio/music.ogg',
        f'SoundSheet.Sfx2Id = "{old_ids["Sfx2Id"]}" -- "rbxassetid://…" of art/audio/sfx2.ogg',
        f'SoundSheet.Sfx3Id = "{old_ids["Sfx3Id"]}" -- "rbxassetid://…" of art/audio/sfx3.ogg (6.12)',
        f'SoundSheet.Sfx4Id = "{old_ids["Sfx4Id"]}" -- "rbxassetid://…" of art/audio/sfx4.ogg (7.1)',
-       f'SoundSheet.Sfx5Id = "{old_ids["Sfx5Id"]}" -- "rbxassetid://…" of art/audio/sfx5.ogg (8.9)', "",
+       f'SoundSheet.Sfx5Id = "{old_ids["Sfx5Id"]}" -- "rbxassetid://…" of art/audio/sfx5.ogg (8.9)',
+       f'SoundSheet.Sfx6Id = "{old_ids["Sfx6Id"]}" -- "rbxassetid://…" of art/audio/sfx6.ogg (10.1)', "",
        "SoundSheet.Sfx = {"]
 for k, (s, l) in sfx_regions.items():
     lua.append(f"\t{k} = {{ {s}, {l} }},")
@@ -1262,6 +1373,9 @@ for k, (s, l) in sfx4_regions.items():
 lua += ["} :: { [string]: { number } }", "", "SoundSheet.Sfx5 = {"]
 for k, (s, l) in sfx5_regions.items():
     lua.append(f"\t{k} = {{ {s}, {l} }},")
+lua += ["} :: { [string]: { number } }", "", "SoundSheet.Sfx6 = {"]
+for k, (s, l) in sfx6_regions.items():
+    lua.append(f"\t{k} = {{ {s}, {l} }},")
 lua += ["} :: { [string]: { number } }", "", "-- Sounds that loop (their region repeats seamlessly).",
         "SoundSheet.Looped = { " + ", ".join(f"{k} = true" for k in sorted(LOOPED)) + " } :: { [string]: boolean }", "",
         "-- Stand-ins while a sheet is not uploaded (its id empty): a sound of an older sheet (a stand-in's stand-in too);",
@@ -1276,5 +1390,7 @@ open(sheet_path, "w").write("\n".join(lua))
 print("  ".join(f"{name}: {len(dict(items))} sounds, {built[name][2]:.1f} s ({plan[name]})" for name, items, _ in SHEETS))
 if plan["sfx4"] == "write":
     print("sfx4: " + ", ".join(f"{k} {len(v) / SR:.2f} s ({loudness(v):.1f} LUFS)" for k, v in SFX4.items()))
+if plan["sfx6"] == "write":
+    print("sfx6: " + ", ".join(f"{k} {len(v) / SR:.2f} s ({loudness(v):.1f} LUFS, peak {np.max(np.abs(v)):.2f})" for k, v in SFX6.items()))
 if plan["sfx5"] == "write":
     print("sfx5: " + ", ".join(f"{k} {len(v) / SR:.2f} s ({loudness(v):.1f} LUFS, peak {np.max(np.abs(v)):.2f})" for k, v in SFX5.items()))

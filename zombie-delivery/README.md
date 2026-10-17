@@ -359,6 +359,17 @@
 > you walk instead of jumping each look. **A rescued helper goes home**: after his thanks he says he'll wait at your
 > warehouse and fades away (`Config.Crew.Rescue.Leave`, `Fade`; `server/HelperCrew.luau`), never walking after the
 > party; pick him in the CREW window to bring him into runs.
+>
+> **10.4** (the owner: "there is no driving the car any more, so every time you go to a place, an animation of you
+> driving there"): **the ride.** When a run takes you to its house, and when it takes you back to the lobby, the
+> Deliveros van drives across the screen over the jump's fade (`client/RideUi.luau`; `server/Runs.luau` sends
+> `{ kind = "ride" }` just before; `Config.Runs.Ride`: 3.4 s there, 2.4 s back): the sky of the run's difficulty (a fresh
+> morning for Easy … a night with the moon, the stars and the van's lamps for Nightmare; a warm evening on the way back),
+> hills, trees and fence posts going by, the road's dashes, the van bouncing along; at the top ON THE WAY TO and the
+> house's name in the logo's gold, its difficulty in its colour and who rides along, under it the route from the depot
+> with the van moving along it. The engine pulls away and slows as it arrives (sfx6's van sounds); your controls are
+> off while it plays. **The start's sounds** (`art/audio/sfx6.ogg`, `art/audio/NAHRAT-SFX6.md`): the intro's van and
+> jingle, the start screen's and the character creator's; sfx5.ogg's asset id is in.
 
 The active Roblox game in this repository (Merge Blades is preserved in `../archive/merge-blades`). **You run a delivery company** in a world
 gone wrong: take a job, carry the cargo to your vehicle with your own hands (or lead the horses on a rope), drive it

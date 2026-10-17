@@ -13,7 +13,9 @@
 --       main button's text), look? (where it starts: the slot's courier; nil: the default), onDone(look), onBack() }
 --   CharacterCreator.close()
 --   CharacterCreator.isOpen() -> boolean
--- ESC (a gamepad's B) is BACK; ENTER on the name box is nothing (the main button starts).
+-- ESC (a gamepad's B) is BACK; ENTER on the name box is nothing (the main button starts). Its sounds (Sounds.play):
+-- creator_open as it opens, creator_pick for a choice (a little higher or lower each time), creator_dice for RANDOM,
+-- menu_back for BACK and menu_select for the main button.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -27,6 +29,7 @@ local StyleBuild = require(Shared.StyleBuild)
 local Ui = require(script.Parent.Ui)
 local Theme = require(script.Parent.Theme)
 local StylePreview = require(script.Parent.StylePreview)
+local Sounds = require(script.Parent.Sounds) -- 10.1: its swoosh, a choice's tick, the dice, BACK (art/audio/sfx6.ogg)
 
 local CharacterCreator = {}
 
@@ -238,6 +241,7 @@ end
 
 function CharacterCreator.open(gui: Instance, options: Options)
 	CharacterCreator.close()
+	Sounds.play("creator_open")
 	local look = CharacterLooks.clean(options.look or CharacterLooks.default())
 	look.name = look.name or Players.LocalPlayer.DisplayName
 	local touch = Ui.touchLayout()
@@ -287,6 +291,7 @@ function CharacterCreator.open(gui: Instance, options: Options)
 		Position = UDim2.fromOffset(10, 8), TextSize = 12, Font = Theme.Font, TextColor3 = K.secondary, TextXAlignment = Enum.TextXAlignment.Right,
 	})
 	local random = Ui.button(card, "🎲  RANDOM", UDim2.fromOffset(PREVIEW_W, 44), Theme.Postage.paper, function()
+		Sounds.play("creator_dice")
 		local name = s.look.name
 		s.look = CharacterLooks.random(function(n: number): number
 			return math.random(1, n)
@@ -326,6 +331,7 @@ function CharacterCreator.open(gui: Instance, options: Options)
 	local refreshers: { () -> () } = {}
 	local customRows: { GuiObject } = {}
 	local function pick(field: string, id: string)
+		Sounds.play("creator_pick", 0.8, 0.92 + math.random() * 0.18)
 		s.look[field] = id
 		s.refresh()
 	end
@@ -363,12 +369,14 @@ function CharacterCreator.open(gui: Instance, options: Options)
 
 	-- the actions (bottom right)
 	local back = Ui.ghostButton(card, "‹  BACK", UDim2.fromOffset(140, 48), nil, function()
+		Sounds.play("menu_back")
 		local onBack = s.options.onBack
 		CharacterCreator.close()
 		onBack()
 	end)
 	back.Position = UDim2.fromOffset(right, H - 80)
 	local done = Ui.button(card, options.action, UDim2.fromOffset(rightW - 156, 48), K.red, function()
+		Sounds.play("menu_select")
 		local chosen = CharacterLooks.clean(s.look)
 		chosen.name = CharacterLooks.name(nameBox.Text)
 		local onDone = s.options.onDone
@@ -439,6 +447,7 @@ function CharacterCreator.open(gui: Instance, options: Options)
 			return
 		end
 		if input.KeyCode == Enum.KeyCode.Escape or input.KeyCode == Enum.KeyCode.ButtonB then
+			Sounds.play("menu_back")
 			local onBack = s.options.onBack
 			CharacterCreator.close()
 			onBack()

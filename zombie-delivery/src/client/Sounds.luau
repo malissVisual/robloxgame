@@ -54,6 +54,12 @@
 -- client/SandboxSounds.luau event (shared/SoundPlan.luau Events). A Notice's notify waits Config.Soundscape.NoticeWait s:
 -- when a sound of its own answers it (Sounds.answered, SandboxSounds': a piece given to Danny, an order, a trade's
 -- ka-ching) the notify is left out, never both. Sounds.has(name): does a sound play now (its sheet, or a stand-in).
+--
+-- 10.1, the start's sounds (art/audio/sfx6.ogg, SoundSheet.Sfx6; until Sfx6Id is filled in, their stand-ins): the start
+-- screen's (client/Menu.luau: a save picked, the game starting, START OVER's question, BACK) and the character
+-- creator's (client/CharacterCreator.luau: its swoosh, a choice's tick, the dice) by name (Sounds.play). The intro's
+-- (the van driving in and off, the wordmark's jingle) are played by src/first/Loading.client.luau itself: it runs
+-- before this module is there.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -93,6 +99,7 @@ local sheet2 = SoundSheet.Sfx2Id ~= "" -- 5.7: the world's sounds
 local sheet3 = SoundSheet.Sfx3Id ~= "" -- 6.12: doors, horns, steps by surface, ambience, UI stings
 local sheet4 = SoundSheet.Sfx4Id ~= "" -- 7.1: the moves' sounds and the mountains'
 local sheet5 = SoundSheet.Sfx5Id ~= "" -- 8.9: the newest features' (the clipboard, Danny's orders, trades, the auction)
+local sheet6 = SoundSheet.Sfx6Id ~= "" -- 10.1: the start's (the start screen, the character creator; the intro's)
 -- 5.7: stand-ins from the first sheet while sfx2.ogg is not uploaded yet. 6.12: and from the first two while sfx3.ogg
 -- is not (a stand-in of a stand-in works too: a step plays the 5.7 step once sfx2 is up). 7.1: the list is
 -- SoundSheet.Fallback (make_audio.py), sfx4's too.
@@ -141,6 +148,12 @@ local function find(name: string): (string?, NumberRange?)
 		range = region(SoundSheet.Sfx5, name)
 		if range then
 			return SoundSheet.Sfx5Id, range
+		end
+	end
+	if sheet6 then
+		range = region(SoundSheet.Sfx6, name)
+		if range then
+			return SoundSheet.Sfx6Id, range
 		end
 	end
 	local standIn = FALLBACK[name]
@@ -801,6 +814,8 @@ function Sounds.start()
 		print("[Sounds] 7.1: art/audio/sfx4.ogg is not uploaded yet (SoundSheet.Sfx4Id): stand-ins play (art/audio/NAHRAT-SFX4.md)")
 	elseif not sheet5 then
 		print("[Sounds] 8.9: art/audio/sfx5.ogg is not uploaded yet (SoundSheet.Sfx5Id): stand-ins play (art/audio/NAHRAT-SFX5.md)")
+	elseif not sheet6 then
+		print("[Sounds] 10.1: art/audio/sfx6.ogg is not uploaded yet (SoundSheet.Sfx6Id): stand-ins play (art/audio/NAHRAT-SFX6.md)")
 	end
 	player.CharacterAdded:Connect(function()
 		spawnedAt = os.clock()

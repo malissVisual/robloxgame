@@ -17,6 +17,8 @@
 -- 10.1 (Config.SaveSlots): the sandbox's card lists your save slots (CONTINUE, NEW GAME, LOOK, START OVER; the Slots
 -- remote, server/SaveSlots.luau) and opens the character creator (client/CharacterCreator.luau); the game starts once
 -- the server says the save is in. Up, it sets the player attribute StartScreen (the loading screen's cue to go).
+-- Its sounds (Sounds.play, art/audio/sfx6.ogg): a save picked (menu_select), START OVER's question (menu_warn) and
+-- CANCEL (menu_back), the game starting (menu_start, as the fade begins); the creator plays its own.
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -31,6 +33,7 @@ local CharacterLooks = require(ReplicatedStorage:WaitForChild("Shared"):WaitForC
 local SaveSlotRules = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("SaveSlotRules")) -- 10.1: the slots' lines
 local Ui = require(script.Parent.Ui)
 local CharacterCreator = require(script.Parent.CharacterCreator) -- 10.1: NEW GAME, LOOK, START OVER
+local Sounds = require(script.Parent.Sounds) -- 10.1: the start screen's sounds (art/audio/sfx6.ogg)
 local Theme = require(script.Parent.Theme)
 
 local Menu = {}
@@ -469,6 +472,7 @@ local function showSandbox(onPlay: () -> ())
 		slotAction = function(action: string, slot: number)
 			local summary = summaryOf(slot)
 			if action == "play" then
+				Sounds.play("menu_select")
 				choose("play", slot, nil)
 			elseif action == "new" then
 				creator(`New courier · slot {slot}`, "START THE GAME", nil, function(look)
@@ -482,6 +486,7 @@ local function showSandbox(onPlay: () -> ())
 				if confirm then
 					confirm:Destroy()
 				end
+				Sounds.play("menu_warn")
 				phase = "confirm"
 				confirm = Ui.make("Frame", {
 					Name = "Confirm", Size = UDim2.fromOffset(512, 150), Position = UDim2.fromOffset(24, 150),
@@ -502,6 +507,7 @@ local function showSandbox(onPlay: () -> ())
 				end)
 				yes.Position, yes.ZIndex = UDim2.fromOffset(16, 96), 22
 				local no = Ui.ghostButton(confirm, "CANCEL", UDim2.fromOffset(120, 40), nil, function()
+					Sounds.play("menu_back")
 					confirm:Destroy()
 					confirm = nil
 					phase = "list"
@@ -541,6 +547,7 @@ local function showSandbox(onPlay: () -> ())
 				status.Text = `Loading slot {message.slot}…`
 			elseif message.kind == "ready" then
 				status.Text = ""
+				Sounds.play("menu_start")
 				task.spawn(start)
 			elseif message.kind == "refused" then
 				status.Text = tostring(message.text)

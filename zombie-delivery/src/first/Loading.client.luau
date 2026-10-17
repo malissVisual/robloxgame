@@ -10,11 +10,18 @@
 --     sets the player attribute StartScreen), or after GIVE_UP s whatever happens: the van drives off to the right and
 --     the screen fades into the start screen. Any key, a click or a tap skips the rest of the intro (never the loading).
 -- With Reduced Motion on (Roblox's setting) nothing bounces: the pieces just fade in.
+-- 10.1, its sounds (art/audio/sfx6.ogg: SoundSheet.Sfx6; while it is not uploaded, SoundSheet.Fallback's stand-ins): the
+-- van driving in, the wordmark's jingle, the van driving off. Shared is not there when this starts, so it waits for
+-- SoundSheet a moment (SHEET_WAIT s, in its own thread) and plays each sound at its moment, or leaves it out when its
+-- asset was not ready LATE s after it (a jingle long after the logo would only confuse).
 
+local ContentProvider = game:GetService("ContentProvider")
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedFirst = game:GetService("ReplicatedFirst")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local SoundService = game:GetService("SoundService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
@@ -22,6 +29,11 @@ local INTRO = 2.6 -- s the intro runs before it may go (unless skipped)
 local SKIP_FROM = 0.8 -- s before a key may skip it
 local GIVE_UP = 25 -- s at most: then it goes, ready or not
 local OUT = 0.55 -- s the van drives off and the screen fades
+local SHEET_WAIT = 5 -- s it waits for Shared's SoundSheet (the intro's sounds)
+local LATE = 0.35 -- s a sound may start after its moment, else it is left out
+local VOLUME = 0.7
+-- the sheets in the order client/Sounds.luau looks for a sound (each with its asset id's field)
+local SHEETS = { { "Sfx", "SfxId" }, { "Sfx2", "Sfx2Id" }, { "Sfx3", "Sfx3Id" }, { "Sfx4", "Sfx4Id" }, { "Sfx5", "Sfx5Id" }, { "Sfx6", "Sfx6Id" } }
 local TIPS = {
 	"Every move hides 2 – 4 collectibles. Legendary ones glow gold.",
 	"Put your best pieces on the stands: they earn money every minute you play.",
@@ -220,6 +232,71 @@ local skip = make("TextLabel", {
 make("UITextSizeConstraint", { MaxTextSize = 14 }, skip)
 local veil = make("Frame", { Name = "Veil", Size = UDim2.fromScale(1, 1), BackgroundColor3 = rgb(12, 14, 18), BackgroundTransparency = 0, BorderSizePixel = 0, ZIndex = 50 }, gui)
 
+-- ── The sounds ─────────────────────────────────────────────────────────────
+
+local sounds: { [string]: Sound } = {}
+
+-- A sound's asset and region: the first sheet that has it and is uploaded, else its stand-in's (as client/Sounds.luau).
+local function find(sheet: any, name: string, depth: number): (string?, NumberRange?)
+	for _, pair in SHEETS do
+		local list, id = sheet[pair[1]], sheet[pair[2]]
+		local r = if type(list) == "table" then list[name] else nil
+		if type(r) == "table" and type(id) == "string" and id ~= "" then
+			return id, NumberRange.new(r[1], r[1] + r[2])
+		end
+	end
+	local standIn = if type(sheet.Fallback) == "table" then sheet.Fallback[name] else nil
+	if type(standIn) == "string" and depth < 4 then
+		return find(sheet, standIn, depth + 1)
+	end
+	return nil, nil
+end
+
+task.spawn(function()
+	local shared = ReplicatedStorage:WaitForChild("Shared", SHEET_WAIT)
+	local module = if shared then shared:WaitForChild("SoundSheet", SHEET_WAIT) else nil
+	if not module or not module:IsA("ModuleScript") then
+		return
+	end
+	local ok, sheet = pcall(require, module)
+	if not ok or type(sheet) ~= "table" then
+		return
+	end
+	local made: { Instance } = {}
+	for _, name in { "intro_drive", "intro_logo", "intro_leave" } do
+		local asset, range = find(sheet, name, 0)
+		if asset and range then
+			local sound = make("Sound", {
+				Name = name, SoundId = asset, PlaybackRegionsEnabled = true, PlaybackRegion = range, Volume = VOLUME,
+			}, SoundService)
+			sounds[name] = sound
+			table.insert(made, sound)
+		end
+	end
+	pcall(function()
+		ContentProvider:PreloadAsync(made)
+	end)
+end)
+
+-- `name` at `at` s after the start (waiting LATE s at most for its asset), else not at all.
+local function cue(name: string, at: number)
+	task.spawn(function()
+		local wait = started + at - os.clock()
+		if wait > 0 then
+			task.wait(wait)
+		end
+		local deadline = math.max(started + at, os.clock()) + LATE
+		while os.clock() < deadline and not (sounds[name] and sounds[name].IsLoaded) do
+			task.wait(0.05)
+		end
+		local sound = sounds[name]
+		if sound and sound.IsLoaded then
+			sound.TimePosition = sound.PlaybackRegion.Min
+			sound:Play()
+		end
+	end)
+end
+
 -- ── The intro ──────────────────────────────────────────────────────────────
 
 local skipped = false
@@ -227,6 +304,8 @@ tween(veil, 0.35, { BackgroundTransparency = 1 })
 task.delay(0.1, function()
 	tween(van, if reduced then 0.01 else 1.2, { Position = UDim2.fromScale(0.3, 0.86) }, Enum.EasingStyle.Quint)
 end)
+cue("intro_drive", 0.1)
+cue("intro_logo", 0.55)
 task.delay(0.55, function()
 	tween(word, 0.3, { TextTransparency = 0 })
 	tween(edge, 0.3, { Transparency = 0 })
@@ -295,6 +374,7 @@ end
 -- ── Off it goes ────────────────────────────────────────────────────────────
 
 inputConnection:Disconnect()
+cue("intro_leave", os.clock() - started)
 tween(van, OUT, { Position = UDim2.fromScale(1.35, 0.86) }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 task.wait(OUT * 0.5)
 tween(root, OUT, { BackgroundTransparency = 1 })
@@ -310,4 +390,9 @@ end
 task.wait(OUT + 0.05)
 stepConnection:Disconnect()
 gui:Destroy()
-script:Destroy()
+task.delay(2, function() -- (the van's sound rings out)
+	for _, sound in sounds do
+		sound:Destroy()
+	end
+	script:Destroy()
+end)
