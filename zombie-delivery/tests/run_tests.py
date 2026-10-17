@@ -649,30 +649,6 @@ def analytics_check():
 if not analytics_check():
     ok = False
 
-# 7.1 review: a new server answers PLAY and has its lighting before the Alps' terrain is built. World.build lights the
-# world before its last piece starts the Alps (the cheap part only: Alpine.start), and Main.server.luau defers
-# World.buildLate (the terrain's fills, the forests) right after World.build, before the PLAY listener.
-def alps_order_check():
-    root = os.path.dirname(HERE)
-    world = open(os.path.join(root, "src", "server", "World.luau"), encoding="utf-8").read()
-    main = open(os.path.join(root, "src", "server", "Main.server.luau"), encoding="utf-8").read()
-    bad = []
-    start, late = world.find("function World.build()"), world.find("function World.buildLate()")
-    build = world[start:late] if 0 <= start < late else ""
-    light, alps = build.find('piece("lighting"'), build.find("Alpine).start(")
-    if "Alpine).build(" in world:
-        bad.append("World.luau builds all of the Alps at once (Alpine.build)")
-    if light < 0 or alps < 0 or light > alps:
-        bad.append("World.build: the lighting before the Alps' start")
-    built, deferred, play = main.find("World.build()"), main.find("task.defer(World.buildLate)"), main.find('Net.get("Play").OnServerEvent')
-    if min(built, deferred, play) < 0 or not built < deferred < play:
-        bad.append("Main.server.luau: task.defer(World.buildLate) right after World.build(), before the PLAY listener")
-    print("== alps order: " + ("the lighting before the Alps, their terrain and forests deferred past PLAY" if not bad else "; ".join(bad)))
-    return not bad
-
-if not alps_order_check():
-    ok = False
-
 # 8.0 SANDBOX: the HUD's city parts stay hidden in the sandbox (client/Hud.luau ── Sandbox ──, read as text: the HUD is
 # Roblox's through and through) and the key hints show the move's keys and the car's only (client/KeyHints.luau
 # sandboxLines). What the client starts there: tests/clientboot_test.luau.
@@ -781,16 +757,15 @@ if not upgrades_hooks_check():
     ok = False
 
 # 8.3 SANDBOX: the gamepad's D-pad (← the STOCK list, → the book, ↓ the TASKS panel: Config's StockPad / Pad,
-# shared/SandboxPad.luau) is free in the sandbox: no module the sandbox's client starts (client/Main.client.luau's
-# sandbox block: what it requires, its own modules) reads a D-pad button itself, none of the city's D-pad users (the
+# shared/SandboxPad.luau) is free in the sandbox: no module the sandbox's client starts (client/Main.client.luau: what
+# it requires, its own modules) reads a D-pad button itself, none of the city's D-pad users (the
 # weapon wheel ↑, the phone ↓, the hands ← →) is started there, no prompt of the server's (GamepadKeyCode) is on the
 # D-pad, and the three chips are on three different D-pad buttons, never ↑ (Roblox's emote wheel).
 def pad_check():
     root = os.path.dirname(HERE)
     client = os.path.join(root, "src", "client")
     main = open(os.path.join(client, "Main.client.luau"), encoding="utf-8").read()
-    start = main.index("if Config.Sandbox.On then")
-    block = main[start:main.index("\nend\n", start)]
+    block = main  # (10.0: the whole client is the sandbox's)
     started = set(re.findall(r"require\(Client\.(\w+)\)", block))
     own = re.search(r"for _, name in \{([^}]*)\} do", block)
     started |= set(re.findall(r'"(\w+)"', own.group(1))) if own else set()

@@ -8,8 +8,8 @@
 --     repaired, the only vehicle, Marge's tutorial never asked), a second PLAY nothing, a respawn keeps the van (a gone
 --     one comes back, not on a move), CAR at the house's curb or at home, a player without a plot on Depot Row,
 --     RequestState through Main's queueState.
---   * Off: the city's boot as before (the Alps, World.build, World.buildLate deferred, every service in Main's order,
---     the hooks, its PLAY asking Marge's tutorial before the car).
+--   * 10.0 (only the sandbox is the game): Main boots the sandbox whatever Config.Sandbox.On says and requires none of
+--     the old city's modules itself.
 --   * 8.0.1: Moving's hook parkVan is SandboxBoot.parkVan, set before Moving starts (a move's START parks the van the
 --     sandbox's way: at the vanSpot, not seated, repaired); a respawn on a move stands where Moving.respawnAt says (by
 --     the move's van, else outside the house), off a move at home.
@@ -30,8 +30,6 @@ local function check(name: string, ok: boolean, detail: any?)
 	end
 end
 
--- Main's order of the city's services (server/Main.server.luau's `safely` list).
-local CITY = { "PlayerData", "Analytics", "Vehicles", "CarRighting", "Zombies", "Jobs", "JobQueue", "SpecialOrders", "LiveEvents", "Gun", "Items", "Shops", "ShopClerks", "BanditCars", "Npcs", "Animals", "Cargo", "Admin", "DayNight", "Traffic", "Crew", "Ranking", "Estate", "CarCall", "Business", "Missions", "Challenges", "Tasks", "Shift", "Garages", "Repair", "Explore", "Tutorial", "Hand", "CloseCombat", "Buddy", "Transport", "Skills", "VanQuest", "KitWear", "Fuel", "StyleWear", "Horn", "Buses", "Rental", "ZipLines", "FurnitureMesh", "FixtureMesh", "Moving" }
 -- What the sandbox starts (SandboxWorld: its start or build) and what it never touches.
 local SANDBOX = { "SandboxWorld", "PlayerData", "Analytics", "SandboxAnalytics", "Vehicles", "CarRighting", "Zombies", "Npcs", "Admin", "Crew", "Transport", "KitWear", "Horn", "Clipboard", "SandboxPlots", "Collection", "CollectionBook", "Warehouse", "Upgrades", "VanPaint", "SandboxTasks", "SandboxLeaders", "Visitors", "SandboxBadges", "PlayerTrade", "SprinterMesh", "FurnitureMesh", "FixtureMesh", "Moving" }
 local PARALLEL = { "SandboxWorld", "Collection", "CollectionBook", "Warehouse", "Upgrades", "VanPaint", "SandboxTasks", "SandboxLeaders", "Visitors", "SprinterMesh", "SandboxAnalytics", "SandboxBadges", "PlayerTrade" }
@@ -356,58 +354,21 @@ check("missing modules: none of them run", #early == 0, table.concat(early, ", "
 check("missing modules: the rest still starts (Moving last)", started.PlayerData ~= nil and started.Zombies ~= nil and started.Moving ~= nil and started.SandboxPlots ~= nil)
 check("missing map: the place's baseplate stays (something to stand on)", not E.called("Baseplate.Destroy"))
 
--- ── The city: unchanged ────────────────────────────────────────────────────
+-- ── 10.0: no city any more ─────────────────────────────────────────────────
 Config.Sandbox.On = false
 E.reset()
-E.override("Jobs", {
-	vehicleFor = function(): string?
-		return nil
-	end,
-})
-E.override("Vehicles", {
-	get = function(): any
-		return nil
-	end,
-})
+E.fakes.SandboxBoot = loadBoot()
 main()
 started = E.started()
-check("city: SandboxBoot never required", E.modules.SandboxBoot == nil)
-local publish, build = E.find("MapStyle.publish"), E.find("World.build")
-check("city: the Alps' summary, then the world, before every service", publish ~= nil and build ~= nil and publish < build and build < started.PlayerData)
-check("city: World.buildLate deferred", E.deferred[1] == E.module("World").buildLate)
-local order, previous, absentCity = true, 0, {}
-for _, name in CITY do
-	local index = started[name]
-	if index == nil then
-		table.insert(absentCity, name)
-	elseif index < previous then
-		order = false
-	else
-		previous = index
+check("10.0: Main boots the sandbox whatever Config.Sandbox.On says", started.SandboxWorld ~= nil and started.PlayerData ~= nil and started.Moving ~= nil)
+local requiredCity = {}
+for _, name in NEVER do
+	if E.modules[name] ~= nil then
+		table.insert(requiredCity, name)
 	end
 end
-check("city: every service starts", #absentCity == 0, table.concat(absentCity, ", "))
-check("city: in Main's order", order)
-check("city: the sandbox's own pieces do not start", started.SandboxPlots == nil and started.Warehouse == nil and started.Collection == nil and started.SandboxWorld == nil)
-check("city: Zombies keeps its own zombies (ambient untouched)", E.find("set Zombies.ambient") == nil)
-check("city: the hooks wired (Zombies.hunts = Jobs.involved, Crew.hasJob = Jobs.active)", E.module("Zombies").hunts == E.module("Jobs").involved and E.module("Crew").hasJob == E.module("Jobs").active)
-for _, remote in { "Play", "SpawnCar", "RequestState", "Aiming" } do
-	check(`city: the {remote} remote answered`, E.handlers[`Net.get({remote}).OnServerEvent`] ~= nil)
-end
-local carl = E.object("Carl", { Name = "Carl" })
-E.fire("Net.get(Play).OnServerEvent", carl)
-check("city PLAY: the call, the trip home, Marge's tutorial asked before the car", E.called("CarCall.onPlay") and E.called("Estate.onPlay") and E.called("Tutorial.ahead") and E.called("Tutorial.onPlay"))
-check("city PLAY: her first day ahead keeps the van away", not E.called("Vehicles.spawn"))
-E.override("Tutorial", {
-	ahead = function(): boolean
-		return false
-	end,
-})
-local dora = E.object("Dora", { Name = "Dora" })
-E.fire("Net.get(Play).OnServerEvent", dora)
-local spawns = E.callsOf("Vehicles.spawn")
-check("city PLAY: after her first day the van comes (Vehicles.spawn, force)", #spawns == 1 and spawns[1][1] == dora and spawns[1][2] == true)
-check("city: it says it runs (not the sandbox)", contains(E.printed, "is running") and not contains(E.printed, "SANDBOX"))
+check("10.0: Main requires none of the old city's modules (no World, Jobs, Gun, Shops …)", #requiredCity == 0, table.concat(requiredCity, ", "))
+check("10.0: no world build, no Alps", E.find("World.build") == nil and E.find("MapStyle.publish") == nil and #E.deferred == 0)
 Config.Sandbox.On = true
 
 if failures == 0 then
