@@ -44,7 +44,9 @@ end
 --                                      opens its picker and closing that goes back to the list) and 8.8's AuctionUi (the
 --                                      Auction House's window: it starts nothing while Config.Auction.On is false),
 --                                      8.9's VillageTraffic (the D5's cars, this screen's only), 9.1's DrivePedals (GAS
---                                      and BRAKE while you drive: a touch screen's driving buttons, a computer's feet):
+--                                      and BRAKE while you drive: a touch screen's driving buttons, a computer's feet),
+--                                      9.x's LootOutline and LootStars (the loot's coloured outlines, its stars and
+--                                      its toasts; the stars step aside under a window):
 --                                      each started only when it is there; 8.7's TradePrompts (the trade prompts on
 --                                      your own stands hidden, a big sale's chat line) next to CargoPrompts
 -- 8.5.1: Studio kept old scripts after a sync? This side's stamp (client/BuildStamp.luau) against the shared Config's
@@ -128,7 +130,7 @@ if Config.Sandbox.On then
 	-- The sandbox's own modules (other workers write them at the same time): only when they are there, and one that
 	-- fails to load is skipped with a warning.
 	local own: { { name: string, module: any } } = {}
-	for _, name in { "SandboxHud", "WarehouseUi", "SandboxGuide", "UpgradeUi", "CollectionBookUi", "SandboxTasksUi", "MoveHelperCard", "DannyOrders", "OfferCard", "VanPaintUi", "TradeUi", "AuctionUi", "VillageTraffic", "DrivePedals" } do -- (8.1: the UPGRADES desk's window; 8.2: the collection book, the TASKS panel; 8.3: Danny's command card, a visitor's offer, the PAINT shop; 8.5: Danny's clipboard, orders mode; 8.7: trading between players; 8.8: the Auction House's window, only while Config.Auction.On; 8.9: the D5's cars, Jinočany; 9.1: the drive pedals)
+	for _, name in { "SandboxHud", "WarehouseUi", "SandboxGuide", "UpgradeUi", "CollectionBookUi", "SandboxTasksUi", "MoveHelperCard", "DannyOrders", "OfferCard", "VanPaintUi", "TradeUi", "AuctionUi", "VillageTraffic", "DrivePedals", "LootOutline", "LootStars" } do -- (8.1: the UPGRADES desk's window; 8.2: the collection book, the TASKS panel; 8.3: Danny's command card, a visitor's offer, the PAINT shop; 8.5: Danny's clipboard, orders mode; 8.7: trading between players; 8.8: the Auction House's window, only while Config.Auction.On; 8.9: the D5's cars, Jinočany; 9.1: the drive pedals; 9.x loot: the outlines, the stars and the toasts)
 		local found = Client:FindFirstChild(name)
 		if found and found:IsA("ModuleScript") then
 			local ok, module = pcall(function(): any
@@ -287,6 +289,11 @@ if Config.Sandbox.On then
 	local Orders = ownModule("DannyOrders")
 	if type(Orders) == "table" then
 		Orders.covered = CameraRig.windowOpen
+	end
+	-- 9.x loot: the pieces' stars step aside while a window covers the game (their outlines stay: they are the world's)
+	local Stars = ownModule("LootStars")
+	if type(Stars) == "table" then
+		Stars.covered = CameraRig.windowOpen
 	end
 	KeyHints.covered = function(): boolean
 		return CameraRig.mouseNeeded() or Hud.resultOpen()

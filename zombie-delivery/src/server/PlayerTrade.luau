@@ -138,7 +138,7 @@ local function nameOf(player: Player): string
 end
 
 local function rarityOf(entry: { item: string }): string
-	return CollectionRules.rarityOf(CollectionRules.defOf(entry.item))
+	return CollectionRules.pieceRarity(entry) -- (9.x loot: its own roll, as its value)
 end
 
 -- The player's piece on stand `stand` (a copy), nil for none.

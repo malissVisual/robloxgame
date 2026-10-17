@@ -391,3 +391,15 @@ from drivepedalsenv import drivepedals_env  # noqa: E402
 with tempfile.TemporaryDirectory() as folder:
     drivepedals_env(Path(folder))
     subprocess.run([args.luau, "drivepedals.luau"], cwd=folder, check=True)
+# 9.x loot: the stars over the pieces, the toast and the outlines (client/LootStars.luau, client/LootOutline.luau with
+# shared/LootRules.luau and shared/OutlinePick.luau) beside client/Hud.luau's column: tools/phone-ui/loot.luau on phones
+# held sideways (844 x 390, 667 x 375) and computers (1280 x 800, 1920 x 1080) (lootenv.py builds the folder;
+# loot_preview.py draws the same scenes): the nearest few, their words never cut and readable, never through a wall,
+# none under a window or over the piece in your hands, the first sight's sparkle and sound, the toast's words and
+# colours in the column clear of the touch controls, once a piece, its gap, the load's toast, the outlines' colours and
+# the shared budget with the enemies, no warnings.
+from lootenv import loot_env  # noqa: E402
+
+with tempfile.TemporaryDirectory() as folder:
+    loot_env(Path(folder))
+    subprocess.run([args.luau, "loot.luau"], cwd=folder, check=True)

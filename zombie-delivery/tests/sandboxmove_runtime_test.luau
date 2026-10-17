@@ -416,6 +416,11 @@ check("…its back doors toward the house", cargoDoor.WorldPosition.Z > truck.ch
 -- Carry and load at the back doors ---------------------------------------------------------------------------------------------
 
 local lamp = newItem(1)
+do -- 9.x loot: Moving's hook (server/Loot.luau) put each piece's rarity, stars and value on its model, and the tag
+	local rarity, piece = lamp:GetAttribute("Rarity"), newItem(2)
+	check("9.x loot: the house's pieces carry their rarity, stars and value and the loot tag (Normal: their own)", rarity == "common" and lamp:GetAttribute("Stars") == 1
+		and lamp:GetAttribute("Value") == E.items.lamp.value and lamp:GetAttribute("Tag_" .. Config.Loot.Tag) == true and piece:GetAttribute("Rarity") == "uncommon", rarity)
+end
 E.place(ann, lamp.PrimaryPart.Position + V3(1, 0, 0))
 trigger(promptIn(lamp, "Pick up"), ann)
 step()
@@ -521,6 +526,9 @@ check("8.2: Moving.onTrip: the owner's trip 1, its 2 pieces stored, 2 home, the 
 	and trip.facts.pieces == 2 and trip.facts.stored == 2 and trip.facts.home == 2 and trip.facts.out == 0 and trip.facts.value > 0, trips)
 check("8.2: …and the move's not over (no onFinish yet)", select(2, lastTold("finish")) == 0)
 local lampIn, tvIn = E.collected[1].entry, E.collected[2].entry
+do -- 9.x loot: the trip home stores each piece with its house's roll (Collection.add's rarity)
+	check("9.x loot: …each with its rarity (the lamp Common, the TV Uncommon)", lampIn.rarity == "common" and tvIn.rarity == "uncommon", `{lampIn.rarity} {tvIn.rarity}`)
+end
 check("…with its item, variant, condition and name", lampIn.item == "lamp" and lampIn.name == "Lamp" and lampIn.variant == 3 and lampIn.condition == stateOf(ann, 1).condition
 	and tvIn.item == "tv" and tvIn.name == "TV" and tvIn.variant == 4 and type(tvIn.condition) == "number", `{lampIn.item} {lampIn.variant} {lampIn.condition}`)
 check("…the pieces leave the van (their models go), the state says delivered", lamp.destroyed == true and tv.destroyed == true and stateOf(ann, 1).state == "delivered"

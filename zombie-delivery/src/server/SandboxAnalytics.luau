@@ -184,7 +184,7 @@ local function hookCollection()
 				local def = CollectionRules.defOf(entry.item)
 				if def and def.rarity then
 					local worth = math.floor(CollectionRules.valueOf(entry) * math.clamp(entry.condition, 0, 1) + 0.5)
-					PlayerData.track("event", player, "CollectibleFound", worth, def.rarity, entry.item)
+					PlayerData.track("event", player, "CollectibleFound", worth, CollectionRules.pieceRarity(entry), entry.item) -- (9.x loot: its own roll)
 				end
 			end
 		end

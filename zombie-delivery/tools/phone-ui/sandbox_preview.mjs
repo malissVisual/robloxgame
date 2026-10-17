@@ -150,6 +150,12 @@ function render(scene, fonts) {
     } else if (o.kind === 'text') {
       el.style.justifyContent = 'flex-end';
       el.textContent = o.label || '';
+    } else if (o.kind === 'piece') {
+      // 9.x loot (loot.luau): a piece of furniture as a box, outlined in its tier's colour with a soft fill (its Highlight)
+      const c = o.color || [178, 182, 188];
+      el.style.cssText += `border-radius:4px;background:linear-gradient(180deg,#9a7b5c,#6e5640);align-items:flex-end;font-weight:500;font-size:10px;` +
+        `box-shadow:0 0 0 2px rgba(${c[0]},${c[1]},${c[2]},0.95),inset 0 0 0 999px rgba(${c[0]},${c[1]},${c[2]},0.12);`;
+      el.textContent = o.label || '';
     } else if (o.kind === 'chat') {
       el.style.cssText += 'background:rgba(25,27,29,0.6);border-radius:6px;align-items:flex-start;justify-content:flex-start;padding:10px;font-weight:500;flex-direction:column;';
       el.innerHTML = ['Ann: nice van', 'Courier: brb, warehouse', '[System] Welcome to Zombie Delivery'].map(s => `<div style="margin-bottom:6px">${s}</div>`).join('');

@@ -3138,6 +3138,7 @@ local function setupItem(s: Session, spot: number, model: Model)
 		onHelp(s, spot, player)
 	end)
 	model:SetAttribute("MoveSpot", spot)
+	require(script.Parent.Loot).tag(model, spot, s) -- 9.x loot: its rarity, stars and value (server/Loot.luau)
 	s.items[spot] = {
 		spot = spot,
 		model = model,
@@ -4532,7 +4533,8 @@ local function deliverTrip(s: Session, clock: number)
 end
 
 -- 8.0 SANDBOX: a trip's pieces into the move owner's warehouse stock (server/Collection.luau Collection.add, one a piece:
--- its item, its colours' variant from the plan, its condition, its name); how many it took (refused: no save yet).
+-- its item, its colours' variant from the plan, its condition, its name; 9.x its loot rarity, server/Loot.luau's); how
+-- many it took (refused: no save yet).
 function SB.store(s: Session, spots: { number }): number
 	local Collection = require(script.Parent.Collection)
 	local took = 0
@@ -4544,7 +4546,7 @@ function SB.store(s: Session, spots: { number }): number
 				variant = planned.variant
 			end
 		end
-		local ok, uid = pcall(Collection.add, s.owner, { item = thing.item, variant = variant, condition = thing.condition, name = thing.name })
+		local ok, uid = pcall(Collection.add, s.owner, { item = thing.item, variant = variant, condition = thing.condition, name = thing.name, rarity = (thing :: any).rarity }) -- (9.x loot: server/Loot.luau's)
 		if ok and uid ~= nil then
 			took += 1
 		else

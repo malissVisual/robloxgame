@@ -1023,6 +1023,10 @@ local function drawTile(parent: any, row: Row, index: number, layout: Layout, st
 	Ui.corner(picture, 8)
 	local emoji = Ui.label(picture, emojiOf(entry), UDim2.fromScale(1, 1), { Name = "Emoji", TextSize = math.floor(layout.picture * 0.55), TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Center, ZIndex = 1 })
 	Ui.make("Frame", { Name = "RarityBar", Size = UDim2.new(1, 0, 0, 4), Position = UDim2.new(0, 0, 1, -4), BackgroundColor3 = accent, BorderSizePixel = 0, ZIndex = 3 }, picture)
+	-- 9.x loot: its stars (the tier's rank) in the tier's colour over the bar, as over the piece in the world
+	local tier = (Config.Collection.Tiers :: any)[values.rarity]
+	local stars = string.rep("★", if tier then tier.rank else 1)
+	Ui.label(picture, stars, UDim2.fromOffset(CardKit.width(stars, 11, Theme.HeadingFont) + 4, 14), { Name = "Stars", Position = UDim2.new(1, -6, 1, -7), AnchorPoint = Vector2.new(1, 1), Font = Theme.HeadingFont, TextSize = 11, TextColor3 = accent, TextTransparency = dim, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 4 })
 	if entry.stand then
 		local on = `ON STAND {entry.stand}`
 		local ribbon = Ui.label(picture, on, UDim2.fromOffset(CardKit.width(on, 11, Theme.HeadingFont) + 16, 20), {

@@ -1562,6 +1562,7 @@ E.real = {
 	PlayerTrade = true, -- 8.7: trading between players (the stands' trade prompts: Warehouse.onTrade)
 	VillageWorld = true, -- 8.9: Jinočany's village on the map (SandboxWorld builds it)
 	FixtureMesh = true, -- 8.9.1: the houses' fixtures in the owner's Blender model (no import here: the parts' look)
+	Loot = true, -- 9.x loot: every piece of the house gets its rarity, stars and value (Moving's hook)
 }
 E.fakes = {}
 
