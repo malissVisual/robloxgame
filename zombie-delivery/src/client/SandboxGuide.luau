@@ -59,8 +59,8 @@
 --     attribute Config.SandboxUpgrades.WarehouseAttribute; 4 until the server sets it), every level its own building:
 --     the stands' spots are WarehouseLayout.stands(WarehouseLayout.site(plot, level)) (all the level has, the bought
 --     ones pointed at), found once a plot and level, so a level up moves the arrow to the new building's stands.
--- Everything waits for Config.Sandbox.On (client/Main.client.luau starts it in the sandbox).
---   SandboxGuide.start()            builds it and starts the loop (once; nothing outside the sandbox)
+-- client/Main.client.luau starts it.
+--   SandboxGuide.start()            builds it and starts the loop (once)
 --   SandboxGuide.setEnabled(on)     shows or hides the guide (the G hold, the ✕, a settings row)
 --   SandboxGuide.enabled()          is it on?
 --   SandboxGuide.close()            the hint's ✕ (8.3: a soft step dismissed, else the guide off)
@@ -1270,7 +1270,7 @@ local function follow(dt: number)
 end
 
 function SandboxGuide.start()
-	if started or not Config.Sandbox.On then
+	if started then
 		return
 	end
 	started = true

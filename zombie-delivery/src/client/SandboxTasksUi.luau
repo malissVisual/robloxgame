@@ -22,7 +22,7 @@
 --     while a gamepad is used, the D-pad's ↓ opens and closes the panel (not while another window has the gamepad's
 --     selection); the panel keeps the selection inside it (a selection group), lands on the first CLAIM (else ✕) and
 --     keeps what was selected when a new state draws it again; B closes it.
---   SandboxTasksUi.start()               listens (once; nothing when Config.Sandbox.On is false)
+--   SandboxTasksUi.start()               listens (once)
 --   SandboxTasksUi.open() / close() / toggle() / isOpen()
 --   SandboxTasksUi.state()               the last state (nil: none yet)
 --   SandboxTasksUi.layout(W, H, touch, dock?)   the panel on a W × H screen (px under Roblox's top bar); dock: the chip's
@@ -109,11 +109,6 @@ local key: Enum.KeyCode? = nil
 local arrangeQueued = false
 local pressedAt: { [string]: number } = {}
 local opens = 0 -- the panel's opening (its countdown's loop stops with another)
-
-local function sandboxOn(): boolean
-	local sandbox = (Config :: any).Sandbox
-	return type(sandbox) == "table" and sandbox.On == true
-end
 
 -- ── Words (pure) ────────────────────────────────────────────────────────────
 
@@ -857,7 +852,7 @@ local function onEvent(message: any)
 end
 
 function SandboxTasksUi.start()
-	if started or not sandboxOn() then
+	if started then
 		return
 	end
 	started = true

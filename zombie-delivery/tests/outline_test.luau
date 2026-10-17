@@ -33,20 +33,16 @@ check("picked a few times a second (0.1 … 0.5 s)", O.Every >= 0.1 and O.Every 
 check("the hold is a little more than the range", O.HoldRange > 1 and O.HoldRange < 1.5, O.HoldRange)
 check("a phone still outlines a few", math.floor(O.Count * Config.Performance.Lite.Count + 0.5) >= 4 and O.Range * Config.Performance.Lite.Range >= 60)
 
--- Which colour: the server's Bandit mark (bandits, gunners, the pickups) is orange; the zombie kinds red.
-check("a walker is red", OutlinePick.tone("walker", false) == "zombie")
-check("a runner is red", OutlinePick.tone("runner", false) == "zombie")
-check("a brute is red", OutlinePick.tone("brute", false) == "zombie")
-check("a bandit (marked Bandit) is orange", OutlinePick.tone("bandit", true) == "human")
-check("a gunner (marked Bandit) is orange", OutlinePick.tone("gunner", true) == "human")
-check("a bandits' pickup (no kind, marked Bandit) is orange", OutlinePick.tone(nil, true) == "human")
-check("the base's soldier (infected look, bites) follows HumanKinds", OutlinePick.tone("soldier", false) == (if O.HumanKinds.soldier == true then "human" else "zombie"))
-check("no kind and no mark: red", OutlinePick.tone(nil, false) == "zombie")
--- (server/Zombies.luau marks Bandit exactly the ranged kinds)
-check("every kind: orange when it shoots (Bandit) or HumanKinds names it, else red", (function(): boolean
-	for kind, def in Config.Zombies do
-		local want = if def.ranged == true or O.HumanKinds[kind] == true then "human" else "zombie"
-		if OutlinePick.tone(kind, def.ranged == true) ~= want then
+-- Which colour: the zombie kinds red; orange only for a kind HumanKinds names (10.5: no bandits, nobody marked Bandit).
+check("a walker is red", OutlinePick.tone("walker") == "zombie")
+check("a runner is red", OutlinePick.tone("runner") == "zombie")
+check("a brute is red", OutlinePick.tone("brute") == "zombie")
+check("the soldier (infected look, bites) follows HumanKinds", OutlinePick.tone("soldier") == (if O.HumanKinds.soldier == true then "human" else "zombie"))
+check("no kind: red", OutlinePick.tone(nil) == "zombie")
+check("every kind: orange when HumanKinds names it, else red", (function(): boolean
+	for kind in Config.Zombies do
+		local want = if O.HumanKinds[kind] == true then "human" else "zombie"
+		if OutlinePick.tone(kind) ~= want then
 			return false
 		end
 	end

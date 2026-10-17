@@ -5,7 +5,7 @@
 -- client/SandboxHud.luau (the money block) and client/SandboxTasksUi.luau (the TASKS chip), a stand-in move's panel (a
 -- top block where MoveLayout.panel puts it) and Hud's groups where client/Hud.luau puts them, on a phone held sideways
 -- (844 × 390: 844 × 354 under Roblox's top bar, the touch layout), a computer (1280 × 800) and a big screen
--- (1920 × 1080): nothing when Config.Sandbox.On is false; the status line under the panel, its words fitting, its button
+-- (1920 × 1080): the status line under the panel, its words fitting, its button
 -- a finger's size on a phone; a tap on it opens the card; the card beside Danny's head on
 -- the screen (right of it, else left of it: never on it), on the screen, clear of the HUD's chips, the move's panel and
 -- status line, the touch buttons, the thumbstick and the jump button; his list in words, how
@@ -394,13 +394,6 @@ end
 local MoveHelperHud = require("./MoveHelperHud")
 local MoveHelperCard = require("./MoveHelperCard")
 screen(true, 844, 354)
-Config.Sandbox.On = false
-MoveHelperCard.start()
-attribute("MoveHelper", "hired")
-check("Config.Sandbox.On false: MoveHelperCard.start() does nothing (no card, no prompt on him)", not MoveHelperCard.isOpen() and M.gui:FindFirstChild("MoveHelperCard") == nil
-	and dannyRoot:FindFirstChild("TalkToDanny") == nil)
-attribute("MoveHelper", nil)
-Config.Sandbox.On = true
 
 -- ── On: the HUD's chips, the status line (10.1: Danny with you from the start, free) ──
 local SandboxHud = require("./SandboxHud")

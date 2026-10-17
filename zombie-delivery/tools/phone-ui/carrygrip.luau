@@ -743,16 +743,6 @@ wire = open("wobble", false)
 frames(1)
 check("a phone with a gamepad used last: \"Press R2\" and its glyph", hint.Text == "Press R2" and padKey.Visible, hint.Text)
 moving.OnClientEvent:Fire("grip", "close", wire.id)
--- 8.3 keys: the city's words as before (a touch screen first, its E; no glyph)
-Config.Sandbox.On = false
-wire = open("lift", false)
-frames(1)
-check("the city: a phone with a gamepad: \"Tap GRIP\" as before, no glyph", string.find(hint.Text, "Tap GRIP", 1, true) == 1 and not padKey.Visible, hint.Text)
-result(wire.id, "knock", 87)
-frames(1)
-check("… its knock: \"87% left · try again (E)\" as before", hint.Text == "87% left · try again (E)", hint.Text)
-frames(math.ceil(G.Ui.Linger * 60) + 2)
-Config.Sandbox.On = true
 M.touch = false
 useGamepad(false)
 frames(1)

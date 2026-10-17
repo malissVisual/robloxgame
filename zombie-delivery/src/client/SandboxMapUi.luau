@@ -69,11 +69,6 @@ local ui: { [string]: any } = {} -- gui, shade, window, map, side, canvas, key, 
 local chip: { [string]: any } = {} -- gui, button, label, key, scale, corner, own
 local placeNow: Data.Place? = nil
 
-local function sandboxOn(): boolean
-	local sandbox = (Config :: any).Sandbox
-	return type(sandbox) == "table" and sandbox.On == true
-end
-
 local function toast(text: string)
 	local notify = SandboxMapUi.notify
 	if notify then
@@ -456,7 +451,7 @@ function SandboxMapUi.isOpen(): boolean
 end
 
 function SandboxMapUi.open()
-	if opened or not sandboxOn() then
+	if opened then
 		return
 	end
 	opened = true
@@ -709,7 +704,7 @@ local function carrying(): boolean
 end
 
 function SandboxMapUi.start()
-	if started or not sandboxOn() then
+	if started then
 		return
 	end
 	started = true

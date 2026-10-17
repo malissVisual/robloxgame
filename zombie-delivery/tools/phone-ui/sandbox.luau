@@ -1,7 +1,7 @@
 -- 8.0 SANDBOX: the sandbox's HUD (client/SandboxHud.luau) and the warehouse picker (client/WarehouseUi.luau, with
 -- client/CardKit.luau and the real shared data) run for real on sandbox_mock.luau's recorder, on a phone held sideways
 -- (844 × 390: 844 × 354 under Roblox's top bar, the touch layout), a computer (1280 × 800) and a big screen (1920 × 1080):
--- nothing when Config.Sandbox.On is false; the money (big, money green, counted up) from the player's State
+-- the money (big, money green, counted up) from the player's State
 -- (SandboxHud.setState, as client/Main.client.luau passes it), "+$X/min"
 -- only while pieces are on show, the "📦 N in stock" chip (the pieces not on show) opening the STOCK list, the key B
 -- (and not when another thing took it), in a ScreenGui named "SandboxHud" (the guide's hint finds it) where
@@ -314,11 +314,6 @@ end
 local SandboxHud = require("./SandboxHud")
 local WarehouseUi = require("./WarehouseUi")
 screen(true, 844, 354)
-Config.Sandbox.On = false
-SandboxHud.start()
-WarehouseUi.start()
-check("Config.Sandbox.On false: SandboxHud.start() and WarehouseUi.start() do nothing", SandboxHud.block() == nil and M.remotes.Collection == nil and M.slotsMade == nil)
-Config.Sandbox.On = true
 
 -- ── The phone: the HUD ──────────────────────────────────────────────────────
 SandboxHud.start()

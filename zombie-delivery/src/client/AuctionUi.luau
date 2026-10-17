@@ -31,7 +31,7 @@
 -- client/SandboxSounds.luau event): the price up on the lot (a bid: a soft tick, at most every BidGap s), the lot on the
 -- podium closing (the gavel, then the "sold!" bell); while the window is open, and the bell of your own lot (yours sold,
 -- or you bought it: louder) anywhere. The server's step only has to send its views (nothing else to call).
---   AuctionUi.start()                  listens (once; nothing when Config.Sandbox.On or Config.Auction.On is false)
+--   AuctionUi.start()                  listens (once; nothing while Config.Auction.On is false)
 --   AuctionUi.open(tab?) / close() / isOpen()
 --   AuctionUi.state()                  the last view (AuctionRules.View; nil: none yet)
 --   AuctionUi.view()                   { tab, selected }: the open tab, the consign tile picked (a uid)
@@ -171,8 +171,8 @@ end
 -- ── The stub link, the toasts ───────────────────────────────────────────────
 
 local function auctionOn(): boolean
-	local sandbox, auction = (Config :: any).Sandbox, (Config :: any).Auction
-	return type(sandbox) == "table" and sandbox.On == true and type(auction) == "table" and auction.On == true
+	local auction = (Config :: any).Auction
+	return type(auction) == "table" and auction.On == true
 end
 
 -- One request a kind at most every 0.6 s (a double tap is one request); nothing while the auction is off.

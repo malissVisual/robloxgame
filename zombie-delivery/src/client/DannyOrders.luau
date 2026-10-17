@@ -823,7 +823,7 @@ local function step()
 end
 
 function DannyOrders.start()
-	if started or not Config.Sandbox.On then
+	if started then
 		return
 	end
 	started = true

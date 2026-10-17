@@ -21,7 +21,7 @@
 -- reason ("🔒 Needs the Big Warehouse") in place of the price and BUY, its next line "Locked for now" (its next level
 -- gives nothing yet); a tap on the reason only says it again, never a purchase. The cards are lower when the screen is
 -- short (a phone held sideways shows all five); the list scrolls only below that.
---   UpgradeUi.start()                  listens (once; nothing when Config.Sandbox.On is false)
+--   UpgradeUi.start()                  listens (once)
 --   UpgradeUi.open() / close() / isOpen()
 --   UpgradeUi.state()                  { levels, money } the last state (nil: none yet)
 --   UpgradeUi.layout(W, H, touch)      the card on a W × H screen (px under Roblox's top bar)
@@ -548,13 +548,8 @@ local function onMoney(state: any)
 	end
 end
 
-local function sandboxOn(): boolean
-	local sandbox = (Config :: any).Sandbox
-	return type(sandbox) == "table" and sandbox.On == true
-end
-
 function UpgradeUi.start()
-	if started or not sandboxOn() then
+	if started then
 		return
 	end
 	started = true

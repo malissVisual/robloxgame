@@ -18,7 +18,7 @@
 -- ✕, ESC, the gamepad's B, the Roblox menu or a tap beside the card close it. It is modal (the mouse free: a Modal
 -- button; a touch screen's buttons under it) and keeps the gamepad's selection inside (a selection group). Opening it
 -- closes the other sandbox windows (client/Main.client.luau: onOpen). Follows client/UpgradeUi.luau's kit.
---   VanPaintUi.start()                  listens (once; nothing when Config.Sandbox.On is false)
+--   VanPaintUi.start()                  listens (once)
 --   VanPaintUi.open() / close() / isOpen()
 --   VanPaintUi.state()                  the last state ({ owned, worn, money, paid }; nil: none yet)
 --   VanPaintUi.view()                   { tab, selected, pick }: the tab, the swatch looked at, what the picture shows
@@ -652,13 +652,8 @@ local function onMoney(state: any)
 	end
 end
 
-local function sandboxOn(): boolean
-	local sandbox = (Config :: any).Sandbox
-	return type(sandbox) == "table" and sandbox.On == true
-end
-
 function VanPaintUi.start()
-	if started or not sandboxOn() then
+	if started then
 		return
 	end
 	started = true

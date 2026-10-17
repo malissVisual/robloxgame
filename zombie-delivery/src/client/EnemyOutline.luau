@@ -1,28 +1,21 @@
 --!strict
 -- 6.15, the owner: "I'd outline the zombies: a red outline, but just subtle." A thin outline on the nearest living
--- enemies on this client: the zombies red, the people orange (the ones the server marks Bandit: the bandits, the
--- gunners, the bandits' pickups as a whole with their crew inside; Config.Outline). Cosmetic only, the server knows
--- nothing of it.
---   * A Roblox Highlight per outlined enemy (Adornee = its model): no fill (FillTransparency 1), the outline at
+-- zombies of a run on this client: red (orange for a kind Config.Outline.HumanKinds names a person; Config.Outline).
+-- Cosmetic only, the server knows nothing of it.
+--   * A Roblox Highlight per outlined zombie (Adornee = its model): no fill (FillTransparency 1), the outline at
 --     Config.Outline.Transparency, DepthMode Occluded (only the part you can see is outlined, never through walls).
 --   * Roblox draws at most 31 Highlights on a client, so this keeps a pool of at most Config.Outline.Count (made as
 --     needed, never destroyed, an unused one disabled with no Adornee) in a local folder (workspace.EnemyOutlines) and
---     hands them out every Config.Outline.Every seconds to the nearest living enemies within Range of the camera
+--     hands them out every Config.Outline.Every seconds to the nearest living zombies within Range of the camera
 --     (shared/OutlinePick.luau: one already outlined keeps it a little farther, nothing blinks at the edge). A phone
 --     gets fewer and nearer ones (client/DeviceBudget.luau, Config.Performance.Lite).
---   * The enemies are lists kept by the Zombies and BanditCars folders' ChildAdded / ChildRemoved (the models that
---     stream in and out too), their humanoid and root looked up once: no GetDescendants, no GetChildren per pick.
---     Only those two folders: never a player, a resident, a passer-by, the traffic or an animal (other folders).
---   * Dead is dead at once: the outlined one's Humanoid Health (a pickup's Health attribute) reaching 0 takes the
---     outline off before the next pick, so the falling corpses and the burning wrecks never wear one. (An enemy in the
---     safe zone dies there: server/Zombies.luau.)
---   * The phone's SETTINGS turns it off and on for this session (EnemyOutline.toggle, Main wires it; like the sound).
---   * 7.0 planning: a Guard on a move sees the zombies through walls (EnemyOutline.setXray(studs), client/MovingHud.luau
---     sets Config.MoveRoles.Guard.XRay for the role): an outlined zombie within that of the camera is drawn
---     AlwaysOnTop; 0 (everybody else) keeps the rule above. 8.8: no roles (shared/MoveRoles.luau MoveRoles.on: the
---     sandbox never has them): always 0.
+--   * The zombies are a list kept by the Zombies folder's ChildAdded / ChildRemoved (the models that stream in and out
+--     too), their humanoid and root looked up once: no GetDescendants, no GetChildren per pick. Only that folder:
+--     never a player, Danny, a helper or a visitor.
+--   * Dead is dead at once: the outlined one's Humanoid Health reaching 0 takes the outline off before the next pick,
+--     so the falling corpses never wear one.
 --   * 9.x loot: one budget with the loot's outlines (client/LootOutline.luau, shared/OutlinePick.luau BUDGET): the
---     enemies come first. EnemyOutline.drawn() says how many enemies wear one now (the loot takes what is left), and
+--     zombies come first. EnemyOutline.drawn() says how many zombies wear one now (the loot takes what is left), and
 --     before a pick outlines more of them EnemyOutline.onSqueeze(count) (LootOutline.squeeze) takes loot outlines off
 --     first, so the two together never pass Roblox's 31 less Config.Outline.Spare.
 
@@ -42,7 +35,6 @@ local RETRY = 0.5 -- seconds between new lookups of a body still missing its hum
 type Slot = { highlight: Highlight, enemy: Enemy?, death: RBXScriptConnection? }
 type Enemy = {
 	model: Model,
-	car: boolean, -- a bandits' pickup (BanditCars), else a body (Zombies)
 	entry: OutlinePick.Entry, -- what OutlinePick sees of it (kept, filled again every pick)
 	humanoid: Humanoid?,
 	root: BasePart?,
@@ -56,10 +48,8 @@ local slots: { Slot } = {}
 local entries: { OutlinePick.Entry } = {} -- this pick's entries …
 local order: { Enemy } = {} -- … and their enemies, in the same order
 local folder: Folder? = nil
-local on = true
 local started = false
 local nextPick = 0
-local xray = 0 -- 7.0 planning: the Guard's sight through walls (studs; 0: none)
 
 -- 9.x loot: the loot's outlines make room before more enemies are outlined (client/LootOutline.luau sets it).
 EnemyOutline.onSqueeze = nil :: ((number) -> ())?
@@ -72,12 +62,9 @@ local COLORS = {
 	human = rgb(OutlinePick.color("human")),
 }
 
--- The body's humanoid and root (a pickup: its chassis, the PrimaryPart), looked up once and kept while still inside.
+-- The body's humanoid and root, looked up once and kept while still inside.
 local function partsOf(enemy: Enemy, now: number): (Humanoid?, BasePart?)
 	local model = enemy.model
-	if enemy.car then
-		return nil, model.PrimaryPart
-	end
 	local humanoid, root = enemy.humanoid, enemy.root
 	if humanoid and root and humanoid.Parent == model and root.Parent == model then
 		return humanoid, root
@@ -91,11 +78,6 @@ local function partsOf(enemy: Enemy, now: number): (Humanoid?, BasePart?)
 	local foundRoot = if found and found:IsA("BasePart") then found else nil
 	enemy.humanoid, enemy.root = foundHumanoid, foundRoot
 	return foundHumanoid, foundRoot
-end
-
-local function carAlive(model: Model): boolean
-	local health = model:GetAttribute("Health")
-	return type(health) == "number" and health > 0
 end
 
 -- The pool's local folder (in the workspace: a Highlight renders there; this client's only, never streamed).
@@ -167,16 +149,9 @@ local function assign(enemy: Enemy)
 	highlight.OutlineColor = if enemy.entry.human then COLORS.human else COLORS.zombie
 	highlight.Adornee = enemy.model
 	highlight.Enabled = true
-	-- Its death takes the outline off at once (not at the next pick): no outline on a falling corpse or a wreck.
-	local model = enemy.model
+	-- Its death takes the outline off at once (not at the next pick): no outline on a falling corpse.
 	local humanoid = enemy.humanoid
-	if enemy.car then
-		slot.death = model:GetAttributeChangedSignal("Health"):Connect(function()
-			if slot.enemy == enemy and not carAlive(model) then
-				release(slot)
-			end
-		end)
-	elseif humanoid then
+	if humanoid then
 		slot.death = humanoid.HealthChanged:Connect(function(health: number)
 			if slot.enemy == enemy and health <= 0 then
 				release(slot)
@@ -200,7 +175,7 @@ local function pick()
 		local entry = enemy.entry
 		if root then
 			entry.distance = (root.Position - eye).Magnitude
-			entry.alive = if enemy.car then carAlive(enemy.model) else humanoid ~= nil and humanoid.Health > 0
+			entry.alive = humanoid ~= nil and humanoid.Health > 0
 		else
 			entry.distance = math.huge
 			entry.alive = false
@@ -230,20 +205,12 @@ local function pick()
 		if not enemy.slot then
 			assign(enemy)
 		end
-		-- 7.0 planning: the Guard's zombies through walls
-		local slot = enemy.slot
-		if slot then
-			local depth = if xray > 0 and not enemy.entry.human and enemy.entry.distance <= xray then Enum.HighlightDepthMode.AlwaysOnTop else Enum.HighlightDepthMode.Occluded
-			if slot.highlight.DepthMode ~= depth then
-				slot.highlight.DepthMode = depth
-			end
-		end
 	end
 end
 
 -- ── The enemies ────────────────────────────────────────────────────────────
 
-local function add(child: Instance, car: boolean)
+local function add(child: Instance)
 	if not child:IsA("Model") then
 		return
 	end
@@ -252,10 +219,9 @@ local function add(child: Instance, car: boolean)
 		return
 	end
 	local kind = model:GetAttribute("Zombie")
-	local tone: OutlinePick.Tone = OutlinePick.tone(if type(kind) == "string" then kind else nil, model:GetAttribute("Bandit") == true)
+	local tone: OutlinePick.Tone = OutlinePick.tone(if type(kind) == "string" then kind else nil)
 	local enemy: Enemy = {
 		model = model,
-		car = car,
 		entry = { distance = math.huge, alive = false, human = tone == "human", outlined = false },
 		humanoid = nil,
 		root = nil,
@@ -287,15 +253,13 @@ local function drop(child: Instance)
 	end
 end
 
--- A folder of enemies (made by the server, maybe after this client starts).
-local function watch(name: string, car: boolean)
+-- The folder of zombies (made by the server, maybe after this client starts).
+local function watch(name: string)
 	local function hook(found: Instance)
 		for _, child in found:GetChildren() do
-			add(child, car)
+			add(child)
 		end
-		found.ChildAdded:Connect(function(child: Instance)
-			add(child, car)
-		end)
+		found.ChildAdded:Connect(add)
 		found.ChildRemoved:Connect(drop)
 	end
 	local found = workspace:FindFirstChild(name)
@@ -313,20 +277,7 @@ local function watch(name: string, car: boolean)
 	end)
 end
 
--- ── On and off ─────────────────────────────────────────────────────────────
-
--- 7.0 planning: the zombies outlined through walls within `range` studs (a Guard on a move); 0: never.
-function EnemyOutline.setXray(range: number)
-	local value = if range == range then math.max(0, range) else 0
-	if value ~= xray then
-		xray = value
-		nextPick = 0
-	end
-end
-
-function EnemyOutline.isOn(): boolean
-	return on
-end
+-- ── The budget ────────────────────────────────────────────────────────────
 
 -- 9.x loot: the enemies wearing an outline now (the shared budget: the loot takes what is left).
 function EnemyOutline.drawn(): number
@@ -339,35 +290,15 @@ function EnemyOutline.drawn(): number
 	return count
 end
 
--- On or off on this client (the phone's SETTINGS); off takes every outline off at once.
-function EnemyOutline.setOn(value: boolean)
-	on = value
-	if not on then
-		for _, slot in slots do
-			release(slot)
-		end
-	end
-	nextPick = 0 -- (on: picked on the next frame)
-end
-
--- Returns the new state.
-function EnemyOutline.toggle(): boolean
-	EnemyOutline.setOn(not on)
-	return on
-end
-
 function EnemyOutline.start()
 	if started then
 		return
 	end
 	started = true
-	watch("Zombies", false)
-	if Tuning.Pickups then
-		watch("BanditCars", true)
-	end
+	watch("Zombies")
 	RunService.Heartbeat:Connect(function()
 		local now = os.clock()
-		if not on or now < nextPick then
+		if now < nextPick then
 			return
 		end
 		nextPick = now + Tuning.Every

@@ -27,7 +27,7 @@
 -- closes it (not while another window has the gamepad's selection; the HUD's chip shows its glyph); the book keeps the
 -- selection inside it (a selection group), lands on the lit tab, every card can be selected (the D-pad walks the grid
 -- and the grid scrolls to the card: every piece reachable), a redraw keeps what was selected; B closes it.
---   CollectionBookUi.start()                 listens (once; nothing when Config.Sandbox.On is false)
+--   CollectionBookUi.start()                 listens (once)
 --   CollectionBookUi.open() / close() / toggle() / isOpen()
 --   CollectionBookUi.state()                 { book, paid } the last state (nil: none yet)
 --   CollectionBookUi.layout(W, H, touch)     the card on a W × H screen (px under Roblox's top bar)
@@ -787,13 +787,8 @@ local function onEvent(message: any)
 	end
 end
 
-local function sandboxOn(): boolean
-	local sandbox = (Config :: any).Sandbox
-	return type(sandbox) == "table" and sandbox.On == true
-end
-
 function CollectionBookUi.start()
-	if started or not sandboxOn() then
+	if started then
 		return
 	end
 	started = true

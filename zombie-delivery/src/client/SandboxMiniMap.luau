@@ -58,11 +58,6 @@ local started = false
 local parts: { [string]: any } = {} -- gui, square, holder, caption, canvas, key, box, boxAt
 local canvas: Draw.Canvas? = nil
 
-local function sandboxOn(): boolean
-	local sandbox = (Config :: any).Sandbox
-	return type(sandbox) == "table" and sandbox.On == true
-end
-
 local function ask(fn: (() -> boolean)?): boolean
 	if not fn then
 		return false
@@ -298,7 +293,7 @@ function SandboxMiniMap.canvas(): Draw.Canvas?
 end
 
 function SandboxMiniMap.start()
-	if started or not sandboxOn() then
+	if started then
 		return
 	end
 	started = true

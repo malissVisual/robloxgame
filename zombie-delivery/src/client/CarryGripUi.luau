@@ -18,11 +18,11 @@
 --   * The outcome (the server's): BALANCED! (+10% walk), SLIPPED BACK! (a knock: try again), STEADY!, STAGGER! (a knock,
 --     slower a moment, the next miss drops it), DROPPED! (it fell). A miss shakes the widget (a pixel with Reduced
 --     Motion) and the camera a little (client/CameraRig.luau shake), flashes red; it stays Ui.Linger s.
---   * 8.3 keys (the sandbox; shared/SandboxPad.luau "grip" and "use", client/PadGlyph.luau): the words name the press
+--   * 8.3 keys (shared/SandboxPad.luau "grip" and "use", client/PadGlyph.luau): the words name the press
 --     of the device used now, a gamepad used last first: "Press LMB / F", "Press R2" with R2's glyph at the widget's top
 --     right (the platform's picture; while the check waits for the press), "Tap GRIP"; SLIPPED BACK!'s "try again (E)",
 --     "(X)" with a gamepad, no key on a touch screen (its Pick up is tapped). They follow a gamepad picked up or put
---     down at once. The city's words as before.
+--     down at once.
 --   * The sounds (art/audio/sfx4.ogg): grip_tick at a lift check's start and each time the needle enters the zone,
 --     grip_warning at a wobble's (louder when its miss drops it) and at a stagger, ding on a hit, furniture_putdown on a
 --     lift's knock, client/MoveSounds.luau slipped() on a drop (one thud, not two).
@@ -183,15 +183,7 @@ local function lookReduced()
 end
 
 local function keysText(): string
-	if Config.Sandbox.On then -- 8.3 keys: the device used now (a gamepad used last first)
-		return SandboxPad.howTo("grip", PadGlyph.device()) or ""
-	end
-	if Ui.touchLayout() then
-		return "Tap GRIP"
-	elseif Ui.gamepadActive() then
-		return "Press R2"
-	end
-	return "Press LMB / F"
+	return SandboxPad.howTo("grip", PadGlyph.device()) or "" -- 8.3 keys: the device used now (a gamepad used last first)
 end
 
 -- ── The widget ─────────────────────────────────────────────────────────────
@@ -417,15 +409,15 @@ local function toneColor(tone: string): Color3
 	return if tone == "good" then K.good elseif tone == "warn" then K.warn elseif tone == "red" then K.red else ORANGE
 end
 
--- 8.3 keys: the press's gamepad button as its glyph at the top right (the sandbox, a gamepad used last, the check
--- waiting for the press; the title makes room).
+-- 8.3 keys: the press's gamepad button as its glyph at the top right (a gamepad used last, the check waiting for the
+-- press; the title makes room).
 local function badge(r: Run)
 	local p = parts
 	if not p then
 		return
 	end
 	local waits = r.check ~= nil and r.verdict == nil and r.outcome == nil
-	local image = if Config.Sandbox.On and waits and PadGlyph.device() == "pad" then PadGlyph.image(SandboxPad.pads("grip")[1] or "") else ""
+	local image = if waits and PadGlyph.device() == "pad" then PadGlyph.image(SandboxPad.pads("grip")[1] or "") else ""
 	local on = image ~= ""
 	if p.padKey.Visible ~= on or p.padKey.Image ~= image then
 		p.padKey.Image = image
@@ -434,9 +426,9 @@ local function badge(r: Run)
 	end
 end
 
--- SLIPPED BACK!'s way on (8.3 keys: the sandbox's in the device's words, the Pick up prompt's key; the city's E).
+-- SLIPPED BACK!'s way on (8.3 keys: in the device's words, the Pick up prompt's key).
 local function tryAgain(): string
-	return if Config.Sandbox.On then SandboxPad.withKey("try again", "use", PadGlyph.device()) else "try again (E)"
+	return SandboxPad.withKey("try again", "use", PadGlyph.device())
 end
 
 -- The title, its tone and the line under it as the run has them now (asked when the run changes: open, a press, the

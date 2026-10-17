@@ -1,8 +1,8 @@
 -- 8.3 SANDBOX: the PAINT shop's window (client/VanPaintUi.luau, with client/CardKit.luau and the real shared data:
 -- shared/VanPaintRules.luau, Config.VanPaint; its 3D picture client/VanPaintPreview.luau recorded: what it is asked to
 -- show) run for real on sandbox_mock.luau's recorder, on a phone held sideways (844 × 390: 844 × 354 under Roblox's top
--- bar, the touch layout), a computer (1280 × 800) and a big screen (1920 × 1080): nothing when Config.Sandbox.On is
--- false; the state asked at the start; the window only on the server's "open"; the picture of your van in what you wear;
+-- bar, the touch layout), a computer (1280 × 800) and a big screen (1920 × 1080): the state
+-- asked at the start; the window only on the server's "open"; the picture of your van in what you wear;
 -- the PAINT tab's swatches in Config's order (their chips, names and lines: ✓ ON VAN, OWNED, the price, 🔒 LOCKED), the
 -- swatch you wear looked at first; a tapped swatch looked at (the picture with it and the livery you wear; its name,
 -- line and button: BUY $X once for a double tap, NEED $X saying how much is missing, 🔒 LOCKED saying what unlocks it,
@@ -197,10 +197,6 @@ end
 -- ── Off: nothing ────────────────────────────────────────────────────────────
 local PaintUi = require("./VanPaintUi")
 screen(true, 844, 354)
-Config.Sandbox.On = false
-PaintUi.start()
-check("Config.Sandbox.On false: VanPaintUi.start() does nothing", M.remotes.VanPaint == nil and #sentOn("VanPaint") == 0)
-Config.Sandbox.On = true
 
 -- ── On: the state asked, the window only on "open" ──────────────────────────
 PaintUi.start()

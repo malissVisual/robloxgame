@@ -1,8 +1,8 @@
 -- 8.2 SANDBOX: the daily tasks' TASKS chip and panel (client/SandboxTasksUi.luau, with client/CardKit.luau, the real
 -- client/SandboxHud.luau beside it and the real shared data: shared/SandboxTasks.luau makes the server's view) run for
 -- real on sandbox_mock.luau's recorder, on a phone held sideways (844 × 390: 844 × 354 under Roblox's top bar, the
--- touch layout), a computer (1280 × 800, the chat shut and open) and a big screen (1920 × 1080): nothing when
--- Config.Sandbox.On is false; the state asked at the start; THE CHIP in its own ScreenGui ("SandboxTasksChip"), just
+-- touch layout), a computer (1280 × 800, the chat shut and open) and a big screen (1920 × 1080): the state
+-- asked at the start; THE CHIP in its own ScreenGui ("SandboxTasksChip"), just
 -- under SandboxHud's money block at its scale (read from the ScreenGui "SandboxHud", following it when it grows),
 -- "📋 TASKS 1/3", the key J on a computer, a badge and the green look with a reward waiting, a spacer of its size second
 -- in Hud's column (the toasts under it), clear of the touch buttons, the thumbstick, the left column and the move's
@@ -259,10 +259,6 @@ local FIRST = viewOf({ { "home", 12, 12 }, { "trips", 3, 1 }, { "sell", 250, 120
 local SandboxHud = require("./SandboxHud")
 local SandboxTasksUi = require("./SandboxTasksUi")
 screen(true, 844, 354)
-Config.Sandbox.On = false
-SandboxTasksUi.start()
-check("Config.Sandbox.On false: SandboxTasksUi.start() does nothing", M.remotes.SandboxTasks == nil and M.gui:FindFirstChild("SandboxTasksChip") == nil)
-Config.Sandbox.On = true
 
 -- ── On: the chip under the money ────────────────────────────────────────────
 SandboxHud.start()

@@ -40,7 +40,7 @@
 --     answer's sound says it).
 --   * Sounds.answered (client/Sounds.luau asks it NoticeWait s after every Notice): true when an await claims that
 --     Notice, or an event that comes with one played round it; its notify is left out then.
---   SandboxSounds.start()   listens (once; nothing when Config.Sandbox.On is false; client/Main.client.luau starts it)
+--   SandboxSounds.start()   listens (once; client/Main.client.luau starts it)
 --   SandboxSounds.event(name, after?) -> boolean   8.9 plays an event now (after: in that many s); false: none, too soon
 --   SandboxSounds.await(outcome)                   8.9 an answer awaited (see above)
 -- Presentation only.
@@ -310,7 +310,7 @@ function SandboxSounds.await(outcome: () -> string?)
 end
 
 function SandboxSounds.start()
-	if started or not Config.Sandbox.On then
+	if started then
 		return
 	end
 	started = true

@@ -1,84 +1,35 @@
 --!strict
--- The game's sound and music on this client. Everything comes from two audio assets made for the game
--- (art/audio/make_audio.py): sfx.ogg with every effect one after another and music.ogg with four seamless loops;
--- shared/SoundSheet.luau says where each one sits, a Sound plays just that region (PlaybackRegion / LoopRegion).
+-- The game's sound and music on this client. Everything comes from the audio sheets made for the game
+-- (art/audio/make_audio.py): sfx.ogg … sfx6.ogg with the effects one after another and music.ogg with its seamless
+-- loops; shared/SoundSheet.luau says where each one sits, a Sound plays just that region (PlaybackRegion / LoopRegion).
+-- A sheet not uploaded yet plays the stand-ins of SoundSheet.Fallback (written by make_audio.py) from the sheets that
+-- are. Every module plays by name: Sounds.play(name, volume?, pitch?) (2D) and Sounds.playAt(name, position, …) (3D, at
+-- most Config.Audio.MaxVoices at once); Sounds.has(name) says whether a sound plays now.
 --
--- Music: "menu" on the start screen, then "day" or "night" (workspace attribute Night), and "tension" on a job
--- while a zombie wave has just arrived or zombies crowd you; the loops crossfade (Config.Audio).
--- Effects: listened for on the remotes the HUD uses too (shots: Tracer, hit markers: Hit, results, notices, the car
--- call), on the world (explosions, your cargo, your car's engine, elevator rides; 6.16: the zombies' voices are
--- client/ZombieLife.luau's, through Sounds.playAt) and on
--- every Ui.button (a soft click). Other players' shots and explosions are 3D sounds at their place.
--- The SOUND button (Hud.onSound) and the N key cycle: everything on → music off → all off.
--- Until the two asset ids are filled in SoundSheet, it stays silent (one note in the Output).
---
--- 5.7, the world's sounds (art/audio/sfx2.ogg, SoundSheet.Sfx2, Config.Juice): your footsteps by speed (on foot, on
--- the ground; Roblox's own running sound is muted then), a bike's freewheel and a scooter's (or an E-Bike's) electric
--- hum in place of the van's engine, the zip line's whirr while you ride (your ZipLine attribute), the bus's brake as it
--- stands at a stop and its doors' hiss as it leaves (a bus's BusAt attribute), the knock at a door and the door's creak
--- (a character's Gesture "knock", server/Npcs.luau Npcs.act), the phone's buzz with a banner (client/PhoneMotion.luau),
--- coins on a payout and on money popped by a kill, and the city's hum and wind (louder at night). Until Sfx2Id is
--- filled in, a few play a stand-in from the first sheet (coin: cash, the buzz: notify, the knock: putdown) and the
--- rest stay silent (no van engine on a bike). Also starts client/Juice.luau.
---
--- 6.12, the world sounds alive (art/audio/sfx3.ogg, SoundSheet.Sfx3, Config.Soundscape): client/SoundScape.luau plays
--- the footsteps by surface (yours and the nearest players'; it took over the 5.7 steps and the hum and wind), the
--- splashes, the car doors and the backs, the horn (H in the driver's seat) and the ambience (the day, the night, a
--- rooftop's wind, the park's fountain); it gets how to play from here (SoundScape.start). Money that went down outside
--- a job plays "purchase". The UI stings for other modules: Sounds.play("task_done" | "purchase" | "event_start" |
--- "event_end", volume?, pitch?). Until Sfx3Id is filled in, a few play a stand-in (FALLBACK: the steps the 5.7 steps, a
--- door (or a tailgate) shut the putdown, the horns the chauffeur's horn, the bell the coin, the beep the notice,
--- task_done job_done, purchase cash, event_start the wave alarm, event_end the notice) and the rest stay silent.
--- 6.16: a soft tick under every hit of yours (the hit marker's, Config.Shots.Marker.Ticks: a sheet's sound pitched up).
---
--- 6.16, the engine's note (shared/DriveFeel.luau engine, Config.DriveFeel.Engine): a little gearbox by the vehicle's
--- class (a car, a van, a truck, the monster truck: their own Idle and Top pitch), the pitch climbing through each gear
--- and dropping at the shift, a touch higher on the throttle (Drive.throttle) and lower as it coasts, the volume by the
--- speed and the throttle; followed every frame (a shift is heard as one). A bike's freewheel and a scooter's hum stay.
---
--- 7.1, the moves' sounds (art/audio/sfx4.ogg, SoundSheet.Sfx4): the furniture, the truck, the grip, the move's stings,
--- the horde's siren, the Wall's gate and the mountains' sounds, for every module by name (Sounds.play / playAt).
--- client/MoveSounds.luau plays the ones the move already tells (its state, its result, your MoveCarry); a move's carry
--- no longer plays the old pickup / putdown under them. The stand-ins of every sheet not uploaded yet are
--- SoundSheet.Fallback (written by make_audio.py; the sfx2 / sfx3 ones moved there from here).
---
--- 8.1 SANDBOX, the sandbox's sounds (sfx4.ogg's 8.1 part, Config.Soundscape.Sandbox): the meadow, the warehouse's hall
--- and the chalet's room are client/SoundScape.luau's (it is told whether sfx4 is up: sheet4); the stands, the till,
--- the trip home's fanfare, the stands' income, the Sprinter's sliding door and its step are client/SandboxSounds.luau's
--- (through Sounds.play / playAt). Money that went up outside a job plays nothing here in the sandbox (its money is a
--- sale or the stands' income: SandboxSounds plays those). 8.3: the book's, the tasks' and the bulk actions' feedback are
--- SandboxSounds' too (shared/SoundPlan.luau feedbackCues: the existing sheets' sounds, one after the other).
---
--- 8.9, the newest features' sounds (art/audio/sfx5.ogg, SoundSheet.Sfx5; until Sfx5Id is filled in, their stand-ins:
--- SoundSheet.Fallback): Danny's clipboard, his orders and his whistle, the trades, the auction, played by name through
--- client/SandboxSounds.luau event (shared/SoundPlan.luau Events). A Notice's notify waits Config.Soundscape.NoticeWait s:
--- when a sound of its own answers it (Sounds.answered, SandboxSounds': a piece given to Danny, an order, a trade's
--- ka-ching) the notify is left out, never both. Sounds.has(name): does a sound play now (its sheet, or a stand-in).
---
--- 10.1, the start's sounds (art/audio/sfx6.ogg, SoundSheet.Sfx6; until Sfx6Id is filled in, their stand-ins): the start
--- screen's (client/Menu.luau: a save picked, the game starting, START OVER's question, BACK) and the character
--- creator's (client/CharacterCreator.luau: its swoosh, a choice's tick, the dice) by name (Sounds.play). The intro's
--- (the van driving in and off, the wordmark's jingle) are played by src/first/Loading.client.luau itself: it runs
--- before this module is there.
+-- Music: "menu" on the start screen, then "day" (or "night" while the workspace attribute Night is set); the loops
+-- crossfade (Config.Audio).
+-- Effects heard here: the hits of the run's bat (the Hit remote, server/CloseCombat.luau: a hit, a kill, a headshot,
+-- each with its soft tick, Config.Shots.Marker.Ticks), explosions (a bloater), money that went down (a purchase), a
+-- server's notice (8.9: unless a sound of its own answers it: Sounds.answered, Config.Soundscape.NoticeWait), a piece
+-- picked up and put down (7.1: a move's piece has its own, client/MoveSounds.luau), your van's load, a knock at a door
+-- and its creak (a character's Gesture "knock"), the ding of a jump far away (a run's fade), every Ui.button's soft
+-- click (Ui.onClick). The world's sounds (the footsteps by surface, the van's back, the countryside's ambience) are
+-- client/SoundScape.luau's; the moves' client/MoveSounds.luau's; the sandbox's stands, till and trades
+-- client/SandboxSounds.luau's; the zombies' voices client/ZombieLife.luau's; the start screen's, the character
+-- creator's and the ride's their own modules' (by name).
+-- The N key cycles: everything on → music off → all off (Sounds.cycle; Sounds.notify says it).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
 local SoundService = game:GetService("SoundService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
-local Levels = require(Shared.Levels)
 local Net = require(Shared.Net)
 local SoundSheet = require(Shared.SoundSheet)
-local ShotFeel = require(Shared.ShotFeel) -- 6.16: the hit marker's tick
-local DriveFeel = require(Shared.DriveFeel)
-local Drive = require(script.Parent.Drive)
 local Ui = require(script.Parent.Ui)
-local PhoneMotion = require(script.Parent.PhoneMotion)
-local Juice = require(script.Parent.Juice)
 local SoundScape = require(script.Parent.SoundScape)
 local MoveSounds = require(script.Parent.MoveSounds) -- 7.1
 
@@ -178,7 +129,7 @@ local function makeSound(asset: string, range: NumberRange, looped: boolean, gro
 end
 
 -- 2D effects: one ready Sound per name (a small round of them for the fast ones), replayed from the start.
-local ROUND = { gun_light = 3, gun_crack = 2, gun_heavy = 2, gun_rapid = 4, hit = 3, kill = 2, ui_click = 2, step_a = 2, step_b = 2, coin = 2, stand_display = 3 } -- (8.3: FILL BEST's clicks ring out)
+local ROUND = { hit = 3, kill = 2, ui_click = 2, step_a = 2, step_b = 2, coin = 2, stand_display = 3 } -- (8.3: FILL BEST's clicks ring out)
 local flat: { [string]: { sounds: { Sound }, next: number } } = {}
 
 local function play(name: string, volume: number?, pitch: number?)
@@ -257,8 +208,6 @@ end
 local tracks: { [string]: Sound } = {}
 local current: string? = nil
 local inGame = false
-local tenseUntil = 0
-local tenseSince = 0
 
 local function fade(sound: Sound, volume: number)
 	local tween = TweenService:Create(sound, TweenInfo.new(AUDIO.MusicFade, Enum.EasingStyle.Sine), { Volume = volume })
@@ -299,43 +248,12 @@ local function setMusic(name: string)
 end
 
 -- What should play now (every second).
-local hasJob = false
-local function zombiesNear(range: number): number
-	local character = player.Character
-	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
-	local folder = workspace:FindFirstChild("Zombies")
-	if not root or not folder then
-		return 0
-	end
-	local count = 0
-	for _, model in folder:GetChildren() do
-		local body = model:FindFirstChild("HumanoidRootPart") :: BasePart?
-		if body and (body.Position - root.Position).Magnitude < range then
-			count += 1
-		end
-	end
-	return count
-end
-
 local function pickMusic()
 	if not inGame then
 		setMusic("menu")
 		return
 	end
-	local now = os.clock()
-	if hasJob and zombiesNear(AUDIO.TensionRange) >= AUDIO.TensionZombies then
-		tenseUntil = math.max(tenseUntil, now + 6)
-	end
-	if hasJob and now < tenseUntil then
-		if current ~= "tension" then
-			tenseSince = now
-		end
-		setMusic("tension")
-	elseif current == "tension" and now - tenseSince < AUDIO.TensionHold then
-		return -- let it play a little longer: no flip-flopping
-	else
-		setMusic(if workspace:GetAttribute("Night") == true then "night" else "day")
-	end
+	setMusic(if workspace:GetAttribute("Night") == true then "night" else "day")
 end
 
 -- The start screen is over (Main's play()).
@@ -363,54 +281,22 @@ end
 
 -- ── Listening ─────────────────────────────────────────────────────────────
 
--- Tracer colour → the gun that fired it (every hand gun and car gun has its own colour; the same colours share a sound).
-local byColor: { [string]: string } = {}
-local function colorKey(c: Color3): string
-	return `{math.floor(c.R * 255 + 0.5)},{math.floor(c.G * 255 + 0.5)},{math.floor(c.B * 255 + 0.5)}`
-end
-for _, list in { Config.Weapons :: { any }, Config.CarGuns :: { any } } do
-	for _, def in list do
-		local key = `{def.color[1]},{def.color[2]},{def.color[3]}`
-		if not byColor[key] then
-			byColor[key] = AUDIO.WeaponSounds[def.id] or "gun_light"
-		end
-	end
-end
-
-local function listenShots()
-	local lastShot: { [number]: number } = {}
-	Net.get("Tracer").OnClientEvent:Connect(function(from: Vector3, _to: Vector3, color: Color3, shooter: number)
-		if typeof(from) ~= "Vector3" then
-			return
-		end
-		local now = os.clock()
-		local id = if type(shooter) == "number" then shooter else 0
-		-- A shotgun's pellets are one shot; a bandit's burst too (shooter 0: everyone who is not a player).
-		if id ~= 0 and lastShot[id] and now - lastShot[id] < 0.05 then
-			return
-		end
-		lastShot[id] = now
-		local name = if typeof(color) == "Color3" then byColor[colorKey(color)] or "gun_light" else "gun_light"
-		if id == player.UserId then
-			play(name, if name == "gun_rapid" then 0.55 else 0.8, 0.97 + math.random() * 0.06)
-		else
-			playAt(name, from, if id == 0 then 0.65 else 0.8)
-		end
-	end)
-	-- 6.16: a soft tick under it, the hit marker's (Config.Shots.Marker.Ticks: a sound of the sheet pitched up; a
-	-- headshot's brighter); a shotgun's pellets tick once, the strongest of them.
+-- The run's bat: a hit, a kill, a headshot (the Hit remote, server/CloseCombat.luau), each with its soft tick under it
+-- (Config.Shots.Marker.Ticks: a sound of the sheet pitched up; a headshot's brighter). Explosions where they are.
+local function listenHits()
 	local ticks = Config.Shots.Marker
 	local RANK: { [string]: number } = { hit = 1, kill = 2, head = 3 }
 	local tickAt, tickRank = -math.huge, 0
-	Net.get("Hit").OnClientEvent:Connect(function(_position: Vector3, _damage: number, crit: boolean, killed: boolean)
+	Net.get("Hit").OnClientEvent:Connect(function(_position: Vector3, _damage: number, crit: boolean, killed: any)
+		local dead = killed == true or (type(killed) == "number" and killed > 0)
 		if crit then
 			play("headshot", 0.7)
-		elseif killed then
+		elseif dead then
 			play("kill", 0.8)
 		else
 			play("hit", 0.6, 0.95 + math.random() * 0.1)
 		end
-		local kind = ShotFeel.hitKind(crit, killed)
+		local kind = if crit then "head" elseif dead then "kill" else "hit"
 		local now = os.clock()
 		local tick = ticks.Ticks[kind]
 		if tick and (now - tickAt >= ticks.TickGap or RANK[kind] > tickRank) then
@@ -427,66 +313,16 @@ local function listenShots()
 end
 
 local function listenGame()
-	local level: number? = nil
 	local money: number? = nil
-	local lastPayout = 0
 	Net.get("State").OnClientEvent:Connect(function(state: any)
-		if type(state) ~= "table" then
+		if type(state) ~= "table" or type(state.money) ~= "number" then
 			return
 		end
-		if type(state.xp) == "number" then
-			local now = Levels.levelFor(state.xp)
-			if level and now > level then
-				task.delay(0.6, play, "level_up", 0.8)
-			end
-			level = now
+		-- 6.12: money that went down: a purchase (up is a sale or the stands' income: client/SandboxSounds.luau's)
+		if money and state.money < money then
+			play("purchase", Config.Soundscape.PurchaseVolume)
 		end
-		if type(state.money) == "number" then
-			-- Money that moved without a job or a kill: a purchase, a collected safe. 6.12: a purchase (down) its own.
-			if money and state.money ~= money and os.clock() - lastPayout > 1.5 then
-				if state.money < money then
-					play("purchase", Config.Soundscape.PurchaseVolume)
-				elseif not Config.Sandbox.On then -- (8.1: the sandbox's money is client/SandboxSounds.luau's)
-					play("cash", 0.6)
-				end
-			end
-			money = state.money
-		end
-	end)
-	local lastCoin = 0
-	Net.get("Reward").OnClientEvent:Connect(function()
-		lastPayout = os.clock()
-		if os.clock() - lastCoin > 0.2 then -- 5.7: the money popped by a kill clinks (quieter)
-			lastCoin = os.clock()
-			play("coin", JUICE.CoinVolume * 0.6, 1.08)
-		end
-	end)
-	Net.get("DeliveryResult").OnClientEvent:Connect(function(r: any)
-		lastPayout = os.clock()
-		if type(r) == "table" and r.success then
-			play("job_done", 0.8)
-			if (tonumber(r.total) or 0) > 0 then
-				task.delay(0.5, function() -- 5.7: and the pay comes in
-					play("coin", JUICE.CoinVolume)
-				end)
-			end
-		else
-			play("job_fail", 0.7)
-		end
-	end)
-	local wave = 0
-	Net.get("Job").OnClientEvent:Connect(function(job: any)
-		hasJob = type(job) == "table"
-		local now = if hasJob and type(job.wave) == "number" then job.wave else 0
-		if now > wave then
-			play("wave", 0.7)
-			tenseUntil = os.clock() + AUDIO.TensionAfterWave
-			task.defer(pickMusic)
-		end
-		wave = now
-		if not hasJob then
-			lastPayout = os.clock()
-		end
+		money = state.money
 	end)
 	local lastNotice = 0
 	Net.get("Notice").OnClientEvent:Connect(function()
@@ -506,28 +342,6 @@ local function listenGame()
 				play("notify", 0.5)
 			end
 		end)
-	end)
-	local lastOpen = 0
-	local function opened()
-		if os.clock() - lastOpen > 0.4 then
-			lastOpen = os.clock()
-			play("ui_open", 0.6)
-		end
-	end
-	Net.get("OpenShop").OnClientEvent:Connect(opened)
-	Net.get("Estate").OnClientEvent:Connect(opened)
-	-- The chauffeur brought the car: it honks where it stopped.
-	local calledCar: Model? = nil
-	Net.get("CarCall").OnClientEvent:Connect(function(seconds: number?, car: any, _reason: any?)
-		if seconds ~= nil then
-			calledCar = if typeof(car) == "Instance" and car:IsA("Model") then car else nil
-			return
-		end
-		local model = calledCar
-		calledCar = nil
-		if car == nil and model and model.Parent then
-			playAt("horn", model:GetPivot().Position, 0.8, 1, 200)
-		end
 	end)
 	Ui.onClick = function()
 		play("ui_click", 0.5)
@@ -598,108 +412,7 @@ local function listenCargo()
 	player.CharacterAdded:Connect(watchCharacter)
 end
 
--- ── The steady loops: your engine, zombies, elevator rides, the music ─────
-
-local engine: Sound? = nil
-local engineCar: Model? = nil
-local engineKind = "engine"
-local engineNote = { class = "van", gear = 1 } -- 6.16: the class of your car's engine and the gear it is in
-
--- 5.7: what your ride sounds like: a pedal bike's freewheel, an electric scooter's (or the E-Bike's) hum, else the
--- engine. (No stand-in: a bike never plays the van's engine.)
-local function loopFor(car: Model): string
-	if car:GetAttribute("Bike") == true then
-		return if car:GetAttribute("BikeStand") == true or car:GetAttribute("CarId") == "ebike" then "scooter" else "freewheel"
-	end
-	return "engine"
-end
-
-local function updateEngine(dt: number)
-	local car, driving = Drive.seatedCar()
-	if not driving or not car then
-		car = nil
-	end
-	if car ~= engineCar then
-		if engine then
-			engine:Destroy()
-			engine = nil
-		end
-		engineCar = car
-		local seat = car and car:FindFirstChild("DriverSeat")
-		local kind = if car then loopFor(car) else "engine"
-		local asset, range = find(kind)
-		if seat and asset and range and enabled then
-			local sound = makeSound(asset, range, true, effectsGroup, seat)
-			sound.RollOffMinDistance = 15
-			sound.RollOffMaxDistance = 120
-			sound.Volume = if kind == "engine" then 0.35 else 0
-			sound:Play()
-			engine = sound
-			engineKind = kind
-			local id = car and car:GetAttribute("CarId")
-			engineNote.class = DriveFeel.engineClass(DriveFeel.styleOf(if type(id) == "string" then id else nil))
-			engineNote.gear = 1
-		end
-	end
-	local sound = engine
-	if sound and car then
-		local top = car:GetAttribute("MaxSpeed")
-		local share = math.clamp(math.abs(Drive.speed()) / (if type(top) == "number" and top > 0 then top else 80), 0, 1.3)
-		local boost = if Drive.boosting() then 0.12 else 0
-		local ease = 1 - 0.65 ^ (dt / 0.1) -- (the 5.7 ease: 0.35 every 0.1 s)
-		if engineKind == "freewheel" then
-			-- The ratchet ticks faster with the wheel; silent standing still.
-			sound.PlaybackSpeed += (0.6 + share * 0.9 - sound.PlaybackSpeed) * ease
-			sound.Volume = JUICE.BikeVolume * math.clamp(share * 2.5, 0, 1)
-		elseif engineKind == "scooter" then
-			sound.PlaybackSpeed += (0.75 + share * 0.55 + boost - sound.PlaybackSpeed) * ease
-			sound.Volume = JUICE.ScooterVolume * (0.35 + 0.65 * math.min(share, 1))
-		else
-			-- 6.16: the gearbox (DriveFeel.engine), followed every frame
-			local spec = Config.DriveFeel.Engine.Classes[engineNote.class]
-			engineNote.gear = DriveFeel.shift(engineNote.gear, share, if spec then spec.Gears else 4)
-			local pitch, volume = DriveFeel.engine(engineNote.class, share, engineNote.gear, Drive.throttle(), boost > 0)
-			local follow = 1 - math.exp(-dt * Config.DriveFeel.Engine.Follow)
-			sound.PlaybackSpeed += (pitch - sound.PlaybackSpeed) * follow
-			sound.Volume += (volume - sound.Volume) * follow
-		end
-	end
-end
-
--- 5.7: the zip line's whirr while you ride one (your character's ZipLine attribute, client/ZipRide.luau), its pitch
--- with your speed.
-local zipSound: Sound? = nil
-local function updateZip()
-	local character = player.Character
-	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
-	local riding = character ~= nil and root ~= nil and character:GetAttribute("ZipLine") ~= nil and mode ~= 3
-	local sound = zipSound
-	if sound and (not riding or sound.Parent ~= root) then
-		sound:Destroy()
-		zipSound = nil
-		sound = nil
-	end
-	if not riding or not root then
-		return
-	end
-	if not sound then
-		local asset, range = find("zip")
-		if not asset or not range then
-			return
-		end
-		local made = makeSound(asset, range, true, effectsGroup, root)
-		made.RollOffMinDistance = 10
-		made.RollOffMaxDistance = 90
-		made.Volume = 0
-		made:Play()
-		zipSound = made
-		sound = made
-	end
-	assert(sound)
-	local share = math.clamp(root.AssemblyLinearVelocity.Magnitude / math.max(1, Config.ZipLines.Speed), 0, 1.2)
-	sound.PlaybackSpeed += (0.7 + 0.5 * share - sound.PlaybackSpeed) * 0.4
-	sound.Volume = JUICE.ZipVolume * (0.3 + 0.7 * math.min(share, 1))
-end
+-- ── The world's loops, the knocks, the ding ─────────────────────────────────
 
 -- 6.12: the footsteps (5.7: yours by speed) and the ambience (5.7: the hum and the wind) moved to
 -- client/SoundScape.luau, with the doors, the horn, the splashes and the fountain. How it plays: this module's.
@@ -712,36 +425,6 @@ local function make(name: string, parent: Instance?, looped: boolean): Sound?
 		return nil
 	end
 	return makeSound(asset, range, looped, effectsGroup, parent or effectsGroup)
-end
-
--- 5.7: the buses: the brake as one stands at a stop, the doors' hiss as it leaves (its BusAt attribute,
--- server/Buses.luau), where it is.
-local function listenBuses()
-	task.spawn(function()
-		local buses = workspace:WaitForChild("Buses", 120)
-		if not buses then
-			return
-		end
-		local function watch(bus: Instance)
-			if not bus:IsA("Model") then
-				return
-			end
-			local at = bus:GetAttribute("BusAt")
-			bus:GetAttributeChangedSignal("BusAt"):Connect(function()
-				local now = bus:GetAttribute("BusAt")
-				local arrived = now ~= nil and at == nil
-				local left = now == nil and at ~= nil
-				at = now
-				if arrived or left then
-					playAt(if arrived then "bus_brake" else "bus_door", bus:GetPivot().Position, JUICE.BusVolume, 1, JUICE.BusRange)
-				end
-			end)
-		end
-		for _, bus in buses:GetChildren() do
-			watch(bus)
-		end
-		buses.ChildAdded:Connect(watch)
-	end)
 end
 
 -- 5.7: a knock at a door (anybody's character, its Gesture "knock" from server/Npcs.luau Npcs.act) and, when the door
@@ -791,8 +474,8 @@ local function elevator()
 	local position = root.Position
 	local was = lastPosition
 	lastPosition = position
-	-- A jump of many studs in a tenth of a second, on foot: an elevator pad (or a ride home) took you there.
-	if was and (position - was).Magnitude > 40 and os.clock() - spawnedAt > 3 and not Drive.seatedCar() then
+	-- A jump of many studs in a tenth of a second: a run's fade (there and back) took you there.
+	if was and (position - was).Magnitude > 40 and os.clock() - spawnedAt > 3 then
 		play("ding", 0.6)
 	end
 end
@@ -827,14 +510,10 @@ function Sounds.start()
 		end
 		Sounds.cycle()
 	end)
-	listenShots()
+	listenHits()
 	listenGame()
 	listenCargo()
-	listenBuses()
 	listenKnocks()
-	PhoneMotion.onBanner = function()
-		play("phone_buzz", JUICE.BuzzVolume)
-	end
 	pickMusic()
 	-- 6.12: the footsteps, the splashes, the doors, the horn and the ambience (client/SoundScape.luau)
 	SoundScape.start({
@@ -861,18 +540,12 @@ function Sounds.start()
 			return enabled and mode ~= 3
 		end,
 	})
-	RunService.Heartbeat:Connect(function(dt: number)
-		if enabled then
-			updateEngine(dt) -- 6.16: every frame (the gear shifts)
-		end
-	end)
 	task.spawn(function()
 		local tick = 0
 		while true do
 			task.wait(0.1)
 			tick += 1
 			if enabled then
-				updateZip()
 				elevator()
 			end
 			if tick % 10 == 0 then
@@ -880,7 +553,6 @@ function Sounds.start()
 			end
 		end
 	end)
-	Juice.start() -- 5.7: the money counting up, the confetti
 end
 
 return Sounds

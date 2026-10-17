@@ -3,18 +3,14 @@
 -- normally available, so remove the Alt option"): the real client/CameraRig.luau (tests/run_tests.py copies it as
 -- CameraRigClient.luau, a function of the globals it reads) on a computer's keyboard and mouse, on
 -- tests/runtime/ClientRuntime.luau's instances, frames and vectors, made afresh for each world:
---   * the sandbox (CameraRig.aimOnly and CameraRig.armed as client/Main.client.luau sets them there): the cursor free
---     (MouseBehavior Default, shown, no crosshair dot) while the rig still drives the camera (Scriptable: the walk goes
---     the camera's way, the body turns where it walks); a mouse move turns nothing; the right mouse held turns the
---     camera (LockCurrentPosition) and aims nothing (no Aiming to the server, the walk's speed kept); let go, free
---     again; a left click shoots and aims nothing; Alt and the MOUSE button change nothing; the wheel zooms, but not
---     while a window needs the mouse or a list under it takes the wheel; a window open: the right mouse turns nothing;
---     a Tool equipped (armed): the mouse locked (LockCenter, no cursor), the dot, a mouse move turns the camera, the
---     right mouse aims (Aiming); put away: free again; another armed hook decides alone; driving with the cursor free
---     (the mouse moving or not) the camera swings behind the van; a door's trip (CameraRig.face) puts it behind you;
---   * the city (Config.Sandbox.On false: aimOnly never set): locked as before (LockCenter, no cursor, the dot), a
---     mouse move turns the camera, Alt held frees it, the MOUSE button frees it until clicked again, the phone open
---     (freeLook) lets the right mouse turn it, the right and the left mouse aim, a Tool changes nothing;
+--   * a computer: the cursor free (MouseBehavior Default, shown, no crosshair dot) while the rig still drives the
+--     camera (Scriptable: the walk goes the camera's way, the body turns where it walks); a mouse move turns nothing;
+--     the right mouse held turns the camera (LockCurrentPosition) and aims nothing (nothing to the server, the walk's
+--     speed kept); let go, free again; a left click stays the world's; Alt changes nothing; a trackpad's swipe and
+--     pinch, the turn keys; the wheel zooms, but not while a window needs the mouse or a list under it takes the
+--     wheel; a window open: the right mouse turns nothing; a Tool equipped (armed, the run's bat): the mouse locked
+--     (LockCenter, no cursor), the dot, a mouse move turns the camera, the right mouse aims nothing; put away: free
+--     again; another armed hook decides alone; a door's trip (CameraRig.face) puts it behind you;
 --   * a touch screen: the Roblox camera as before (the rig never binds its camera step, the mouse is never locked).
 -- Run with tests/run_tests.py.
 
@@ -84,15 +80,13 @@ type World = {
 	render: { [string]: (number) -> () },
 	sent: { { any } },
 	window: boolean,
-	phone: boolean,
-	car: any,
 	dt: number,
 }
 
 local clock = 100
 
-local function world(sandbox: boolean, touch: boolean?): World
-	local w: World = { render = {}, sent = {}, window = false, phone = false, car = nil, dt = 1 / 60 } :: any
+local function world(touch: boolean?): World
+	local w: World = { render = {}, sent = {}, window = false, dt = 1 / 60 } :: any
 	local uis = {
 		KeyboardEnabled = not touch,
 		MouseEnabled = not touch,
@@ -163,19 +157,6 @@ local function world(sandbox: boolean, touch: boolean?): World
 	end }
 	local fakes = {
 		Config = Config,
-		Net = { get = function(name: string): any
-			return { FireServer = function(_remote: any, ...: any)
-				table.insert(w.sent, { name, ... })
-			end }
-		end },
-		Drive = {
-			seatedCar = function(): (any, boolean)
-				return w.car, w.car ~= nil
-			end,
-			boardingCar = function(): (any, boolean)
-				return nil, false
-			end,
-		},
 		Stamina = {
 			update = function(): boolean
 				return false
@@ -187,15 +168,6 @@ local function world(sandbox: boolean, touch: boolean?): World
 				return true
 			end,
 		},
-		Holster = {
-			holstered = function(): boolean
-				return false
-			end,
-			pressDraws = function(): boolean
-				return false
-			end,
-		},
-		ShotKick = { apply = function() end },
 		PairSteer = {
 			start = function() end,
 			steering = function(): boolean
@@ -229,20 +201,11 @@ local function world(sandbox: boolean, touch: boolean?): World
 		return {}
 	end }
 	local rig = CameraRigClient(game, workspace, script, fakeRequire, Instance, RaycastParams, task, os, CFrame, Vector3, Vector2, E.Color3, UDim, UDim2, Enum)
-	-- what client/Main.client.luau sets (the sandbox's block, or the city's)
+	-- what client/Main.client.luau sets
 	rig.mouseNeeded = function(): boolean
-		return w.window or (not sandbox and w.phone)
-	end
-	rig.windowOpen = function(): boolean
 		return w.window
 	end
-	rig.freeLook = function(): boolean
-		return not sandbox and w.phone and not w.window
-	end
-	if sandbox then
-		rig.aimOnly = true
-		rig.armed = rig.toolEquipped
-	end
+	rig.windowOpen = rig.mouseNeeded
 	rig.start()
 	rig.setEnabled(true)
 	w.rig = rig
@@ -288,14 +251,8 @@ local function dot(w: World): any
 	local crosshair = gui and gui:FindFirstChild("Crosshair")
 	return crosshair and crosshair:FindFirstChild("Dot")
 end
-local function aimed(w: World): boolean -- the last word to the server: the gun arm up
-	local last = nil
-	for _, entry in w.sent do
-		if entry[1] == "Aiming" then
-			last = entry[2]
-		end
-	end
-	return last == true
+local function aimed(w: World): boolean -- (no aim any more: nothing goes to the server)
+	return #w.sent > 0
 end
 local function free(w: World): boolean
 	local d = dot(w)
@@ -308,16 +265,16 @@ end
 
 local SENSITIVITY = 0.0032 -- (the rig's: a mouse's px to radians)
 
--- ── The sandbox ─────────────────────────────────────────────────────────────
+-- ── A computer ──────────────────────────────────────────────────────────────
 
 do
-	local w = world(true)
+	local w = world()
 	frame(w)
-	check("sandbox: the cursor is free by default (MouseBehavior Default, shown, no crosshair dot)", free(w),
+	check("the cursor is free by default (MouseBehavior Default, shown, no crosshair dot)", free(w),
 		`{w.uis.MouseBehavior} {w.uis.MouseIconEnabled}`)
 	check("… the rig still drives the camera (Scriptable: the walk goes the camera's way), the body turns where it walks",
 		w.camera.CameraType == "Scriptable" and w.humanoid.AutoRotate == true)
-	check("… the hooks as Main sets them: aimOnly, armed = a Tool equipped", w.rig.aimOnly == true and w.rig.armed == w.rig.toolEquipped and not w.rig.armed())
+	check("… armed: a Tool equipped (none now)", w.rig.armed == w.rig.toolEquipped and not w.rig.armed())
 	local before = yawOf(w)
 	moveMouse(w, 200, 40)
 	frame(w)
@@ -331,10 +288,10 @@ do
 	before = yawOf(w)
 	moveMouse(w, -100, 0)
 	frame(w)
-	check("… a mouse move turns the camera (100 px left: the same turn as the city's)", math.abs(turned(before, yawOf(w)) - 100 * SENSITIVITY) < 1e-3,
+	check("… a mouse move turns the camera (100 px left)", math.abs(turned(before, yawOf(w)) - 100 * SENSITIVITY) < 1e-3,
 		turned(before, yawOf(w)))
-	check("… and aims nothing (no Aiming to the server, the walk's speed kept, the body still turns where it walks)", not aimed(w)
-		and math.abs(w.humanoid.WalkSpeed - Config.Movement.Walk) < 1e-6 and w.humanoid.AutoRotate == true and not (w.rig.aimPose()), w.humanoid.WalkSpeed)
+	check("… and aims nothing (nothing to the server, the walk's speed kept, the body still turns where it walks)", not aimed(w)
+		and math.abs(w.humanoid.WalkSpeed - Config.Movement.Walk) < 1e-6 and w.humanoid.AutoRotate == true, w.humanoid.WalkSpeed)
 	release(w, "MouseButton2")
 	frame(w)
 	before = yawOf(w)
@@ -345,19 +302,15 @@ do
 	-- a left click is the world's
 	press(w, "MouseButton1")
 	frame(w, 5)
-	check("a left click (held): no shot, no aim, the cursor stays free", not aimed(w) and not (w.rig.aimPose()) and free(w))
+	check("a left click (held): no shot, no aim, the cursor stays free", not aimed(w) and free(w))
 	release(w, "MouseButton1")
 	frame(w)
 
-	-- Alt and the MOUSE button do nothing here
+	-- Alt does nothing
 	press(w, "Keyboard", "LeftAlt")
 	frame(w)
 	check("Alt held: nothing changes (still free)", free(w))
 	release(w, "Keyboard", "LeftAlt")
-	w.rig.toggleFreeMouse()
-	frame(w)
-	check("… nor does the city's MOUSE button (client/Hud.luau hides it here): still free", free(w))
-	w.rig.toggleFreeMouse()
 
 	-- 9.0.1 (the owner: "on the Mac you can't turn with the touchpad at all"): a trackpad's two-finger swipe turns the
 	-- camera (PointerAction's pan), a pinch zooms; , / . and the arrows on foot turn it; never under a list or a window
@@ -424,7 +377,7 @@ do
 	frame(w)
 
 	-- armed: a Tool in the hands brings back the locked mouse and the crosshair
-	local tool = E.new("Tool", "Pistol", w.body)
+	local tool = E.new("Tool", "Bat", w.body)
 	frame(w)
 	check("a Tool equipped (armed): the mouse locked (LockCenter), no cursor, the crosshair dot", lockedAiming(w), w.uis.MouseBehavior)
 	before = yawOf(w)
@@ -433,10 +386,10 @@ do
 	check("… a mouse move turns the camera", math.abs(turned(before, yawOf(w)) - 50 * SENSITIVITY) < 1e-3, turned(before, yawOf(w)))
 	press(w, "MouseButton2")
 	frame(w, 10)
-	check("… the right mouse aims (Aiming to the server, the careful step)", aimed(w) and (w.rig.aimPose()) and w.humanoid.WalkSpeed < Config.Movement.Walk)
+	check("… the right mouse aims nothing (nothing to the server, the walk's speed kept, still locked)", not aimed(w) and lockedAiming(w)
+		and math.abs(w.humanoid.WalkSpeed - Config.Movement.Walk) < 1e-6)
 	release(w, "MouseButton2")
-	frame(w, 60)
-	check("… let go: the aim down", not aimed(w))
+	frame(w)
 	tool:Destroy()
 	frame(w)
 	check("put away: free again (the cursor, no dot)", free(w))
@@ -444,7 +397,7 @@ do
 		return true
 	end
 	frame(w)
-	check("another armed hook (Main's, guns brought later) decides alone: locked with the dot", lockedAiming(w))
+	check("another armed hook decides alone: locked with the dot", lockedAiming(w))
 	w.window = true
 	frame(w)
 	check("… a window open frees the mouse even then", not w.rig.locked() and w.uis.MouseBehavior == "Default" and not dot(w).Visible)
@@ -453,97 +406,16 @@ do
 	frame(w)
 	check("… back to a Tool: free", free(w))
 
-	-- driving: the camera follows behind the van with the cursor free
-	local car = E.new("Model", "Van", w.workspace)
-	local chassis = E.new("Part", "Chassis", car)
-	local carYaw = 1.1
-	chassis.CFrame = CFrame.new(0, 3, -20) * CFrame.Angles(0, carYaw, 0)
-	chassis.Position = chassis.CFrame.Position
-	chassis.AssemblyLinearVelocity = Vector3.new(-math.sin(carYaw) * 30, 0, -math.cos(carYaw) * 30)
-	chassis.AssemblyAngularVelocity = Vector3.zero
-	car.PrimaryPart = chassis
-	car.GetExtentsSize = function(): any
-		return Vector3.new(7, 8, 18)
-	end
-	w.car = car
-	frame(w, 30)
-	for _ = 1, 30 do
-		moveMouse(w, 40, 0) -- (the free cursor moving over the screen: not a turn of the camera)
-		frame(w, 5)
-	end
-	local behind = (w.camera.CFrame.Position - chassis.Position):Dot(chassis.CFrame.LookVector)
-	check("driving, the cursor free (moving or not): the camera swings round behind the van", turned(yawOf(w), carYaw) < 0.05 and behind < 0 and free(w),
-		`{turned(yawOf(w), carYaw)} {behind}`)
-	w.car = nil
-	frame(w, 30)
-
 	-- a door's trip: the camera behind you, looking the way you go
 	check("a door's trip (CameraRig.face): the rig turns the camera", w.rig.face(Vector3.new(1, 0, 0)) == true)
 	frame(w)
 	check("… it looks the way you go (+X), the cursor still free", turned(yawOf(w), math.atan2(-1, 0)) < 1e-3 and free(w), yawOf(w))
 end
 
--- ── The city: unchanged ─────────────────────────────────────────────────────
-
-do
-	local w = world(false)
-	frame(w)
-	check("city: aimOnly never set (Main's sandbox block only)", w.rig.aimOnly == false)
-	check("city: the mouse locked as before (LockCenter, no cursor, the crosshair dot)", lockedAiming(w), w.uis.MouseBehavior)
-	local before = yawOf(w)
-	moveMouse(w, 100, 0)
-	frame(w)
-	check("… a mouse move turns the camera", math.abs(turned(before, yawOf(w)) - 100 * SENSITIVITY) < 1e-3)
-	press(w, "Keyboard", "LeftAlt")
-	frame(w)
-	check("… Alt held frees it (Default, the cursor, no dot)", free(w))
-	before = yawOf(w)
-	moveMouse(w, 100, 0)
-	frame(w)
-	check("… and the mouse turns nothing then", turned(before, yawOf(w)) < 1e-6)
-	release(w, "Keyboard", "LeftAlt")
-	frame(w)
-	check("… Alt let go: locked again", lockedAiming(w))
-	check("… the MOUSE button frees it", w.rig.toggleFreeMouse() == true)
-	frame(w)
-	check("… (free: the cursor, no dot)", free(w))
-	check("… clicked again: locked", w.rig.toggleFreeMouse() == false)
-	frame(w)
-	check("… (locked with the dot)", lockedAiming(w))
-	w.phone = true
-	frame(w)
-	press(w, "MouseButton2")
-	frame(w)
-	before = yawOf(w)
-	moveMouse(w, -80, 0)
-	frame(w)
-	check("the phone open (freeLook): the right mouse turns the camera (LockCurrentPosition), no aim", w.uis.MouseBehavior == "LockCurrentPosition"
-		and math.abs(turned(before, yawOf(w)) - 80 * SENSITIVITY) < 1e-3 and not aimed(w))
-	release(w, "MouseButton2")
-	w.phone = false
-	frame(w)
-	press(w, "MouseButton2")
-	frame(w, 10)
-	check("the phone away: the right mouse aims (Aiming, the careful step)", aimed(w) and w.humanoid.WalkSpeed < Config.Movement.Walk)
-	release(w, "MouseButton2")
-	frame(w, 60)
-	press(w, "MouseButton1")
-	frame(w, 10)
-	check("… the left mouse shoots with the gun up (Aiming)", aimed(w))
-	release(w, "MouseButton1")
-	frame(w, 60)
-	E.new("Tool", "Pistol", w.body)
-	frame(w)
-	check("a Tool changes nothing in the city (still locked with the dot)", lockedAiming(w))
-	w.window = true
-	frame(w)
-	check("a window open frees the mouse as before", free(w))
-end
-
 -- ── A touch screen: the Roblox camera as before ─────────────────────────────
 
 do
-	local w = world(true, true)
+	local w = world(true)
 	check("a touch screen: the rig never binds its camera step (the Roblox camera), its feel step only", w.render.ZombieDeliveryCamera == nil
 		and w.render.ZombieDeliveryFeel ~= nil)
 	check("… the mouse is never locked there", not w.rig.locked() and w.uis.MouseBehavior == "Default")

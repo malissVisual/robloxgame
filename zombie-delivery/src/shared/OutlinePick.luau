@@ -2,8 +2,7 @@
 -- 6.15, the enemies' subtle outline (the owner: "I'd outline the zombies: a red outline, but just subtle"): the pure
 -- rules behind client/EnemyOutline.luau, with their numbers in Config.Outline. Pure (no Roblox at its top level;
 -- tests/outline_test.luau runs it in the plain Luau CLI).
---   * OutlinePick.tone(kind, bandit): "human" (orange) for the people the server marks Bandit (the bandits, the gunners,
---     the bandits' pickups) and any kind Config.Outline.HumanKinds names true; else "zombie" (red).
+--   * OutlinePick.tone(kind): "human" (orange) for a kind Config.Outline.HumanKinds names true; else "zombie" (red).
 --   * OutlinePick.color(tone): that tone's { r, g, b }.
 --   * OutlinePick.limit: the most outlines ever drawn on a client: Config.Outline.Count, but never past Roblox's 31
 --     Highlights less Config.Outline.Spare (room for anything else that highlights).
@@ -45,9 +44,9 @@ OutlinePick.limit = math.max(0, math.min(Tuning.Count, OutlinePick.ROBLOX_MAX - 
 -- 9.x loot: every outline on a client together (the enemies' and the loot's) stays within this.
 OutlinePick.BUDGET = math.max(0, OutlinePick.ROBLOX_MAX - Tuning.Spare)
 
--- kind: the model's Zombie attribute (nil for a pickup); bandit: its Bandit attribute is true.
-function OutlinePick.tone(kind: string?, bandit: boolean): Tone
-	if bandit or (kind ~= nil and Tuning.HumanKinds[kind] == true) then
+-- kind: the model's Zombie attribute.
+function OutlinePick.tone(kind: string?): Tone
+	if kind ~= nil and Tuning.HumanKinds[kind] == true then
 		return "human"
 	end
 	return "zombie"

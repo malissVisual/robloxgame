@@ -1,7 +1,7 @@
 -- 8.1 SANDBOX: the UPGRADES desk's window (client/UpgradeUi.luau, with client/CardKit.luau and the real shared data:
 -- shared/UpgradeRules.luau, Config.SandboxUpgrades) run for real on sandbox_mock.luau's recorder, on a phone held
 -- sideways (844 × 390: 844 × 354 under Roblox's top bar, the touch layout), a computer (1280 × 800) and a big screen
--- (1920 × 1080): nothing when Config.Sandbox.On is false; the state asked at the start; the window only on the server's
+-- (1920 × 1080): the state asked at the start; the window only on the server's
 -- "open"; one card an upgrade in Config's order with its name, level ("LV 1/4" and its segments), what it gives now
 -- and next, the next price and BUY (green with the money; grey "NEED $X" without, a tap only says so; a gold MAX at the
 -- top); BUY's request ({ kind = "buy", id, level }) once for a double tap; the money following the State remote; the
@@ -192,10 +192,6 @@ end
 -- ── Off: nothing ────────────────────────────────────────────────────────────
 local UpgradeUi = require("./UpgradeUi")
 screen(true, 844, 354)
-Config.Sandbox.On = false
-UpgradeUi.start()
-check("Config.Sandbox.On false: UpgradeUi.start() does nothing", M.remotes.Upgrades == nil and #sentOn("Upgrades") == 0)
-Config.Sandbox.On = true
 
 -- ── On: the state asked, the window only on "open" ──────────────────────────
 UpgradeUi.start()

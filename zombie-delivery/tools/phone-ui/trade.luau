@@ -2,7 +2,6 @@
 -- question), the real client/OfferCard.luau with a player's offer, and the real client/WarehouseUi.luau's STOCK list 🏷,
 -- on sandbox_mock.luau's recorder beside the real client/SandboxHud.luau, at 844 × 390 and 667 × 375 (phones held
 -- sideways: 844 × 354 and 667 × 339 under Roblox's top bar, the touch layout), 1280 × 800 and 1920 × 1080. Checked:
---   * nothing when Config.Sandbox.On is false;
 --   * the composer ({ kind = "compose" }): its words (the piece, its rarity, condition, value and $ a minute, "📖 New for
 --     your book!", the price with its × and bounds, the presets, SEND $X, the seller's clock), on the screen, its pieces
 --     never on each other, every word fitting, a finger's size on a phone; −, +, the presets (always within the
@@ -154,13 +153,8 @@ local SCREENS = {
 local TradeUi = require("./TradeUi")
 local trade = M.Net.get("PlayerTrade")
 screen(true, 844, 354)
-Config.Sandbox.On = false
-TradeUi.start()
 local COMPOSE = { kind = "compose", seller = 22, sellerName = "Bob", uid = "22-5", stand = 3, name = "Gramophone", item = "gramophone", rarity = "rare",
 	condition = 0.92, value = 800, income = 6.4, isNew = true, money = 3400 }
-trade.OnClientEvent:Fire(COMPOSE)
-check("Config.Sandbox.On false: TradeUi.start() does nothing (no window on a compose)", not TradeUi.isOpen() and M.gui:FindFirstChild("TradeUi") == nil)
-Config.Sandbox.On = true
 
 -- ── On ──────────────────────────────────────────────────────────────────────
 local SandboxHud = require("./SandboxHud")

@@ -23,7 +23,7 @@
 -- Down.Seconds / 3 red), the seconds left in its middle and "REVIVE <NAME>" under it (his revive prompt: hold E by
 -- him); seen through walls within Ring.Range studs, gone once he is up or out. Looked at every Ring.Every s (the tag,
 -- no scan of the world).
---   CrewUi.start()                      listens (once; nothing when Config.Sandbox.On is false)
+--   CrewUi.start()                      listens (once)
 --   CrewUi.open() / close() / isOpen()
 --   CrewUi.state()                      the last state (nil: none yet)
 --   CrewUi.step()                       one look: the rings and the window's countdowns (the loop's; the checks')
@@ -745,13 +745,8 @@ function CrewUi.step()
 	end
 end
 
-local function sandboxOn(): boolean
-	local sandbox = (Config :: any).Sandbox
-	return type(sandbox) == "table" and sandbox.On == true
-end
-
 function CrewUi.start()
-	if started or not sandboxOn() then
+	if started then
 		return
 	end
 	started = true

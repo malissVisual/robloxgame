@@ -1,8 +1,6 @@
 --!strict
--- Animates the zombies and bandits on this client: a shambling walk (legs swing with the speed, arms sway out in
--- front), a twitchy head, a frantic clawing for the ones hanging on a car, a steady aim for the bandits.
--- Only joint transforms, no animation assets. The R15 bodies walk with their Animator (server); the bandits among
--- them hold their guns up with the players' aim pose (client/ArmPose.luau) laid over it.
+-- Animates the zombies on this client: a shambling walk (legs swing with the speed, arms sway out in front), a twitchy
+-- head. Only joint transforms, no animation assets. The R15 bodies walk with their Animator (server).
 -- The joints can be Motor6Ds or AnimationConstraints (shared/Joints.luau).
 -- 6.13.1 (performance): the zombies are a list kept by the folder's ChildAdded / ChildRemoved (streaming too: a zombie
 -- that streams out is forgotten), not a new GetChildren every frame; an R15 body is known once; a phone animates only
@@ -10,9 +8,9 @@
 -- 6.16, zombies with a life of their own: the R15 bodies get a pose of their own laid over the stock zombie animations
 -- (the server's Animator) through client/PoseLedger.luau, the maths shared/ZombieStyle.luau's (ZombieStyle.pose) from
 -- the model's Seed attribute (its gait), its speed, the stock walk's left thigh, Attack (a lunge and a swipe) and Hit
--- (a flinch, a bigger one with a stagger on a headshot, a punch, a ram or a blast; the people flinch too, ArmPose keeps
--- their arms): the walkers' and soldiers' shamble (a limp, a hunch, the head on one side, an arm hanging lower), the
--- runners' lurch, the brutes' stomp, a slow sway while they wait, clawing on a car. Only the Config.ZombieLife MaxPosed
+-- (a flinch, a bigger one with a stagger on a headshot, a swing of the bat or a blast; a person's only the waist and the
+-- head): the walkers' and soldiers' shamble (a limp, a hunch, the head on one side, an arm hanging lower), the
+-- runners' lurch, the brutes' stomp, a slow sway while they wait. Only the Config.ZombieLife MaxPosed
 -- nearest within Range of the camera (a phone fewer and nearer: DeviceBudget), picked every Retarget s; within Near
 -- worked out every frame, farther every FarEvery frames (the pose kept in between); one that stops being posed (far,
 -- dead) gets its joints back to the animation. The sounds hook in (client/ZombieLife.luau): ZombieAnimator.onHit /
@@ -29,7 +27,6 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Joints = require(Shared:WaitForChild("Joints"))
 local Config = require(Shared:WaitForChild("Config"))
 local ZombieStyle = require(Shared:WaitForChild("ZombieStyle"))
-local ArmPose = require(script.Parent.ArmPose)
 local DeviceBudget = require(script.Parent.DeviceBudget)
 local Ledger = require(script.Parent.PoseLedger)
 
@@ -115,7 +112,7 @@ type Life = {
 	humanoid: Humanoid,
 	root: BasePart,
 	gait: ZombieStyle.Gait,
-	person: boolean, -- a bandit or a gunner: only the flinch (ArmPose has the arms)
+	person: boolean, -- a person's style: only the waist and the head
 	joints: { any }, -- Root, Waist, Neck, LeftShoulder, RightShoulder (the ones written)
 	thigh: any, -- LeftHip: the stock walk's step, read
 	pose: ZombieStyle.Pose,
@@ -185,7 +182,7 @@ local function lifeOf(model: Model, now: number): Life?
 		humanoid = humanoid,
 		root = root,
 		gait = gait,
-		person = gait.style == "person" or model:GetAttribute("Bandit") == true,
+		person = gait.style == "person",
 		joints = joints,
 		thigh = thigh,
 		pose = ZombieStyle.newPose(),
@@ -312,7 +309,7 @@ local function work(life: Life, t: number)
 	m.t = t
 	m.attack = if t - life.attackAt < Tuning.AttackTime then t - life.attackAt else -1
 	m.hit = if t - life.hitAt < Tuning.HardTime then t - life.hitAt else -1
-	m.latched = life.model:GetAttribute("LatchedTo") ~= nil
+	m.latched = false -- (nobody drives: no zombie on a car)
 	m.lunge = if t - life.lungeAt < Tuning.Dive.Time then t - life.lungeAt else -1 -- 6.24
 	m.fuse = if t < life.fuseTo then (t - life.fuseFrom) / math.max(0.05, life.fuseTo - life.fuseFrom) else -1
 	local p = ZombieStyle.pose(life.pose, life.gait, m)
@@ -334,7 +331,7 @@ local function work(life: Life, t: number)
 end
 
 local function lay(life: Life)
-	-- The people: the waist and the head only (ArmPose has their arms; their root is left alone).
+	-- The people: the waist and the head only (their arms and their root are left alone).
 	local from, to = if life.person then 2 else 1, if life.person then 3 else 5
 	for i = from, to do
 		local joint = life.joints[i]
@@ -381,15 +378,7 @@ local function step(dt: number)
 			bodies[model] = true
 		end
 		if bodies[model] then
-			-- A real R15 body: animated by its Animator (server). A bandit holds the gun up over the walk.
-			if model:GetAttribute("Bandit") then
-				local humanoid = model:FindFirstChildOfClass("Humanoid")
-				local root = model:FindFirstChild("HumanoidRootPart")
-				if humanoid and humanoid.Health > 0 and root and root:IsA("BasePart") and (root.Position - eye).Magnitude <= range then
-					ArmPose.apply(model, 1, 0)
-				end
-			end
-			continue
+			continue -- (a real R15 body: animated by its Animator, server; its own life below)
 		end
 		local rig = rigOf(model)
 		if not rig or rig.humanoid.Health <= 0 then
@@ -399,15 +388,6 @@ local function step(dt: number)
 			continue
 		end
 		local p = rig.phase + t
-		if model:GetAttribute("LatchedTo") then
-			-- Clawing at the car.
-			set(rig.leftArm, CFrame.Angles(math.sin(p * 18) * 0.6, 0, 0))
-			set(rig.rightArm, CFrame.Angles(math.sin(p * 18 + 2) * 0.6, 0, 0))
-			set(rig.leftLeg, CFrame.Angles(math.sin(p * 6) * 0.5, 0, 0))
-			set(rig.rightLeg, CFrame.Angles(-math.sin(p * 6) * 0.5, 0, 0))
-			set(rig.neck, CFrame.Angles(math.sin(p * 9) * 0.25, 0, 0))
-			continue
-		end
 		local velocity = rig.root.AssemblyLinearVelocity
 		local speed = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
 		local amount = math.clamp(speed / 12, 0, 1)
@@ -415,18 +395,11 @@ local function step(dt: number)
 		local swing = math.sin(rig.stride) * 0.8 * amount
 		set(rig.leftLeg, CFrame.Angles(swing, 0, 0))
 		set(rig.rightLeg, CFrame.Angles(-swing, 0, 0))
-		if model:GetAttribute("Bandit") then
-			-- Bandits hold the gun steady and look around.
-			set(rig.leftArm, CFrame.identity)
-			set(rig.rightArm, CFrame.Angles(math.sin(p * 1.5) * 0.04, 0, 0))
-			set(rig.neck, CFrame.Angles(0, math.sin(p * 0.9) * 0.25, 0))
-			continue
-		end
 		set(rig.leftArm, CFrame.Angles(math.sin(p * 2.1) * 0.15 - swing * 0.2, 0, math.sin(p * 1.3) * 0.1))
 		set(rig.rightArm, CFrame.Angles(math.sin(p * 2.4 + 1) * 0.15 + swing * 0.2, 0, math.sin(p * 1.7) * 0.1))
 		set(rig.neck, CFrame.Angles(math.sin(p * 3.3) * 0.1, math.sin(p * 0.7) * 0.3, math.sin(p * 5) * 0.06))
 	end
-	-- 6.16: after the bandits' aim, the R15 bodies' own life (composed over what is there).
+	-- 6.16: the R15 bodies' own life (composed over what is there).
 	lifeStep(eye)
 end
 

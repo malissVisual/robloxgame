@@ -1057,6 +1057,6 @@ end
 SandboxGuide.covered, SandboxGuide.windowOpen = nil, nil
 screen(false)
 check("8.0.1: one arrow: through the whole move the move's HUD set no GPS (no waypoint, no GPS toast), only the guide's chevron and path",
-	Config.Sandbox.On == true and gpsSets == 0 and gpsTold == 0 and M.waypoint == nil, `{gpsSets} {gpsTold}`)
+	gpsSets == 0 and gpsTold == 0 and M.waypoint == nil, `{gpsSets} {gpsTold}`)
 check("no warnings", #M.warnings == 0, M.warnings[1])
 print("ALL SANDBOX GUIDE CHECKS PASSED")

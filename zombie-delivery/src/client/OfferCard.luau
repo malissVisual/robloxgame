@@ -583,7 +583,7 @@ local function onMessage(message: any, player: boolean)
 end
 
 function OfferCard.start()
-	if started or not Config.Sandbox.On then
+	if started then
 		return
 	end
 	started = true

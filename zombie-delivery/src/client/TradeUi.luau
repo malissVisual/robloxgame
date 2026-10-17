@@ -533,7 +533,7 @@ local function onMessage(message: any)
 end
 
 function TradeUi.start()
-	if started or not Config.Sandbox.On then
+	if started then
 		return
 	end
 	started = true
