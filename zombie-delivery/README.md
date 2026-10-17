@@ -264,6 +264,12 @@
 > 12 – 16 minutes by size. Danny walks all six (his way's first leg checked off the walls too: `HouseRoute.path`; the
 > stuck audit over every place on the real map). A woodpecker drums in the forest where the chapel bell rang. The map is
 > lighter: 1,909 parts (was 2,253). A save with a village house loads with none and the next card gives a free place.
+>
+> **9.0.1** (the owner: "on the Mac you can't turn with the touchpad at all"): the sandbox's free camera turned only
+> with the right mouse held, which a trackpad hardly gives. Now, as Roblox's own camera does, a **two-finger swipe** on a
+> trackpad turns it (`UserInputService.PointerAction`'s pan) and a **pinch** zooms; **, / .** anywhere and the **arrow
+> keys Left / Right** on foot (in a car they steer) turn it too (`Config.CameraTurn`: Pan, PanPitch, Pinch, Keys). A
+> window or a list under the cursor keeps its scroll, and typing in a text box turns nothing (`tests/camerarig_test.luau`).
 
 The active Roblox game in this repository (Merge Blades is preserved in `../archive/merge-blades`). **You run a delivery company** in a world
 gone wrong: take a job, carry the cargo to your vehicle with your own hands (or lead the horses on a rope), drive it
