@@ -1,7 +1,11 @@
 # Zombie Delivery
 
 > **8.0 SANDBOX (the game the owner tests now).** With `Config.Sandbox.On = true` (the default) the server builds a
-> test world instead of the city (`shared/SandboxMap.luau`, `server/SandboxWorld.luau`): since 9.0 **open countryside**
+> test world instead of the city (`shared/SandboxMap.luau`, `server/SandboxWorld.luau`). **Since 10.0 a small lobby
+> like Dungeon Quest** (`design/lobby/`, `server/LobbyWorld.luau`: the plaza, the four warehouses, the shops and six
+> portals) from which a party goes into a house to empty at a chosen difficulty (`server/Runs.luau`, see the 10.0 note
+> below; its pieces wear their rarity's outline and stars); the houses stand in their own fenced run zones of the
+> 9.0 countryside: since 9.0 **open countryside**
 > (`design/countryside/`; 8.9: the village of Jinočany, 8.0 – 8.8: an alpine meadow with one road) with **six places to
 > empty**, each on its own country lane (`SandboxMap.Houses`, a contract each in `Config.Moving.Sandbox.Houses`; every
 > move a new random layout with 2 – 4 **collectibles** from uncommon to legendary): **The Old Farmstead** (the big
@@ -270,6 +274,36 @@
 > trackpad turns it (`UserInputService.PointerAction`'s pan) and a **pinch** zooms; **, / .** anywhere and the **arrow
 > keys Left / Right** on foot (in a car they steer) turn it too (`Config.CameraTurn`: Pan, PanPitch, Pinch, Keys). A
 > window or a list under the cursor keeps its scroll, and typing in a text box turns nothing (`tests/camerarig_test.luau`).
+>
+> **10.0** (the owner: "make the map small, one little lobby, like Dungeon Quest: you go into a house … and you get
+> loot there. For the loot outlines with their own colour by how rare it is, and stars, so it has value"; asked, no
+> driving, and on the easier difficulties a timer and traps, on the harder ones zombies too). **The lobby and the
+> runs.** The sandbox's world is now a small lobby (480 × 400 studs, `design/lobby/plan.py` → `plan.json`, `plan.png`;
+> `tools/lobby/sandboxmap.py` writes SandboxMap's LOBBY section; built by `server/LobbyWorld.luau`): a plaza with the
+> spawn, a fountain and the ZDC dispatch, your four plots with their warehouses along the north edge, the UPGRADES
+> desks, the PAINT shop's booth, the TOP MOVERS board, the Auction House's place and six portals, one for each house (a
+> gate, a facade in the house's colours, its sign, a glowing pad: blue free, amber counting down, red IN USE). Step
+> onto a pad and a 10 s countdown starts; up to four go together, and the first on the pad picks the difficulty: Easy,
+> Normal, Hard, Insane, Nightmare (Easy and Normal open; each next one opens when you finish a run at the one before,
+> saved as `runUnlocked` with its flag; `shared/RunRules.luau`, `Config.Runs`). The party fades over to the house's
+> fenced run zone, the truck parked at the curb (no driving): carry the loot out and into it before the clock (the
+> house's time × the difficulty: 1.3, 1, 0.85, 0.72, 0.6) runs out. The host's FINISH at the truck, everybody else's
+> vote or the clock ends the run; what you loaded goes to your own warehouse stock, a results card shows the haul, and
+> everybody fades back next to the portal. LEAVE THE RUN takes you back alone; the host leaving ends it for all
+> (`server/Runs.luau`, `client/RunUi.luau`). The guide speaks of the lobby, and the admin panel's Runs group starts a run
+> on any house at any difficulty. The map is 1,313 parts. **Loot.** Every piece of a house gets a rarity from the
+> server as the house is made (`server/Loot.luau`, `shared/LootRules.luau`, `Config.Loot`; Moving's hook in
+> `setupItem`): its own (the furniture's by its value, a collectible's own) rolled by the run's difficulty: Easy now
+> and then a tier lower, Normal as before, Hard, Insane and Nightmare lift pieces (more rolls, the best kept; Nightmare
+> always at least one Epic, a Legendary in about one house of three), the same house and difficulty always the same
+> loot; a tier up is worth × 1.5, a tier down × 0.8. The model carries `Rarity`, `Stars` and `Value` and the tag
+> `LootPiece`; the stock keeps the rarity (an older piece reads as its own), so the stands, selling, the book (its page
+> keeps the rarest found), the trades and the auction show the same rarity and value. On your screen
+> (`client/LootOutline.luau`, `client/LootStars.luau`): an outline in the tier's colour (green, blue, purple, gold;
+> Commons none) on the pieces near you, in your hands, in the truck and on the stands (the rarest first, never through
+> walls; one budget with the zombies' outlines within Roblox's 31, `OutlinePick.loot`), ★ × its stars over the nearest
+> few ("★★★ RARE · $450" up close; none under a window), a toast when you pick one up or load it, and an Epic or
+> Legendary piece sparkles with a sound the first time you see it. Previews: `design/lobby/`, `design/loot/`.
 
 The active Roblox game in this repository (Merge Blades is preserved in `../archive/merge-blades`). **You run a delivery company** in a world
 gone wrong: take a job, carry the cargo to your vehicle with your own hands (or lead the horses on a rope), drive it
