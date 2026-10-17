@@ -35,6 +35,8 @@
 --     taken out while you carry). Gone when the run ends or you leave it; back after a respawn.
 --   * A player who dies in a run drops what they carried (Moving) and comes back by the truck (Moving.respawnAt); the
 --     party hears it.
+--   * 10.4: the host's upgrade tree's Spare keys (UpgradeRules.effect(levels, "startKey")): the first locked room's key
+--     is found from the start ("by Spare keys").
 --   RunDanger.start(port)          the hooks (Moving.onRunStart, Zombies.steer, Zombies.onBite) and the loop
 --   RunDanger.begin(s, port)       a run's danger now (its move's session; Moving's run start listener)
 --   RunDanger.step()               one look at every run (the loop's; the tests')
@@ -1372,6 +1374,17 @@ function RunDanger.begin(s: any, port: any)
 	if vaultPlan then
 		for spot, floor in vaultPlan.floors do
 			Loot.boost(s, spot, 0, floor)
+		end
+	end
+	-- 10.4: the host's upgrade tree's Spare keys: the first locked room's key is the party's from the start
+	local first = st.locks[1]
+	if first then
+		local ok, profile = pcall(function(): any
+			return require(script.Parent.PlayerData).get(s.owner)
+		end)
+		local levels = if ok and type(profile) == "table" then profile.sandboxUpgrades else nil
+		if require(Shared.UpgradeRules).effect(levels, "startKey") >= 1 then
+			found(st, first.key, "Spare keys", `🔑 Your spare key fits the {first.plan.name}: no need to search for it`)
 		end
 	end
 	updateRoute(st)

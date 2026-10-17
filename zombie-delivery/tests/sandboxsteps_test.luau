@@ -322,14 +322,19 @@ do
 	check("… not without a hot piece in the stock", chosen(rich({ hot = NONE, hotCount = 0 }), { show = true, grow = true }).id ~= "hot")
 	step = chosen(rich(), { show = true, grow = true, hot = true })
 	local cheapest, price = SandboxSteps.upgradeFor(rich())
-	check("then another upgrade in reach (the cheapest, 8.3 economy: all three $1,500, the window's order breaks the tie: the lights): \"💡 New upgrade in reach: Showroom lights at the UPGRADES desk ($1,500)\"",
+	check("then another upgrade in reach (the cheapest, 8.3 economy: the first nodes $1,500, the tree's order breaks the tie: the lights): \"💡 New upgrade in reach: Hall spotlights at the UPGRADES desk ($1,500)\"",
 		step.id == "upgrade" and step.target == "desk" and cheapest == "lights" and price == 1500
-		and SandboxSteps.words(step, rich()) == "💡 New upgrade in reach: Showroom lights at the UPGRADES desk ($1,500)", SandboxSteps.words(step, rich()))
+		and SandboxSteps.words(step, rich()) == "💡 New upgrade in reach: Hall spotlights at the UPGRADES desk ($1,500)", SandboxSteps.words(step, rich()))
 	check("… the lights at their top: the next in the window's order at the same price (the van engine)", SandboxSteps.upgradeFor(rich({ levels = { lights = 5 } })) == "engine")
 	check("… the lights' next level dearer ($4,000): the engine's $1,500 first", SandboxSteps.upgradeFor(rich({ money = 5000, levels = { lights = 1 } })) == "engine")
 	check("… $1,400: none ($1,500 each)", select(2, SandboxSteps.upgradeFor(rich({ money = 1400 }))) == nil)
-	check("… never the warehouse (grow's), nor a locked card (More stands below the Big Warehouse)", SandboxSteps.upgradeFor(rich({ money = 1e9, levels = { lights = 5, engine = 3, danny = 3 } })) == nil)
-	check("… More stands once the warehouse is the Big Warehouse (level 4)", SandboxSteps.upgradeFor(rich({ money = 1e9, levels = { warehouse = 3, lights = 5, engine = 3, danny = 3 } })) == "stands")
+	-- (10.4, the tree: every other node bought; the "soon" ones never offered)
+	local everyOther = table.clone(UpgradeRules.full())
+	everyOther.warehouse, everyOther.stands = nil, nil
+	local bigOther = table.clone(everyOther)
+	bigOther.warehouse = 3
+	check("… never the warehouse (grow's), nor a locked node (More hall stands below the Big Warehouse), nor one that comes later", SandboxSteps.upgradeFor(rich({ money = 1e9, levels = everyOther })) == nil)
+	check("… More hall stands once the warehouse is the Big Warehouse (level 4)", SandboxSteps.upgradeFor(rich({ money = 1e9, levels = bigOther })) == "stands")
 	step = chosen(rich(), { show = true, grow = true, hot = true, upgrade = true })
 	check("then the PAINT shop: \"🎨 Make your truck your own at the PAINT SHOP\" (9.7: the lobby's booth; the truck is seen in the runs)", step.id == "paint" and step.target == "paint"
 		and SandboxSteps.words(step, rich()) == "🎨 Make your truck your own at the PAINT SHOP", show(step))
@@ -428,7 +433,7 @@ do
 		local words = SandboxSteps.words(Steps[id], rich({ levels = { warehouse = 3 }, money = 30000, hot = "Grandfather Clock" }))
 		check(`{id}'s words with their price or piece: one line or two (≤ 80 characters)`, utf8.len(words) ~= nil and (utf8.len(words) :: number) <= 80, words)
 	end
-	check("UpgradeRules' order has the warehouse first and four others", UpgradeRules.Order[1] == "warehouse" and #UpgradeRules.Order == 5)
+	check("UpgradeRules' order has the warehouse first and the tree's other nodes (10.4)", UpgradeRules.Order[1] == "warehouse" and #UpgradeRules.Order == #Config.SandboxUpgrades.Order and #UpgradeRules.Order > 5)
 
 	-- the collection's market
 	local summary = SandboxSteps.collection({ kind = "state", stock = {

@@ -26,6 +26,21 @@
 
 local E = require("./CollectionRuntime")
 local Config = require("./Config")
+
+-- 10.4: trading is the SHOWROOM's (Config.Showroom): this test's stands are showroom stands (S(k) = its Base + k), its
+-- showroom as big as its hall was (2, 4, 9, 9, 9 stands by level, every one a big stand's size: the test's own spots)
+local SB = Config.Showroom.Base
+local function S(k: number): number
+	return SB + k
+end
+for showLevel, showCount in { 2, 4, 9, 9, 9 } do
+	Config.Showroom.Levels[showLevel] = { Stands = showCount, Most = showCount }
+	local spots = require("./WarehouseLayout").grid(showLevel).show
+	table.clear(spots)
+	for k = 1, showCount do
+		spots[k] = { 0, 0, 10, 10, 180 }
+	end
+end
 local CollectionRules = require("./CollectionRules")
 local Visitors = require("./Visitors")
 local Market = require("./Market")
@@ -175,34 +190,34 @@ E.flush()
 local gramophone, piano, sofa, armchair = uidOf(bob, "gramophone"), uidOf(bob, "piano"), uidOf(bob, "sofa"), uidOf(bob, "armchair")
 local plant, tv, radio = uidOf(bob, "plant"), uidOf(bob, "tv"), uidOf(bob, "radio")
 for stand, uid in { gramophone, piano, sofa, armchair, plant, tv, radio } do
-	Collection.display(bob, uid, stand)
+	Collection.display(bob, uid, S(stand))
 end
 E.flush()
-check("(Bob's seven pieces on stands 1 – 7 of his 24)", Collection.stands(bob) == 24 and entryOf(bob, radio).stand == 7)
+check("(Bob's seven pieces on stands 1 – 7 of his 24)", Collection.stands(bob) == 24 and entryOf(bob, radio).stand == S(7))
 
 -- ── The composer ───────────────────────────────────────────────────────────
 local gramEntry = entryOf(bob, gramophone)
 local gramValue = Rules.value(gramEntry)
 local least, most = Rules.bounds(gramValue)
 local mark = #E.sent
-local message, why = Trade.compose(ann, bob, 1)
+local message, why = Trade.compose(ann, bob, S(1))
 E.flush()
 local composed = trade(ann, mark, "compose")[1]
 local piece = Rules.readPiece(composed)
 check("Make an offer: the composer for Ann (the piece on stand 1, its value, the bounds, read on her client)", message ~= nil and why == nil and piece ~= nil
-	and piece.uid == gramophone and piece.stand == 1 and piece.name == gramEntry.name and piece.value == gramValue and piece.least == least and piece.most == most
+	and piece.uid == gramophone and piece.stand == S(1) and piece.name == gramEntry.name and piece.value == gramValue and piece.least == least and piece.most == most
 	and piece.seller == 302 and piece.sellerName == nm(bob), why)
 check("… the $ a minute in HER warehouse (her boost, her market), new for her book, no sign, her money", piece ~= nil
 	and math.abs(piece.income - CollectionRules.income(gramEntry, Collection.boost(ann), Collection.market(ann))) < 0.01 and piece.isNew == true and piece.sale == nil
 	and piece.money == 50000)
 check("… nothing to Bob", #trade(bob, mark, "compose") == 0)
-local _, own = Trade.compose(bob, bob, 1)
-local _, empty = Trade.compose(ann, bob, 20)
+local _, own = Trade.compose(bob, bob, S(1))
+local _, empty = Trade.compose(ann, bob, S(20))
 check("… refused: his own piece, an empty stand", own == "That's your own piece." and empty == "Nothing is on show on this stand.", `{own} | {empty}`)
 Collection.hasWarehouse = function(player: Player): boolean
 	return player ~= ann
 end
-local _, house = Trade.compose(ann, bob, 1)
+local _, house = Trade.compose(ann, bob, S(1))
 check("… refused: no warehouse of her own (a full server's fifth player)", house == "You need a warehouse of your own to buy: wait for a free plot.", house)
 Collection.hasWarehouse = nil
 
@@ -210,19 +225,19 @@ Collection.hasWarehouse = nil
 local price = Rules.clamp(gramValue * 2, gramValue)
 local fee = Rules.fee(price)
 mark = #E.sent
-local offer, offerWhy = Trade.offer(ann, bob, gramophone, 1, price)
+local offer, offerWhy = Trade.offer(ann, bob, gramophone, S(1), price)
 E.flush()
 local card = trade(bob, mark, "offer")[1]
 local read = Visitors.readOffer(card)
-check("an offer: open, the price, the piece's value as its base", offer ~= nil and offerWhy == nil and offer.price == price and offer.value == gramValue and offer.stand == 1
+check("an offer: open, the price, the piece's value as its base", offer ~= nil and offerWhy == nil and offer.price == price and offer.value == gramValue and offer.stand == S(1)
 	and #Trade.open(bob) == 1, offerWhy)
 check("… Bob's card (a player's offer: read by client/OfferCard, \"🧑 Ann offers\") and his toast", read ~= nil and read.player == true and read.price == price
 	and read.base == gramValue and read.who == nm(ann) and read.seconds == T.Expire and Visitors.cardLines(read :: any).who == `🧑 {nm(ann)} offers`
 	and heard(bob, mark, Rules.offerToast(nm(ann), price, gramEntry.name, gramValue)))
 check("… Ann: sent (its clock), a notice; analytics PlayerTrade made", #trade(ann, mark, "sent") == 1 and trade(ann, mark, "sent")[1].seconds == T.Expire
 	and string.find(lastSaid(ann, mark), "Offer sent", 1, true) ~= nil and #tradeEvents("made") == 1 and tradeEvents("made")[1].value == price)
-local again, againWhy = Trade.offer(ann, bob, piano, 2, Rules.bounds(Rules.value(entryOf(bob, piano))))
-local _, composeWhy = Trade.compose(ann, bob, 2)
+local again, againWhy = Trade.offer(ann, bob, piano, S(2), Rules.bounds(Rules.value(entryOf(bob, piano))))
+local _, composeWhy = Trade.compose(ann, bob, S(2))
 check("… one open offer a buyer: another refused (and the composer too)", again == nil and string.find(againWhy or "", "still open", 1, true) ~= nil and composeWhy == againWhy, againWhy)
 
 local moneyAt = #money
@@ -247,8 +262,8 @@ check("… its SKU the furniture id; no CollectionSale (a deal between players c
 check("… the piece: gone from Bob, in Ann's stock (not on show, a new uid of hers, its look and name kept, no sign)", entryOf(bob, gramophone) == nil and bought ~= nil
 	and bought.stand == nil and string.sub(bought.uid, 1, 4) == "301-" and bought.variant == gramEntry.variant and bought.condition == gramEntry.condition and bought.name == gramEntry.name
 	and bought.sale == nil and #Collection.stock(ann) == stockBefore + 1)
-check("… Bob's stand 1 free, his income down by the piece's", Collection.incomePerMinute(bob) < incomeBefore
-	and math.abs(incomeBefore - Collection.incomePerMinute(bob) - CollectionRules.income(gramEntry, Collection.boost(bob), Collection.market(bob))) < 1e-6)
+check("… Bob's showroom stand 1 free, his income as it was (10.4: a showroom piece earns nothing a minute)", Collection.incomePerMinute(bob) == incomeBefore
+	and Collection.isOpen(bob, S(1)) and entryOf(bob, gramophone) == nil)
 check("… Ann's book: the gramophone in it, marked bought (8.7 review: shown, never found)", ((Book.book(ann) :: any).gramophone or {}).n == 1
 	and ((Book.book(ann) :: any).gramophone or {}).bought == true)
 check("… the toasts: \"🤝 Sold … (fee $X)\" to Bob, \"📦 Bought … from Bob\" to Ann", heard(bob, mark, Rules.soldToast(gramEntry.name, nm(ann), price, fee))
@@ -270,15 +285,15 @@ check("… a second ACCEPT: that offer isn't open any more", lastSaid(bob, mark)
 
 -- ── DECLINE, the clock ─────────────────────────────────────────────────────
 local pianoValue = Rules.value(entryOf(bob, piano))
-Trade.compose(cid, bob, 2)
-local cidOffer = Trade.offer(cid, bob, piano, 2, pianoValue)
+Trade.compose(cid, bob, S(2))
+local cidOffer = Trade.offer(cid, bob, piano, S(2), pianoValue)
 mark = #E.sent
 moneyAt = #money
 E.fire(bob, "PlayerTrade", { kind = "answer", id = (cidOffer :: any).id, accept = false })
 check("DECLINE: closed, Cid hears it in words, nothing moved", #Trade.open() == 0 and trade(bob, mark, "closed")[1].how == "declined"
-	and heard(cid, mark, `{nm(bob)} declined your offer for the {entryOf(bob, piano).name}.`) and entryOf(bob, piano).stand == 2 and #money == moneyAt)
-Trade.compose(cid, bob, 2)
-cidOffer = Trade.offer(cid, bob, piano, 2, pianoValue + 1)
+	and heard(cid, mark, `{nm(bob)} declined your offer for the {entryOf(bob, piano).name}.`) and entryOf(bob, piano).stand == S(2) and #money == moneyAt)
+Trade.compose(cid, bob, S(2))
+cidOffer = Trade.offer(cid, bob, piano, S(2), pianoValue + 1)
 mark = #E.sent
 E.advance(T.Expire - 1)
 check("… open until its clock runs out", #Trade.open() == 1)
@@ -287,66 +302,66 @@ check("the clock run out: expired (the card closed, Cid told)", #Trade.open() ==
 	and heard(cid, mark, `{nm(bob)} didn't answer: your offer for the {entryOf(bob, piano).name} ran out.`))
 
 -- ── The buyer out of money at ACCEPT; the stock full ───────────────────────
-Trade.compose(cid, bob, 2)
-cidOffer = Trade.offer(cid, bob, piano, 2, pianoValue * 3)
+Trade.compose(cid, bob, S(2))
+cidOffer = Trade.offer(cid, bob, piano, S(2), pianoValue * 3)
 profileOf(cid).money = 10
 mark = #E.sent
 moneyAt = #money
 local got, refused = Trade.answer(bob, (cidOffer :: any).id, true)
 check("ACCEPT with Cid out of money: refused, nothing moved, both told, closed (failed)", got == nil and refused == `{nm(cid)} can't pay {Market.money(pianoValue * 3)} any more: the deal is off.`
-	and entryOf(bob, piano).stand == 2 and #money == moneyAt and string.find(lastSaid(cid, mark), "couldn't pay", 1, true) ~= nil and #Trade.open() == 0
+	and entryOf(bob, piano).stand == S(2) and #money == moneyAt and string.find(lastSaid(cid, mark), "couldn't pay", 1, true) ~= nil and #Trade.open() == 0
 	and trade(bob, mark, "closed")[1].how == "failed", refused)
 profileOf(cid).money = 50000
-Trade.compose(cid, bob, 2)
-cidOffer = Trade.offer(cid, bob, piano, 2, pianoValue)
+Trade.compose(cid, bob, S(2))
+cidOffer = Trade.offer(cid, bob, piano, S(2), pianoValue)
 local maxStock = Config.Collection.MaxStock
 Config.Collection.MaxStock = #Collection.stock(cid) -- (Cid's stock full meanwhile)
 mark = #E.sent
 got, refused = Trade.answer(bob, (cidOffer :: any).id, true)
 check("ACCEPT with Cid's stock full: refused (his warehouse full), nothing moved", got == nil and refused == `{nm(cid)}'s warehouse is full: the deal is off.`
-	and entryOf(bob, piano).stand == 2 and string.find(lastSaid(cid, mark), "warehouse is full", 1, true) ~= nil, refused)
-local _, fullWhy = Trade.compose(cid, bob, 2)
+	and entryOf(bob, piano).stand == S(2) and string.find(lastSaid(cid, mark), "warehouse is full", 1, true) ~= nil, refused)
+local _, fullWhy = Trade.compose(cid, bob, S(2))
 check("… the composer refused too while it is full", string.find(fullWhy or "", "warehouse is full", 1, true) ~= nil, fullWhy)
 Config.Collection.MaxStock = maxStock
 
 -- ── The piece taken down, moved, sold meanwhile ────────────────────────────
-Trade.compose(cid, bob, 2)
-cidOffer = Trade.offer(cid, bob, piano, 2, pianoValue)
+Trade.compose(cid, bob, S(2))
+cidOffer = Trade.offer(cid, bob, piano, S(2), pianoValue)
 mark = #E.sent
 Collection.undisplay(bob, piano)
 E.flush()
 check("the piece taken down: the offer gone (Cid told)", #Trade.open() == 0 and trade(bob, mark, "closed")[1].how == "gone"
 	and heard(cid, mark, `Your offer is off: the {entryOf(bob, piano).name} isn't on show at {nm(bob)}'s any more.`))
-Collection.display(bob, piano, 2)
-Trade.compose(cid, bob, 2)
-cidOffer = Trade.offer(cid, bob, piano, 2, pianoValue)
-Collection.display(bob, piano, 9)
+Collection.display(bob, piano, S(2))
+Trade.compose(cid, bob, S(2))
+cidOffer = Trade.offer(cid, bob, piano, S(2), pianoValue)
+Collection.display(bob, piano, S(9))
 E.flush()
 check("… moved to another stand: gone", #Trade.open() == 0)
-Collection.display(bob, piano, 2)
+Collection.display(bob, piano, S(2))
 local sofaValue = Rules.value(entryOf(bob, sofa))
-Trade.compose(cid, bob, 3)
-cidOffer = Trade.offer(cid, bob, sofa, 3, sofaValue)
+Trade.compose(cid, bob, S(3))
+cidOffer = Trade.offer(cid, bob, sofa, S(3), sofaValue)
 Collection.sell(bob, sofa)
 E.flush()
 check("… sold to the game: gone; an ACCEPT after it refused", #Trade.open() == 0 and (Trade.answer(bob, (cidOffer :: any).id, true)) == nil)
 
 -- ── Bounds, limits, self ───────────────────────────────────────────────────
 local pLeast, pMost = Rules.bounds(pianoValue)
-Trade.compose(cid, bob, 2) -- (its ticket: a refused offer leaves it)
-local low, lowWhy = Trade.offer(cid, bob, piano, 2, pLeast - 1)
-local high, highWhy = Trade.offer(cid, bob, piano, 2, pMost + 1)
-local frac = Trade.offer(cid, bob, piano, 2, pLeast + 0.5)
-local wrong = Trade.offer(cid, bob, piano, 5, pLeast)
+Trade.compose(cid, bob, S(2)) -- (its ticket: a refused offer leaves it)
+local low, lowWhy = Trade.offer(cid, bob, piano, S(2), pLeast - 1)
+local high, highWhy = Trade.offer(cid, bob, piano, S(2), pMost + 1)
+local frac = Trade.offer(cid, bob, piano, S(2), pLeast + 0.5)
+local wrong = Trade.offer(cid, bob, piano, S(5), pLeast)
 check("a price out of the bounds refused (the words name them); a fraction; the wrong stand", low == nil and high == nil and frac == nil and wrong == nil
 	and lowWhy == `Price it between {Market.money(pLeast)} and {Market.money(pMost)}.` and highWhy == lowWhy, lowWhy)
-local selfOffer, selfWhy = Trade.offer(bob, bob, piano, 2, pLeast)
-local selfDeal, selfRefusal = Collection.transfer(bob, bob, piano, 2, pLeast, 0)
+local selfOffer, selfWhy = Trade.offer(bob, bob, piano, S(2), pLeast)
+local selfDeal, selfRefusal = Collection.transfer(bob, bob, piano, S(2), pLeast, 0)
 check("a self-trade refused (PlayerTrade and Collection.transfer)", selfOffer == nil and selfWhy == "That's your own piece." and selfDeal == nil and selfRefusal ~= nil and selfRefusal.code == "self")
 E.advance(6)
 mark = #E.sent
-E.fire(cid, "PlayerTrade", { kind = "offer", seller = 302, uid = piano, stand = 2, price = pLeast })
-E.fire(cid, "PlayerTrade", { kind = "offer", seller = 302, uid = armchair, stand = 4, price = Rules.value(entryOf(bob, armchair)) })
+E.fire(cid, "PlayerTrade", { kind = "offer", seller = 302, uid = piano, stand = S(2), price = pLeast })
+E.fire(cid, "PlayerTrade", { kind = "offer", seller = 302, uid = armchair, stand = S(4), price = Rules.value(entryOf(bob, armchair)) })
 check("the remote: an offer made; a second within 5 s: one offer every few seconds", #Trade.open(cid) == 1 and Trade.open(cid)[1].uid == piano
 	and lastSaid(cid, mark) == "One offer every few seconds: try again in a moment.", lastSaid(cid, mark))
 for _ = 1, 12 do
@@ -359,8 +374,8 @@ end
 check("… the remote's limit: a burst of 12 answered PlayerTrade a second at most", answered >= 1 and answered <= Config.Robust.Limits.PlayerTrade, answered)
 E.advance(1)
 E.fire(cid, "PlayerTrade", "offer")
-E.fire(cid, "PlayerTrade", { kind = "offer", seller = "302", uid = piano, stand = 2, price = pLeast })
-E.fire(cid, "PlayerTrade", { kind = "buy", seller = 999, uid = piano, stand = 2, price = pLeast })
+E.fire(cid, "PlayerTrade", { kind = "offer", seller = "302", uid = piano, stand = S(2), price = pLeast })
+E.fire(cid, "PlayerTrade", { kind = "buy", seller = 999, uid = piano, stand = S(2), price = pLeast })
 E.fire(cid, "PlayerTrade", { kind = "price", uid = { 1 }, price = "x" })
 check("… junk ignored or refused in words (no error)", #Trade.open(cid) == 1)
 -- PerSeller: Dee and Eve offer too, a fourth buyer is refused
@@ -372,11 +387,11 @@ for _, p in { dee, eve, fay } do
 	profileOf(p).money = 50000
 end
 local armValue, plantValue = Rules.value(entryOf(bob, armchair)), Rules.value(entryOf(bob, plant))
-Trade.compose(dee, bob, 4)
-Trade.offer(dee, bob, armchair, 4, armValue)
-Trade.compose(eve, bob, 5)
-Trade.offer(eve, bob, plant, 5, plantValue)
-local fourth, fourthWhy = Trade.offer(fay, bob, radio, 7, Rules.value(entryOf(bob, radio)))
+Trade.compose(dee, bob, S(4))
+Trade.offer(dee, bob, armchair, S(4), armValue)
+Trade.compose(eve, bob, S(5))
+Trade.offer(eve, bob, plant, S(5), plantValue)
+local fourth, fourthWhy = Trade.offer(fay, bob, radio, S(7), Rules.value(entryOf(bob, radio)))
 check(`PerSeller: {T.PerSeller} offers open to Bob; a fourth refused`, #Trade.open(bob) == T.PerSeller and fourth == nil
 	and fourthWhy == `{nm(bob)} has {T.PerSeller} offers open already: try again in a moment.`, fourthWhy)
 
@@ -388,14 +403,14 @@ check("the buyer leaves: her offer closed (left), Bob told", #Trade.open(bob) ==
 Collection.add(fay, { item = "plant", condition = 1 })
 E.flush()
 local fayPlant = uidOf(fay, "plant")
-Collection.display(fay, fayPlant, 1)
-local fayOffer = Trade.offer(dee, fay, fayPlant, 1, Rules.value(entryOf(fay, fayPlant)))
+Collection.display(fay, fayPlant, S(1))
+local fayOffer = Trade.offer(dee, fay, fayPlant, S(1), Rules.value(entryOf(fay, fayPlant)))
 check("(an offer from Dee to Fay refused: Dee's offer to Bob still open)", fayOffer == nil)
 local gusLike = E.join(307, "Gus")
 E.flush()
 profileOf(gusLike).money = 50000
-Trade.compose(gusLike, fay, 1)
-fayOffer = Trade.offer(gusLike, fay, fayPlant, 1, Rules.value(entryOf(fay, fayPlant)))
+Trade.compose(gusLike, fay, S(1))
+fayOffer = Trade.offer(gusLike, fay, fayPlant, S(1), Rules.value(entryOf(fay, fayPlant)))
 mark = #E.sent
 E.leave(fay)
 check("the seller leaves: the offer to her closed (left), Gus told", fayOffer ~= nil and #Trade.open(gusLike) == 0
@@ -406,22 +421,22 @@ local deeOffer = Trade.open(dee)[1]
 Upgrades.admin(bob, "level2") -- (a Workshop: 4 stands; the armchair on stand 4 stays, the radio on stand 7 goes)
 E.flush()
 local radioAfter = entryOf(bob, radio)
-check("(a level down: the radio on stand 7 back to the stock)", radioAfter.stand == nil and entryOf(bob, armchair).stand == 4)
-Collection.display(bob, radio, 3)
+check("(a level down: the radio on stand 7 back to the stock)", radioAfter.stand == nil and entryOf(bob, armchair).stand == S(4))
+Collection.display(bob, radio, S(3))
 E.flush()
-local radioOffer = Trade.offer(fay, bob, radio, 3, Rules.value(radioAfter))
+local radioOffer = Trade.offer(fay, bob, radio, S(3), Rules.value(radioAfter))
 check("(Fay gone: no offer from her)", radioOffer == nil)
-Trade.compose(gusLike, bob, 3)
-Trade.offer(gusLike, bob, radio, 3, Rules.value(radioAfter))
+Trade.compose(gusLike, bob, S(3))
+Trade.offer(gusLike, bob, radio, S(3), Rules.value(radioAfter))
 Upgrades.admin(bob, "level1") -- (the Garage: 2 stands; the radio on 3 and the armchair on 4 go)
 E.flush()
 check("the seller's warehouse a level down: the offers for pieces that left their stands gone", #Trade.open(gusLike) == 0 and #Trade.open(dee) == 0 and deeOffer ~= nil)
 Upgrades.admin(bob, "level5")
 E.flush()
-Collection.display(bob, armchair, 4)
-Collection.display(bob, plant, 5)
-Collection.display(bob, tv, 6)
-Collection.display(bob, radio, 7)
+Collection.display(bob, armchair, S(4))
+Collection.display(bob, plant, S(5))
+Collection.display(bob, tv, S(6))
+Collection.display(bob, radio, S(7))
 E.flush()
 for _, open in Trade.open(bob) do -- (Cid's offer for the piano: declined)
 	Trade.answer(bob, open.id, false)
@@ -432,9 +447,9 @@ E.advance(6)
 local radioValue = Rules.value(entryOf(bob, radio))
 local rLeast, rMost = Rules.bounds(radioValue)
 mark = #E.sent
-check("Set price: the picker for Bob (pricing: the piece on stand 7)", Trade.pricing(bob, 7) == nil and (Rules.readPiece(trade(bob, mark, "pricing")[1]) :: any).uid == radio)
-check("… nothing for an empty stand", Trade.pricing(bob, 20) == "Nothing is on show on this stand.")
-Trade.prompt(ann, bob, 7, "price")
+check("Set price: the picker for Bob (pricing: the piece on stand 7)", Trade.pricing(bob, S(7)) == nil and (Rules.readPiece(trade(bob, mark, "pricing")[1]) :: any).uid == radio)
+check("… nothing for an empty stand", Trade.pricing(bob, S(20)) == "Nothing is on show on this stand.")
+Trade.prompt(ann, bob, S(7), "price")
 check("… another player's Set price: whose warehouse it is", lastSaid(ann, mark) == `This is {nm(bob)}'s warehouse.`)
 local okLow, lowPrice = Trade.setPrice(bob, radio, rLeast - 1)
 local okHigh = Trade.setPrice(bob, radio, rMost + 1)
@@ -454,34 +469,34 @@ check("… SET (the remote): the sign on the piece, in Bob's state, his notice",
 	and string.find(lastSaid(bob, mark), "FOR SALE", 1, true) ~= nil)
 local stockUid = Collection.add(bob, { item = "sofa", condition = 1 }) :: string
 local stockOk, stockWhy = Trade.setPrice(bob, stockUid, Rules.value(entryOf(bob, stockUid)))
-check("… a piece in the stock takes no sign", not stockOk and string.find(stockWhy or "", "on show first", 1, true) ~= nil and entryOf(bob, stockUid).sale == nil, stockWhy)
+check("… a piece in the stock takes no sign (10.4: only in the showroom)", not stockOk and string.find(stockWhy or "", "for sale first", 1, true) ~= nil and entryOf(bob, stockUid).sale == nil, stockWhy)
 -- Buy $X: the question, then BUY only at its price
 mark = #E.sent
-Trade.prompt(ann, bob, 7, "buy")
+Trade.prompt(ann, bob, S(7), "buy")
 local confirm = Rules.readPiece(trade(ann, mark, "confirm")[1])
 check("Buy $X: Ann's question (the price, her money)", confirm ~= nil and confirm.price == signPrice and confirm.uid == radio and confirm.money == profileOf(ann).money)
 local poorCid = profileOf(cid).money
 profileOf(cid).money = 1
-check("… refused before the question without the money", string.find(Trade.askBuy(cid, bob, 7) or "", "not enough", 1, true) ~= nil)
+check("… refused before the question without the money", string.find(Trade.askBuy(cid, bob, S(7)) or "", "not enough", 1, true) ~= nil)
 profileOf(cid).money = poorCid
-local _, otherPrice = Trade.buy(ann, bob, radio, 7, signPrice - 1)
+local _, otherPrice = Trade.buy(ann, bob, radio, S(7), signPrice - 1)
 -- (8.7 review: a BUY only from its question: Cid asks about the piano while it has a sign, then Bob takes it off)
 Trade.setPrice(bob, piano, pianoValue)
-Trade.askBuy(cid, bob, 2)
+Trade.askBuy(cid, bob, S(2))
 Trade.setPrice(bob, piano, 0)
-local _, noSign = Trade.buy(cid, bob, piano, 2, pianoValue)
+local _, noSign = Trade.buy(cid, bob, piano, S(2), pianoValue)
 check("… BUY at another price refused (the price changed); a piece whose sign came off refused", string.find(otherPrice or "", "The price changed", 1, true) ~= nil
 	and string.find(noSign or "", "off sale", 1, true) ~= nil and entryOf(bob, radio) ~= nil and entryOf(bob, piano) ~= nil, `{otherPrice} | {noSign}`)
 -- a visitor's offer and Cid's offer for the radio; Ann's own offer for it too
 local visitor = Offers.make(bob, radio, "collector", 0.5)
-Trade.compose(cid, bob, 7)
-Trade.offer(cid, bob, radio, 7, radioValue)
+Trade.compose(cid, bob, S(7))
+Trade.offer(cid, bob, radio, S(7), radioValue)
 check("(a visitor's offer and Cid's open for the radio)", visitor ~= nil and Offers.current(bob) ~= nil and #Trade.open(cid) == 1)
 mark = #E.sent
 moneyAt = #money
 local feeSign = Rules.fee(signPrice)
 E.advance(0.5)
-E.fire(ann, "PlayerTrade", { kind = "buy", seller = 302, uid = radio, stand = 7, price = signPrice })
+E.fire(ann, "PlayerTrade", { kind = "buy", seller = 302, uid = radio, stand = S(7), price = signPrice })
 E.flush()
 check("BUY (the remote): the radio Ann's, the money moved (the fee gone), analytics sign", entryOf(bob, radio) == nil and paid(ann, "PlayerBuy", moneyAt) == -signPrice
 	and paid(bob, "PlayerSale", moneyAt) == signPrice and paid(bob, "TradeFee", moneyAt) == -feeSign and #tradeEvents("sign") == 1)
@@ -493,7 +508,7 @@ Trade.setPrice(bob, armchair, Rules.value(entryOf(bob, armchair)) * 2)
 check("(the armchair on sale)", entryOf(bob, armchair).sale ~= nil)
 Collection.undisplay(bob, armchair)
 check("… taken down: no sign", entryOf(bob, armchair).sale == nil)
-Collection.display(bob, armchair, 4)
+Collection.display(bob, armchair, S(4))
 Trade.setPrice(bob, armchair, Rules.value(entryOf(bob, armchair)) * 2)
 local okOff = Trade.setPrice(bob, armchair, 0)
 check("… TAKE OFF SALE (price 0): no sign", okOff and entryOf(bob, armchair).sale == nil)
@@ -501,11 +516,11 @@ check("… TAKE OFF SALE (price 0): no sign", okOff and entryOf(bob, armchair).s
 E.advance(6)
 local tvValue = Rules.value(entryOf(bob, tv))
 Trade.setPrice(bob, tv, tvValue * 2)
-Trade.compose(ann, bob, 6)
-local annOffer = Trade.offer(ann, bob, tv, 6, tvValue)
-Trade.askBuy(ann, bob, 6)
+Trade.compose(ann, bob, S(6))
+local annOffer = Trade.offer(ann, bob, tv, S(6), tvValue)
+Trade.askBuy(ann, bob, S(6))
 mark = #E.sent
-Trade.buy(ann, bob, tv, 6, tvValue * 2)
+Trade.buy(ann, bob, tv, S(6), tvValue * 2)
 E.flush()
 check("her own offer for what she bought: closed (bought), no words about it", annOffer ~= nil and #Trade.open(ann) == 0 and trade(ann, mark, "result")[1].how == "bought"
 	and not heard(ann, mark, `{nm(bob)} sold the {(annOffer :: any).name} to somebody else: your offer is off.`))
@@ -516,9 +531,9 @@ local big = math.max(T.BigSale, Rules.value(plantNow))
 local saved = T.MaxTimes
 T.MaxTimes = math.ceil(big / Rules.value(plantNow)) + 1
 Trade.setPrice(bob, plant, big)
-Trade.askBuy(cid, bob, 5)
+Trade.askBuy(cid, bob, S(5))
 mark = #E.sent
-Trade.buy(cid, bob, plant, 5, big)
+Trade.buy(cid, bob, plant, S(5), big)
 local news = 0
 for _, sent in E.sent do
 	if sent.remote == "PlayerTrade" and type(sent.args[1]) == "table" and sent.args[1].kind == "news" then
@@ -543,7 +558,7 @@ end
 check("the save: the sign in Bob's leave save", savedSign == pianoSign)
 local bob2 = E.join(302, "Bob")
 E.flush()
-check("… back: the piano on its stand, its sign kept", entryOf(bob2, piano) ~= nil and entryOf(bob2, piano).stand == 2 and entryOf(bob2, piano).sale == pianoSign)
+check("… back: the piano on its stand, its sign kept", entryOf(bob2, piano) ~= nil and entryOf(bob2, piano).stand == S(2) and entryOf(bob2, piano).sale == pianoSign)
 -- an older server writes it again: it drops the field (its clean knows none)
 E.leave(bob2)
 for _, entry in E.saves.Player_302.collection.entries do
@@ -551,7 +566,7 @@ for _, entry in E.saves.Player_302.collection.entries do
 end
 local bob3 = E.join(302, "Bob")
 E.flush()
-check("… written again by an 8.6 server (the field dropped): back, simply not for sale", entryOf(bob3, piano) ~= nil and entryOf(bob3, piano).stand == 2 and entryOf(bob3, piano).sale == nil)
+check("… written again by an 8.6 server (the field dropped): back, simply not for sale", entryOf(bob3, piano) ~= nil and entryOf(bob3, piano).stand == S(2) and entryOf(bob3, piano).sale == nil)
 -- an 8.6 save: the collection kept with its flag, no sale anywhere; junk in one
 E.saves.Player_308 = { money = 900, collectionKept = true, collection = { nextUid = 4, entries = {
 	{ uid = "308-1", item = "sofa", variant = 1, condition = 1, name = "Sofa", stand = 1, got = 1 },

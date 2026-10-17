@@ -39,6 +39,17 @@
 --                                    save loading: server/SandboxBadges.luau's firstUpgrade)
 --   Upgrades.start()                 the remote, joining and leaving, the vans
 --
+-- 10.4 THE UPGRADE TREE (Config.SandboxUpgrades, shared/UpgradeRules.luau): the five above are nodes of the tree now
+-- (the trunk's tiers, the hall's Hall spotlights and More hall stands, the runs' Van engine, the crew's Danny's
+-- training), with the new ones beside them. A purchase is checked as before, its refusal UpgradeRules.locked's reason:
+-- a node's parents (needs) and the warehouse tier its rank needs (tiers), a soon node ("Comes later"), the auction's
+-- while the Auction House is closed. The effects other scripts read go through Upgrades.effect(player, key)
+-- (UpgradeRules.effect on their levels): Collection the hall's and the showroom's, server/Visitors.luau the visitors',
+-- server/HelperCrew.luau the helpers', server/Moving.luau the run clock, server/RunDanger.luau the spare key,
+-- server/Loot.luau the luck, server/Warehouse.luau the looks. The player attributes Config.SandboxUpgrades.Attributes
+-- (ShowroomStands, HallStands) follow them for the clients.
+--   Upgrades.effect(player, key)     an effect's value for the player (their levels; {} before the save loads)
+--
 -- The "Upgrades" remote (Config.Robust.Limits.Upgrades requests a second; every input checked):
 --   client → server   { kind = "state" } | { kind = "buy", id, level }; a refusal comes back as a Notice (its why)
 --   server → client   { kind = "state", levels, money } after every change (once a frame), when the save has loaded and
@@ -116,6 +127,9 @@ local function applyEffects(player: Player)
 	end
 	player:SetAttribute(Config.SandboxUpgrades.Danny, Rules.level(levels, "danny"))
 	player:SetAttribute(Config.SandboxUpgrades.WarehouseAttribute, Rules.warehouseLevel(levels))
+	local names = Config.SandboxUpgrades.Attributes -- 10.4: the two areas' stands (the picker, the guide)
+	player:SetAttribute(names.Show, Rules.showStands(levels))
+	player:SetAttribute(names.Hall, Rules.totalStands(levels))
 	local cars = workspace:FindFirstChild("Cars")
 	if cars then
 		for _, car in cars:GetChildren() do
@@ -155,6 +169,12 @@ end
 
 function Upgrades.warehouseLevel(player: Player): number
 	return Rules.warehouseLevel(levelsOf(player))
+end
+
+function Upgrades.effect(player: Player, key: string): number
+	local profile = PlayerData.get(player)
+	local levels = if profile and type(profile.sandboxUpgrades) == "table" then profile.sandboxUpgrades else {}
+	return Rules.effect(levels, key)
 end
 
 function Upgrades.buy(player: Player, id: any, expect: any): (boolean, string?)

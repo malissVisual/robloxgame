@@ -49,15 +49,20 @@ PLAYERS = 4  # the sandbox's plots (Config.Sandbox.MaxPlayers): one van each
 
 COLLECTION = """-- (tools/perf/sandbox_count.py: server/Collection.luau's stand-in: the owners' stock, set by the counter)
 local C = {}
-local stock, stands = {}, {}
-function C.__own(player, entries, count)
+local stock, stands, shows = {}, {}, {}
+function C.__own(player, entries, count, show)
 	stock[player] = entries
 	stands[player] = count
+	shows[player] = show
 end
 function C.stock(player) return stock[player] or {} end
 function C.stands(player) return stands[player] or 32 end
+function C.showStands(player) return shows[player] or 0 end -- (10.4: the showroom's plinths)
 function C.incomePerMinute() return 0 end
 function C.boost() return 1 end
+function C.bonus() return { all = 1, rare = 1, sets = 0 } end -- (10.4: the hall's Bonus)
+function C.showFactor() return 1 end
+function C.market() return nil end
 function C.marketIncome() return 1 end -- (8.3: the market's hot kinds, server/Warehouse.luau's tags)
 function C.onChanged() end
 function C.openPicker() end
@@ -74,7 +79,7 @@ function P.onChanged() end
 return P
 """
 UPGRADES = ("local U = {}\nfunction U.open() end\nfunction U.onChanged() end\n"
-            "function U.levels() return { warehouse = 4, stands = 4 } end -- (8.3: the worst case, the Logistics Center, More stands at its top)\n"
+            "function U.levels() return { warehouse = 4, stands = 4, showstands = 3, paint = 1, sign = 1 } end -- (8.3: the worst case, the Logistics Center, More stands at its top; 10.4: its showroom full, its looks)\n"
             "return U\n")
 
 COLUMNS = [

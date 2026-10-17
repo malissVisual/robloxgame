@@ -7569,6 +7569,8 @@ Config.Collection = {
 	IdleShare = 0.25,
 	IdleMove = 4,
 	IdleRemotes = { "Collection", "Moving", "Upgrades", "SandboxTasks", "Visitors", "VanPaint", "PlayerTrade" } :: { string }, -- (8.7: PlayerTrade)
+	SetSize = 3, -- 10.4: a room set in the hall: this many different pieces of one room (the tree's Room sets)
+	MaxSets = 6, -- 10.4: the room sets that count at most
 }
 
 -- 9.7 RUNS (the owner: "like Dungeon Quest: from the lobby you go into a house, alone, with friends or with Danny. In
@@ -7980,7 +7982,7 @@ Config.Warehouse = {
 	PromptDistance = 8,
 	SellHold = 1,
 	Rebuild = 0.15,
-	MaxParts = 400,
+	MaxParts = 470, -- (10.4: + the showroom's plinths, carpet and signs)
 	ArtLevel = 4,
 	Levels = {
 		{ name = "Garage", size = { 26, 12, 22 }, door = { 14, 9.5 }, roof = "shed", rise = 2.5, stands = 2 },
@@ -8102,42 +8104,242 @@ Config.Sprinter = {
 -- in your warehouse (server/Warehouse.luau builds it, client/UpgradeUi.luau is its window, server/Upgrades.luau decides
 -- every purchase; shared/UpgradeRules.luau has the rules, tests/upgrades_test.luau and tests/upgrades_runtime_test.luau
 -- check them). The levels are per player in the save (profile.sandboxUpgrades: Config.Upgrades and profile.upgrades are
--- the city's gun and car tracks). Each upgrade:
---   name, icon     its card's title and picture (an emoji)
---   max            its top level; prices: the price of each level (prices[n] buys level n)
---   step           what one level gives: warehouse (8.3) the next warehouse level (Config.Warehouse.Levels: its upgrade
---                  level k is warehouse level k + 1, a new player's Garage is 0); stands +step small display stands
---                  (from Config.Warehouse.MoreFrom: the level's big stands + these); lights the
---                  income × (1 + step) a level (compounding: CollectionRules' income, so the HUD, the stands' tags and
---                  the picker show it); engine the van's top speed + step a level (its SpeedMult attribute,
---                  client/Drive.luau); danny his walk + step a level (shared/MoveHelperBrain.luau trained)
--- (A bigger cargo bay was not done: the moves' packing, Config.Moving.Beds.sprinter, and the Sprinter's walk-in body
--- are one size; the engine is the safe van upgrade.)
--- The tuning (8.3 economy: saving up): a first haul on show earns about $40 – 50 a minute on 12 stands
--- (Config.Collection) and a move takes about 20 minutes, so the first level of each comes after a move or two, the top
--- ones after 10 – 15 hours of play; the lights, the engine and Danny cost $161,500 in all, More stands $52,000 and the
--- warehouse's levels $138,500 (8.3 economy: the Workshop after a move or two, the Big Warehouse, today's, after hours,
--- the Logistics Center the long goal): everything bought $352,000.
---   Order          the cards' order in the window
+-- the city's gun and car tracks).
+-- 10.4 THE UPGRADE TREE (the owner: "not a skill tree, but an upgrade tree … and later on more looks for it"): the five
+-- tracks of 8.1 – 8.3 are nodes of one tree now (shared/UpgradeRules.luau, tests/upgrades_test.luau; the window
+-- client/UpgradeUi.luau draws it full screen). The trunk is the warehouse: its tiers 1 … 5 (the Garage … the Logistics
+-- Center) open the branches' deeper nodes. Five branches grow from it: the HALL (income: the collection hall's stands,
+-- its income), the SHOWROOM (selling: its stands, its visitors, their offers), RUNS (the clock, the key, the loot), the
+-- CREW (the helpers) and LOOKS (cosmetic: the warehouse's paint and sign; later more). A node has ranks (1 … max); its
+-- id is the save's key, so 8.1's five ids are nodes as they were (their levels are the nodes' ranks: nobody loses
+-- anything). Each node (List):
+--   name, icon     its tile's title and picture (an emoji)
+--   max            its top rank; prices: the price of each rank (prices[n] buys rank n; they grow along the branch)
+--   step           what one rank adds to its effect (Effects: its mode says how ranks add up)
+--   branch         its branch's id (Branches)
+--   effect         the effect it feeds (Effects' key; the other systems read UpgradeRules.effect(levels, key))
+--   needs          { [parent id] = rank }: the parent nodes and the rank each must have before rank 1 can be bought
+--   tiers          the warehouse tier each rank needs (tiers[n] for rank n; none listed: 1); the trunk's own rank r
+--                  needs tier r (the tier it has: always)
+--   at             its place in the tree's grid { column, row } (the trunk's tiers at the odd columns of its row)
+--   blurb          the details' line (what it does, in a sentence)
+--   soon           shown in the tree, never sold yet: the reason ("Comes with …")
+--   look           LOOKS: what it paints when owned { kind = "wall" | "sign", color = RGB }
+--   auction        true: locked while Config.Auction.On is false ("The Auction House opens later")
+-- The legacy five keep their 8.1 – 8.3 prices and their rules: warehouse (8.3: its rank k is warehouse tier k + 1),
+-- stands (More hall stands: +2 small stands a rank, from Config.Warehouse.MoreFrom), lights (the hall's income ×1.1 a
+-- rank, compounding), engine (the van's top speed +5 % a rank), danny (Danny's walk +10 % a rank).
+--   Order          the nodes in the tree's order (the trunk first, then each branch from its root out)
+--   Branches       in the window's order: id, name, colour (RGB), row (its lane's first row in the grid), blurb
+--   Effects        key → { base, mode, min?, max? }: base the value with no rank; mode "add" (base + Σ step × rank),
+--                  "pow" (base × Π (1 + step) ^ rank); min / max clamp it
+--   Grid           the tree's grid: Columns, Rows (its size), the trunk's Row
+--   Balance        the pure balance test's reference (tests/upgrades_test.luau): Earn[t] the $ a minute a player at
+--                  warehouse tier t makes (the hall's income and the sales: Config.Collection's tuning), Hall[t] the
+--                  hall's income alone; every rank must cost MinMinutes … MaxMinutes of Earn at the tier it needs, an
+--                  income node must pay back within Payback hours of its tier's Hall, the whole tree within TotalHours
+--                  of Earn[5], each branch's first rank within FirstMinutes of Earn[1]
 --   Flag           the save's mark: profile.sandboxUpgrades is read only from a real save written with it
+--   TreeFlag       10.4: the tree's mark: a real save written without it (8.1 – 10.3: the five tracks) is migrated
+--                  (Migrate: an old track's id → its node, its level the node's rank) and the tree's nodes an older
+--                  server dropped come back from `rewards`' short keys ("up:<id>:<rank>": UpgradeRules.mirror)
+--   Migrate        old track id → node id
 --   Danny          the player attribute server/Upgrades.luau keeps Danny's training level in (the helper reads it)
 --   WarehouseFlag  8.3: the save's mark of the warehouse level: a real save without it (from before 8.3) had today's
 --                  warehouse, so it gets warehouse level 4 (UpgradeRules.fromSave); WarehouseAttribute the player
 --                  attribute server/Upgrades.luau keeps their warehouse level (1 … 5) in (the client reads it)
-export type SandboxUpgradeDef = { name: string, icon: string, max: number, step: number, prices: { number } }
+--   Attributes     10.4: the player attributes server/Upgrades.luau keeps the effects other scripts read in: the
+--                  showroom's and the hall's stands (the picker), the looks (the warehouse's paint)
+--   Window         the tree's window (client/UpgradeUi.luau): Node { w, h } (px at zoom 1), Gap { x, y } between two
+--                  nodes (a column is half a node and its gap wide: the nodes stand on the even columns, the trunk's tiers
+--                  on the odd ones between them, their lines down the gaps), Pad (the canvas's margin), Zooms (the − / + steps), DefaultZoom (a fresh window's step at
+--                  least), Panel (the details' width), Header, TouchScale (the least scale on a phone)
+-- The tuning (8.3 economy: saving up; 10.4: a long goal): a first haul on show earns about $40 – 50 a minute on 12
+-- stands (Config.Collection) and a run takes about 20 minutes, so a branch's first node comes after a run or two, the
+-- deep ones after hours; the legacy five cost $352,000 as before, the whole tree about $1.1 million (the balance test
+-- holds every price to the reference incomes in Balance).
+export type SandboxUpgradeDef = {
+	name: string,
+	icon: string,
+	max: number,
+	step: number,
+	prices: { number },
+	branch: string?,
+	effect: string?,
+	needs: { [string]: number }?,
+	tiers: { number }?,
+	at: { number }?,
+	blurb: string?,
+	soon: string?,
+	look: { kind: string, color: { number } }?,
+	auction: boolean?,
+}
+export type UpgradeBranch = { id: string, name: string, color: { number }, row: number, blurb: string }
+export type UpgradeEffect = { base: number, mode: string, min: number?, max: number? }
 Config.SandboxUpgrades = {
-	Order = { "warehouse", "stands", "lights", "engine", "danny" } :: { string },
+	Order = {
+		"warehouse",
+		"lights", "idle", "rare", "sets", "stands",
+		"showstands", "traffic", "haggle", "vip", "auction",
+		"engine", "clock", "key", "truck", "luck", "helperslot",
+		"danny", "toughness", "medic", "pace", "hospital",
+		"paint", "sign",
+	} :: { string },
 	List = {
-		warehouse = { name = "Deliveros Warehouse", icon = "🏭", max = 4, step = 1, prices = { 1000, 7500, 30000, 100000 } },
-		stands = { name = "More stands", icon = "🏛️", max = 4, step = 2, prices = { 4000, 8000, 15000, 25000 } },
-		lights = { name = "Showroom lights", icon = "💡", max = 5, step = 0.1, prices = { 1500, 4000, 12000, 30000, 75000 } },
-		engine = { name = "Van engine", icon = "🚐", max = 3, step = 0.05, prices = { 1500, 5000, 15000 } },
-		danny = { name = "Danny's training", icon = "🏃", max = 3, step = 0.1, prices = { 1500, 4000, 12000 } },
+		-- the trunk
+		warehouse = { name = "Deliveros Warehouse", icon = "🏭", max = 4, step = 1, prices = { 1000, 7500, 30000, 100000 }, branch = "warehouse", effect = "tier", at = { 1, 4 },
+			blurb = "A bigger building: more hall stands, more showroom stands, and every branch's deeper nodes." },
+		-- the hall (income)
+		lights = { name = "Hall spotlights", icon = "💡", max = 5, step = 0.1, prices = { 1500, 4000, 12000, 30000, 75000 }, branch = "hall", effect = "hallIncome", tiers = { 1, 1, 2, 3, 4 }, at = { 2, 3 },
+			blurb = "Everything in your collection hall earns 10% more a rank (it adds up: ×1.61 at rank 5)." },
+		idle = { name = "Night watchman", icon = "🌙", max = 2, step = 0.15, prices = { 5000, 18000 }, branch = "hall", effect = "idleShare", needs = { lights = 1 }, tiers = { 2, 3 }, at = { 4, 2 },
+			blurb = "While you're idle the hall still pays more of its income (25% → 40% → 55%)." },
+		rare = { name = "Collector's corner", icon = "💎", max = 3, step = 0.2, prices = { 4000, 12000, 30000 }, branch = "hall", effect = "rareIncome", needs = { lights = 2 }, tiers = { 2, 3, 4 }, at = { 4, 3 },
+			blurb = "Epic and Legendary pieces in the hall earn 20% more a rank." },
+		sets = { name = "Room sets", icon = "🛋️", max = 3, step = 0.04, prices = { 8000, 22000, 45000 }, branch = "hall", effect = "setBonus", needs = { rare = 1 }, tiers = { 3, 4, 5 }, at = { 6, 3 },
+			blurb = "Three different pieces from one room (kitchen, bedroom …) in the hall make a set: each set adds 4% a rank." },
+		stands = { name = "More hall stands", icon = "🏛️", max = 4, step = 2, prices = { 4000, 8000, 15000, 25000 }, branch = "hall", effect = "hallStands", tiers = { 4, 4, 4, 4 }, at = { 8, 3 },
+			blurb = "Two more small stands in the collection hall a rank." },
+		-- the showroom (selling)
+		showstands = { name = "Showroom stands", icon = "🏷️", max = 3, step = 1, prices = { 2500, 12000, 40000 }, branch = "showroom", effect = "showStands", tiers = { 1, 3, 5 }, at = { 2, 5 },
+			blurb = "One more stand in the showroom a rank (as many as your building has room for)." },
+		traffic = { name = "Shop window", icon = "🪟", max = 3, step = 0.2, prices = { 3000, 9000, 24000 }, branch = "showroom", effect = "visitorRate", needs = { showstands = 1 }, tiers = { 2, 2, 3 }, at = { 4, 5 },
+			blurb = "Visitors come 20% more often a rank." },
+		haggle = { name = "Sales pitch", icon = "🤝", max = 3, step = 0.06, prices = { 6000, 18000, 45000 }, branch = "showroom", effect = "showPrice", needs = { traffic = 1 }, tiers = { 3, 3, 4 }, at = { 6, 5 },
+			blurb = "Pieces in the showroom sell for 6% more a rank, and the visitors offer 6% more." },
+		vip = { name = "VIP buyers", icon = "🎩", max = 1, step = 1, prices = { 55000 }, branch = "showroom", effect = "vip", needs = { haggle = 2 }, tiers = { 4 }, at = { 8, 5 },
+			blurb = "VIP buyers visit too: they pay 25% extra for Rare, Epic and Legendary pieces." },
+		auction = { name = "Auction fast lane", icon = "🔨", max = 1, step = 0.25, prices = { 75000 }, branch = "showroom", effect = "auctionSpeed", needs = { vip = 1 }, tiers = { 5 }, at = { 10, 5 }, auction = true,
+			blurb = "Your lots come up first at the Auction House." },
+		-- runs
+		engine = { name = "Van engine", icon = "🚐", max = 3, step = 0.05, prices = { 1500, 5000, 15000 }, branch = "runs", effect = "vanSpeed", tiers = { 1, 1, 2 }, at = { 2, 6 },
+			blurb = "Your van's top speed +5% a rank." },
+		clock = { name = "Overtime", icon = "⏱️", max = 3, step = 0.08, prices = { 4000, 12000, 30000 }, branch = "runs", effect = "runClock", tiers = { 2, 3, 4 }, at = { 4, 6 },
+			blurb = "Every run you host gets 8% more time on its clock a rank." },
+		key = { name = "Spare keys", icon = "🔑", max = 1, step = 1, prices = { 18000 }, branch = "runs", effect = "startKey", needs = { clock = 1 }, tiers = { 3 }, at = { 6, 6 },
+			blurb = "Your runs start with one locked room's key already in the party's hands." },
+		truck = { name = "Bigger truck", icon = "🚚", max = 2, step = 0.15, prices = { 45000, 110000 }, branch = "runs", effect = "truckSize", needs = { clock = 1 }, tiers = { 3, 5 }, at = { 6, 7 },
+			blurb = "A truck with room for more loot.", soon = "Comes with the bigger run trucks" },
+		luck = { name = "Keen eye", icon = "🍀", max = 2, step = 0.03, prices = { 25000, 70000 }, branch = "runs", effect = "lootLuck", needs = { key = 1 }, tiers = { 4, 5 }, at = { 8, 6 },
+			blurb = "In the runs you host, a piece is 3% more likely a rank to come one rarity higher." },
+		helperslot = { name = "Second helper", icon = "👥", max = 1, step = 1, prices = { 120000 }, branch = "runs", effect = "helperSlots", needs = { luck = 1 }, tiers = { 5 }, at = { 10, 6 },
+			blurb = "Two helpers come into your runs.", soon = "Comes later" },
+		-- the crew
+		danny = { name = "Danny's training", icon = "🏃", max = 3, step = 0.1, prices = { 1500, 4000, 12000 }, branch = "crew", effect = "dannySpeed", at = { 2, 8 },
+			blurb = "Danny walks 10% faster a rank." },
+		toughness = { name = "Pads & helmets", icon = "⛑️", max = 3, step = 0.15, prices = { 3000, 9000, 22000 }, branch = "crew", effect = "helperHealth", needs = { danny = 1 }, tiers = { 2, 2, 3 }, at = { 4, 8 },
+			blurb = "Your helpers have 15% more health a rank." },
+		medic = { name = "First aid", icon = "🩹", max = 2, step = -0.25, prices = { 5000, 15000 }, branch = "crew", effect = "reviveTime", needs = { toughness = 1 }, tiers = { 3, 3 }, at = { 6, 8 },
+			blurb = "Getting a helper back up takes 25% less time a rank." },
+		pace = { name = "Running shoes", icon = "👟", max = 2, step = 0.05, prices = { 7000, 20000 }, branch = "crew", effect = "helperSpeed", needs = { toughness = 1 }, tiers = { 3, 4 }, at = { 6, 9 },
+			blurb = "Every helper walks 5% faster a rank." },
+		hospital = { name = "Good doctors", icon = "🏥", max = 2, step = -0.25, prices = { 9000, 26000 }, branch = "crew", effect = "hospital", needs = { medic = 1 }, tiers = { 4, 4 }, at = { 8, 8 },
+			blurb = "A helper's hospital stay is 25% shorter a rank (and so an early discharge cheaper)." },
+		-- looks (cosmetic; later more: a node a look)
+		paint = { name = "Fresh paint", icon = "🎨", max = 1, step = 1, prices = { 2000 }, branch = "looks", effect = "wallPaint", at = { 2, 1 }, look = { kind = "wall", color = { 46, 74, 120 } },
+			blurb = "Your warehouse's walls in Deliveros navy." },
+		sign = { name = "Gold sign", icon = "✨", max = 1, step = 1, prices = { 5000 }, branch = "looks", effect = "signPaint", needs = { paint = 1 }, tiers = { 2 }, at = { 4, 1 }, look = { kind = "sign", color = { 214, 168, 52 } },
+			blurb = "Your name over the door in gold." },
 	} :: { [string]: SandboxUpgradeDef },
+	Branches = {
+		{ id = "warehouse", name = "WAREHOUSE", color = { 240, 132, 44 }, row = 4, blurb = "The building: its tiers open the deeper nodes" },
+		{ id = "looks", name = "LOOKS", color = { 232, 112, 176 }, row = 1, blurb = "Your warehouse's looks (more to come)" },
+		{ id = "hall", name = "COLLECTION HALL", color = { 255, 196, 64 }, row = 2, blurb = "Income: the pieces in the hall earn every minute" },
+		{ id = "showroom", name = "SHOWROOM", color = { 86, 164, 255 }, row = 5, blurb = "Selling: visitors, offers and prices" },
+		{ id = "runs", name = "RUNS", color = { 255, 120, 60 }, row = 6, blurb = "The runs you host: time, keys and loot" },
+		{ id = "crew", name = "CREW", color = { 92, 210, 180 }, row = 8, blurb = "Your helpers: health, speed, the hospital" },
+	} :: { UpgradeBranch },
+	Effects = {
+		tier = { base = 1, mode = "add", min = 1, max = 5 },
+		hallIncome = { base = 1, mode = "pow" },
+		idleShare = { base = 0, mode = "add", min = 0, max = 0.75 },
+		rareIncome = { base = 1, mode = "add" },
+		setBonus = { base = 0, mode = "add", min = 0 },
+		hallStands = { base = 0, mode = "add", min = 0 },
+		showStands = { base = 0, mode = "add", min = 0 },
+		visitorRate = { base = 1, mode = "add", min = 0.25 },
+		showPrice = { base = 1, mode = "add", min = 1 },
+		vip = { base = 0, mode = "add", min = 0, max = 1 },
+		auctionSpeed = { base = 1, mode = "add", min = 1 },
+		vanSpeed = { base = 1, mode = "add" },
+		runClock = { base = 1, mode = "add", min = 1, max = 2 },
+		startKey = { base = 0, mode = "add", min = 0, max = 1 },
+		truckSize = { base = 1, mode = "add", min = 1 },
+		lootLuck = { base = 0, mode = "add", min = 0, max = 0.25 },
+		helperSlots = { base = 0, mode = "add", min = 0 },
+		dannySpeed = { base = 1, mode = "add" },
+		helperHealth = { base = 1, mode = "add", min = 1 },
+		reviveTime = { base = 1, mode = "add", min = 0.2, max = 1 },
+		helperSpeed = { base = 1, mode = "add", min = 1 },
+		hospital = { base = 1, mode = "add", min = 0.2, max = 1 },
+		wallPaint = { base = 0, mode = "add", min = 0, max = 1 },
+		signPaint = { base = 0, mode = "add", min = 0, max = 1 },
+	} :: { [string]: UpgradeEffect },
+	Grid = { Columns = 10, Rows = 9, TrunkRow = 4 },
+	Balance = {
+		Earn = { 20, 45, 90, 180, 350 } :: { number },
+		Hall = { 12, 30, 60, 120, 250 } :: { number },
+		MinMinutes = 10,
+		MaxMinutes = 720,
+		Payback = 36,
+		TotalHours = 80,
+		FirstMinutes = 150,
+		EpicShare = 0.35, -- (the share of a hall's income its Epic and Legendary pieces earn: the rarity node's payback)
+		Sets = 3, -- (the room sets a hall at the node's tier holds: its payback)
+	},
 	Flag = "sandboxUpgradesKept",
+	TreeFlag = "upgradeTreeKept",
+	Migrate = { warehouse = "warehouse", stands = "stands", lights = "lights", engine = "engine", danny = "danny" } :: { [string]: string },
 	Danny = "DannyTraining",
 	WarehouseFlag = "warehouseLevelKept",
 	WarehouseAttribute = "WarehouseLevel",
+	Attributes = { Show = "ShowroomStands", Hall = "HallStands", Wall = "WarehouseWall", Sign = "WarehouseSign" },
+	Window = {
+		Node = { 184, 84 } :: { number },
+		Gap = { 28, 20 } :: { number },
+		Pad = 28,
+		Zooms = { 0.55, 0.7, 0.85, 1, 1.2 } :: { number },
+		DefaultZoom = 3, -- (the step a fresh window starts at, at least: 0.85, the words readable on a phone)
+		Panel = 300,
+		Header = 56,
+		TouchScale = 0.8,
+	},
+}
+
+-- 10.4 SANDBOX, the warehouse in two (the owner: "the warehouse has an exhibition area for selling, and then something
+-- for generating money: split it a bit, so it's better"). A warehouse holds two areas, laid out per level by
+-- shared/WarehouseLayout.luau (its showroom stands by the door, the collection hall's stands behind and round them,
+-- each with its own floor and signs):
+--   * the COLLECTION HALL (the stands 1 … of 8.0 – 10.3, Collection.stands): its pieces earn every minute you play
+--     (Config.Collection); no visitor and no player buys them;
+--   * the SHOWROOM (the stands Base + 1 …): its pieces are on sale: the visitors look at them and make offers
+--     (server/VisitorOffers.luau), other players buy them (FOR SALE signs, offers: server/PlayerTrade.luau), they sell
+--     for SellBonus × the market's price (and the tree's Sales pitch); they earn nothing a minute.
+-- Each piece goes where its owner puts it (the stand picker's and the STOCK list's PUT IN THE HALL / SHOW FOR SALE).
+--   Base        the showroom's stand numbers start after this (101, 102 …: a piece's `stand`, saved as before)
+--   Levels      per warehouse level: Stands (the showroom stands it comes with), Most (how many it has room for: the
+--               tree's Showroom stands add up to this)
+--   SellBonus   × a showroom piece's sale price (the market's) and the base of a visitor's offer for it
+--   Vip         the VIP buyers (the tree's vip node): Pay (+ the offer's × for a Rare or rarer piece), Kind (the visitor
+--               kind's id, Config.Visitors.Kinds), Weight (how often one comes while the node is owned)
+--   Flag        the save's mark: a real save written without it (8.0 – 10.3) had every piece on a stand earning: they stay
+--               in the hall (their stands are the hall's), any FOR SALE sign comes down (a sign is the showroom's)
+--   Carpet      the showroom's floor (RGB) and the hall's sign colour (RGB)
+export type ShowroomLevel = { Stands: number, Most: number }
+Config.Showroom = {
+	Base = 100,
+	Levels = {
+		{ Stands = 1, Most = 2 },
+		{ Stands = 1, Most = 2 },
+		{ Stands = 2, Most = 4 },
+		{ Stands = 2, Most = 4 },
+		{ Stands = 3, Most = 6 },
+	} :: { ShowroomLevel },
+	SellBonus = 1.2,
+	Vip = { Pay = 0.25, Kind = "vip", Weight = 3 },
+	Flag = "showroomKept",
+	Carpet = { 38, 70, 128 } :: { number },
+	HallSign = { 255, 196, 64 } :: { number },
 }
 
 -- 8.2 SANDBOX, the collection book (the owner: collectors want to know what they have found and what is still out
@@ -8538,6 +8740,9 @@ Config.Visitors = {
 			look = { hat = "none", shirt = { 138, 106, 72 }, vest = { 112, 86, 58 }, tie = { 124, 36, 42 }, pants = { 84, 74, 62 }, hair = { 172, 172, 168 } } },
 		{ id = "dealer", title = "Antique dealer", weight = 1, chance = 1.3, pay = 0.05, names = { "Mrs. Moretti", "Mr. Okafor" },
 			look = { hat = "none", coat = { 52, 66, 58 }, shirt = { 226, 220, 204 }, tie = { 40, 40, 46 }, pants = { 50, 50, 56 } } },
+		-- 10.4: the VIP buyer (weight 0: only for an owner with the upgrade tree's VIP buyers, Config.Showroom.Vip)
+		{ id = "vip", title = "VIP buyer", weight = 0, chance = 1.8, pay = 0.1, names = { "Sir Pemberton", "Ms. Vandermeer", "Count Orlov" },
+			look = { hat = "none", coat = { 24, 24, 30 }, shirt = { 240, 238, 230 }, tie = { 186, 150, 52 }, pants = { 28, 28, 34 } } },
 	} :: { VisitorKind },
 }
 

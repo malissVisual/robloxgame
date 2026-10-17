@@ -10,7 +10,9 @@
 -- sold at the offer, the visitor with a box on its way out and gone; DECLINE: it moves on; the clock run out: it moves
 -- on; a player stepping up to a visitor that looks: it moves on; the owner away: a group every AwayEvery s at most and
 -- no offers; every piece taken down: nobody new; the owner leaving: their visitors go; Config.Visitors.On false: every
--- visitor goes, nobody comes; no script error, no warning.
+-- visitor goes, nobody comes; no script error, no warning. 10.4 (the warehouse in two, Config.Showroom): the visitors
+-- come for the SHOWROOM: Ann's pieces on show are on its plinths (her Showroom stands node at 3: the Garage's 2, the Big
+-- warehouse's 4, the Logistics Center's 6), a piece in the collection hall brings nobody.
 -- Run: python3 tests/run_tests.py [path to the luau binary]
 math.randomseed(8303)
 
@@ -117,7 +119,9 @@ local function caughtAt(level: number, x: number, z: number): boolean
 	end
 	local stand = WarehouseLayout.standAt(site, x, z)
 	local desk = WarehouseLayout.terminal(site)
-	return (stand ~= nil and ann ~= nil and stand <= Collection.stands(ann)) or (math.abs(x - desk.x) <= desk.sx / 2 and math.abs(z - desk.z) <= desk.sz / 2)
+	local own = stand ~= nil and ann ~= nil and (stand <= Collection.stands(ann) -- (10.4: or one of her showroom's plinths)
+		or (stand > Config.Showroom.Base and stand <= Config.Showroom.Base + Collection.showStands(ann)))
+	return own or (math.abs(x - desk.x) <= desk.sx / 2 and math.abs(z - desk.z) <= desk.sz / 2)
 end
 local function look()
 	local level = Warehouse.level(1)
@@ -190,6 +194,7 @@ local function stopsBad(level: number): string?
 	end
 	return nil
 end
+-- (10.4: on the showroom's plinths, as many as she has; a piece too big for a plinth stays in the stock)
 local function show(count: number)
 	local shown = 0
 	for _, entry in Collection.stock(ann) do
@@ -198,9 +203,8 @@ local function show(count: number)
 		end
 	end
 	for _, entry in Collection.stock(ann) do
-		if shown < count then
+		if shown < math.min(count, Collection.showStands(ann)) and Collection.display(ann, entry.uid, Config.Showroom.Base + shown + 1) then
 			shown += 1
-			Collection.display(ann, entry.uid, shown)
 		end
 	end
 	E.flush()
@@ -210,6 +214,9 @@ end
 ann = E.join(11, "Ann")
 E.advance(2)
 check("(Ann's warehouse: the Garage, level 1, 2 stands)", Warehouse.level(1) == 1 and Collection.stands(ann) == 2)
+local annSave = PlayerData.get(ann) :: any
+annSave.sandboxUpgrades.showstands = 3 -- (10.4: her showroom as big as each level has room for)
+check("(10.4: her Garage's showroom: 2 plinths)", Collection.showStands(ann) == 2, Collection.showStands(ann))
 E.place(ann, standIn(1))
 run(90)
 check("nothing on show: nobody comes, though Ann is in her warehouse", #bodies == 0 and Visitors.count() == 0)
@@ -220,7 +227,19 @@ for _, item in items do
 	Collection.add(ann, { item = item, condition = 1 })
 end
 E.flush()
+-- 10.4: a piece in the collection hall only: nobody comes for it
+Collection.display(ann, Collection.stock(ann)[1].uid, 1)
+E.flush()
+run(T.FirstWait[2] + T.Stagger * 3 + 5)
+check("10.4: a piece in the collection hall only (none in the showroom): nobody comes", #bodies == 0 and Visitors.count() == 0, #bodies)
 show(2)
+check("10.4: … two in the showroom (the piano too big for a Garage plinth: the next pieces)", (function()
+	local n = 0
+	for _, entry in Collection.stock(ann) do
+		n += if entry.stand and entry.stand > Config.Showroom.Base then 1 else 0
+	end
+	return n == 2
+end)())
 local names: { string } = {}
 for _, entry in Collection.stock(ann) do
 	table.insert(names, string.lower(entry.name))
@@ -439,9 +458,9 @@ for index = 1, 14 do
 end
 E.flush()
 show(18)
-check("(level 5: visitors at its back stands)", run(T.NearEvery[2] + 120, function()
+check("(level 5: visitors at its showroom's far plinths, deep in the hall)", run(T.NearEvery[2] + 120, function()
 	for _, v in visitorsIn(1) do
-		if v.state == "look" and v.stand and v.stand >= 13 then
+		if v.state == "look" and v.stand and v.stand >= Config.Showroom.Base + 5 then
 			return true
 		end
 	end
@@ -449,7 +468,7 @@ check("(level 5: visitors at its back stands)", run(T.NearEvery[2] + 120, functi
 end))
 local deep: any = nil
 for _, v in visitorsIn(1) do
-	if v.state == "look" and v.stand and v.stand >= 13 then
+	if v.state == "look" and v.stand and v.stand >= Config.Showroom.Base + 5 then
 		deep = v.model
 	end
 end
@@ -462,7 +481,7 @@ for _, v in visitorsIn(1) do
 		stillInside = true
 	end
 end
-check("back to the Garage (the admin's level 1) with visitors deep in the hall: none left in its walls, on its podiums or at its desk; the one at a back stand on its way out",
+check("back to the Garage (the admin's level 1) with visitors deep in the hall: none left in its walls, on its podiums or at its desk; the one at a far plinth on its way out",
 	Warehouse.level(1) == 1 and not stillInside and deep ~= nil and (deep.Parent == nil or (function()
 		for _, v in visitorsIn(1) do
 			if v.model == deep then
@@ -509,12 +528,7 @@ run(T.AwayEvery[2] + 30)
 check("every piece taken down: the visitors there go, nobody new comes", #bodies == empty and Visitors.count(1) == 0)
 
 -- ── The owner leaves; the switch ──────────────────────────────────────────
-for index, entry in Collection.stock(ann) do
-	if index <= 4 then
-		Collection.display(ann, entry.uid, index)
-	end
-end
-E.flush()
+show(4) -- (10.4: on the showroom's plinths)
 run(30, function()
 	return Visitors.count(1) > 0
 end)

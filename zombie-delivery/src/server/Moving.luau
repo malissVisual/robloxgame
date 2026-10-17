@@ -4806,6 +4806,7 @@ function Moving.startRun(host: Player, house: string, difficulty: string): strin
 	made.seed = seed :: number
 	made.difficulty = RunRules.clean(difficulty)
 	made.time = RunRules.time(if own then own.Time else (base.time or T.Time), made.difficulty)
+	made.time = math.floor((made.time :: number) * require(Shared.UpgradeRules).effect((PlayerData.get(host) or {} :: any).sandboxUpgrades, "runClock") + 0.5) -- 10.4: the host's upgrade tree's Overtime
 	made.hordeAt = if T.Sandbox.Horde then T.Sandbox.HordeAt else 0
 	MoveLobby.close(host, nil)
 	local failed = startMove(host, house, true, nil, made)

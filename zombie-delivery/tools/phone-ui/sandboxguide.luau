@@ -820,8 +820,8 @@ check("the STOCK list opened (it shows the 🔥 tags): the market found, the rin
 coveredNow, windowNow = false, nil
 wait(G.SoftGap + 0.02)
 tick()
-check("… then another upgrade in reach (8.3 economy: all three $1,500, the window's order first): \"💡 New upgrade in reach: Showroom lights at the UPGRADES desk ($1,500)\" (the desk again)", SandboxGuide.step() == "upgrade"
-	and words.Text == "💡 New upgrade in reach: Showroom lights at the UPGRADES desk ($1,500)" and shown() and at(desk2.x, desk2.z), words.Text)
+check("… then another upgrade in reach (8.3 economy: the first nodes $1,500, the tree's order first): \"💡 New upgrade in reach: Hall spotlights at the UPGRADES desk ($1,500)\" (the desk again)", SandboxGuide.step() == "upgrade"
+	and words.Text == "💡 New upgrade in reach: Hall spotlights at the UPGRADES desk ($1,500)" and shown() and at(desk2.x, desk2.z), words.Text)
 local soft = G.SoftSeconds
 G.SoftSeconds = 1
 for _ = 1, math.ceil(1 / G.Every) + 1 do

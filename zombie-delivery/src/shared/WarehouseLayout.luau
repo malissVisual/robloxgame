@@ -51,7 +51,9 @@
 --                                          the level's door)
 --   WarehouseLayout.receiving(plot)        the receiving zone (Rect): the door's width, Config.Warehouse.Receiving deep
 --   WarehouseLayout.doorPath(plot)         the way in that stays clear (Rect): from the van's back through the door and
---                                          the receiving zone to an aisle's width past it
+--                                          the receiving zone to an aisle's width past it (10.4: on a level with the
+--                                          showroom's runway behind the receiving zone, to its edge: the runway's walk
+--                                          goes on)
 --   WarehouseLayout.count(level?)          how many big stands a warehouse has (Config.Warehouse.Stands; 8.3: the
 --                                          level's, nil: level 4's 12)
 --   WarehouseLayout.capacity(level?)       8.1: how many the hall holds (Config.Warehouse.MaxStands; the upgrades'; 8.3:
@@ -82,6 +84,23 @@
 --   WarehouseLayout.tagLines(name, rarity, perMinute)             a shown piece's tag: its name, "RARE · +$3/min"
 --   WarehouseLayout.money(n)               "$1,234" (to a tenth under ten: "$2.5")
 --   WarehouseLayout.rarityColor(rarity?)   a rarity's colour (Config.Warehouse.Rarity; unknown: common's)
+-- 10.4 THE WAREHOUSE IN TWO (Config.Showroom): every level has a SHOWROOM by the door (where the visitors come in: a
+-- Garage's and a Storehouse's two and four plinths in the front corners either side of the receiving zone; a
+-- Workshop's, a Big Warehouse's and a Logistics Center's two, four and six down the runway behind the door, turned to
+-- its walk; there the hall's small middle spots, 8.1's, move back behind the runway) on a blue carpet, its words on the
+-- floor and its sign (on the front wall over the corners, or a banner hung across the runway); the rest is the
+-- COLLECTION HALL (the stands of 8.0 – 10.3, their numbers as before), its words on the floor and its signs on the back
+-- wall. A showroom stand's number is past Config.Showroom.Base (101, 102 …: its plate says S1, S2 …); a stand's sx is
+-- across the way its piece looks, sz along it (a turned one's box turned with it: extent):
+--   WarehouseLayout.ShowBase               Config.Showroom.Base
+--   WarehouseLayout.showCapacity(level?)   the showroom stands the level has room for (Config.Showroom.Levels' Most)
+--   WarehouseLayout.isShow(i)              a showroom stand's number? showStand(k) the k-th's number
+--   WarehouseLayout.stand(plot, i)         also a showroom stand (show = true, small = true; nil past its room)
+--   WarehouseLayout.showStands(plot, n?)   the first n showroom stands (default: all the level has room for)
+--   WarehouseLayout.extent(stand)          its half extents along x and z (turned by its yaw)
+--   WarehouseLayout.plateText(i), standName(i)   "7" / "S2", "hall stand 7" / "showroom stand 2"
+--   WarehouseLayout.showTagLines(name, rarity, price)   a showroom piece's tag: "RARE · 🏷 $450"
+--   WarehouseLayout.showSignLines(), hallSignLines()    the areas' signs
 --
 -- A Piece: name (unique in a warehouse), group ("shell", "roof", "door", "inside", "paint", "sign", "stand", "bay",
 -- 8.1: "terminal"),
@@ -101,7 +120,7 @@ local T = Config.Warehouse
 local WarehouseLayout = {}
 
 export type Rect = SandboxMap.Rect
-export type Stand = { index: number, x: number, y: number, z: number, sx: number, sz: number, yaw: number, small: boolean? }
+export type Stand = { index: number, x: number, y: number, z: number, sx: number, sz: number, yaw: number, small: boolean?, show: boolean? }
 export type Line = { text: string, color: { number }, size: number, font: string? }
 export type Words = { face: string, lines: { Line }, back: { number }?, lit: boolean? }
 export type Light = { range: number, brightness: number, color: { number } }
@@ -136,7 +155,9 @@ local FIT = 0.2 -- studs a piece keeps from its podium's edges
 local DESK = { 6.4, 3.2, 2.8 } -- 8.1: the UPGRADES desk (its top included): across, high, deep
 local LEVELS = 5 -- 8.3: Config.Warehouse.Levels
 local PLAIN = 4 -- 8.3: a plain Plot's level (SandboxMap's plot.warehouse is its box)
+local SHOW_BASE = Config.Showroom.Base -- 10.4: a showroom stand's number is past it
 WarehouseLayout.FloorTop = FLOOR_TOP
+WarehouseLayout.ShowBase = SHOW_BASE
 WarehouseLayout.Wall = WALL
 WarehouseLayout.Fit = FIT
 WarehouseLayout.Levels = LEVELS
@@ -156,12 +177,27 @@ local PODIUM = { 50, 53, 58 }
 local FELT = { 202, 196, 184 }
 local PAINT = { 242, 198, 42 }
 local GLOW = Config.SandboxLight.Warehouse.Glow -- 8.3: the lamps' discs (Config.SandboxLight)
+local SKY = { 120, 190, 255 } -- 10.4: the showroom's words
+local GOLD = Config.Showroom.HallSign -- 10.4: the hall's words
+local CARPET = Config.Showroom.Carpet -- 10.4: the showroom's floor
 
 -- 8.3: each level's hall, fitted to the owner's Blender building (Config.Warehouse.Levels: its size and door). The
 -- stands' grid (WarehouseLayout.grid; level 4's from Config, the warehouse of 8.0 – 8.2); `beams` and `lamps` are the
 -- model's trusses and (some of) its lamps, in studs from the front wall's outer face (`lamps`: { x, in }); `board` and
 -- `sign` the STOCK board and the UPGRADES sign ({ across, high, y (their middle) }, on the back wall's middle; `wall =
 -- "west"`: on the west wall, `at` studs in from the front wall's inside); `desk` the UPGRADES desk's size.
+-- 10.4 (the warehouse in two, Config.Showroom): `show` the SHOWROOM's stands by the door, { x (across from the middle),
+-- back (their middle, studs in from the front wall's inside), across, deep (in the stand's own frame: across the way
+-- its piece looks, and along it), yaw (the way its piece looks) }: a Garage's and a Storehouse's in the front corners
+-- either side of the receiving zone, a Workshop's, a Big Warehouse's and a Logistics Center's down the middle runway
+-- behind the door, turned to its walk (there the hall's small middle spots move back to leave it room: `middleFrom`,
+-- the first one's front edge studs in, `middleGap` between them). `carpet` the showroom's floor { x0, x1, back0, back1 };
+-- `showWords` / `hallWords` the floor's words { x, back, w, d }; `showSigns` / `hallSigns` the signs { kind ("wall" on
+-- the front or back wall's inside, "hang" a banner across, both faces), x, back (a banner's), w, h, y (its middle) }.
+type Spot = { number } -- { x, back, across, deep, yaw }
+type Rect4 = { number } -- { x0, x1, back0, back1 }
+type Words4 = { number } -- { x, back, w, d }
+type SignDef = { kind: string, wall: string?, x: number, back: number?, w: number, h: number, y: number }
 type Hall = {
 	columns: number,
 	middle: number,
@@ -178,33 +214,77 @@ type Hall = {
 	boardAt: number?,
 	sign: { number },
 	desk: { number },
+	show: { Spot },
+	runway: boolean?,
+	middleFrom: number?,
+	middleGap: number?,
+	carpet: { Rect4 },
+	showWords: { Words4 },
+	hallWords: { Words4 },
+	showSigns: { SignDef },
+	hallSigns: { SignDef },
 }
 local HALLS: { [number]: Hall } = {
 	{ -- Garage (26 × 22): its 2 stands against the back wall, either side of a narrow aisle with the small desk
 		columns = 2, middle = 4, aisle = 0, side = 0, front = 10, gap = 0, receiving = 5, walk = 4,
 		beams = { 11 }, lamps = { { 0, 11 } },
 		board = { 6.4, 2.8, 6.2 }, boardWall = "west", boardAt = 4.2, sign = { 3.8, 1.3, 8.4 }, desk = { 3.6, 3.2, 2.4 },
+		-- 10.4: two small plinths in the front corners, the hall's words between them and its stands
+		show = { { 9.5, 2.9, 4.6, 4.6, 0 }, { -9.5, 2.9, 4.6, 4.6, 0 } },
+		carpet = { { 7.3, 12, 0, 5.6 }, { -12, -7.3, 0, 5.6 } }, -- (clear of the door's rails)
+		showWords = {}, hallWords = { { 0, 7.6, 11, 2.6 } },
+		showSigns = { { kind = "wall", wall = "front", x = 9.9, w = 3.8, h = 1.1, y = 10.35 }, { kind = "wall", wall = "front", x = -9.9, w = 3.8, h = 1.1, y = 10.35 } },
+		hallSigns = {},
 	},
 	{ -- Workshop (40 × 30): 2 × 2 against the side walls and the back wall, the door's width between them
 		columns = 2, middle = 18, aisle = 0, side = 0, front = 4, gap = 4, receiving = 3, walk = 4,
 		beams = { 10, 20 }, lamps = { { -5, 10 }, { 5, 10 }, { -5, 20 }, { 5, 20 } },
 		board = { 14, 3.6, 12.4 }, sign = { 12, 2.4, 9 }, desk = DESK,
+		-- 10.4: an island of two plinths down the middle behind the door, looking at it (an aisle all round)
+		show = { { 0, 6.7, 8, 4.6, 180 }, { 0, 15.3, 8, 4.6, 180 } }, runway = true,
+		carpet = { { -6.5, 6.5, 3.4, 18.4 } },
+		showWords = { { 0, 11, 7.4, 2.2 } }, hallWords = { { -14, 16, 9, 2.4 }, { 14, 16, 9, 2.4 } },
+		showSigns = { { kind = "hang", x = 0, back = 11, w = 11, h = 1.8, y = 12.4 } },
+		hallSigns = { { kind = "wall", wall = "back", x = -13.5, w = 7, h = 1.6, y = 12.6 }, { kind = "wall", wall = "back", x = 13.5, w = 7, h = 1.6, y = 12.6 } },
 	},
 	{ -- Storehouse (58 × 42): 4 × 2, the outer columns against the side walls
 		columns = 4, middle = 8, aisle = 4, side = 0, front = 9, gap = 5, receiving = 5, walk = 4,
 		beams = { 10.5, 21, 31.5 }, lamps = { { -7.25, 10.5 }, { 7.25, 10.5 }, { -21.75, 21 }, { 21.75, 21 }, { -7.25, 31.5 }, { 7.25, 31.5 } },
 		board = { 22, 6, 13.5 }, sign = { 12, 2.4, 9 }, desk = DESK,
+		-- 10.4: four plinths in the front corners, looking into the walk before the hall's front row
+		show = { { -15.2, 2.8, 7.6, 4.4, 0 }, { 15.2, 2.8, 7.6, 4.4, 0 }, { -23.7, 2.8, 7.6, 4.4, 0 }, { 23.7, 2.8, 7.6, 4.4, 0 } },
+		carpet = { { -28, -11.3, 0, 5.6 }, { 11.3, 28, 0, 5.6 } }, -- (clear of the door's rails)
+		showWords = {}, hallWords = { { 0, 21.5, 20, 3.2 } },
+		showSigns = { { kind = "wall", wall = "front", x = -19.5, w = 12, h = 2, y = 16.6 }, { kind = "wall", wall = "front", x = 19.5, w = 12, h = 2, y = 16.6 } },
+		hallSigns = { { kind = "wall", wall = "back", x = -19.5, w = 11, h = 2.2, y = 13.5 }, { kind = "wall", wall = "back", x = 19.5, w = 11, h = 2.2, y = 13.5 } },
 	},
 	{ -- Big Warehouse (80 × 60): the warehouse of 8.0 – 8.2 (its grid from Config)
 		columns = T.Columns, middle = T.MiddleAisle, aisle = T.Aisle, side = T.Aisle, front = T.Receiving + T.Aisle, gap = T.Aisle, receiving = T.Receiving, walk = T.Aisle,
 		beams = { 11, 22, 33, 44, 55 }, lamps = { { -21.5, 22 }, { 0, 22 }, { 21.5, 22 }, { -21.5, 44 }, { 0, 44 }, { 21.5, 44 } },
 		board = { 22, 6, 13.5 }, sign = { 12, 2.4, 9 }, desk = DESK,
+		-- 10.4: the runway behind the door (two plinths each side), the hall's middle spots moved back behind it
+		show = { { -5.6, 13.5, 8, 4.6, -90 }, { 5.6, 13.5, 8, 4.6, 90 }, { -5.6, 22, 8, 4.6, -90 }, { 5.6, 22, 8, 4.6, 90 } },
+		runway = true, middleFrom = 26, middleGap = 1.4,
+		carpet = { { -9, 9, 9.2, 25.8 } },
+		showWords = { { 0, 17.75, 6.2, 2.2 } }, hallWords = { { -21.5, 26.5, 22, 3.2 }, { 21.5, 26.5, 22, 3.2 } },
+		showSigns = { { kind = "hang", x = 0, back = 10.6, w = 16, h = 2.4, y = 17.6 } },
+		hallSigns = { { kind = "wall", wall = "back", x = -30.5, w = 14, h = 2.4, y = 13.5 }, { kind = "wall", wall = "back", x = 30.5, w = 14, h = 2.4, y = 13.5 } }, -- (the back windows between)
 	},
 	{ -- Logistics Center (104 × 84): 6 × 4
 		columns = 6, middle = 18, aisle = 4, side = 4, front = 14, gap = 5, receiving = 9, walk = 4,
 		beams = { 10.5, 21, 31.5, 42, 52.5, 63, 73.5 },
 		lamps = { { -39, 21 }, { -13, 21 }, { 13, 21 }, { 39, 21 }, { -39, 42 }, { -13, 42 }, { 13, 42 }, { 39, 42 }, { -39, 63 }, { -13, 63 }, { 13, 63 }, { 39, 63 } },
 		board = { 22, 6, 13.5 }, sign = { 12, 2.4, 9 }, desk = DESK,
+		-- 10.4: the runway behind the door (three plinths each side), the hall's middle spots moved back behind it
+		show = {
+			{ -5.6, 13.5, 8, 4.6, -90 }, { 5.6, 13.5, 8, 4.6, 90 }, { -5.6, 22, 8, 4.6, -90 }, { 5.6, 22, 8, 4.6, 90 },
+			{ -5.6, 30.5, 8, 4.6, -90 }, { 5.6, 30.5, 8, 4.6, 90 },
+		},
+		runway = true, middleFrom = 35, middleGap = 1.5,
+		carpet = { { -9, 9, 9.2, 34.8 } },
+		showWords = { { 0, 17.75, 6.2, 2.2 } }, hallWords = { { -28, 26.5, 24, 3.2 }, { 28, 26.5, 24, 3.2 } },
+		showSigns = { { kind = "hang", x = 0, back = 10.6, w = 16, h = 2.4, y = 19.6 } },
+		hallSigns = { { kind = "wall", wall = "back", x = -30, w = 16, h = 2.6, y = 14 }, { kind = "wall", wall = "back", x = 30, w = 16, h = 2.6, y = 14 } },
 	},
 }
 
@@ -290,7 +370,9 @@ end
 function WarehouseLayout.doorPath(plot: SandboxMap.Plot): Rect
 	local r = WarehouseLayout.receiving(plot)
 	local d = WarehouseLayout.door(plot)
-	return { x0 = r.x0, x1 = r.x1, z0 = r.z0 - WarehouseLayout.grid(WarehouseLayout.levelOf(plot)).walk, z1 = d.z + SandboxMap.VanGap }
+	local hall = WarehouseLayout.grid(WarehouseLayout.levelOf(plot))
+	-- (10.4: where the showroom's runway starts behind the receiving zone, its walk is the way on)
+	return { x0 = r.x0, x1 = r.x1, z0 = r.z0 - (if hall.runway then 0 else hall.walk), z1 = d.z + SandboxMap.VanGap }
 end
 
 -- The big stands of a level (8.3: Config.Warehouse.Levels; nil: level 4's, Config.Warehouse.Stands).
@@ -332,15 +414,41 @@ local function smallSize(): (number, number)
 	return T.StandSize, T.StandSize
 end
 
+-- 10.4: the showroom's stands a level has room for (its `show` spots; Config.Showroom.Levels' Most is the same).
+function WarehouseLayout.showCapacity(level: number?): number
+	return #WarehouseLayout.grid(level).show
+end
+
+function WarehouseLayout.isShow(i: any): boolean
+	return type(i) == "number" and i > SHOW_BASE
+end
+
+-- 10.4: a showroom stand's number (k: its place in the level's `show`: 1 …).
+function WarehouseLayout.showStand(k: number): number
+	return SHOW_BASE + k
+end
+
 function WarehouseLayout.stand(plot: SandboxMap.Plot, i: number): Stand?
 	local level = WarehouseLayout.levelOf(plot)
 	local base = WarehouseLayout.count(level)
-	if i ~= math.floor(i) or i < 1 or i > WarehouseLayout.capacity(level) then
+	if type(i) ~= "number" or i ~= math.floor(i) or i < 1 then
 		return nil
 	end
 	local hall = WarehouseLayout.grid(level)
 	local x = frame(plot)
 	local top = FLOOR_TOP + T.StandHeight
+	if i > SHOW_BASE then
+		-- 10.4, a showroom stand: its spot by the door (its size in its own frame, turned by its yaw)
+		local spot = hall.show[i - SHOW_BASE]
+		if not spot then
+			return nil
+		end
+		local inner = WarehouseLayout.inside(plot).z1
+		return { index = i, x = x + spot[1], y = top, z = inner - spot[2], sx = spot[3], sz = spot[4], yaw = spot[5], small = true, show = true }
+	end
+	if i > WarehouseLayout.capacity(level) then
+		return nil
+	end
 	local front = WarehouseLayout.inside(plot).z1 - hall.front -- the front row's front edge
 	if i > base then
 		-- 8.1, an upgrade stand: the front corners beside the receiving zone (the inner pair west and east, then the
@@ -355,6 +463,11 @@ function WarehouseLayout.stand(plot: SandboxMap.Plot, i: number): Stand?
 			return { index = i, x = x + across, y = top, z = (zone.z0 + zone.z1) / 2, sx = sw, sz = sd, yaw = 0, small = true }
 		end
 		local z = front - sd / 2 - (k - 5) * (sd + T.Aisle)
+		local from = hall.middleFrom
+		if from then
+			-- (10.4: behind the showroom's runway, closer together: a hall stand needs no visitor's room)
+			z = WarehouseLayout.inside(plot).z1 - from - sd / 2 - (k - 5) * (sd + (hall.middleGap or T.Aisle))
+		end
 		return { index = i, x = x, y = top, z = z, sx = sw, sz = sd, yaw = 180, small = true }
 	end
 	local columns = hall.columns
@@ -434,14 +547,49 @@ function WarehouseLayout.ceiling(plot: SandboxMap.Plot, z: number): number
 	return back + (h - back) * t
 end
 
+-- 10.4: a stand's half extents along x and z (its own across × deep turned by its yaw).
+function WarehouseLayout.extent(s: Stand): (number, number)
+	local r = math.rad(s.yaw or 0)
+	local c, n = math.abs(math.cos(r)), math.abs(math.sin(r))
+	return (s.sx * c + s.sz * n) / 2, (s.sx * n + s.sz * c) / 2
+end
+
 function WarehouseLayout.standAt(plot: SandboxMap.Plot, x: number, z: number): number?
-	for i = 1, WarehouseLayout.capacity(WarehouseLayout.levelOf(plot)) do
+	local level = WarehouseLayout.levelOf(plot)
+	local function on(i: number): boolean
 		local s = WarehouseLayout.stand(plot, i)
-		if s and math.abs(x - s.x) <= s.sx / 2 and math.abs(z - s.z) <= s.sz / 2 then
+		if not s then
+			return false
+		end
+		local hx, hz = WarehouseLayout.extent(s)
+		return math.abs(x - s.x) <= hx and math.abs(z - s.z) <= hz
+	end
+	for i = 1, WarehouseLayout.capacity(level) do
+		if on(i) then
 			return i
 		end
 	end
+	for k = 1, WarehouseLayout.showCapacity(level) do
+		if on(SHOW_BASE + k) then
+			return SHOW_BASE + k
+		end
+	end
 	return nil
+end
+
+-- 10.4: a plot's (or a Site's) first `count` showroom stands (default: all the level has room for), in order.
+function WarehouseLayout.showStands(plot: SandboxMap.Plot | number, count: number?): { Stand }
+	local found: SandboxMap.Plot? = if type(plot) == "number" then SandboxMap.Plots[plot] else plot
+	local list: { Stand } = {}
+	if not found then
+		return list
+	end
+	local most = WarehouseLayout.showCapacity(WarehouseLayout.levelOf(found))
+	local n = if type(count) == "number" and count == count then math.clamp(math.floor(count), 0, most) else most
+	for k = 1, n do
+		list[k] = WarehouseLayout.stand(found, SHOW_BASE + k) :: Stand
+	end
+	return list
 end
 
 function WarehouseLayout.bay(plot: SandboxMap.Plot): Rect
@@ -498,19 +646,35 @@ function WarehouseLayout.stockLines(stock: number, perMinute: number, shown: num
 	}
 end
 
--- 8.1: an upgrade stand's painted spot until it is bought.
+-- 8.1: an upgrade stand's painted spot until it is bought. 10.4: a showroom stand's ("SHOWROOM 2").
 function WarehouseLayout.spotLines(i: number): { Line }
+	if i > SHOW_BASE then
+		return {
+			line(`SHOWROOM {i - SHOW_BASE}`, SKY, 0.4, "Black"),
+			line("🔒 UPGRADES", SKY, 0.3, "Bold"),
+		}
+	end
 	return {
 		line(`STAND {i}`, PAINT, 0.42, "Black"),
 		line("🔒 UPGRADES", PAINT, 0.3, "Bold"),
 	}
 end
 
--- 8.1: the UPGRADES desk's monitor.
+-- 10.4: a stand's number plate ("7" in the hall, "S2" in the showroom).
+function WarehouseLayout.plateText(i: number): string
+	return if i > SHOW_BASE then `S{i - SHOW_BASE}` else tostring(i)
+end
+
+-- 10.4: a stand in words ("hall stand 7", "showroom stand 2").
+function WarehouseLayout.standName(i: number): string
+	return if i > SHOW_BASE then `showroom stand {i - SHOW_BASE}` else `hall stand {i}`
+end
+
+-- 8.1: the UPGRADES desk's monitor (10.4: the tree).
 function WarehouseLayout.terminalLines(): { Line }
 	return {
 		line("DELIVEROS UPGRADES", ORANGE, 0.36, "Black"),
-		line("Warehouse · Stands · Lights · Van", WHITE, 0.2, "Bold"),
+		line("The upgrade tree: hall · showroom · runs · crew", WHITE, 0.2, "Bold"),
 		line("WALK UP TO OPEN", GREY, 0.18, "Medium"), -- (8.3 keys: no key, a phone and a gamepad read it too)
 	}
 end
@@ -519,6 +683,29 @@ function WarehouseLayout.tagLines(name: string, rarity: string?, perMinute: numb
 	return {
 		line(name, WarehouseLayout.rarityColor(rarity), 0.55, "Bold"),
 		line(`{string.upper(rarity or "common")} · +{WarehouseLayout.money(perMinute)}/min`, WHITE, 0.4, "Bold"),
+	}
+end
+
+-- 10.4: a showroom piece's tag: its name, "RARE · FOR SALE $450" (its showroom price: it earns nothing a minute).
+function WarehouseLayout.showTagLines(name: string, rarity: string?, price: number): { Line }
+	return {
+		line(name, WarehouseLayout.rarityColor(rarity), 0.55, "Bold"),
+		line(`{string.upper(rarity or "common")} · 🏷 {WarehouseLayout.money(price)}`, SKY, 0.4, "Bold"),
+	}
+end
+
+-- 10.4: the areas' signs.
+function WarehouseLayout.showSignLines(): { Line }
+	return {
+		line("SHOWROOM", SKY, 0.56, "Black"),
+		line("FOR SALE · VISITORS WELCOME", WHITE, 0.3, "Bold"),
+	}
+end
+
+function WarehouseLayout.hallSignLines(): { Line }
+	return {
+		line("COLLECTION HALL", GOLD, 0.56, "Black"),
+		line("EARNS EVERY MINUTE · NOT FOR SALE", WHITE, 0.3, "Bold"),
 	}
 end
 
@@ -805,30 +992,93 @@ function WarehouseLayout.pieces(plot: SandboxMap.Plot): { Piece }
 	-- for the upgrade stands in the front corners). 8.1: an upgrade stand's spot is painted on the floor under it too
 	-- (its outline and "STAND 13 · 🔒 UPGRADES", read from its aisle): server/Warehouse.luau shows its podium once it is
 	-- bought, and the podium covers the paint.
+	-- 10.4: the showroom's floor (a carpet a hair over the concrete, under its paint) and its words, the hall's words
+	for n, r in hall.carpet do
+		local cw, cd = r[2] - r[1], r[4] - r[3]
+		add(`ShowCarpet{n}`, "paint", { cw, 0.03, cd }, { (r[1] + r[2]) / 2, FLOOR_TOP + 0.016, inner - (r[3] + r[4]) / 2 }, CARPET, "Fabric")
+	end
+	local function floorWords(name: string, at: Words4, lines: { Line })
+		-- (lying flat like RECEIVING: its Back face up, its text's top to the north: read from the door)
+		local p = add(name, "paint", { at[3], at[4], 0.05 }, { at[1], FLOOR_TOP + 0.03, inner - at[2] }, PAINT, "SmoothPlastic")
+		p.pitch, p.transparency = -90, 1
+		p.words = { { face = "Back", lines = lines } }
+	end
+	for n, at in hall.showWords do
+		floorWords(`ShowFloorText{n}`, at, { line("SHOWROOM", SKY, 0.9, "Black") })
+	end
+	for n, at in hall.hallWords do
+		floorWords(`HallFloorText{n}`, at, { line("COLLECTION HALL", GOLD, 0.9, "Black") })
+	end
+
+	-- the display stands: a dark podium, its felt top and its number plate at the front (to the aisle: south, or north
+	-- for the upgrade stands in the front corners; 10.4 a showroom plinth's to its walk). 8.1: an upgrade stand's spot is
+	-- painted on the floor under it too (its outline and "STAND 13 · 🔒 UPGRADES", read from its aisle):
+	-- server/Warehouse.luau shows its podium once it is bought, and the podium covers the paint. 10.4: the showroom's
+	-- plinths after the hall's (S1, S2 …), every one the level has room for (the ones not owned yet: their spot).
+	local numbers: { number } = {}
 	for i = 1, WarehouseLayout.capacity(level) do
+		table.insert(numbers, i)
+	end
+	for k = 1, WarehouseLayout.showCapacity(level) do
+		table.insert(numbers, SHOW_BASE + k)
+	end
+	local ownShow = math.max(0, (Config.Showroom.Levels[level] or { Stands = 0 }).Stands)
+	for _, i in numbers do
 		local s = WarehouseLayout.stand(plot, i) :: Stand
 		local x, z = s.x - ox, s.z - oz
 		local podiumHigh = T.StandHeight - 0.1
+		local turned = math.abs(s.yaw) == 90 -- (10.4: a runway plinth: its box turned with it)
 		local podium = solid(add(`Stand{i}`, "stand", { s.sx, podiumHigh, s.sz }, { x, FLOOR_TOP + podiumHigh / 2, z }, PODIUM, "SmoothPlastic"))
 		podium.stand = i
-		local top = solid(add(`StandTop{i}`, "stand", { s.sx - 0.6, 0.1, s.sz - 0.6 }, { x, s.y - 0.05, z }, FELT, "Fabric"))
+		local top = solid(add(`StandTop{i}`, "stand", { s.sx - 0.6, 0.1, s.sz - 0.6 }, { x, s.y - 0.05, z }, if s.show then CARPET else FELT, "Fabric"))
 		top.stand = i
-		local facing = if s.yaw == 0 then -1 else 1 -- (+z: south)
-		local plate = add(`Plate{i}`, "stand", { 1.6, 0.6, 0.1 }, { x, FLOOR_TOP + podiumHigh / 2, z + facing * (s.sz / 2 + 0.05) }, WHITE, "SmoothPlastic")
+		if turned then
+			podium.yaw, top.yaw = s.yaw, s.yaw
+		end
+		local facing = math.rad(s.yaw)
+		local fx, fz = -math.sin(facing), -math.cos(facing) -- (the way its piece looks: its plate's side)
+		local plate = add(`Plate{i}`, "stand", { 1.6, 0.6, 0.1 }, { x + fx * (s.sz / 2 + 0.05), FLOOR_TOP + podiumHigh / 2, z + fz * (s.sz / 2 + 0.05) }, if s.show then SKY else WHITE, "SmoothPlastic")
 		plate.yaw, plate.stand = s.yaw, i
-		plate.words = { { face = "Front", lines = { line(tostring(i), INK, 0.9, "Black") } } }
-		if i > base then
+		plate.words = { { face = "Front", lines = { line(WarehouseLayout.plateText(i), INK, 0.9, "Black") } } }
+		if i > base and (i <= SHOW_BASE or i - SHOW_BASE > ownShow) then
+			local ex, ez = WarehouseLayout.extent(s)
 			local edge, y = 0.3, FLOOR_TOP + 0.02
-			add(`Spot{i}North`, "paint", { s.sx, 0.04, edge }, { x, y, z - s.sz / 2 + edge / 2 }, PAINT, "SmoothPlastic")
-			add(`Spot{i}South`, "paint", { s.sx, 0.04, edge }, { x, y, z + s.sz / 2 - edge / 2 }, PAINT, "SmoothPlastic")
-			add(`Spot{i}West`, "paint", { edge, 0.04, s.sz - 2 * edge }, { x - s.sx / 2 + edge / 2, y, z }, PAINT, "SmoothPlastic")
-			add(`Spot{i}East`, "paint", { edge, 0.04, s.sz - 2 * edge }, { x + s.sx / 2 - edge / 2, y, z }, PAINT, "SmoothPlastic")
+			local ink = if s.show then SKY else PAINT
+			add(`Spot{i}North`, "paint", { 2 * ex, 0.04, edge }, { x, y, z - ez + edge / 2 }, ink, "SmoothPlastic")
+			add(`Spot{i}South`, "paint", { 2 * ex, 0.04, edge }, { x, y, z + ez - edge / 2 }, ink, "SmoothPlastic")
+			add(`Spot{i}West`, "paint", { edge, 0.04, 2 * ez - 2 * edge }, { x - ex + edge / 2, y, z }, ink, "SmoothPlastic")
+			add(`Spot{i}East`, "paint", { edge, 0.04, 2 * ez - 2 * edge }, { x + ex - edge / 2, y, z }, ink, "SmoothPlastic")
 			-- (lying flat like RECEIVING: its Back face up, its words' top away from the aisle it looks at)
-			local words = add(`SpotText{i}`, "paint", { s.sx - 1.2, s.sz - 1.2, 0.05 }, { x, FLOOR_TOP + 0.03, z }, PAINT, "SmoothPlastic")
+			local words = add(`SpotText{i}`, "paint", { s.sx - 1.2, s.sz - 1.2, 0.05 }, { x, FLOOR_TOP + 0.03, z }, ink, "SmoothPlastic")
 			words.pitch, words.transparency = -90, 1
-			words.yaw = if s.yaw == 0 then 180 else 0
+			words.yaw = if s.yaw == 0 then 180 elseif s.yaw == 180 then 0 else s.yaw + 180
 			words.words = { { face = "Back", lines = WarehouseLayout.spotLines(i) } }
 		end
+	end
+
+	-- 10.4: the areas' signs: on the front or back wall's inside (into the hall), or a banner hung across the showroom's
+	-- runway (its words both ways, its two wires up to the tie beam)
+	local function areaSign(name: string, d: SignDef, lines: { Line })
+		if d.kind == "hang" then
+			local at = inner - (d.back or 0)
+			local p = add(name, "sign", { d.w, d.h, 0.3 }, { d.x, d.y, at }, TRIM, "SmoothPlastic")
+			p.words = { { face = "Front", lit = true, lines = lines }, { face = "Back", lit = true, lines = lines } }
+			local wire = math.max(0.2, back - 0.6 - (d.y + d.h / 2))
+			for _, side in { -1, 1 } do
+				add(`{name}Wire{if side < 0 then "West" else "East"}`, "sign", { 0.12, wire, 0.12 }, { d.x + side * (d.w / 2 - 0.6), d.y + d.h / 2 + wire / 2, at }, STEEL, "Metal")
+			end
+			return
+		end
+		local front = d.wall == "front"
+		local p = add(name, "sign", { d.w, d.h, 0.3 }, { d.x, d.y, if front then inner - 0.15 else -hz + WALL + 0.15 }, TRIM, "SmoothPlastic")
+		p.yaw = if front then 0 else 180 -- (its front into the hall)
+		p.words = { { face = "Front", lit = true, lines = lines } }
+	end
+	for n, d in hall.showSigns do
+		areaSign(`ShowSign{n}`, d, WarehouseLayout.showSignLines())
+	end
+	for n, d in hall.hallSigns do
+		areaSign(`HallSign{n}`, d, WarehouseLayout.hallSignLines())
 	end
 
 	-- 8.1: the UPGRADES desk at the back wall's middle (its prompt: server/Warehouse.luau), its monitor facing the
@@ -844,7 +1094,7 @@ function WarehouseLayout.pieces(plot: SandboxMap.Plot): { Piece }
 	screen.yaw = 180 -- (its front into the hall)
 	screen.words = { { face = "Front", lit = true, lines = WarehouseLayout.terminalLines() } }
 	local sign = wallSign("UpgradeSign", hall.sign, nil, nil)
-	sign.words = { { face = "Front", lit = true, lines = { line("⬆ UPGRADES", ORANGE, 0.62, "Black"), line("WAREHOUSE · STANDS · LIGHTS · VAN · DANNY", WHITE, 0.26, "Bold") } } }
+	sign.words = { { face = "Front", lit = true, lines = { line("⬆ UPGRADES", ORANGE, 0.62, "Black"), line("THE UPGRADE TREE · HALL · SHOWROOM · RUNS · CREW", WHITE, 0.26, "Bold") } } }
 
 	-- outside: the UNLOAD HERE bay round the van at its spot, its back to the door (the words in the room between the
 	-- van's back and the bay's door end: seen with the van parked)

@@ -67,6 +67,15 @@
 -- 8.3 (design/warehouse-levels/KONTRAKT.md): which stands are small depends on your warehouse's level (the player
 -- attribute Config.SandboxUpgrades.WarehouseAttribute, 1 … 5, server/Upgrades.luau; 4 until the server sets it, as a
 -- plain Plot): WarehouseLayout.fits and count ask with it, so TOO BIG and its words follow a level up.
+-- 10.4, the warehouse in two (Config.Showroom: the COLLECTION HALL earns, the SHOWROOM sells): a tile has its
+-- placement row over SELL. A piece in the stock: 🏛 HALL (PUT IN THE HALL) and 🏷 FOR SALE (SHOW FOR SALE); in the
+-- picker the stand's own area is the green one ({ kind = "display", uid, stand }), the other sends { kind = "place",
+-- uid, area } (that area's first free stand: server/Collection.luau place); in the STOCK list both send "place", and a
+-- piece on show has the other area's button (a move) over the row, TAKE DOWN beside SELL. A piece on show is marked
+-- HALL · STAND 3 (gold) or FOR SALE · S2 (blue: its big number its showroom price, the line under it what it would earn
+-- in the hall; "HALL 3" / "SALE S2" on a narrow tile). The 🏷 (a FOR SALE sign) is a showroom piece's only. The picker
+-- of a showroom stand says SHOWROOM 2 · CHOOSE A PIECE (and that the showroom sells); the server's { kind = "placed",
+-- area, stand } is a toast.
 -- Presentation only.
 
 local GuiService = game:GetService("GuiService")
@@ -161,6 +170,7 @@ local HEADER = 52
 local MARKET_H = 18 -- 8.3: the market's line under the header
 local HOT_FACE, HOT_INK = Color3.fromRGB(74, 32, 18), Color3.fromRGB(255, 156, 96) -- 8.3: a hot kind's tag, the line
 local COLD_FACE, COLD_INK = Color3.fromRGB(22, 38, 58), Color3.fromRGB(150, 200, 255) -- 8.3: a cold kind's tag
+local SHOW_FACE, SHOW_INK = Color3.fromRGB(28, 52, 92), Color3.fromRGB(128, 192, 255) -- 10.4: the showroom's ribbon, its price
 local SEARCH_W = 170 -- 8.2: the search box (a computer)
 local MAX_SEARCH = 40 -- its longest words
 local SCROLLBAR = 6
@@ -324,6 +334,11 @@ function WarehouseUi.layout(W: number, H: number, touch: boolean): Layout
 	local cols = math.max(1, math.floor((area + gap) / (least + gap)))
 	local tileW = math.floor((area - (cols - 1) * gap) / cols)
 	local picture = math.floor(tileW * (if touch then PICK.PictureTouch else PICK.Picture))
+	if not touch then
+		-- (10.4: two rows of tiles in view on a computer with the placement row: the picture a little lower if need be)
+		local room = math.floor((h - gridY - pad - gap) / 2) - TILE_TEXT - 2 * button - 6
+		picture = math.max(math.floor(tileW * 0.45), math.min(picture, room))
+	end
 	return {
 		touch = touch,
 		scale = scale,
@@ -342,7 +357,7 @@ function WarehouseUi.layout(W: number, H: number, touch: boolean): Layout
 		gridH = h - gridY - pad,
 		cols = cols,
 		tileW = tileW,
-		tileH = picture + TILE_TEXT + button,
+		tileH = picture + TILE_TEXT + 2 * button + 6, -- (10.4: the placement row over SELL)
 		picture = picture,
 		gap = gap,
 		button = button,
@@ -582,6 +597,14 @@ end
 local function warehouseLevel(): number
 	local level = Players.LocalPlayer:GetAttribute(Config.SandboxUpgrades.WarehouseAttribute)
 	return if type(level) == "number" then level else 4
+end
+
+-- 10.4: a stand's area ("hall", "show"; nil: no stand): a showroom stand's number is past Config.Showroom.Base.
+local function areaOf(stand: any): string?
+	if type(stand) ~= "number" then
+		return nil
+	end
+	return if WarehouseLayout.isShow(stand) then "show" else "hall"
 end
 
 -- 8.2: does a piece of this item stand on stand i (an upgrade's small stand holds no bed)? As the server's
@@ -1027,16 +1050,24 @@ local function drawTile(parent: any, row: Row, index: number, layout: Layout, st
 	local tier = (Config.Collection.Tiers :: any)[values.rarity]
 	local stars = string.rep("★", if tier then tier.rank else 1)
 	Ui.label(picture, stars, UDim2.fromOffset(CardKit.width(stars, 11, Theme.HeadingFont) + 4, 14), { Name = "Stars", Position = UDim2.new(1, -6, 1, -7), AnchorPoint = Vector2.new(1, 1), Font = Theme.HeadingFont, TextSize = 11, TextColor3 = accent, TextTransparency = dim, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 4 })
+	local inShow = areaOf(entry.stand) == "show" -- 10.4: on sale in the showroom
+	local hasTag = stand == nil and inShow -- (8.7: the STOCK list's 🏷 at the picture's top right; 10.4: the showroom's)
 	if entry.stand then
-		local on = `ON STAND {entry.stand}`
+		-- (10.4: "HALL · STAND 3" in the hall's gold, "FOR SALE · S2" in the showroom's blue; "HALL 3" / "SALE S2" on a
+		-- tile too narrow for it beside the 🏷)
+		local on = if inShow then `FOR SALE · {WarehouseLayout.plateText(entry.stand)}` else `HALL · STAND {entry.stand}`
+		local tagRoom = if hasTag then (if layout.touch then math.max(24, math.ceil(Ui.MinTouch / layout.scale)) else 24) + 6 else 0
+		if CardKit.width(on, 11, Theme.HeadingFont) + 16 > w - 12 - 12 - tagRoom then
+			on = if inShow then `SALE {WarehouseLayout.plateText(entry.stand)}` else `HALL {entry.stand}`
+		end
 		local ribbon = Ui.label(picture, on, UDim2.fromOffset(CardKit.width(on, 11, Theme.HeadingFont) + 16, 20), {
 			Name = "OnStand",
 			Position = UDim2.fromOffset(6, 6),
-			BackgroundColor3 = C.rushFace,
+			BackgroundColor3 = if inShow then SHOW_FACE else C.rushFace,
 			BackgroundTransparency = 0,
 			Font = Theme.HeadingFont,
 			TextSize = 11,
-			TextColor3 = C.rushInk,
+			TextColor3 = if inShow then SHOW_INK else C.rushInk,
 			TextWrapped = false,
 			TextXAlignment = Enum.TextXAlignment.Center,
 			ZIndex = 4,
@@ -1073,8 +1104,9 @@ local function drawTile(parent: any, row: Row, index: number, layout: Layout, st
 		tagY += 24
 	end
 	-- 8.7: the STOCK list's 🏷 on a piece on show (its FOR SALE sign: the price picker), a square at the picture's top
-	-- right (the ribbon and the tags are at its left), gold while the piece has a sign (its price: the SellPrice line)
-	if stand == nil and entry.stand ~= nil then
+	-- right (the ribbon and the tags are at its left), gold while the piece has a sign (its price: the SellPrice line);
+	-- 10.4: on a showroom piece only (a sign is the showroom's)
+	if hasTag then
 		local sale = amount((entry :: any).sale)
 		local side = if layout.touch then math.max(24, math.ceil(Ui.MinTouch / layout.scale)) else 24
 		local picW = w - 12
@@ -1103,53 +1135,106 @@ local function drawTile(parent: any, row: Row, index: number, layout: Layout, st
 	y += 16
 	Ui.label(frame, nameOf(entry), UDim2.fromOffset(inner, 18), { Name = "PieceName", Position = UDim2.fromOffset(10, y), Font = Theme.HeadingFont, TextSize = 14, TextColor3 = K.text, TextTransparency = dim, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
 	y += 20
-	-- the one big number: what it earns a minute on show; the price under it
-	Ui.label(frame, WarehouseUi.rate(values.perMinute), UDim2.fromOffset(inner, 22), { Name = "PerMinute", Position = UDim2.fromOffset(10, y), Font = Theme.DisplayFont, TextSize = 18, TextColor3 = if tooBig then K.secondary else C.money, TextTransparency = dim, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
+	-- the one big number: what it earns a minute in the hall (10.4: a showroom piece earns nothing a minute: its price
+	-- there, in the showroom's blue); the price under it
+	local big = if inShow then `🏷 {Ui.money(values.sell)}` else WarehouseUi.rate(values.perMinute)
+	Ui.label(frame, big, UDim2.fromOffset(inner, 22), { Name = "PerMinute", Position = UDim2.fromOffset(10, y), Font = Theme.DisplayFont, TextSize = 18, TextColor3 = if tooBig then K.secondary elseif inShow then SHOW_INK else C.money, TextTransparency = dim, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
 	y += 22
-	-- (8.7: a piece with a FOR SALE sign says its sign's price there, in gold: the game's price is in SELL's question)
+	-- (8.7: a piece with a FOR SALE sign says its sign's price there, in gold: the game's price is in SELL's question;
+	-- 10.4: a showroom piece without one what it would earn in the hall)
 	local sign = if stand == nil and entry.stand ~= nil then amount((entry :: any).sale) else nil
-	Ui.label(frame, if sign then `🏷 For sale {Ui.money(sign)}` else `Sell {Ui.money(values.sell)}`, UDim2.fromOffset(inner, 16), { Name = "SellPrice", Position = UDim2.fromOffset(10, y), Font = Theme.HeadingFont, TextSize = 12, TextColor3 = if sign then C.gold else K.secondary, TextTransparency = dim, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
-	-- the buttons: DISPLAY / SELL (the picker), TAKE DOWN / SELL (a piece on show), SELL (the stock list)
+	local small = if sign then `🏷 For sale {Ui.money(sign)}` elseif inShow then `In the hall {WarehouseUi.rate(values.perMinute)}` else `Sell {Ui.money(values.sell)}`
+	Ui.label(frame, small, UDim2.fromOffset(inner, 16), { Name = "SellPrice", Position = UDim2.fromOffset(10, y), Font = Theme.HeadingFont, TextSize = 12, TextColor3 = if sign then C.gold else K.secondary, TextTransparency = dim, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
+	-- the buttons (10.4, the warehouse in two): the placement row over SELL. A piece in the stock: 🏛 HALL (PUT IN THE
+	-- HALL: it earns every minute) and 🏷 FOR SALE (SHOW FOR SALE: the showroom, the visitors' offers); in the picker the
+	-- stand's own area is the green one (onto this stand: { kind = "display", uid, stand }), the other goes to that area's
+	-- first free stand ({ kind = "place", uid, area }); a piece on show (the stock list): the other area's button (a move)
+	-- and TAKE DOWN. 8.2: too big for the picker's stand, its own area's button is a grey TOO BIG that says where it goes.
 	local buttons: { any } = {}
-	local first: any = nil
 	local by = layout.tileH - 8 - layout.button
-	if stand and tooBig then
-		-- 8.2: TOO BIG instead of DISPLAY, grey; a tap says where it goes
-		first = tileButton(frame, "Display", "TOO BIG", "shut", layout, function()
-			toast(`Your {nameOf(entry)} is too big for small stand {stand}: show it on stands 1 – {WarehouseLayout.count(warehouseLevel())}.`)
-		end)
-		first.AutoButtonColor = false
-		first.TextTransparency = 0.3
-	elseif stand then
-		first = tileButton(frame, "Display", "DISPLAY", "good", layout, function()
+	local rowY = by - 6 - layout.button
+	local here = if stand then areaOf(stand) else nil -- (the picker's stand's area)
+	local area = areaOf(entry.stand) -- (where the piece is now: nil in the stock)
+	local function busy()
+		for _, button in buttons do
+			button.Text = "…"
+			button.Active = false
+		end
+	end
+	local function put(where: string)
+		if stand and here == where then
 			if send({ kind = "display", uid = entry.uid, stand = stand }) then
 				WarehouseUi.close()
 			end
-		end)
-	elseif entry.stand then
-		first = tileButton(frame, "TakeDown", "TAKE DOWN", "quiet", layout, function()
-			if send({ kind = "undisplay", uid = entry.uid }) then
-				for _, button in buttons do
-					button.Text = "…"
-					button.Active = false
+		elseif send({ kind = "place", uid = entry.uid, area = where }) then
+			if stand then
+				WarehouseUi.close()
+			else
+				busy()
+			end
+		end
+	end
+	local pair: { any } = {}
+	for _, where in { "hall", "show" } do
+		if area ~= where then
+			local own = here == where
+			local blocked = own and tooBig
+			local text = if blocked then "TOO BIG" elseif where == "hall" then "🏛 HALL" else "🏷 FOR SALE"
+			local button = tileButton(frame, if where == "hall" then "Hall" else "Show", text, if blocked then "shut" elseif own then "good" else "quiet", layout, function()
+				if blocked then
+					toast(if WarehouseLayout.isShow(stand) then `Your {nameOf(entry)} is too big for this showroom stand: put it in the hall.`
+						else `Your {nameOf(entry)} is too big for small stand {stand}: show it on stands 1 – {WarehouseLayout.count(warehouseLevel())}.`)
+					return
 				end
+				put(where)
+			end)
+			if blocked then
+				button.AutoButtonColor = false
+				button.TextTransparency = 0.3
+			end
+			button:SetAttribute("Area", where)
+			table.insert(pair, button)
+		end
+	end
+	local takeDown: any = nil
+	if area ~= nil and not stand then
+		-- (a piece on show: its move over the whole row, TAKE DOWN beside SELL under it)
+		takeDown = tileButton(frame, "TakeDown", "TAKE DOWN", "quiet", layout, function()
+			if send({ kind = "undisplay", uid = entry.uid }) then
+				busy()
 			end
 		end)
+	end
+	-- (the row's two as wide as their words need, each at least a share)
+	local size = if layout.touch then 14 else 12
+	local needs: { number } = {}
+	local total = 0
+	for n, button in pair do
+		needs[n] = CardKit.width(button.Text, size, Theme.HeadingFont) + 14
+		total += needs[n]
+	end
+	local room = inner - 6 * math.max(0, #pair - 1)
+	local used = 0
+	for n, button in pair do
+		local share = if n == #pair then room - used else math.floor(room * needs[n] / math.max(1, total))
+		button.Size = UDim2.fromOffset(share, layout.button)
+		button.Position = UDim2.fromOffset(10 + used + 6 * (n - 1), rowY)
+		used += share
+		table.insert(buttons, button)
 	end
 	local sell = tileButton(frame, "Sell", "SELL", "quiet", layout, function()
 		askSell(row)
 	end)
-	if first then
-		-- (the first as wide as its words need, at least its share; SELL keeps room for its own)
-		local size = if layout.touch then 14 else 12
-		local need = CardKit.width(first.Text, size, Theme.HeadingFont) + 18
+	if takeDown then
+		-- (TAKE DOWN as wide as its words need, at least half; SELL keeps room for its own)
+		local need = CardKit.width(takeDown.Text, size, Theme.HeadingFont) + 18
 		local sellNeed = CardKit.width("SELL", size, Theme.HeadingFont) + 16
-		local firstW = math.floor(math.clamp(need, (inner - 6) * 0.5, inner - 6 - sellNeed))
-		first.Size = UDim2.fromOffset(firstW, layout.button)
-		first.Position = UDim2.fromOffset(10, by)
-		sell.Size = UDim2.fromOffset(inner - 6 - firstW, layout.button)
-		sell.Position = UDim2.fromOffset(16 + firstW, by)
-		table.insert(buttons, first)
+		local downW = math.floor(math.clamp(need, (inner - 6) * 0.5, math.max((inner - 6) * 0.5, inner - 6 - sellNeed)))
+		takeDown.Size = UDim2.fromOffset(downW, layout.button)
+		takeDown.Position = UDim2.fromOffset(10, by)
+		sell.Size = UDim2.fromOffset(inner - 6 - downW, layout.button)
+		sell.Position = UDim2.fromOffset(16 + downW, by)
+		table.insert(buttons, takeDown)
 	else
 		sell.Size = UDim2.fromOffset(inner, layout.button)
 		sell.Position = UDim2.fromOffset(10, by)
@@ -1372,7 +1457,8 @@ draw = function(keepScroll: boolean)
 	-- the header: the title, a line under it, the ✕
 	local stand = open.stand
 	local state = current
-	local title = if stand then `STAND {stand} · CHOOSE A PIECE` else "YOUR STOCK"
+	-- (10.4: a showroom stand's "SHOWROOM 2 · CHOOSE A PIECE"; a hall stand's as before)
+	local title = if stand and WarehouseLayout.isShow(stand) then `SHOWROOM {stand - WarehouseLayout.ShowBase} · CHOOSE A PIECE` elseif stand then `STAND {stand} · CHOOSE A PIECE` else "YOUR STOCK"
 	Ui.label(frame, title, UDim2.new(1, -(layout.pad * 2 + layout.close + 8), 0, 24), { Name = "Title", Position = UDim2.fromOffset(layout.pad, 10), Font = Theme.HeadingFont, TextSize = 18, TextColor3 = K.text, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
 	local all: { Row } = if state then rows(state, nil) else {}
 	local onShow = 0
@@ -1383,7 +1469,8 @@ draw = function(keepScroll: boolean)
 	end
 	local earning = if state then state.income else 0
 	local subtitle = if not state then "Loading your stock…"
-		elseif stand then "On show it earns money every minute you play."
+		elseif stand and areaOf(stand) == "show" then "For sale here: visitors and players buy it (the hall earns, the showroom sells)."
+		elseif stand then "In the hall it earns money every minute you play."
 		else `{#all} {if #all == 1 then "piece" else "pieces"} · {onShow} on show{if earning > 0 then ` · {WarehouseUi.rate(earning)}` else ""}`
 	Ui.label(frame, subtitle, UDim2.new(1, -(layout.pad * 2 + layout.close + 8), 0, 16), { Name = "Subtitle", Position = UDim2.fromOffset(layout.pad, 33), TextSize = 12, TextColor3 = K.secondary, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
 	local market = if state then state.market else nil
@@ -1575,6 +1662,14 @@ local function onEvent(message: any)
 			toast(`⭐ {pieces(n)} put on show{if income and income > 0 then ` · {WarehouseUi.rate(income)}` else ""}`)
 		elseif message.action == "undisplayall" and n > 0 then
 			toast(`↩ {pieces(n)} back in your stock`)
+		end
+	elseif kind == "placed" then
+		-- 10.4: PUT IN THE HALL / SHOW FOR SALE's answer
+		local stand = tonumber(message.stand)
+		if stand and message.area == "show" then
+			toast(`🏷 On sale in the showroom ({WarehouseLayout.plateText(stand)}): visitors make offers, players can buy`)
+		elseif stand then
+			toast(`🏛 In the collection hall (stand {stand}): it earns every minute`)
 		end
 	end
 end
