@@ -22,6 +22,21 @@
 
 local E = require("./CollectionRuntime")
 local Config = require("./Config")
+
+-- 10.4: trading is the SHOWROOM's (Config.Showroom): this test's stands are showroom stands (S(k) = its Base + k), its
+-- showroom as big as its hall was (2, 4, 9, 9, 9 stands by level, every one a big stand's size: the test's own spots)
+local SB = Config.Showroom.Base
+local function S(k: number): number
+	return SB + k
+end
+for showLevel, showCount in { 2, 4, 9, 9, 9 } do
+	Config.Showroom.Levels[showLevel] = { Stands = showCount, Most = showCount }
+	local spots = require("./WarehouseLayout").grid(showLevel).show
+	table.clear(spots)
+	for k = 1, showCount do
+		spots[k] = { 0, 0, 10, 10, 180 }
+	end
+end
 local CollectionRules = require("./CollectionRules")
 local BookRules = require("./CollectionBookRules")
 local BadgeRules = require("./SandboxBadgeRules")
@@ -121,7 +136,7 @@ local function seller(id: number, name: string, items: { string }, condition: nu
 	for index, item in items do
 		local uid = Collection.add(p, { item = item, condition = condition or 1 }) :: string
 		E.flush()
-		Collection.display(p, uid, index)
+		Collection.display(p, uid, S(index))
 		table.insert(uids, uid)
 	end
 	E.flush()
@@ -161,8 +176,8 @@ do
 	local bought = 0
 	for _, item in BookRules.Pieces do
 		local uid = uidOf(main, item) :: string
-		Collection.display(main, uid, 1)
-		bought += if signBuy(main, alt, uid, 1) then 1 else 0
+		Collection.display(main, uid, S(1))
+		bought += if signBuy(main, alt, uid, S(1)) then 1 else 0
 		E.advance(0.2)
 	end
 	E.advance(2)
@@ -254,8 +269,8 @@ do
 	local holder, other, uid = ann, bob, uids[1]
 	local passes = 0
 	for _ = 1, 10 do
-		Collection.display(holder, uid, 1)
-		passes += if signBuy(holder, other, uid, 1) then 1 else 0
+		Collection.display(holder, uid, S(1))
+		passes += if signBuy(holder, other, uid, S(1)) then 1 else 0
 		E.advance(0.5)
 		uid = uidOf(other, item) :: string
 		holder, other = other, holder
@@ -313,7 +328,7 @@ do
 		local gram = uids[1]
 		local price = Rules.clamp(Rules.value(entryOf(bob, gram)) * 2, Rules.value(entryOf(bob, gram)))
 		Trade.setPrice(bob, gram, price)
-		Trade.askBuy(ann, bob, 1)
+		Trade.askBuy(ann, bob, S(1))
 		E.advance(4)
 		if buyerSavedBefore then
 			PlayerData.save(ann)
@@ -325,7 +340,7 @@ do
 		E.budget = budget
 		local from = #E.storeCalls
 		local annMoney, bobMoney = profileOf(ann).money, profileOf(bob).money
-		local got = Trade.buy(ann, bob, gram, 1, price)
+		local got = Trade.buy(ann, bob, gram, S(1), price)
 		local order = writes(from)
 		local annKey, bobKey = `Player_{ann.UserId}`, `Player_{bob.UserId}`
 		local annHas, annSaved = savedCount(ann.UserId, "gramophone")
@@ -364,7 +379,7 @@ do
 	E.advance(30)
 	local price3 = Rules.value(entryOf(seller3, uids[1]))
 	Trade.setPrice(seller3, uids[1], price3)
-	Trade.askBuy(buyer3, seller3, 1)
+	Trade.askBuy(buyer3, seller3, S(1))
 	local failed = false
 	E.storeFault = function(key: string): string?
 		if key == `Player_{buyer3.UserId}` and not failed then
@@ -374,7 +389,7 @@ do
 		return nil
 	end
 	local from = #E.storeCalls
-	Trade.buy(buyer3, seller3, uids[1], 1, price3)
+	Trade.buy(buyer3, seller3, uids[1], S(1), price3)
 	local sellerLost = savedCount(seller3.UserId, "gramophone") == 0
 	local buyerHas = savedCount(buyer3.UserId, "gramophone") == 1
 	check("… the buyer's write failing: the seller's not written before it (the stored saves as before the deal)", failed and not sellerLost and not buyerHas, #writes(from))
@@ -401,51 +416,51 @@ do
 	E.advance(10)
 	-- the remote alone: a guessed uid ("<UserId>-<n>"), no prompt ever used
 	local mark = #E.sent
-	E.fire(mal, "PlayerTrade", { kind = "offer", seller = 602, uid = "602-1", stand = 1, price = Rules.value(entryOf(bob, gram)) })
+	E.fire(mal, "PlayerTrade", { kind = "offer", seller = 602, uid = "602-1", stand = S(1), price = Rules.value(entryOf(bob, gram)) })
 	check("5. an offer through the remote alone (no Make an offer used, a guessed uid): refused, nothing to Bob", #Trade.open(mal) == 0
 		and #E.received(bob, "PlayerTrade", mark) == 0 and lastSaid(mal, mark) == "Walk up to Bob's stand and use Make an offer there.", lastSaid(mal, mark))
 	Trade.setPrice(bob, tv, Rules.value(entryOf(bob, tv)))
 	E.advance(1)
 	mark = #E.sent
-	E.fire(mal, "PlayerTrade", { kind = "buy", seller = 602, uid = tv, stand = 2, price = Rules.value(entryOf(bob, tv)) })
+	E.fire(mal, "PlayerTrade", { kind = "buy", seller = 602, uid = tv, stand = S(2), price = Rules.value(entryOf(bob, tv)) })
 	check("… a FOR SALE sign bought through the remote alone (no Buy used): refused, nothing moved", count(mal, "tv") == 0 and entryOf(bob, tv) ~= nil
 		and lastSaid(mal, mark) == "Walk up to Bob's stand and use Buy there.", lastSaid(mal, mark))
 	-- the ticket: its own piece and stand only; the buyer there
 	local ann = buyer(603, "Ann")
 	standAt(ann, 11, 4) -- (in front of stand 1)
-	Trade.prompt(ann, bob, 1, "offer", spots[1])
+	Trade.prompt(ann, bob, S(1), "offer", spots[1])
 	local gramValue = Rules.value(entryOf(bob, gram))
-	local other, otherWhy = Trade.offer(ann, bob, piano, 3, Rules.value(entryOf(bob, piano)))
+	local other, otherWhy = Trade.offer(ann, bob, piano, S(3), Rules.value(entryOf(bob, piano)))
 	check("… Make an offer at stand 1: its window may offer for that piece only (the piano on stand 3 refused)", other == nil and otherWhy == "Walk up to Bob's stand and use Make an offer there.", otherWhy)
 	standAt(ann, 11 + T.Reach + 5, 4)
-	local far, farWhy = Trade.offer(ann, bob, gram, 1, gramValue)
+	local far, farWhy = Trade.offer(ann, bob, gram, S(1), gramValue)
 	check(`… sent from more than Reach ({T.Reach} studs) from the stand: refused`, far == nil and farWhy == "You walked away from Bob's warehouse: go back to send your offer.", farWhy)
 	standAt(ann, 11 + T.Reach - 5, 4)
-	local near = Trade.offer(ann, bob, gram, 1, gramValue)
+	local near = Trade.offer(ann, bob, gram, S(1), gramValue)
 	check("… sent from within Reach: the offer made", near ~= nil and #Trade.open(ann) == 1)
 	Trade.answer(bob, if near then near.id else "", true)
-	local spent, spentWhy = Trade.offer(ann, bob, gram, 1, gramValue)
+	local spent, spentWhy = Trade.offer(ann, bob, gram, S(1), gramValue)
 	check("… the ticket spent by its offer (accepted: no cooldown; the same ticket again: refused)", count(ann, "gramophone") == 1 and spent == nil
 		and spentWhy == "Walk up to Bob's stand and use Make an offer there.", spentWhy)
-	local composed = Trade.compose(ann, bob, 3, spots[3])
+	local composed = Trade.compose(ann, bob, S(3), spots[3])
 	check("… after a deal she may offer Bob again at once (a new prompt)", composed ~= nil)
 	-- no character (dead, respawning): not there
 	local cid = buyer(604, "Cid")
-	Trade.prompt(cid, bob, 3, "offer", spots[3])
-	local _, bodyless = Trade.offer(cid, bob, piano, 3, Rules.value(entryOf(bob, piano)))
+	Trade.prompt(cid, bob, S(3), "offer", spots[3])
+	local _, bodyless = Trade.offer(cid, bob, piano, S(3), Rules.value(entryOf(bob, piano)))
 	check("… a buyer with no character: not there", bodyless == "You walked away from Bob's warehouse: go back to send your offer.", bodyless)
 	-- an old ticket
 	standAt(cid, 31, 4)
 	E.advance(T.Ticket + 1)
-	local _, stale = Trade.offer(cid, bob, piano, 3, Rules.value(entryOf(bob, piano)))
+	local _, stale = Trade.offer(cid, bob, piano, S(3), Rules.value(entryOf(bob, piano)))
 	check(`… a ticket older than Ticket ({T.Ticket} s): refused`, stale == "That was a while ago: use Make an offer at Bob's stand again.", stale)
 	-- the cooldown: after a DECLINE, after one run out; none after a deal (above); a rejoin keeps it
-	Trade.prompt(cid, bob, 3, "offer", spots[3])
-	local declined = Trade.offer(cid, bob, piano, 3, Rules.value(entryOf(bob, piano)))
+	Trade.prompt(cid, bob, S(3), "offer", spots[3])
+	local declined = Trade.offer(cid, bob, piano, S(3), Rules.value(entryOf(bob, piano)))
 	Trade.answer(bob, if declined then declined.id else "", false)
 	mark = #E.sent
-	Trade.prompt(cid, bob, 3, "offer", spots[3])
-	local again = Trade.offer(cid, bob, piano, 3, Rules.value(entryOf(bob, piano)))
+	Trade.prompt(cid, bob, S(3), "offer", spots[3])
+	local again = Trade.offer(cid, bob, piano, S(3), Rules.value(entryOf(bob, piano)))
 	check(`… DECLINEd: no new offer to Bob for Cooldown ({T.Cooldown} s): the prompt says so, no composer`, declined ~= nil and again == nil
 		and lastSaid(cid, mark) == `You can make Bob another offer in {T.Cooldown} s.` and #E.received(cid, "PlayerTrade", mark) == 0, lastSaid(cid, mark))
 	local cidId = cid.UserId
@@ -453,13 +468,13 @@ do
 	cid = buyer(cidId, "Cid")
 	standAt(cid, 31, 4)
 	E.advance(T.Cooldown / 2)
-	local _, rejoined = Trade.compose(cid, bob, 3, spots[3])
+	local _, rejoined = Trade.compose(cid, bob, S(3), spots[3])
 	E.advance(T.Cooldown / 2 + 1)
-	Trade.prompt(cid, bob, 3, "offer", spots[3])
-	local later = Trade.offer(cid, bob, piano, 3, Rules.value(entryOf(bob, piano)))
+	Trade.prompt(cid, bob, S(3), "offer", spots[3])
+	local later = Trade.offer(cid, bob, piano, S(3), Rules.value(entryOf(bob, piano)))
 	check("… a rejoin keeps it; Cooldown s on, an offer again", rejoined ~= nil and string.find(rejoined, "another offer in", 1, true) ~= nil and later ~= nil, rejoined)
 	E.advance(T.Expire + 1)
-	local _, afterExpiry = Trade.compose(cid, bob, 3, spots[3])
+	local _, afterExpiry = Trade.compose(cid, bob, S(3), spots[3])
 	check("… run out (Bob never answered): the cooldown again", #Trade.open(cid) == 0 and afterExpiry ~= nil and string.find(afterExpiry, "another offer in", 1, true) ~= nil, afterExpiry)
 	-- accounts from afar can't keep Bob's PerSeller slots full
 	local alts = { buyer(611, "A1"), buyer(612, "A2"), buyer(613, "A3") }
@@ -469,14 +484,14 @@ do
 		E.advance(6)
 		for _, alt in alts do
 			standAt(alt, 500, 500)
-			Trade.prompt(alt, bob, 4, "offer", spots[4]) -- (a prompt used once, then off home: no better)
-			E.fire(alt, "PlayerTrade", { kind = "offer", seller = 602, uid = sofa, stand = 4, price = Rules.value(entryOf(bob, sofa)) })
+			Trade.prompt(alt, bob, S(4), "offer", spots[4]) -- (a prompt used once, then off home: no better)
+			E.fire(alt, "PlayerTrade", { kind = "offer", seller = 602, uid = sofa, stand = S(4), price = Rules.value(entryOf(bob, sofa)) })
 			held += #Trade.open(alt)
 		end
 		local h = honest[round]
 		standAt(h, 41, 4)
-		Trade.prompt(h, bob, 4, "offer", spots[4])
-		refused += if Trade.offer(h, bob, sofa, 4, Rules.value(entryOf(bob, sofa)) * 5) == nil then 1 else 0
+		Trade.prompt(h, bob, S(4), "offer", spots[4])
+		refused += if Trade.offer(h, bob, sofa, S(4), Rules.value(entryOf(bob, sofa)) * 5) == nil then 1 else 0
 		E.advance(40) -- (Bob never answers: it runs out)
 	end
 	check(`… three accounts from afar hold none of Bob's {T.PerSeller} slots; an honest buyer at the stand is heard every round`, held == 0 and refused == 0, `{held} held, {refused} refused`)
@@ -485,13 +500,13 @@ do
 	Trade.setPrice(bob, armchair, armValue)
 	local eve = buyer(620, "Eve")
 	standAt(eve, 51, 4)
-	Trade.prompt(eve, bob, 5, "buy", spots[5])
+	Trade.prompt(eve, bob, S(5), "buy", spots[5])
 	standAt(eve, 51 + T.Reach + 5, 4)
-	local _, farBuy = Trade.buy(eve, bob, armchair, 5, armValue)
+	local _, farBuy = Trade.buy(eve, bob, armchair, S(5), armValue)
 	standAt(eve, 51, 4)
-	local boughtNear = Trade.buy(eve, bob, armchair, 5, armValue)
+	local boughtNear = Trade.buy(eve, bob, armchair, S(5), armValue)
 	check("… BUY: refused from afar, bought from the stand", farBuy == "You walked away from Bob's warehouse: go back to buy it." and boughtNear ~= nil and count(eve, "armchair") == 1, farBuy)
-	local _, wrongStand = Trade.buy(eve, bob, plant, 6, plantValue)
+	local _, wrongStand = Trade.buy(eve, bob, plant, S(6), plantValue)
 	check("… the question's ticket spent, and good for its own piece only", wrongStand == "Walk up to Bob's stand and use Buy there.", wrongStand)
 end
 

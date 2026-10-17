@@ -26,6 +26,11 @@
 --     and the side room of WarehouseLayout.grid); every level's front wall and door where the plot's are, its box
 --     behind it on the plot, the Blender level's size, door and top (Config.Warehouse.Levels); the pieces on its
 --     stands clear of its beams and lamps; the sites, levelOf, count, capacity, fits and standSize per level
+--   * 10.4 (the warehouse in two, Config.Showroom): where the showroom's runway takes the middle aisle behind the door
+--     (WarehouseLayout.grid's middleFrom: the Big Warehouse, the Logistics Center), the hall's small middle spots stand
+--     behind it as a rack: middleGap apart at least, each with a lane (the level's walk) free at one side to stand at,
+--     the rest as above; the way in ends at the receiving zone there (the runway's walk goes on); the showroom's own
+--     plinths are counted with the stands' parts (their layout: tests/showroom_test.luau)
 -- Run with tests/run_tests.py.
 local Config = require("./Config")
 local SandboxMap = require("./SandboxMap")
@@ -137,13 +142,18 @@ for _, basePlot in SandboxMap.Plots do
 			end
 		end
 	end
+	-- 10.4: the rack behind the showroom's runway (the small middle spots, middleFrom): middleGap apart
+	local function racked(i: number): boolean
+		return G.middleFrom ~= nil and i > BIG + 4
+	end
 	for i = 1, ALL do
 		for j = i + 1, ALL do
 			local a, b = rects[i], rects[j]
 			if a and b then
 				local g = gap(a, b)
+				local need = if racked(i) and racked(j) then (G.middleGap or G.walk) else G.walk
 				worst = math.min(worst, g)
-				aislesOk = aislesOk and g >= G.walk - 1e-6
+				aislesOk = aislesOk and g >= need - 1e-6
 			end
 		end
 	end
@@ -153,11 +163,19 @@ for _, basePlot in SandboxMap.Plots do
 		local r = rects[i]
 		if s and r then
 			local strip: Rect = if s.yaw == 0 then { x0 = r.x0, x1 = r.x1, z0 = r.z0 - G.walk, z1 = r.z0 } else { x0 = r.x0, x1 = r.x1, z0 = r.z1, z1 = r.z1 + G.walk }
-			local clear = within(strip, inside)
-			for j = 1, ALL do
-				if j ~= i and rects[j] and overlaps(strip, rects[j]) then
-					clear = false
+			local function free(room: Rect): boolean
+				local ok = within(room, inside)
+				for j = 1, ALL do
+					if j ~= i and rects[j] and overlaps(room, rects[j]) then
+						ok = false
+					end
 				end
+				return ok
+			end
+			local clear = free(strip)
+			if not clear and racked(i) then
+				-- (10.4: a rack spot: a lane at its west or east side instead)
+				clear = free({ x0 = r.x0 - G.walk, x1 = r.x0, z0 = r.z0, z1 = r.z1 }) or free({ x0 = r.x1, x1 = r.x1 + G.walk, z0 = r.z0, z1 = r.z1 })
 			end
 			if not clear then
 				frontOk = false
@@ -275,7 +293,7 @@ for _, basePlot in SandboxMap.Plots do
 	if basePlot.id == 1 then
 		table.insert(lampsSeen, `{lamps}`)
 	end
-	standPartsOk = standPartsOk and standParts == 3 * ALL
+	standPartsOk = standPartsOk and standParts == 3 * (ALL + WarehouseLayout.showCapacity(level)) -- (10.4: + the showroom's plinths)
 	local shed = def.roof == "shed"
 	for _, name in { "OwnerSign", "StockBoard", "Floor", "Header", "DoorCurtain", "ReceivingText", "BayText", "TerminalDesk", "TerminalTop", "TerminalScreen", "UpgradeSign" } do
 		signsOk = signsOk and names[name] == true

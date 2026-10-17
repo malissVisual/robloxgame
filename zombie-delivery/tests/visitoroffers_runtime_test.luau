@@ -9,7 +9,9 @@
 -- task "offer" done; the closed message, the visitor's answer); the refusals: a forged or stale id, a number for an id,
 -- garbage, another player's id, a second ACCEPT, the clock run out (at the tick and at a late ACCEPT), the piece taken
 -- down, moved to another stand or sold before the answer; DECLINE; the rate limit; leaving; the offer task never picked
--- while Config.Visitors.On is false.
+-- while Config.Visitors.On is false. 10.4 (the warehouse in two, Config.Showroom): the offers are the showroom's: Ann's
+-- pieces on showroom stands (S(k)), the price the market's × the showroom's factor (Collection.showFactor), a piece in
+-- the hall gets none and one moved there closes its offer (gone).
 -- Run: python3 tests/run_tests.py [path to the luau binary]
 
 local E = require("./CollectionRuntime")
@@ -123,7 +125,7 @@ end
 local function priceFor(player: any, uid: string, kind: string, roll: number): (number, number)
 	local entry = entryOf(player, uid)
 	local market = Collection.market(player)
-	local base = CollectionRules.sell(entry, market)
+	local base = CollectionRules.sell(entry, market, Collection.showFactor(player)) -- (10.4: the showroom's price)
 	local rank = CollectionRules.tier(CollectionRules.rarityOf(CollectionRules.defOf(entry.item))).rank
 	local pay = (Visitors.kind(kind) :: Visitors.Kind).pay
 	return Visitors.offerPrice(base, rank, Market.tag(market, entry.item) == "hot", pay, roll), base
@@ -141,7 +143,12 @@ local B = E.join(302, "Bob")
 E.flush()
 check("(Ann and Bob in with their saves: the tasks loaded)", profileOf(A) ~= nil and profileOf(A).sandboxTasks ~= nil and Tasks.state(A) ~= nil)
 Upgrades.admin(A, "level5") -- (8.3 levels: Ann's warehouse the Logistics Center, 24 stands; Bob's the Garage, 2)
+profileOf(A).sandboxUpgrades.showstands = 3 -- (10.4: her showroom's six plinths)
 E.flush()
+local function S(k: number): number -- (10.4: showroom stand k)
+	return Config.Showroom.Base + k
+end
+check("(10.4: Ann's showroom: 6 stands)", Collection.showStands(A) == 6, Collection.showStands(A))
 check("(Ann at level 5: 24 stands; Bob at the start's: 2)", Collection.stands(A) == 24 and Collection.stands(B) == 2)
 for _, item in { "piano", "sofa", "sofa", "plant", "armchair" } do
 	Collection.add(A, { item = item, condition = 1 })
@@ -153,11 +160,11 @@ Collection.add(B, { item = "sofa", condition = 1 })
 E.flush()
 local piano, sofa1, sofa2, plant, armchair = uidOf(A, "piano") :: string, uidOf(A, "sofa", 1) :: string, uidOf(A, "sofa", 2) :: string, uidOf(A, "plant") :: string, uidOf(A, "armchair") :: string
 local broken, hot = uidOf(A, "tv") :: string, uidOf(A, hotKind) :: string
-Collection.display(A, piano, 1)
-Collection.display(A, sofa1, 2)
-Collection.display(A, broken, 3)
-Collection.display(A, hot, 4)
-Collection.display(A, armchair, 5)
+Collection.display(A, piano, S(1))
+Collection.display(A, sofa1, S(2))
+Collection.display(A, broken, S(3))
+Collection.display(A, hot, S(4))
+Collection.display(A, armchair, S(5))
 Collection.display(B, uidOf(B, "sofa") :: string, 1)
 E.flush()
 
@@ -168,7 +175,7 @@ local want, base = priceFor(A, piano, "collector", 0.5)
 local offer = Offers.make(A, piano, "collector", 0.5, "tok1")
 E.flush()
 check("an offer for the piano on show from the collector: the market's price × its factor (rare: 8.3 economy, the collector's pay)", offer ~= nil and offer.price == want
-	and offer.base == base and offer.price > base and offer.who == "Collector" and offer.stand == 1 and offer.rarity == "rare" and offer.token == "tok1", offer and offer.price)
+	and offer.base == base and offer.price > base and offer.who == "Collector" and offer.stand == S(1) and offer.rarity == "rare" and offer.token == "tok1", offer and offer.price)
 check("… its price over the market price: × 1.1 – 1.5 and more (rarity, kind), Top at most", offer ~= nil and offer.price >= base * O.Min and offer.price <= base * O.Top + 10)
 local cards = kinds(E.received(A, "Visitors", mark), "offer")
 local card = cards[1]
@@ -255,7 +262,7 @@ E.fire(A, "Visitors", { kind = "decline", id = (tourist :: any).id })
 E.flush()
 closed = kinds(E.received(A, "Visitors", mark), "closed")
 check("DECLINE: closed (declined), nothing paid, the sofa still on its stand, no notice", #closed == 1 and closed[1].how == "declined" and sales(A, moneyAt) == 0
-	and entryOf(A, sofa1).stand == 2 and #E.received(A, "Notice", mark) == 1 and answers[#answers].how == "declined" and answers[#answers].offer.token == "tok2")
+	and entryOf(A, sofa1).stand == S(2) and #E.received(A, "Notice", mark) == 1 and answers[#answers].how == "declined" and answers[#answers].offer.token == "tok2")
 
 -- ── The clock runs out ────────────────────────────────────────────────────
 E.advance(O.Every)
@@ -296,12 +303,22 @@ end
 gone("taken down", function()
 	Collection.undisplay(A, sofa1)
 end)
-Collection.display(A, sofa1, 2)
+Collection.display(A, sofa1, S(2))
 E.flush()
 gone("moved to another stand", function()
-	Collection.display(A, sofa1, 6)
+	Collection.display(A, sofa1, S(6))
 end)
-Collection.display(A, sofa2, 7)
+gone("10.4: put in the hall", function()
+	Collection.place(A, sofa1, "hall")
+end)
+check("10.4: no offer for a piece in the hall (it earns there)", entryOf(A, sofa1).stand ~= nil and not CollectionRules.isShow(entryOf(A, sofa1).stand)
+	and (function()
+		E.advance(O.Every)
+		return Offers.make(A, sofa1, "tourist", 0.5) == nil
+	end)())
+Collection.place(A, sofa1, "show")
+check("10.4: … shown for sale again (Collection.place): the showroom's first free stand (the piano's, sold)", entryOf(A, sofa1).stand == S(1), entryOf(A, sofa1).stand)
+Collection.display(A, sofa2, S(6))
 E.flush()
 gone("sold at its stand", function()
 	Collection.sell(A, sofa1)
@@ -312,7 +329,7 @@ check("… sold once only (CollectionSale)", entryOf(A, sofa1) == nil and paid(A
 E.advance(O.Every)
 local sofaDemand = (Collection.market(A) :: any).demand.sofa
 local wantSofa, baseSofa = priceFor(A, sofa2, "tourist", 0.5)
-local plainSofa = CollectionRules.sell(entryOf(A, sofa2))
+local plainSofa = CollectionRules.sell(entryOf(A, sofa2), nil, Collection.showFactor(A))
 local afterSale = Offers.make(A, sofa2, "tourist", 0.5)
 check("the next sofa's offer: its market price under the demand (one sofa sold today: 5 % less)", sofaDemand ~= nil and sofaDemand.n == 1 and afterSale ~= nil
 	and afterSale.base == baseSofa and afterSale.price == wantSofa and baseSofa < plainSofa, `{baseSofa} vs {plainSofa}`)

@@ -1821,9 +1821,22 @@ end
 do
 	local Rules = require("./PlayerTradeRules")
 	local T = Config.PlayerTrade
+	-- 10.4 (the warehouse in two): trading is the showroom's; Ann shows two of her hall's pieces for sale (the stock
+	-- list's FOR SALE: the remote's "place"), each to the showroom's first free plinth
+	local placedAt = #E.sent
+	local moved = 0
+	for _, entry in Collection.stock(ann2) do
+		if moved < 2 and entry.stand and not CollectionRules.isShow(entry.stand) and H.request(ann2, { kind = "place", uid = entry.uid, area = "show" }) == "" then
+			moved += 1
+		end
+	end
+	H.rebuilt()
+	local placed = E.lastKind(ann2, "Collection", "placed", placedAt)
+	check("14b. 10.4: Ann shows two hall pieces for sale (FOR SALE: the remote's place): on her showroom's plinths, told where",
+		moved == 2 and placed ~= nil and placed.area == "show" and placed.stand == Config.Showroom.Base + 2 and Warehouse.shown(1, Config.Showroom.Base + 2) ~= nil, moved)
 	local shown = {}
 	for _, entry in Collection.stock(ann2) do
-		if entry.stand then
+		if entry.stand and CollectionRules.isShow(entry.stand) then
 			table.insert(shown, entry)
 		end
 	end

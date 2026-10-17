@@ -7,7 +7,8 @@
 -- tests/runtime/MovingRuntime.luau's. Here: a fake SandboxPlots (Runtime.claim, Runtime.free) and a fake Collection
 -- (a stock per player the test fills, Runtime.give / Runtime.changed; it records Runtime.calls). 8.1: the fake
 -- Collection's stands (Runtime.standCount: player → how many, else the real rule: UpgradeRules.totalStands of their
--- levels) and boost (Runtime.boosts), a fake Upgrades (its open recorded in Runtime.calls as "openUpgrades").
+-- levels) and boost (Runtime.boosts), a fake Upgrades (its open recorded in Runtime.calls as "openUpgrades"). 10.4: its
+-- showStands (Runtime.showCount, else UpgradeRules.showStands of the levels), bonus (the boost), showFactor, market (none).
 -- 8.3, the warehouse levels: the fake Upgrades' levels (Runtime.levels: player → { [id]: level }; Upgrades.levels gives
 -- a copy) and its listeners (Runtime.upgrade(player, levels): the levels set, Upgrades.onChanged's fns told, as the
 -- real one does after a purchase and when a save loads); Runtime.fakeArt() puts a stand-in of the owner's Blender
@@ -36,6 +37,7 @@ local Runtime: any = {
 	standCount = {}, -- 8.1: player → Collection.stands (else UpgradeRules.totalStands of their levels)
 	boosts = {}, -- 8.1: player → Collection.boost (else 1)
 	levels = {}, -- 8.3: player → their upgrades' levels (Upgrades.levels; none: the garage)
+	showCount = {}, -- 10.4: player → Collection.showStands (else UpgradeRules.showStands of their levels)
 }
 
 -- The Shared folder (empty: no CollectionRules) under the services MovingRuntime fakes.
@@ -162,6 +164,18 @@ Runtime.Collection = {
 	end,
 	boost = function(player: any): number
 		return Runtime.boosts[player] or 1
+	end,
+	bonus = function(player: any): number -- (10.4: the hall's Bonus; a plain boost here)
+		return Runtime.boosts[player] or 1
+	end,
+	showStands = function(player: any): number -- (10.4: the showroom's stands: Runtime.showCount, else the real rule)
+		return Runtime.showCount[player] or UpgradeRules.showStands(Runtime.levels[player] or {})
+	end,
+	showFactor = function(): number -- (10.4: the showroom's price × without the tree's Sales pitch)
+		return Config.Showroom.SellBonus
+	end,
+	market = function(): any -- (8.3: no market here)
+		return nil
 	end,
 	marketIncome = function(): number -- (8.3: no hot kinds here)
 		return 1

@@ -130,20 +130,29 @@ function Visitors.kind(id: string): Kind?
 	return nil
 end
 
-function Visitors.pickKind(roll: number): Kind
+-- (10.4: `extra` { [kind id] = weight } in place of those kinds' own: the VIP buyers' kind, whose own weight is 0)
+function Visitors.pickKind(roll: number, extra: { [string]: number }?): Kind
 	local kinds = tune().Kinds
+	local function weight(kind: Kind): number
+		local w = if extra and extra[kind.id] ~= nil then extra[kind.id] else kind.weight
+		return if finite(w) then math.max(0, w) else 0
+	end
 	local total = 0
+	local last: Kind = kinds[1]
 	for _, kind in kinds do
-		total += math.max(0, kind.weight)
+		total += weight(kind)
+		if weight(kind) > 0 then
+			last = kind
+		end
 	end
 	local at = unit(roll) * total
 	for _, kind in kinds do
-		at -= math.max(0, kind.weight)
+		at -= weight(kind)
 		if at < 0 then
 			return kind
 		end
 	end
-	return kinds[#kinds]
+	return last
 end
 
 function Visitors.pickName(kind: Kind, roll: number): string

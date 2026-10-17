@@ -128,6 +128,7 @@ local function dice(seed: number): () -> number
 	end
 end
 
+-- (10.4: LootRules.luck(rolled, chance, seed) lifts a few pieces a tier: the upgrade tree's Keen eye, by its own dice)
 function LootRules.seedOf(seed: any, difficulty: any): number
 	local base = if finite(seed) then math.floor(math.abs(seed)) % 4294967296 else 0
 	local index = table.find(LootRules.Order, LootRules.difficulty(difficulty)) or 0
@@ -217,6 +218,34 @@ function LootRules.lift(roll: Roll, steps: number, floor: string?): Roll
 		base = if lift > 0 then roll.value / lift else roll.value
 	end
 	return { rarity = rarity, stars = LootRules.rank(rarity), value = LootRules.valueOf(base :: number, roll.own, rarity), own = roll.own, base = base }
+end
+
+-- 10.4: the run host's upgrade tree's Keen eye: each piece of a house's rolls a `chance` (0 … 0.25) of a tier more, by
+-- its own die (the house's seed and its spot: the same house, the same luck), never past the top. → the spots lifted.
+function LootRules.luck(rolled: { [number]: Roll }, chance: number, seed: number): { number }
+	local lifted: { number } = {}
+	local p = if finite(chance) then math.clamp(chance, 0, 0.25) else 0
+	if p <= 0 then
+		return lifted
+	end
+	local spots: { number } = {}
+	for spot in rolled do
+		table.insert(spots, spot)
+	end
+	table.sort(spots)
+	for _, spot in spots do
+		local roll = dice((if finite(seed) then math.floor(math.abs(seed)) else 0) * 31 + spot * 7919 + 104723)
+		roll()
+		if roll() < p then
+			local was = rolled[spot]
+			local now = LootRules.lift(was, 1)
+			if now ~= was then
+				rolled[spot] = now
+				table.insert(lifted, spot)
+			end
+		end
+	end
+	return lifted
 end
 
 function LootRules.attributes(rarity: string, value: number): { [string]: any }

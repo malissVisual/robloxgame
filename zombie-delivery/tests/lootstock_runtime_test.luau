@@ -81,8 +81,12 @@ local page = (CollectionBook.book(ann) :: any).sofa
 check("the book's page: four sofas, its rarest found Epic", page ~= nil and page.n == 4 and page.top == "epic")
 
 -- a deal between players: the same rarity and value at the buyer's
-check("the Epic sofa on stand 1", (Collection.display(ann, u1, 1)))
-local piece = Collection.transfer(ann, bob, u1, 1, 200, 16)
+local showStand = Config.Showroom.Base + 1 -- (10.4: a deal is a showroom piece's; a sofa's plinth from the Workshop on)
+local annProfile = PlayerData.get(ann) :: any
+annProfile.sandboxUpgrades.warehouse = 1
+local shownOk, shownWhy = Collection.display(ann, u1, showStand)
+check("the Epic sofa on showroom stand 1", shownOk, shownWhy)
+local piece = Collection.transfer(ann, bob, u1, showStand, 200, 16)
 check("a deal (Collection.transfer): the buyer's piece Epic too", piece ~= nil and piece.rarity == "epic" and Rules.valueOf(piece) == LIFT2)
 E.flush()
 local bobView = viewOf(stateOf(bob), (piece :: any).uid)

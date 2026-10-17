@@ -12,7 +12,8 @@
 --                              that rarity: the move's facts count it) and its rarity (thing.rarity: the trip home stores
 --                              it with the piece, Collection.add's `rarity`). Never in the move's way: anything wrong is a
 --                              warning and the piece stays as it was (its own rarity)
---   Loot.rollOf(s)             the house's rolls of move `s` ({ [spot] = LootRules.Roll }), rolled now if not yet
+--   Loot.rollOf(s)             the house's rolls of move `s` ({ [spot] = LootRules.Roll }), rolled now if not yet (10.4:
+--                              a run's, then the host's upgrade tree's Keen eye: LootRules.luck)
 --   Loot.rarityOf(thing)       the rarity Loot gave a move's thing (nil: none)
 --   10.x danger: Loot.boost(s, spot, steps, floor?)   the piece at `spot` of move `s` lifted `steps` tiers and at least
 --                              to `floor` (LootRules.lift: a locked room's pieces a tier, a vault's to Epic or Legendary,
@@ -48,6 +49,14 @@ function Loot.rollOf(s: any): { [number]: LootRules.Roll }
 	local seed = if type(plan) == "table" and type(plan.seed) == "number" then plan.seed else 0
 	local difficulty = if type(contract) == "table" then contract.difficulty else nil
 	local rolled = LootRules.roll(pieces, difficulty, seed)
+	-- 10.4: a run's host's upgrade tree's Keen eye (UpgradeRules.effect "lootLuck"): a small chance a piece more
+	if difficulty ~= nil then
+		local ok, levels = pcall(function(): any
+			local profile = require(script.Parent.PlayerData).get(s.owner)
+			return if profile then profile.sandboxUpgrades else nil
+		end)
+		LootRules.luck(rolled, require(Shared.UpgradeRules).effect(if ok then levels else nil, "lootLuck"), seed)
+	end
 	rolls[move] = rolled
 	return rolled
 end

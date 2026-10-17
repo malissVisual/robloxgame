@@ -35,14 +35,15 @@ do
 			table.insert(bad, `{kind.id} twice`)
 		end
 		ids[kind.id] = true
-		if kind.weight <= 0 or #kind.names == 0 or kind.title == "" or kind.chance < 0 or kind.pay < 0 then
+		local weightless = kind.id == Config.Showroom.Vip.Kind -- (10.4: the VIP, weight 0: only the tree's VIP days send one)
+		if (kind.weight <= 0 and not (weightless and kind.weight == 0)) or #kind.names == 0 or kind.title == "" or kind.chance < 0 or kind.pay < 0 then
 			table.insert(bad, kind.id)
 		end
 		if Visitors.kind(kind.id) ~= kind then
 			table.insert(bad, `Visitors.kind({kind.id})`)
 		end
 	end
-	check("the kinds: unique ids, a weight, names, a title, a chance and a pay; Visitors.kind finds each", #bad == 0 and #Visitors.kinds() >= 3, table.concat(bad, ", "))
+	check("the kinds: unique ids, a weight (the VIP's 0), names, a title, a chance and a pay; Visitors.kind finds each", #bad == 0 and #Visitors.kinds() >= 3, table.concat(bad, ", "))
 	check("tourists, hikers and a collector among them", ids.tourist == true and ids.hiker == true and ids.collector == true)
 	local counts: { [string]: number } = {}
 	for i = 0, 999 do
@@ -60,6 +61,12 @@ do
 		end
 	end
 	check("Visitors.pickKind: each kind by its weight", fair)
+	local vips, vipsWith = 0, 0
+	for i = 0, 999 do
+		vips += if Visitors.pickKind(i / 1000).id == Config.Showroom.Vip.Kind then 1 else 0
+		vipsWith += if Visitors.pickKind(i / 1000, { [Config.Showroom.Vip.Kind] = Config.Showroom.Vip.Weight }).id == Config.Showroom.Vip.Kind then 1 else 0
+	end
+	check("10.4: no VIP without the tree's VIP days; with them (its Weight) one now and then", vips == 0 and vipsWith > 0 and vipsWith < 400, `{vips}, {vipsWith}`)
 	local collector = Visitors.kind("collector") :: Visitors.Kind
 	local look = Visitors.look(collector, "Mr. Whitcombe")
 	check("the collector's look: a tweed jacket (its colour on the shirt, a vest over it), a tie, the name and title over the head, the stroll's pace",

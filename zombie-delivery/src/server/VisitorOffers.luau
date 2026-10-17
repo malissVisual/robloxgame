@@ -10,6 +10,9 @@
 -- clock not run out), its id, the piece still yours and on the stand it was offered at; the price is always the
 -- server's (the client sends only the id). The piece taken down, moved, sold or gone while the offer is open closes it
 -- ("gone"); leaving closes it ("left"). Analytics: VisitorOffer (the offer's $, how it ended, the piece's rarity).
+-- 10.4 (the warehouse in two, Config.Showroom): only a piece in the SHOWROOM gets an offer (a collection hall's piece
+-- is not for sale), priced from its showroom price (× Collection.showFactor: SellBonus and the tree's Sales pitch); a
+-- VIP buyer (the tree's VIP buyers, Config.Showroom.Vip) offers Vip.Pay more for a Rare or rarer piece.
 --
 --   VisitorOffers.ready(player) -> boolean        may a visitor offer now (a save, no offer open, Every s since the last)
 --   VisitorOffers.make(player, uid, kind, roll?, token?) -> Offer?, why
@@ -129,15 +132,25 @@ function VisitorOffers.make(player: Player, uid: string, kindId: string, roll: n
 	if not entry or entry.stand == nil then
 		return nil, "That piece isn't on show."
 	end
+	if not CollectionRules.isShow(entry.stand) then
+		return nil, "That piece is in the collection hall: not for sale." -- (10.4: the visitors buy only in the showroom)
+	end
 	if CollectionRules.broken(entry) then
 		return nil, "Nobody buys a broken piece."
 	end
 	local market = Collection.market(player)
-	local base = CollectionRules.sell(entry, market) -- (the market's price now: the hot and cold kinds, the demand)
+	-- (the market's price now: the hot and cold kinds, the demand; 10.4: × the showroom's, Collection.showFactor)
+	local base = CollectionRules.sell(entry, market, Collection.showFactor(player))
 	local kind = Rules.kind(kindId)
 	local rarity = CollectionRules.pieceRarity(entry) -- (9.x loot: its own roll)
 	local tag = Market.tag(market, entry.item)
-	local price = Rules.offerPrice(base, CollectionRules.tier(rarity).rank, tag == "hot", if kind then kind.pay else 0, roll or math.random())
+	local rank = CollectionRules.tier(rarity).rank
+	local price = Rules.offerPrice(base, rank, tag == "hot", if kind then kind.pay else 0, roll or math.random())
+	if kind and kind.id == Config.Showroom.Vip.Kind and rank >= 3 then
+		-- (10.4: a VIP buyer pays Vip.Pay over a usual offer for a Rare or rarer piece, past the usual top)
+		local step = if price >= 1000 then 10 elseif price >= 100 then 5 else 1
+		price = math.ceil(price * (1 + Config.Showroom.Vip.Pay) / step) * step
+	end
 	counter += 1
 	local now = os.clock()
 	local offer: Offer = {

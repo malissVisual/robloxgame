@@ -163,35 +163,38 @@ do
 		and read.rarity == "common" and read.isNew == false and read.sale == nil and read.money == nil)
 end
 
--- ── The save: the FOR SALE sign ───────────────────────────────────────────
+-- ── The save: the FOR SALE sign (10.4: a sign is the showroom's: its stands past Config.Showroom.Base) ─
 do
+	local S = Config.Showroom.Base
 	local saved = CollectionRules.clean({ entries = {
-		{ uid = "1-1", item = "gramophone", variant = 1, condition = 0.9, name = "Gramophone", stand = 1, got = 1, sale = 1200 },
+		{ uid = "1-1", item = "gramophone", variant = 1, condition = 0.9, name = "Gramophone", stand = S + 1, got = 1, sale = 1200 },
 		{ uid = "1-2", item = "sofa", variant = 1, condition = 1, name = "Sofa", got = 2, sale = 500 }, -- (in the stock: no sign)
-		{ uid = "1-3", item = "radio", variant = 1, condition = 1, name = "Radio", stand = 2, got = 3, sale = 0 / 0 },
-		{ uid = "1-4", item = "radio", variant = 1, condition = 1, name = "Radio", stand = 3, got = 4, sale = 12.5 },
-		{ uid = "1-5", item = "radio", variant = 1, condition = 1, name = "Radio", stand = 4, got = 5, sale = "900" },
-		{ uid = "1-6", item = "radio", variant = 1, condition = 1, name = "Radio", stand = 5, got = 6, sale = 2 ^ 41 },
-		{ uid = "1-7", item = "radio", variant = 1, condition = 1, name = "Radio", stand = 6, got = 7, sale = -5 },
-		{ uid = "1-8", item = "radio", variant = 1, condition = 1, name = "Radio", stand = 7, got = 8 }, -- (8.6's: none)
+		{ uid = "1-3", item = "radio", variant = 1, condition = 1, name = "Radio", stand = S + 2, got = 3, sale = 0 / 0 },
+		{ uid = "1-4", item = "radio", variant = 1, condition = 1, name = "Radio", stand = S + 3, got = 4, sale = 12.5 },
+		{ uid = "1-5", item = "radio", variant = 1, condition = 1, name = "Radio", stand = S + 4, got = 5, sale = "900" },
+		{ uid = "1-6", item = "radio", variant = 1, condition = 1, name = "Radio", stand = S + 5, got = 6, sale = 2 ^ 41 },
+		{ uid = "1-7", item = "radio", variant = 1, condition = 1, name = "Radio", stand = S + 6, got = 7, sale = -5 },
+		{ uid = "1-8", item = "radio", variant = 1, condition = 1, name = "Radio", stand = S + 7, got = 8 }, -- (8.6's: none)
 	}, nextUid = 9 })
 	local e = saved.entries
 	check("clean: a sign on a piece on show kept, a whole number of dollars", e[1].sale == 1200)
 	check("… none on a piece in the stock; NaN, a fraction, a string, too big, negative: none", e[2].sale == nil and e[3].sale == nil and e[4].sale == nil
 		and e[5].sale == nil and e[6].sale == nil and e[7].sale == nil)
-	check("… an older save's piece (no field): simply not for sale", e[8].sale == nil and e[8].stand == 7)
+	check("… an older save's piece (no field): simply not for sale", e[8].sale == nil and e[8].stand == S + 7)
 	local again = CollectionRules.clean(saved)
 	check("… clean again: the same", again.entries[1].sale == 1200 and #again.entries == #saved.entries)
-	check("fromSave: a real save's signs come back; an older one's collection has none to lose", CollectionRules.fromSave({ money = 10, collectionKept = true, collection = saved }).entries[1].sale == 1200
+	check("fromSave: a real save's signs come back; an older one's collection has none to lose", CollectionRules.fromSave({ money = 10, collectionKept = true, showroomKept = true, collection = saved }).entries[1].sale == 1200
 		and #CollectionRules.fromSave({ money = 10, collection = saved }).entries == 0)
 	check("saleOf: the save's own check", CollectionRules.saleOf(5) == 5 and CollectionRules.saleOf(0) == nil and CollectionRules.saleOf(1.5) == nil and CollectionRules.saleOf(nil) == nil)
 	check("view: the client's View carries the sign", CollectionRules.view(e[1]).sale == 1200 and CollectionRules.view(e[2]).sale == nil)
-	local moved = CollectionRules.fitStands(saved, 1)
-	check("fitStands (a level down): the pieces that leave their stands lose their signs; the one that stays keeps it", moved >= 1 and e[1].sale == 1200 and e[1].stand == 1
+	local moved = CollectionRules.fitStands(saved, 0, nil, 1)
+	check("fitStands (a level down): the pieces that leave their stands lose their signs; the one that stays keeps it", moved >= 1 and e[1].sale == 1200 and e[1].stand == S + 1
 		and saved.entries[8].sale == nil and saved.entries[8].stand == nil)
-	local sold = { stand = 1, sale = 1200, item = "gramophone", condition = 1 }
+	local sold = { stand = S + 1, sale = 1200, item = "gramophone", condition = 1 }
 	CollectionRules.fitStands({ entries = { sold :: any }, nextUid = 2 }, 0)
 	check("… and its sign goes with it to the stock", sold.stand == nil and sold.sale == nil)
+	check("10.4: a sign on a hall stand is none (clean), and a save from before the showroom (no showroomKept) keeps none", CollectionRules.clean({ entries = { { uid = "1-1", item = "radio", condition = 1, stand = 1, sale = 900 } } }).entries[1].sale == nil
+		and CollectionRules.fromSave({ money = 10, collectionKept = true, collection = { entries = { { uid = "1-1", item = "radio", condition = 1, stand = S + 1, sale = 900 } } } }).entries[1].sale == nil)
 end
 
 -- ── Selling to a player makes sense ────────────────────────────────────────
