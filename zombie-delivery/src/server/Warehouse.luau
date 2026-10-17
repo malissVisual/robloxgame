@@ -711,7 +711,7 @@ local function remakePrompts(state: PlotState, owner: Player?)
 		local desk = Instance.new("ProximityPrompt")
 		desk.Name = "Upgrades"
 		desk.ActionText = "Upgrades"
-		desk.ObjectText = "ZDC UPGRADES"
+		desk.ObjectText = "DELIVEROS UPGRADES"
 		desk.KeyboardKeyCode = Enum.KeyCode.E
 		desk.GamepadKeyCode = Enum.KeyCode.ButtonX
 		desk.HoldDuration = 0

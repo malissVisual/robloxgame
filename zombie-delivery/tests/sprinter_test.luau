@@ -281,8 +281,8 @@ for _, p in pieces do
 		red += 1
 	end
 end
-check("the ZDC livery: ZDC on both sides and the back door, the company's name, the plates", (texts.ZDC or 0) == 3
-	and (texts["ZOMBIE DELIVERY CO.\nWE DELIVER. THEY DON'T."] or 0) == 2 and (texts["ZDC 02"] or 0) == 2)
+check("the Deliveros livery: Deliveros on both sides and the back door, the company's name, the plates", (texts.DELIVEROS or 0) == 3
+	and (texts["MOVING & STORAGE\nMOVE · FIND · GROW"] or 0) == 2 and (texts["DLV 02"] or 0) == 2)
 check("… the red stripe all round (both sides, the doors, the back)", red >= 10, red)
 local count = #pieces + #Looks.hull() + #Looks.Switched
 check("the part budget: SprinterLooks' parts at most 150 (Vehicles adds ~30: chassis, wheels, seats, doors' panels)", count <= 150, count)
@@ -306,9 +306,9 @@ check("the sliding door: its opening from z -2.85, 0.35 out and 5.0 back (the mo
 -- ── The car ─────────────────────────────────────────────────────────────────
 local def = Economy.findCar("sprinter") :: Config.CarDef
 local van = Economy.findCar(Config.CompanyVan.Car) :: Config.CarDef
-check("Config.Cars sprinter: the ZDC Sprinter, style sprinter, the sandbox's van", def ~= nil and def.name == "ZDC Sprinter" and def.style == "sprinter"
+check("Config.Cars sprinter: the Deliveros Sprinter, style sprinter, the sandbox's van", def ~= nil and def.name == "Deliveros Sprinter" and def.style == "sprinter"
 	and Config.Sandbox.Van == "sprinter")
-check("… heavier than the ZDC Van: slower, slower off the line, a wider turn, tougher", def.maxSpeed < van.maxSpeed and def.accel < van.accel
+check("… heavier than the Deliveros Van: slower, slower off the line, a wider turn, tougher", def.maxSpeed < van.maxSpeed and def.accel < van.accel
 	and def.turn < van.turn and def.health >= van.health)
 check("… a big tank (no pumps in the sandbox): 100,000 studs and more", def.tank ~= nil and def.burn ~= nil
 	and (def.tank :: number) * 1000 / (def.burn :: number) * Config.Fuel.Lasts >= 100000)
@@ -316,6 +316,6 @@ check("… sandbox-only: no stages, no roof gun, no gear, never sold", def.sandb
 	and (def.gearSlots or 0) == 0 and def.price == 0)
 check("… a player's car only while the sandbox is on", Economy.isPlayerCar("sprinter") == Config.Sandbox.On)
 check("… never a bigger car's advice", string.find(Economy.roomAdvice(Config.CompanyVan.Car, 0, 9), "Sprinter", 1, true) == nil)
-check("the ZDC Van stays Config.Cars[1]", Config.Cars[1].id == Config.CompanyVan.Car)
+check("the Deliveros Van stays Config.Cars[1]", Config.Cars[1].id == Config.CompanyVan.Car)
 
 print(if failures == 0 then "ALL CHECKS PASSED" else `{failures} CHECK(S) FAILED`)

@@ -1,4 +1,4 @@
-# Sklad ZDC v pěti úrovních (Blender)
+# Sklad Deliveros v pěti úrovních (Blender)
 
 ![Pět úrovní skladu](warehouse-levels.png)
 
@@ -9,8 +9,8 @@ stojany a další věci, které vymyslíš). Tady je pět modelů v Blenderu, od
 | Level | Budova | Velikost (šířka × výška zdí × hloubka) | Vrata | Stojanů ve hře |
 | --- | --- | --- | --- | --- |
 | 1 | **Garáž**: omítnutá, pultová střecha, otevřená sekční vrata, boční dveře, okno, popelnice | 26 × 12 × 22 | 14 × 9,5 | 2 |
-| 2 | **Dílna**: plechová (vlnitý plech), nízká sedlová střecha, oranžový rám vrat, ZDC na štítu, palety a sudy | 40 × 15 × 30 | 18 × 12 | 4 |
-| 3 | **Sklad**: betonový sokl, plech, světlíky ve střeše, nápis ZDC STORAGE, sloupky a nárazníky u vrat | 58 × 19 × 42 | 22 × 14 | 8 |
+| 2 | **Dílna**: plechová (vlnitý plech), nízká sedlová střecha, oranžový rám vrat, DELIVEROS na štítu, palety a sudy | 40 × 15 × 30 | 18 × 12 | 4 |
+| 3 | **Sklad**: betonový sokl, plech, světlíky ve střeše, nápis DELIVEROS STORAGE, sloupky a nárazníky u vrat | 58 × 19 × 42 | 22 × 14 | 8 |
 | 4 | **Velký sklad**: dvoubarevný plášť s oranžovým pruhem, prosklená kancelář na boku, klimatizace na střeše | 80 × 24 × 60 | 26 × 16 | 12 (+ až 8 malých) |
 | 5 | **Logistické centrum**: klenutá střecha se solárními panely, dva doky s rampami, prosklený roh, vlajky | 104 × 28 × 84 | 26 × 18 | 24 (+ až 8 malých) |
 
@@ -59,7 +59,7 @@ Záložka **Scripting** → `warehouse.py`. Nahoře je **NASTAVENÍ**, hlavně s
 - `W`, `D`, `H` = šířka, hloubka a výška zdí, `door` = šířka a výška vrat;
 - `roof` = střecha: `shed` (pultová), `gable` (sedlová), `barrel` (klenutá), `rise` = jak vysoko jde nad zdi;
 - `wall` = plášť: `plaster` (omítka), `metal` (plech), `plinth` (beton dole, plech nahoře), `twotone` (s oranžovým pruhem);
-- `FINISHES` pod tím = barvy (třeba `"orange"` je barva ZDC, `"metal"` plech).
+- `FINISHES` pod tím = barvy (třeba `"orange"` je barva Deliveros, `"metal"` plech).
 
 Změň, co chceš, a dej **Run Script** (▶ nebo Alt + P). Staré budovy se smažou a postaví se nové. Pak spusť kontrolu
 (`tools/warehouse-art/check.py`, krok „pro AI pomocníky“ níže), jestli se pořád vejdou na pozemek. Nebo napiš Claudovi.
@@ -75,7 +75,7 @@ každý hráč má sklad svého levelu a stojí v něm budova toho levelu z Blen
   doteď, takže nic neztratí.
 - Volný pozemek (bez hráče) ukazuje garáž s nápisem FOR RENT.
 
-**Jak se kupuje další level:** u pultu **UPGRADES** ve skladu (E) je karta **ZDC Warehouse**:
+**Jak se kupuje další level:** u pultu **UPGRADES** ve skladu (E) je karta **Deliveros Warehouse**:
 
 | Koupíš | Budova | Cena | Velkých stojanů |
 | --- | --- | --- | --- |
@@ -124,6 +124,10 @@ Jednou ve Studiu (s hrou otevřenou jako obvykle), jen pokud model ještě nemá
 Vyzkoušení: dej **Play** a na úvodní obrazovce **PLAY**. Stojíš u svého skladu (jako nový hráč u garáže). Vejdi vraty
 dovnitř, u pultu UPGRADES kup další level (peníze: admin panel → SANDBOX → **💰 +$10K**) a dívej se, jak sklad roste.
 Nebo: **P** (admin panel) → záložka **SANDBOX** → **📍 TO WAREHOUSE**.
+
+8.9: hra se jmenuje **Deliveros**, ne ZDC: nápis na štítu (a na ceduli garáže) je DELIVEROS (`BRAND` nahoře ve
+`warehouse.py`; delší nápis se sám zmenší, aby se do štítu vešel). Ve Studiu smaž starý `ZDCWarehouseArt` a naimportuj
+nový `roblox/ZDCWarehouseArt.fbx` (jméno souboru zůstává, hra ho hledá pod ním).
 
 Když sklad v Blenderu změníš: nastav `EXPORT = True`, ulož `.blend` (Ctrl + S) a spusť skript. Ve Studiu pak smaž
 starý `ZDCWarehouseArt` a naimportuj nový `roblox/ZDCWarehouseArt.fbx` (krok 1 až 3). U žádného levelu neměň rozměry

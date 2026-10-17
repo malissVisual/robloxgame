@@ -309,7 +309,7 @@ check("8.3 Danny comes with a crew of one: for hire, not working (nobody hired h
 	and #danny.queue == 0)
 local body = danny.body
 local npc = body.model
-check("his body: Danny, ZDC Moving, his id in the rules (no player's)", npc.Name == "Danny" and npc:GetAttribute("MoveHelper") == danny.id and danny.id < -1000000
+check("his body: Danny, Deliveros Moving, his id in the rules (no player's)", npc.Name == "Danny" and npc:GetAttribute("MoveHelper") == danny.id and danny.id < -1000000
 	and body.humanoid.MaxHealth == H.Health and body.humanoid.Health == H.Health)
 check("…at the van's back", distance(body.root.Position, cargoDoor.WorldPosition) < 8, distance(body.root.Position, cargoDoor.WorldPosition))
 check("he says: Need a hand? Hire me!", E.saidSince("Danny from the depot. Need a hand? Hire me!", 0))

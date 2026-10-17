@@ -28,7 +28,7 @@ check("his plate: FOR SALE · SOLD; his prompt: Talk", VanQuest.priceText() == "
 check("his old van's tag says it is not for sale", string.find(VanQuest.tag(), "SOLD", 1, true) ~= nil and string.find(VanQuest.tag(), "not for sale", 1, true) ~= nil)
 local lines = Config.VanQuest.Lines
 check("his lines go round", #lines >= 2 and VanQuest.line(1) == lines[1] and VanQuest.line(#lines + 1) == lines[1] and VanQuest.line(2) == lines[2])
-check("his first line sends you to your company's ZDC Van", string.find(VanQuest.line(1), "ZDC Van", 1, true) ~= nil)
+check("his first line sends you to your company's Deliveros Van", string.find(VanQuest.line(1), "Deliveros Van", 1, true) ~= nil)
 check("no quest any more: nothing to buy or open", (VanQuest :: any).canBuy == nil and (VanQuest :: any).shouldOpen == nil and (Config.VanQuest :: any).Car == nil)
 check("his old van's body is still the world's (the traffic's Old Van)", (function()
 	for _, def in Config.AmbientCars do
@@ -47,7 +47,7 @@ for _, unlock in Career.unlocksAt(1) do
 		row = unlock
 	end
 end
-check("the road at level 1: ZDC Van: yours from day one", row ~= nil and (row :: Career.Unlock).id == Config.CompanyVan.Car and (row :: Career.Unlock).name == "ZDC Van: yours from day one", row and row.name)
+check("the road at level 1: Deliveros Van: yours from day one", row ~= nil and (row :: Career.Unlock).id == Config.CompanyVan.Car and (row :: Career.Unlock).name == "Deliveros Van: yours from day one", row and row.name)
 check("the level 4 reward no longer sends you to Earl", string.find(Config.Levels.Rewards[4].text or "", "Earl", 1, true) == nil)
 
 -- The lot -------------------------------------------------------------------------------------------------------

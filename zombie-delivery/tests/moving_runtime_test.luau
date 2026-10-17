@@ -88,9 +88,9 @@ for _, d in moves:FindFirstChild("MovingBoard"):GetDescendants() do
 	end
 end
 local cityBoard = table.concat(cityWords, " | ")
-check("8.0.1: the city's kiosk keeps its corkboard (MARGE, WALT'S RANCH, Go to the Wall, ZDC MOVING & EVACUATION; no chalet)",
+check("8.0.1: the city's kiosk keeps its corkboard (MARGE, WALT'S RANCH, Go to the Wall, Deliveros MOVING & EVACUATION; no chalet)",
 	string.find(cityBoard, "MARGE", 1, true) ~= nil and string.find(cityBoard, "WALT'S RANCH", 1, true) ~= nil and string.find(cityBoard, "Go to the Wall", 1, true) ~= nil
-	and string.find(cityBoard, "ZDC MOVING & EVACUATION", 1, true) ~= nil and string.find(cityBoard, "CHALET", 1, true) == nil, cityBoard)
+	and string.find(cityBoard, "DELIVEROS MOVING & EVACUATION", 1, true) ~= nil and string.find(cityBoard, "CHALET", 1, true) == nil, cityBoard)
 Greeters.step() -- (the greeters' loop: the soldier at the Wall)
 check("7.0 greeters: the soldier stands at the Wall", Greeters.soldier() ~= nil and Greeters.soldier().Parent ~= nil)
 -- The porch greeter of `owner`'s move (her body in the world), or nil.
@@ -232,7 +232,7 @@ do
 	check("CAR / MY BIKE / a car job (Vehicles.spawn): refused, the truck stays", string.find(E.Vehicles.spawn(ann, false, nil) or "", out, 1, true) ~= nil
 		and string.find(E.Vehicles.spawn(ann, true, "van") or "", out, 1, true) ~= nil and E.cars[ann] == truck)
 	check("…the phone's CALL CAR in the truck (Vehicles.placeNear): refused", string.find(E.Vehicles.placeNear(ann, nil) or "", out, 1, true) ~= nil and E.cars[ann] == truck)
-	check("…a garage's or a dealer's car (placeAt), ZDC RIDE's (spawnAt): refused, said", E.Vehicles.placeAt(ann, nil, M.CFrame.new(0, 0, 0)) == nil
+	check("…a garage's or a dealer's car (placeAt), Deliveros RIDE's (spawnAt): refused, said", E.Vehicles.placeAt(ann, nil, M.CFrame.new(0, 0, 0)) == nil
 		and E.Vehicles.spawnAt(ann, "escooter", M.CFrame.new(0, 0, 0), false) == nil and string.find(E.lastNotice(ann), out, 1, true) ~= nil and (E.vehicleCalls or 0) == calls)
 	E.Vehicles.spawn(bob, false, nil)
 	check("…a crew mate's own car is theirs to call", (E.vehicleCalls or 0) == calls + 1)
@@ -339,7 +339,7 @@ E.clock += 0.2
 Moving.step()
 local backPrompt = cargoDoor:FindFirstChild("BackPrompt")
 check("back open, a thing carried: Load shows, the back's own E waits", load.Enabled and not backPrompt.Enabled and string.find(load.ActionText, "Lamp", 1, true) ~= nil, load.ActionText)
-check("8.0 SANDBOX off: the prompts say ZDC Van, no walk-in bay's Load", string.find(load.ObjectText, "ZDC Van ·", 1, true) == 1 and truck.chassis:FindFirstChild("MoveLoadBay") == nil,
+check("8.0 SANDBOX off: the prompts say Deliveros Van, no walk-in bay's Load", string.find(load.ObjectText, "Deliveros Van ·", 1, true) == 1 and truck.chassis:FindFirstChild("MoveLoadBay") == nil,
 	load.ObjectText)
 check("the crew may open the back (BackCrew, backAllowed)", truck.model:GetAttribute("BackCrew") == "22")
 trigger(load, ann)
@@ -842,7 +842,7 @@ check("…CAR waits VanAgain s", string.find(E.Vehicles.spawn(ann, false, nil) o
 do
 	local calls = E.vehicleCalls or 0
 	local before = #E.messages
-	check("7.2 review: …the garage's TAKE OUT (placeAt) and a ZDC RIDE scooter (spawnAt) wait too, said", E.Vehicles.placeAt(ann, nil, M.CFrame.new(0, 0, 0)) == nil
+	check("7.2 review: …the garage's TAKE OUT (placeAt) and a Deliveros RIDE scooter (spawnAt) wait too, said", E.Vehicles.placeAt(ann, nil, M.CFrame.new(0, 0, 0)) == nil
 		and E.Vehicles.spawnAt(ann, "escooter", M.CFrame.new(0, 0, 0), false) == nil and (E.vehicleCalls or 0) == calls and heard(ann, "comes back", before + 1),
 		`{(E.vehicleCalls or 0) - calls} calls`)
 end
@@ -961,7 +961,7 @@ do
 	check("(Eve rides her bike: her profile's car, out, no back)", bike ~= nil and bike.id == "rustbike" and E.Vehicles.isBike(bike) and not E.Vehicles.hasBack(bike))
 	Moving.admin(eve, "start")
 	local van = E.cars[eve]
-	check("7.2 review: a move started on a bike goes with the ZDC Van, put out for it (not the bike)", van ~= nil and van ~= bike and van.id == T.Van and E.Vehicles.hasBack(van)
+	check("7.2 review: a move started on a bike goes with the Deliveros Van, put out for it (not the bike)", van ~= nil and van ~= bike and van.id == T.Van and E.Vehicles.hasBack(van)
 		and bike.model.destroyed == true, van and van.id)
 	check("…and CAR brings the van from now on (her car the van, the bike her bike of choice)", E.profiles[eve].car == T.Van and E.profiles[eve].bike == "rustbike"
 		and E.profiles[eve].lastCar == T.Van, E.profiles[eve].car)

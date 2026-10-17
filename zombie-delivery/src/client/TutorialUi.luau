@@ -681,7 +681,7 @@ local function around(index: number)
 	end
 	local dock, stop = tourPlaces()
 	if step == "dock" and dock then
-		tourGps("tour_dock", `ZDC RIDE · {dock.name}`, dock.x, dock.z)
+		tourGps("tour_dock", `DELIVEROS RIDE · {dock.name}`, dock.x, dock.z)
 	elseif step == "bus" and stop then
 		tourGps("tour_bus", `Bus stop · {stop.name}`, stop.x, stop.z)
 	else

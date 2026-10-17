@@ -51,7 +51,7 @@ end
 
 -- Danny ---------------------------------------------------------------------------------------------------------------------------
 
-local danny = Npcs.spawn(Npcs.look("mover", "Danny", "ZDC Moving"), M.CFrame.new(0, 0, 0))
+local danny = Npcs.spawn(Npcs.look("mover", "Danny", "Deliveros Moving"), M.CFrame.new(0, 0, 0))
 local humanoid = danny:FindFirstChildOfClass("Humanoid")
 local root = danny.PrimaryPart
 local tracks = R.tracks(danny)
@@ -138,7 +138,7 @@ check("8.3 …and a person who could jump before: off while carried, on again af
 -- while the body really moves (its root's speed along the ground), at that pace, and the idle while it stands (pressed
 -- against something), on past its arrival with `through` until the next order; another person's walk as ever
 do
-	local walker = Npcs.spawn(Npcs.look("mover", "Danny", "ZDC Moving"), M.CFrame.new(60, 0, 0))
+	local walker = Npcs.spawn(Npcs.look("mover", "Danny", "Deliveros Moving"), M.CFrame.new(60, 0, 0))
 	local root2 = walker.PrimaryPart
 	local tracks2 = R.tracks(walker)
 	local walk2, idle2 = tracks2[WALK_ID], tracks2[IDLE_ID]

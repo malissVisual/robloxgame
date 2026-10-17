@@ -787,17 +787,17 @@ function PhoneApps.rideItem(host: Host): ShopView.Item
 	local found = dock
 	return {
 		id = "ride",
-		name = "🛴 ZDC RIDE",
+		name = "🛴 DELIVEROS RIDE",
 		picture = { emoji = "🛴" },
-		fact = if found then `ZDC RIDE · nearest dock {math.floor(far)} studs` else "ZDC RIDE · free e-scooters",
+		fact = if found then `Deliveros RIDE · nearest dock {math.floor(far)} studs` else "Deliveros RIDE · free e-scooters",
 		owned = true,
 		accent = K.warn,
 		act = if found then { text = "📍 GPS", short = "📍", on = true, run = function()
 			MapView.setWaypoint(Vector3.new(found.x, Map.RoadTop, found.z))
 			pcall(function()
-				MapView.onWaypoint({ id = "zdcride", name = `ZDC RIDE · {found.name}`, icon = "🛴", x = found.x, z = found.z, kind = "shop", description = "" })
+				MapView.onWaypoint({ id = "zdcride", name = `DELIVEROS RIDE · {found.name}`, icon = "🛴", x = found.x, z = found.z, kind = "shop", description = "" })
 			end)
-			host.notify(`GPS: ZDC RIDE · {found.name}`)
+			host.notify(`GPS: DELIVEROS RIDE · {found.name}`)
 		end } else nil,
 		actionName = "Gps",
 		lines = { if player:GetAttribute("Rental") ~= nil then "Your rental: leave it anywhere, or Return it at any dock." else "Free e-scooters at docks across Downtown and the Suburbs: hold Rent." },
@@ -843,7 +843,7 @@ function PhoneApps.keys(list: Instance, look: OrdersUi.Kit, order: number)
 		local _, _, right = look.row2(keys, entry[2], entry[1], index, true)
 		right.TextColor3 = K.text
 	end
-	look.meta(list, `ZDC courier terminal · Zombie Delivery {Config.Version}`, order + 2)
+	look.meta(list, `Deliveros courier terminal · {Config.Version}`, order + 2)
 end
 
 return PhoneApps

@@ -33,6 +33,7 @@ PURE += ("VillageScenery",)  # 8.9 sandbox on the map, 9.4 the countryside: wher
 PURE += ("CountryLooks",)  # 9.4 sandbox, the countryside's art kit (tests/countrylooks_test.luau)
 PURE += ("HouseRoute",)  # 9.0 Danny's way inside a house, on its plan's grid (tests/houseroute_test.luau, tests/dannynav_runtime_test.luau; 9.3 his walk along it, audited against the built parts: tests/movehelper_stuck_runtime_test.luau)
 PURE += ("PedalRules",)  # 9.1 the drive pedals: the input, the press, where they go (tests/drivepedals_test.luau)
+PURE += ("CharacterLooks", "SaveSlotRules")  # 10.1 the start: the courier you make, the save slots (tests/characterlooks_test.luau, tests/saveslots_test.luau, tests/saveslots_runtime_test.luau)
 PURE += ("RunRules",)  # 9.7 runs: the difficulties and their unlocks, the pads, the votes, whose stock (tests/runrules_test.luau)
 PURE += ("LootRules",)  # 9.x loot: a house's pieces' rarities by the difficulty, the stars, the toasts (tests/loot_test.luau)
 luau = sys.argv[1] if len(sys.argv) > 1 else shutil.which("luau") or "luau"
@@ -282,6 +283,16 @@ with tempfile.TemporaryDirectory() as tmp:
         source = re.sub(r"require\(Shared\.(\w+)\)", lambda m: "E.Net" if m[1] == "Net" else f'require("./{m[1]}")', source)
         source = source.replace("require(script.Parent.PlayerData)", 'require("./PlayerDataServer")')
         open(os.path.join(tmp, module + "Server.luau"), "w", encoding="utf-8").write(head + source)
+    # 10.1, the save slots: the real server/SaveSlots.luau as SaveSlotsServer.luau for tests/saveslots_runtime_test.luau on
+    # the same runtime (its PlayerData the real one above); CourierAvatar and TextService the test's stand-ins
+    # (E.CourierAvatar: the looks put on; E.TextService: Roblox's filter), set before it is required.
+    source = open(os.path.join(os.path.dirname(SHARED), "server", "SaveSlots.luau"), encoding="utf-8").read()
+    source = re.sub(r"require\(Shared\.(\w+)\)", lambda m: "E.Net" if m[1] == "Net" else f'require("./{m[1]}")', source)
+    source = source.replace("require(script.Parent.PlayerData)", 'require("./PlayerDataServer")')
+    source = source.replace("require(script.Parent.CourierAvatar)", "E.CourierAvatar")
+    source = source.replace('game:GetService("TextService")', "E.TextService")
+    assert "script.Parent" not in source, "server/SaveSlots.luau requires a module tests/run_tests.py does not give it"
+    open(os.path.join(tmp, "SaveSlotsServer.luau"), "w", encoding="utf-8").write(head + source)
     # 8.1 SANDBOX, the upgrades: the real server/Upgrades.luau as UpgradesServer.luau for tests/upgrades_runtime_test.luau
     # on the same runtime: its PlayerData and Collection the real ones above, SandboxPlots the runtime's fake (its plotOf),
     # `workspace` the runtime's (a Cars folder whose vans come with Runtime.addCar).

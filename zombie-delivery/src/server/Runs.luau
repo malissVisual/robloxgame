@@ -819,7 +819,7 @@ function Runs.start()
 				local prompt = Instance.new("ProximityPrompt")
 				prompt.Name = "DispatchPrompt"
 				prompt.ActionText = "How runs work"
-				prompt.ObjectText = "ZDC DISPATCH"
+				prompt.ObjectText = "DELIVEROS DISPATCH"
 				prompt.KeyboardKeyCode = Enum.KeyCode.E
 				prompt.HoldDuration = 0
 				prompt.MaxActivationDistance = 12

@@ -130,7 +130,7 @@ local function signFace(board: BasePart, face: Enum.NormalId, dock: RentalDocks.
 		label.TextColor3 = color
 		label.Parent = back
 	end
-	line(`ZDC RIDE · {priceText()}`, 0.16, 0.42, Color3.fromRGB(242, 242, 240), Enum.Font.GothamBold)
+	line(`DELIVEROS RIDE · {priceText()}`, 0.16, 0.42, Color3.fromRGB(242, 242, 240), Enum.Font.GothamBold)
 	line(if dock.spawn then "TAKE ONE AND GO" else string.upper(dock.name), 0.64, 0.24, Color3.fromRGB(169, 174, 180), Enum.Font.GothamMedium)
 end
 
@@ -138,7 +138,7 @@ local function prompt(parent: Instance, name: string, action: string, kind: stri
 	local p = Instance.new("ProximityPrompt")
 	p.Name = name
 	p.ActionText = action
-	p.ObjectText = `ZDC RIDE · {priceText()}`
+	p.ObjectText = `DELIVEROS RIDE · {priceText()}`
 	p.HoldDuration = hold
 	p.MaxActivationDistance = Tuning.Reach
 	p.RequiresLineOfSight = false
@@ -191,7 +191,7 @@ end
 
 local function buildDock(folder: Instance, dock: RentalDocks.Dock): DockState
 	local model = Instance.new("Model")
-	model.Name = `ZDC RIDE · {dock.name}`
+	model.Name = `DELIVEROS RIDE · {dock.name}`
 	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
 	model:SetAttribute("DockId", dock.id)
 	local t = Vector3.new(dock.tx, 0, dock.tz)
@@ -340,11 +340,11 @@ function rent(player: Player, state: DockState, chosen: number?)
 		return
 	end
 	if rides[player] then
-		tell(player, "You already have a ZDC RIDE scooter: hop on it, or Return it at any dock.")
+		tell(player, "You already have a Deliveros RIDE scooter: hop on it, or Return it at any dock.")
 		return
 	end
 	if humanoid.SeatPart ~= nil or Vehicles.seatedIn(player) ~= nil or character:GetAttribute("Boarding") ~= nil then
-		tell(player, "Get off first: ZDC RIDE is for people on foot.")
+		tell(player, "Get off first: Deliveros RIDE is for people on foot.")
 		return
 	end
 	if character:GetAttribute("ZipLine") ~= nil then
@@ -386,7 +386,7 @@ function rent(player: Player, state: DockState, chosen: number?)
 	-- 5.7: everything the rental needs is checked before your own vehicle goes home (the scooter's def, the money).
 	if not Economy.findCar(Tuning.CarId) then
 		warn(`[Rental] Config.Rental.CarId {Tuning.CarId} is not a car`)
-		tell(player, "ZDC RIDE is not working right now.")
+		tell(player, "Deliveros RIDE is not working right now.")
 		return
 	end
 	if Tuning.Price > 0 and profile.money < Tuning.Price then
@@ -444,7 +444,7 @@ function rent(player: Player, state: DockState, chosen: number?)
 			PlayerData.addMoney(player, Tuning.Price, "Refund", "Rental")
 		end
 		giveOwnBack()
-		tell(player, if spawned then "Still loading..." else "ZDC RIDE is not working right now: try again in a moment.")
+		tell(player, if spawned then "Still loading..." else "Deliveros RIDE is not working right now: try again in a moment.")
 		return
 	end
 	if own and not own.lent then
@@ -468,7 +468,7 @@ function rent(player: Player, state: DockState, chosen: number?)
 			Vehicles.mount(player, car, Vector3.new(state.dock.nx, 0, state.dock.nz) * Config.Interact.DockSlide) -- 5.7: it slides off the dock (6.10: as you hop on)
 		end
 	end)
-	tell(player, "ZDC RIDE: it's yours for the ride. Leave it anywhere, or Return it at any dock.")
+	tell(player, "Deliveros RIDE: it's yours for the ride. Leave it anywhere, or Return it at any dock.")
 end
 
 local function giveBack(player: Player, state: DockState)
@@ -488,7 +488,7 @@ local function giveBack(player: Player, state: DockState)
 	if humanoid and humanoid.SeatPart and humanoid.SeatPart:IsDescendantOf(ride.car.model) then
 		humanoid.Sit = false
 	end
-	finish(player, "Scooter returned. Thanks for riding ZDC RIDE!")
+	finish(player, "Scooter returned. Thanks for riding Deliveros RIDE!")
 end
 
 -- Every TICK: the rentals that ended some other way, the ones left behind.
@@ -519,7 +519,7 @@ local function check()
 		ride.leftAt = ride.leftAt or now
 		local away = (root.Position - car.chassis.Position).Magnitude > Tuning.WalkAway
 		if away or now - (ride.leftAt :: number) > Tuning.Idle then
-			finish(player, "Your ZDC RIDE scooter went back to its dock. Thanks for riding!")
+			finish(player, "Your Deliveros RIDE scooter went back to its dock. Thanks for riding!")
 		end
 	end
 end
@@ -565,7 +565,7 @@ function Rental.start()
 	Vehicles.onWrecked = function(player: Player, car: Vehicles.Car, reason: string)
 		if car.rental then
 			Zombies.releaseCar(car)
-			tell(player, "Your ZDC RIDE scooter broke down: it goes back by itself. Rent another at any dock.")
+			tell(player, "Your Deliveros RIDE scooter broke down: it goes back by itself. Rent another at any dock.")
 			return
 		end
 		onWrecked(player, car, reason)

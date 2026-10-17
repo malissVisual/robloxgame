@@ -197,7 +197,7 @@ function PhoneMore.bank(list: Instance, _look: OrdersUi.Kit, ctx: Ctx)
 		name = "Balance",
 		height = height,
 		picture = glyph("bank"),
-		title = "ZDC COURIER ACCOUNT",
+		title = "DELIVEROS COURIER ACCOUNT",
 		value = Ui.money(ctx.money or 0),
 		valueColor = C.money,
 		facts = "Deliveries pay into it",

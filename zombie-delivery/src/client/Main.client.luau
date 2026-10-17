@@ -339,8 +339,9 @@ if Config.Sandbox.On then
 		Menu.show(play)
 	end)
 	if not ok then
-		-- No start screen: straight into the game.
+		-- No start screen: straight into the game (10.1: the loading screen goes, the server picks the slot played last).
 		warn(`[Client] the start screen failed: {err}`)
+		game:GetService("Players").LocalPlayer:SetAttribute("StartScreen", true)
 		workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
 		play()
 	end

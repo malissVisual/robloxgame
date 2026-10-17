@@ -189,7 +189,7 @@ end
 
 local function footOf(piece: Rules.Piece, at: number): string
 	if piece.kind == "pricing" then
-		return `You get {Ui.money(Rules.net(at))} after the {math.floor(Config.PlayerTrade.Fee * 100 + 0.5)}% ZDC fee.`
+		return `You get {Ui.money(Rules.net(at))} after the {math.floor(Config.PlayerTrade.Fee * 100 + 0.5)}% Deliveros fee.`
 	elseif piece.kind == "confirm" then
 		return if piece.money then `You have {Ui.money(piece.money)} · it goes into your stock.` else "It goes into your stock."
 	end

@@ -138,9 +138,9 @@ check("a wrap and a decal fit a car, not a bike", Style.forVehicle("wrap", van) 
 check("bike paint fits the bikes and the E-Scooter, not a car", Style.forVehicle("bikepaint", bike) and Style.forVehicle("bikepaint", scooter) and not Style.forVehicle("bikepaint", van))
 check("never on a company vehicle", company ~= nil and not Style.forVehicle("wrap", company) and not Style.forVehicle("decal", company))
 check("7.x: never on a body nobody owns (the old Old Van)", ambient ~= nil and not Style.forVehicle("wrap", ambient) and not Style.forVehicle("decal", ambient))
-check("the toasts", Style.say("bought", cap) == "Backwards Cap · ZDC Red is yours. You're wearing it." and Style.say("money", wrap) == `Not enough money: Satin Teal costs {Style.money(wrap.price)}.`
+check("the toasts", Style.say("bought", cap) == "Backwards Cap · Deliveros Red is yours. You're wearing it." and Style.say("money", wrap) == `Not enough money: Satin Teal costs {Style.money(wrap.price)}.`
 	and Style.say("level", cowboy) == `Cowboy Hat unlocks at level {cowboy.level}.` and string.find(Style.say("off", nil, "hat"), "Hats off", 1, true) ~= nil
-	and Style.say("off", cap, "hat") == "Backwards Cap · ZDC Red is off.")
+	and Style.say("off", cap, "hat") == "Backwards Cap · Deliveros Red is off.")
 check("money with thousands", Style.money(1200) == "$1,200" and Style.money(80) == "$80" and Style.money(15000) == "$15,000")
 check("Style.slots: four for the courier, three for the vehicles", #Style.slots("courier") == 4 and #Style.slots("vehicle") == 3)
 
@@ -216,7 +216,7 @@ check("owned stays owned (no second purchase) anywhere", select(2, Style.canBuyA
 check("the toasts name the clerk and the shop", Style.say("shop", wrap) == "Buy it from Gus at Wrench Garage." and Style.say("shop", cap) == "Buy it from Dot at the gear stall."
 	and Style.say("shop", bikePaint) == "Buy it from Kip at Dead End Motors or Gus at Wrench Garage."
 	and Style.say("where", wrap) == "Gus sells it at Wrench Garage. It's on your GPS." and Style.say("where", bikePaint) == "Kip sells it at Dead End Motors. It's on your GPS."
-	and Style.say("sold", cap) == "Dot sells it at the gear stall." and Style.say("notOwned", decal) == "Buy ZDC Logo first, from Gus at Wrench Garage.")
+	and Style.say("sold", cap) == "Dot sells it at the gear stall." and Style.say("notOwned", decal) == "Buy Deliveros Logo first, from Gus at Wrench Garage.")
 check("the app's button away from the shop", Style.atLabel(wrap) == "AT WRENCH GARAGE" and Style.atLabel(cap) == "AT THE GEAR STALL" and Style.atLabel(bikePaint) == "AT DEAD END MOTORS")
 check("who sells a tab's looks", Style.soldBy("courier") == "Dot at the gear stall" and Style.soldBy("vehicle") == "Gus at Wrench Garage and Kip at Dead End Motors")
 check("no toast says the phone sells", not string.find(string.lower(Style.say("shop", wrap) .. Style.say("where", cap) .. Style.say("notOwned", cap)), "phone", 1, true))
@@ -337,7 +337,7 @@ local sides = { [-1] = 0, [1] = 0 }
 for _, p in StyleLooks.decals("logo", panels, blocks) do
 	if p.name == "LogoFace" then
 		sides[if p.at[1] < 0 then -1 else 1] += 1
-		check("the logo's face reads outward", p.text == "ZDC" and p.face == (if p.at[1] < 0 then "Left" else "Right"))
+		check("the logo's face reads outward", p.text == "DELIVEROS" and p.face == (if p.at[1] < 0 then "Left" else "Right"))
 	end
 end
 check("logo: one on each side", sides[-1] == 1 and sides[1] == 1)

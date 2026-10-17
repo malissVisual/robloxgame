@@ -235,7 +235,7 @@ local Vehicles = {}
 
 -- 5.0: what Vehicles.spawn (the CAR button, a job, PLAY) says to a player who owns no vehicle yet. (7.x: everybody owns
 -- the ZDC Van, so only a save that is still loading hears it.)
-Vehicles.NO_VEHICLE = "Your ZDC Van is not ready yet: try CAR again in a moment."
+Vehicles.NO_VEHICLE = "Your Deliveros Van is not ready yet: try CAR again in a moment."
 
 local cars: { [Player]: Car } = {}
 local lastSpawn: { [Player]: number } = {}
@@ -4841,7 +4841,7 @@ function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: 
 		rental = rental == true,
 		ground = ground,
 	}
-	car.model.Name = if rental then `ZDC RIDE · {player.DisplayName}` else `{player.DisplayName}'s {def.name}`
+	car.model.Name = if rental then `DELIVEROS RIDE · {player.DisplayName}` else `{player.DisplayName}'s {def.name}`
 	car.model:SetAttribute("OwnerId", player.UserId)
 	car.model:SetAttribute("OwnerName", player.DisplayName)
 	car.model:SetAttribute("CarId", def.id)

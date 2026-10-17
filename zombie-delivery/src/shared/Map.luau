@@ -1482,7 +1482,7 @@ export type Landmark = { id: string, name: string, icon: string, x: number, z: n
 -- Everything worth driving to, for the map's list and the GPS. 6.7: every shop's line says what it really sells; the
 -- depot sells nothing (its Depot Garage is the garage terminal: client/MapView.luau lists it on its own, not as a shop).
 local landmarks: { Landmark } = {
-	{ id = "depot", name = "Depot (your company)", icon = "📦", x = Map.Depot.x, z = Map.Depot.z, kind = "shop", description = "Your company, north-east of the Central Park (the giant parcel on its roof): the JOBS spot with the job board, Marge, the garage terminal (your parked van, the company vehicles) and the gear stall by the spawn (ZDC Bags and Last Stop Supplies). The safe zone." },
+	{ id = "depot", name = "Depot (your company)", icon = "📦", x = Map.Depot.x, z = Map.Depot.z, kind = "shop", description = "Your company, north-east of the Central Park (the giant parcel on its roof): the JOBS spot with the job board, Marge, the garage terminal (your parked van, the company vehicles) and the gear stall by the spawn (Deliveros Bags and Last Stop Supplies). The safe zone." },
 	-- 6.11: the Central Park in the middle of the safe zone (Map.Park).
 	{ id = "park", name = Map.Park.name, icon = "🌳", x = Map.Park.x, z = Map.Park.z, kind = "place", description = "The middle of the city and of the safe zone: the pond with the fountain on its island, benches under the trees, the shops all round it (Lead & Co.'s range just outside, to the south-west). The depot is across the junction to the north-east." },
 	-- 7.1: the Hauptplatz north of the park, over Bone St on the footbridge (Map.Square).

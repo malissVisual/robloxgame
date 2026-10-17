@@ -228,7 +228,7 @@ for _, d in DepotLook.details do
 	box("depot", d.name, d.size, frame * CF(d.position[1], d.position[2], d.position[3]) * ANG(math.rad(r[1]), math.rad(r[2]), math.rad(r[3])), d.color, d.material, nil, words)
 end
 box("depot", "NameBoard", { 60, 8, 1 }, o * CF(0, walk + 28, backZ + 38) * ANG(0, math.pi, 0), { 24, 27, 32 }, "Metal", nil,
-	{ { face = "Front", lines = { { text = "ZOMBIE DELIVERY CO.", color = { 255, 190, 60 }, size = 0.6, font = "GothamBlack" } } } })
+	{ { face = "Front", lines = { { text = "DELIVEROS", color = { 255, 190, 60 }, size = 0.6, font = "GothamBlack" } } } })
 box("depot", "SpawnPad", { 10, 0.4, 10 }, CF(dx, walk + 0.2, dz + 26), { 255, 190, 60 }, "Neon")
 for k = 1, 6 do
 	box("depot", "Scooter" .. k, { 0.8, 2.4, 3.6 }, CF(dx + (k - 3.5) * 3.4, walk + 1.2, dz + 44), { 214, 72, 64 }, "Metal")

@@ -33,7 +33,7 @@ end
 -- Main's order of the city's services (server/Main.server.luau's `safely` list).
 local CITY = { "PlayerData", "Analytics", "Vehicles", "CarRighting", "Zombies", "Jobs", "JobQueue", "SpecialOrders", "LiveEvents", "Gun", "Items", "Shops", "ShopClerks", "BanditCars", "Npcs", "Animals", "Cargo", "Admin", "DayNight", "Traffic", "Crew", "Ranking", "Estate", "CarCall", "Business", "Missions", "Challenges", "Tasks", "Shift", "Garages", "Repair", "Explore", "Tutorial", "Hand", "CloseCombat", "Buddy", "Transport", "Skills", "VanQuest", "KitWear", "Fuel", "StyleWear", "Horn", "Buses", "Rental", "ZipLines", "FurnitureMesh", "FixtureMesh", "Moving" }
 -- What the sandbox starts (SandboxWorld: its start or build) and what it never touches.
-local SANDBOX = { "SandboxWorld", "PlayerData", "Analytics", "SandboxAnalytics", "Vehicles", "CarRighting", "Zombies", "Npcs", "Admin", "Crew", "Transport", "KitWear", "Horn", "Clipboard", "SandboxPlots", "Collection", "CollectionBook", "Warehouse", "Upgrades", "VanPaint", "SandboxTasks", "SandboxLeaders", "Visitors", "SandboxBadges", "PlayerTrade", "SprinterMesh", "FurnitureMesh", "FixtureMesh", "Moving", "Runs" }
+local SANDBOX = { "SandboxWorld", "SaveSlots", "PlayerData", "Analytics", "SandboxAnalytics", "Vehicles", "CarRighting", "Zombies", "Npcs", "Admin", "Crew", "Transport", "KitWear", "Horn", "Clipboard", "SandboxPlots", "Collection", "CollectionBook", "Warehouse", "Upgrades", "VanPaint", "SandboxTasks", "SandboxLeaders", "Visitors", "SandboxBadges", "PlayerTrade", "SprinterMesh", "FurnitureMesh", "FixtureMesh", "Moving", "Runs" }
 local PARALLEL = { "SandboxWorld", "Collection", "CollectionBook", "Warehouse", "Upgrades", "VanPaint", "SandboxTasks", "SandboxLeaders", "Visitors", "SprinterMesh", "SandboxAnalytics", "SandboxBadges", "PlayerTrade", "Runs" }
 local NEVER = { "World", "MapStyle", "Alpine", "Jobs", "JobQueue", "SpecialOrders", "LiveEvents", "Shops", "ShopClerks", "BanditCars", "Animals", "Traffic", "Buses", "Rental", "ZipLines", "Estate", "Business", "Missions", "Challenges", "Tasks", "Shift", "Garages", "Repair", "Explore", "Tutorial", "VanQuest", "Fuel", "Buddy", "DayNight", "Gun", "Items", "Cargo", "Ranking", "CarCall", "StyleWear", "Skills", "Hand", "CloseCombat" }
 
@@ -198,6 +198,7 @@ end
 check("sandbox: nothing of the city is called or hooked (no world build, no Alps, no tutorial, no weapons …)", #touchedCity == 0, table.concat(touchedCity, ", "))
 check("sandbox: no World.buildLate deferred", #E.deferred == 0, #E.deferred)
 check("sandbox: the map before the services", started.SandboxWorld < started.PlayerData)
+check("sandbox: 10.1's save slots before PlayerData (a join's load waits for the pick)", started.SaveSlots ~= nil and started.SaveSlots < started.PlayerData)
 check("sandbox: the State hooked before PlayerData starts", (E.find("PlayerData.Changed.Connect") or math.huge) < started.PlayerData)
 check("sandbox: Zombies without its own zombies (ambient off before it starts)", E.module("Zombies").ambient == false and (E.find("set Zombies.ambient") or math.huge) < started.Zombies)
 check("sandbox: the map is SandboxWorld.build, the others' start()", E.called("SandboxWorld.build") and E.called("Collection.start") and E.called("Warehouse.start") and E.called("SprinterMesh.start"))
@@ -252,7 +253,7 @@ check("sandbox: no warnings", #E.warnings == 0, table.concat(E.warnings, " | "))
 
 -- ── Sandbox: the player ────────────────────────────────────────────────────
 local vanId = if Economy.isPlayerCar(Config.Sandbox.Van) then Config.Sandbox.Van else Config.CompanyVan.Car
-check("the van: Config.Sandbox.Van, else the ZDC Van while it is not in Config.Cars", Boot.vanId() == vanId, Boot.vanId())
+check("the van: Config.Sandbox.Van, else the Deliveros Van while it is not in Config.Cars", Boot.vanId() == vanId, Boot.vanId())
 
 local L = Map.Lobby
 local ann = newPlayer("Ann", 2)

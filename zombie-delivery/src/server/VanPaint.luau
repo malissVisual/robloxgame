@@ -299,7 +299,7 @@ function VanPaint.admin(player: Player, what: string): string
 	profile.vanPaint = Rules.empty()
 	VanPaint.repaint(player)
 	pushState(player)
-	return "ADMIN: the paints reset: nothing bought, your van in ZDC cream with the ZDC classic stripe."
+	return "ADMIN: the paints reset: nothing bought, your van in Deliveros cream with the Deliveros classic stripe."
 end
 
 -- ── Joining, leaving, the remote, the prompts ─────────────────────────────

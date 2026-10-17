@@ -1933,7 +1933,7 @@ local function slotsShort(player: Player, offer: Offer): string?
 		if offer.total <= room then
 			return nil
 		end
-		return `This job has {offer.total} {offer.plural}: you carry {room}. A bigger bag (ZDC Bags at the depot) carries more.`
+		return `This job has {offer.total} {offer.plural}: you carry {room}. A bigger bag (Deliveros Bags at the depot) carries more.`
 	end
 	if Freight.isPallet(offer.kind) then
 		local pallets, takes, carName = palletsFor(player, offer)

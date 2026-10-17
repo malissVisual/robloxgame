@@ -537,7 +537,7 @@ function Economy.roomAdvice(carId: string, stage: number, need: number): string
 		end
 	end
 	if #names == 0 then
-		return "No car holds more (7.x: the ZDC Van is the only one): a Roof Rack at Wrench Garage takes two more light pieces."
+		return "No car holds more (7.x: the Deliveros Van is the only one): a Roof Rack at Wrench Garage takes two more light pieces."
 	end
 	return `That needs a bigger vehicle: the {table.concat(names, " or the ")} (your garage, or Dead End Motors).`
 end

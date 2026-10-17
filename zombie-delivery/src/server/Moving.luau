@@ -992,7 +992,7 @@ end
 
 -- The "Moving contracts" prompt on a board's corkboard: the contract card (8.0 SANDBOX: on every plot's board).
 local function boardPrompt(board: BasePart)
-	local prompt = newPrompt(board, "Moving contracts", "ZDC Moving", Enum.KeyCode.E, 0, T.Reach.Board)
+	local prompt = newPrompt(board, "Moving contracts", "Deliveros Moving", Enum.KeyCode.E, 0, T.Reach.Board)
 	prompt.Triggered:Connect(function(player: Player)
 		if not Net.limit(player, "MovingBoard", Config.Robust.Limits.MovingBoard) then
 			return -- (7.0 review: a card a second at most)
@@ -1750,7 +1750,7 @@ end
 -- The van's name on its prompts: "ZDC Van" (the city), the car's own (8.0 SANDBOX: "Sprinter").
 function SB.vanLabel(truck: Vehicles.Car): string
 	local def = if SB.on then Economy.findCar(truck.id) else nil
-	return if def then def.name else "ZDC Van"
+	return if def then def.name else "Deliveros Van"
 end
 
 local function rulesBed(truck: Vehicles.Car?): Rules.Bed
@@ -2588,7 +2588,7 @@ end
 onEnter = function(player: Player, contractId: string, index: number?)
 	local s = sessionOf(player)
 	if not s or s.contract.id ~= contractId then
-		say(player, if SB.on then "Locked. Take the moving contract at a Moving contracts board first (by your warehouse)." else "Locked. Take this moving contract at the depot's board first (ZDC Moving).")
+		say(player, if SB.on then "Locked. Take the moving contract at a Moving contracts board first (by your warehouse)." else "Locked. Take this moving contract at the depot's board first (Deliveros Moving).")
 		return
 	end
 	if traveling[player] or s.ended then
@@ -4135,7 +4135,7 @@ local function vanName(player: Player): string
 	end
 	local profile = PlayerData.get(player)
 	local def = Economy.findCar(if profile and type((profile :: any).car) == "string" then (profile :: any).car else T.Van)
-	return if def and not def.bike then def.name else "ZDC Van"
+	return if def and not def.bike then def.name else "Deliveros Van"
 end
 
 -- The contract card (the board, the admin): the house, its ★ things, the pay, the time; arms START.
@@ -4213,7 +4213,7 @@ local function startMove(owner: Player, contractId: any, admin: boolean, roles: 
 			return if SB.on then "Open the contract at a Moving contracts board first." else "Open the contract at the depot's board first."
 		end
 		if not card.admin and not nearBoard(root, T.Reach.Board + 12) then
-			return if SB.on then "Take the contract at a Moving contracts board (by your warehouse)." else "Take the contract at the depot's board (ZDC Moving)."
+			return if SB.on then "Take the contract at a Moving contracts board (by your warehouse)." else "Take the contract at the depot's board (Deliveros Moving)."
 		end
 	end
 	armed[owner] = nil
@@ -5387,7 +5387,7 @@ local function planMove(owner: Player, contractId: any): string?
 		return if SB.on then "Open the contract at a Moving contracts board first." else "Open the contract at the depot's board first."
 	end
 	if not armedCard.admin and not nearBoard(root, T.Reach.Board + 12) then
-		return if SB.on then "Take the contract at a Moving contracts board (by your warehouse)." else "Take the contract at the depot's board (ZDC Moving)."
+		return if SB.on then "Take the contract at a Moving contracts board (by your warehouse)." else "Take the contract at the depot's board (Deliveros Moving)."
 	end
 	armed[owner] = nil
 	local summary = table.clone(card)
@@ -5648,7 +5648,7 @@ function Moving.start()
 		-- plot's board)
 		local _, _, root = bodyOf(owner)
 		if not nearBoard(root, T.Reach.Board + 24) then
-			return if SB.on then "LAUNCH at a Moving contracts board (by your warehouse)." else "LAUNCH at the depot's board (ZDC Moving): the truck comes there."
+			return if SB.on then "LAUNCH at a Moving contracts board (by your warehouse)." else "LAUNCH at the depot's board (Deliveros Moving): the truck comes there."
 		end
 		return startMove(owner, contractId, true, roles)
 	end

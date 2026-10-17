@@ -160,7 +160,7 @@ check("fromState: firstMove, firstShow, legendary, firstUpgrade, painted", list(
 	list(Rules.fromState(state)))
 CollectionBookRules.fill(book)
 local full = Rules.stateOf({ sandboxMoves = 12, collectionBook = book, sandboxUpgrades = { warehouse = 4 } }, false)
-check("fromState: ten moves, the book full, the warehouse at level 5 (the ZDC Warehouse's 4: bought, an upgrade too)", full.warehouse == 5
+check("fromState: ten moves, the book full, the warehouse at level 5 (the Deliveros Warehouse's 4: bought, an upgrade too)", full.warehouse == 5
 	and list(Rules.fromState(full)) == "firstMove,tenMoves,legendary,fullBook,firstUpgrade,warehouse5", list(Rules.fromState(full)))
 local four = Rules.fromState(Rules.stateOf({ sandboxUpgrades = { warehouse = 3, lights = 1 } }, false))
 check("fromState: level 4 is not level 5", list(four) == "firstUpgrade", list(four))

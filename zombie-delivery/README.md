@@ -304,6 +304,19 @@
 > walls; one budget with the zombies' outlines within Roblox's 31, `OutlinePick.loot`), ★ × its stars over the nearest
 > few ("★★★ RARE · $450" up close; none under a window), a toast when you pick one up or load it, and an Epic or
 > Legendary piece sparkles with a sound the first time you see it. Previews: `design/lobby/`, `design/loot/`.
+>
+> **10.1** (the owner: "when I start my game, a short intro and a loading screen, and every player makes their own
+> character and has their own save that loads, e.g. level 15, and can start over"): **a short intro and a loading
+> screen** (`src/first/Loading.client.luau` in ReplicatedFirst, both project files map it): a sunrise, the Deliveros van
+> drives in, the DELIVEROS wordmark pops up over MOVE · FIND · GROW, a bar and a tip while the game loads; it goes once
+> the start screen is up (about 3 s; any key skips the intro). **Three save slots** for every player
+> (`Config.SaveSlots`, `server/SaveSlots.luau`, `shared/SaveSlotRules.luau`): the start screen lists them (the courier,
+> the warehouse's level, the money, the pieces, the moves, the time played, when it was saved) with **CONTINUE**,
+> **NEW GAME**, **LOOK** and **START OVER**; the save loads only once a slot is picked. Slot 1 is the save of before.
+> **The character creator** (`client/CharacterCreator.luau`, `Config.Characters`, `shared/CharacterLooks.luau`): your
+> own Roblox avatar or a courier made here (the skin, eight hair styles and ten colours, five hats, seven tops, the
+> trousers, glasses or a beard, a name Roblox filters, 🎲 RANDOM) in a turning 3D preview; everybody sees it on your
+> body (`server/CourierAvatar.luau` setLook). See **The start: intro, save slots, your courier (10.1)**.
 
 The active Roblox game in this repository (Merge Blades is preserved in `../archive/merge-blades`). **You run a delivery company** in a world
 gone wrong: take a job, carry the cargo to your vehicle with your own hands (or lead the horses on a rope), drive it
@@ -2309,6 +2322,55 @@ nothing errors. The owner's guide to creating them and pasting the ids is `desig
 
 **Tests:** `sandboxbadges_test`, `sandboxbadges_runtime_test` (a fake BadgeService: ids of 0 never call, each badge
 once, errors swallowed, Studio off, the save).
+
+## The start: intro, save slots, your courier (10.1)
+
+The owner: "když zapnu tu moji hru … intro takový jenom kratší a loading screen … každý hráč měl svoji UI, že si dělá
+charaktera … má nějaký svůj save, … loadne třeba level 15, pak může jít od znova".
+
+- **The intro and the loading screen** (`src/first/Loading.client.luau`, a LocalScript in **ReplicatedFirst**: both
+  `default.project.json` files map it, `node tools/rojo-sync.js zombie-delivery` syncs it). It runs before the rest of
+  the game reaches the client, so it stands alone (it requires nothing; its timings are at its top) and takes Roblox's
+  own loading screen away. A sunrise over green hills, the Deliveros van drives in along the road, **DELIVEROS** pops up
+  in Luckiest Guy with the store logo's gold and red edge, **MOVE · FIND · GROW** under it, then a bar ("Loading the
+  countryside…", "Opening your saves…") and a tip. It goes once the intro has run (2.6 s), the game has loaded and the
+  start screen is up (the player attribute `StartScreen`, set by `client/Menu.luau`), or after 25 s whatever happens:
+  the van drives off and it fades into the start screen. Any key, a click or a tap skips the rest of the intro (never the
+  loading). Reduced Motion: nothing bounces.
+- **Save slots** (`Config.SaveSlots`: 3; `server/SaveSlots.luau`, `shared/SaveSlotRules.luau`, the `Slots` remote).
+  Every slot is its own game: money, warehouse, collection, book, upgrades, tasks, paint and its courier. Slot 1 is the
+  save of before 10.1 (its key unchanged, `Player_<id>`); slot n is `Player_<id>_slot<n>`. A join reads and locks
+  nothing until the start screen picks a slot (`PlayerData.chooseSlot`): the start screen asks for the list (each slot
+  read with GetAsync, at most every `Read` s), and every card shows the courier (a little bust), its name, **LEVEL n · the
+  warehouse's name** (the sandbox has no driver level: the warehouse's 1 – 5 is its progress), the money, the pieces in
+  the collection, the moves finished, the time played and "saved … ago". The save played last is red and ENTER
+  continues it.
+  - **CONTINUE**: that save loads (the lock, the migrations, everything as before), then the game starts.
+  - **NEW GAME** (an empty slot) and **START OVER** (a used one, after a question that says what is lost): the
+    character creator, then a fresh game in that slot, written at once (what it held is gone).
+  - **LOOK**: the creator with the slot's courier, then CONTINUE with the courier changed (written at once).
+  - Every save also writes `playTime` (s) and `savedAt` (os.time) for the cards. The admin's RESET MY SAVE resets the
+    slot played and keeps its courier. An old client (or a start screen that failed) that sends PLAY without a pick gets
+    the slot saved last (`SaveSlots.fallback`). Studio without API access: the cards say saving is off; a game still
+    plays (not kept).
+- **The character creator** (`client/CharacterCreator.luau`; the options `Config.Characters`, the rules and the pieces
+  `shared/CharacterLooks.luau`). Left: your courier in a 3D preview that turns by itself (drag to turn it). Right: the
+  name (Roblox's TextService filters it on the server; one it cannot filter is dropped), **Who you play** (MAKE A
+  COURIER or MY ROBLOX AVATAR), the skin (9), the hair (8 styles) and its colour (10), a hat (StyleLooks' 5 or none) and
+  its colour (12), the top (a T-shirt, long sleeves or StyleLooks' 5 jackets) and its colour, the trousers (8), the face
+  (glasses, sunglasses, a moustache, a beard); 🎲 RANDOM rolls one. A made courier is Roblox's classic blocky R15 in those
+  colours (a HumanoidDescription: the head and the arms the skin, the torso the top, the legs the trousers; no clothes,
+  no accessories, the classic head and face) with its pieces welded on (`StyleBuild.character`: plain decorative parts,
+  massless, never colliding), built the same way in the preview, so what you pick is what everybody sees.
+  `server/CourierAvatar.luau` puts it on once the slot is in (`setLook`) and at every spawn; base "own" (or a save without
+  a courier) wears your own Roblox avatar as since 6.9.
+- Tests: `tests/characterlooks_test.luau` (every list, clean, random, the colours, all 1,680 combinations of the pieces),
+  `tests/saveslots_test.luau` (the keys, the summaries, the cards' words), `tests/saveslots_runtime_test.luau` (the real
+  SaveSlots and PlayerData: nothing read before the pick, the list, NEW GAME, the leave save, CONTINUE with a new look,
+  START OVER, the filter down, the fallback, leaving on the start screen); the e2e test's players CONTINUE slot 1.
+- In Studio: Play; the intro runs, the start screen lists three slots (slot 1 your old save). Try NEW GAME in slot 2
+  (make a courier, START THE GAME), play a moment, Stop, Play again: slot 2 shows its courier, level and time. Try
+  LOOK and START OVER. In a live server two players see each other's made couriers.
 
 ## Saving (8.4)
 

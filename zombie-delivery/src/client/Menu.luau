@@ -8,11 +8,15 @@
 -- 5.8 (the courier phone's look, design/phone-ui/): the card carries the ZDC mark (the red square, the wordmark, a
 -- thin rule, COURIER TERMINAL), PLAY is the phone's red primary action, the company line and the controls are slim
 -- hairline rows (no corners), and the controls card has the ZDC heading.
--- 8.0 SANDBOX (Config.Sandbox.On, design/sandbox/KONTRAKT.md): a simple screen instead (showSandbox): the ZDC mark,
--- the title ZDC MOVES · SANDBOX, PLAY (ENTER) and the version; the camera drifts slowly over the sandbox
--- (shared/SandboxMap.luau: the farmstead, Pražská, your plot), never over the old city. PLAY does what the city's does.
+-- 8.0 SANDBOX (Config.Sandbox.On, design/sandbox/KONTRAKT.md): a simple screen instead (showSandbox): the mark
+-- (8.9: DELIVEROS) over its slogan MOVE · FIND · GROW, PLAY (ENTER) and the version; the camera drifts slowly over the
+-- sandbox (shared/SandboxMap.luau: the farmstead, Pražská, your plot), never over the old city. PLAY does what the
+-- city's does.
 -- 8.3 (design/warehouse-levels/KONTRAKT.md): the two shots of your warehouse look at the building of its level
 -- (WarehouseLayout.site: 1 the Garage … 5 the Logistics Center).
+-- 10.1 (Config.SaveSlots): the sandbox's card lists your save slots (CONTINUE, NEW GAME, LOOK, START OVER; the Slots
+-- remote, server/SaveSlots.luau) and opens the character creator (client/CharacterCreator.luau); the game starts once
+-- the server says the save is in. Up, it sets the player attribute StartScreen (the loading screen's cue to go).
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -22,7 +26,11 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
 local SandboxMap = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("SandboxMap")) -- 8.0 SANDBOX
 local WarehouseLayout = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("WarehouseLayout")) -- 8.3: its level's building
+local Net = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Net")) -- 10.1: the Slots remote
+local CharacterLooks = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("CharacterLooks")) -- 10.1: the slots' busts
+local SaveSlotRules = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("SaveSlotRules")) -- 10.1: the slots' lines
 local Ui = require(script.Parent.Ui)
+local CharacterCreator = require(script.Parent.CharacterCreator) -- 10.1: NEW GAME, LOOK, START OVER
 local Theme = require(script.Parent.Theme)
 
 local Menu = {}
@@ -137,8 +145,116 @@ function Menu.setState(state: any)
 	end
 end
 
--- 8.0 SANDBOX: the sandbox's start screen. The city's charcoal card, smaller: the ZDC mark, ZDC MOVES · SANDBOX, PLAY
--- (ENTER, a gamepad's A) and the version; PLAY fades out the same way and runs onPlay (the server's Play).
+-- 10.1: a slot card's little bust: a made courier in flat blocks (its hat, hair, skin and top), your own avatar's head
+-- shot (Roblox's thumbnail) for base "own" or a save without a courier, a "+" on an empty slot.
+local function bust(parent: Instance, summary: any): any
+	local K = Theme.Contract
+	local frame = Ui.make("Frame", {
+		Name = "Bust", Size = UDim2.fromOffset(64, 64), Position = UDim2.fromOffset(12, 14),
+		BackgroundColor3 = K.recessed, BorderSizePixel = 0, ClipsDescendants = true,
+	}, parent)
+	if summary.empty then
+		Ui.label(frame, "+", UDim2.fromScale(1, 1), { TextSize = 34, TextXAlignment = Enum.TextXAlignment.Center, TextColor3 = K.secondary })
+		return frame
+	end
+	local look = if type(summary.look) == "table" then CharacterLooks.clean(summary.look) else nil
+	if not look or not CharacterLooks.custom(look) then
+		Ui.make("ImageLabel", {
+			Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1,
+			Image = `rbxthumb://type=AvatarHeadShot&id={player.UserId}&w=150&h=150`,
+		}, frame)
+		return frame
+	end
+	local function block(c: { number }?, x: number, y: number, w: number, h: number)
+		local v = c or { 128, 128, 128 }
+		Ui.make("Frame", {
+			Position = UDim2.fromOffset(x, y), Size = UDim2.fromOffset(w, h), BackgroundColor3 = Color3.fromRGB(v[1], v[2], v[3]), BorderSizePixel = 0,
+		}, frame)
+	end
+	local colors = CharacterLooks.colors(look)
+	local hair = CharacterLooks.option("hairColor", look.hairColor)
+	local hat = CharacterLooks.option("hatColor", look.hatColor)
+	block(colors.TorsoColor, 8, 46, 48, 18)
+	if look.hair == "long" or look.hair == "afro" then
+		block(hair and hair.rgb, 16, 14, 32, 30)
+	end
+	block(colors.HeadColor, 20, 18, 24, 26)
+	block({ 30, 30, 34 }, 26, 27, 3, 4)
+	block({ 30, 30, 34 }, 35, 27, 3, 4)
+	if look.hair ~= "none" and look.hat == "none" then
+		block(hair and hair.rgb, 18, if look.hair == "afro" then 6 else 12, 28, if look.hair == "afro" then 14 else 8)
+	end
+	if look.hat ~= "none" then
+		block(hat and hat.rgb, 17, 8, 30, 11)
+	end
+	return frame
+end
+
+-- 10.1: one slot's card (shared/SaveSlotRules.luau's summary): its bust, its courier's name, the warehouse's level, the
+-- money, the collection, the moves, the time played, when it was saved; CONTINUE (red on the save played last), LOOK
+-- and START OVER, or NEW GAME on an empty slot.
+local function slotCard(parent: Instance, summary: any, y: number, latest: boolean, act: (string, number) -> ()): any
+	local K = Theme.Contract
+	local card, body = Ui.ticket(parent, UDim2.fromOffset(512, 92), UDim2.fromOffset(24, y))
+	card.Parent.Name = `Slot{summary.slot}`
+	if latest then
+		Ui.selectRow(card, true)
+	end
+	bust(body, summary)
+	local name = if summary.empty then "Empty" else summary.name or player.DisplayName
+	Ui.label(body, `SLOT {summary.slot}  ·  {string.upper(name)}`, UDim2.fromOffset(256, 22), {
+		Position = UDim2.fromOffset(88, 10), TextSize = 17, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd,
+	})
+	local now = os.time()
+	local line2 = if summary.empty then "Start a new game here." else `LEVEL {summary.level} · {summary.levelName}  ·  {SaveSlotRules.money(summary.money)}`
+	local bits = {}
+	if not summary.empty then
+		table.insert(bits, `{summary.pieces} pieces`)
+		table.insert(bits, `{summary.moves} moves`)
+		local played = SaveSlotRules.played(summary.played)
+		if played ~= "" then
+			table.insert(bits, played)
+		end
+		local ago = SaveSlotRules.ago(summary.savedAt, now)
+		if ago ~= "" then
+			table.insert(bits, `saved {ago}`)
+		end
+	end
+	Ui.label(body, line2, UDim2.fromOffset(256, 20), {
+		Position = UDim2.fromOffset(88, 36), TextSize = 15, Font = Theme.Font, TextColor3 = K.secondary, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd,
+	})
+	Ui.label(body, table.concat(bits, " · "), UDim2.fromOffset(256, 18), {
+		Position = UDim2.fromOffset(88, 60), TextSize = 13, Font = Theme.Font, TextColor3 = K.line, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd,
+	})
+	if summary.empty then
+		local new = Ui.button(body, "NEW GAME", UDim2.fromOffset(150, 44), if latest then K.red else Theme.Colors.yellow, function()
+			act("new", summary.slot)
+		end)
+		new.Position, new.TextSize = UDim2.fromOffset(350, 24), 17
+		return card
+	end
+	local continue = Ui.button(body, "CONTINUE", UDim2.fromOffset(150, 40), if latest then K.red else Theme.Colors.yellow, function()
+		act("play", summary.slot)
+	end)
+	continue.Position, continue.TextSize = UDim2.fromOffset(350, 8), 17
+	local look = Ui.ghostButton(body, "LOOK", UDim2.fromOffset(64, 34), nil, function()
+		act("look", summary.slot)
+	end)
+	look.Position, look.TextSize = UDim2.fromOffset(350, 52), 13
+	local restart = Ui.ghostButton(body, "START OVER", UDim2.fromOffset(84, 34), Theme.Colors.red, function()
+		act("restart", summary.slot)
+	end)
+	restart.Position, restart.TextSize = UDim2.fromOffset(418, 52), 13
+	return card
+end
+
+-- 8.0 SANDBOX: the sandbox's start screen. The city's charcoal card, smaller: the mark (8.9: DELIVEROS), its slogan and
+-- the version; PLAY fades out the same way and runs onPlay (the server's Play).
+-- 10.1 (Config.SaveSlots.On): the card lists your save slots (slotCard) in place of PLAY. CONTINUE asks the server for
+-- that save (the Slots remote), NEW GAME and LOOK open the character creator (client/CharacterCreator.luau), START OVER
+-- asks first, then the creator: a fresh game in the slot. While the save loads the card says so; once the server says
+-- it is in ("ready") the fade runs as PLAY's did. ENTER (a gamepad's A) continues the save played last (none: a new
+-- game in the first empty slot). Without slots: PLAY (ENTER) as before.
 local function showSandbox(onPlay: () -> ())
 	gui = Ui.make("ScreenGui", {
 		Name = "StartScreen",
@@ -150,6 +266,7 @@ local function showSandbox(onPlay: () -> ())
 	local C = Theme.Colors
 	local P = Theme.Postage
 	local K = Theme.Contract
+	local slotsOn = Config.SaveSlots.On
 	local veil = Ui.make("Frame", {
 		Size = UDim2.fromScale(1, 1), BackgroundColor3 = K.charcoal,
 		BackgroundTransparency = 0.45, BorderSizePixel = 0, Active = false, ZIndex = 2,
@@ -157,7 +274,7 @@ local function showSandbox(onPlay: () -> ())
 	Ui.make("UIGradient", {
 		Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 0.8) }),
 	}, veil)
-	local W, H = 520, 292
+	local W, H = if slotsOn then 560 else 520, if slotsOn then 492 else 292
 	local center = Ui.make("Frame", {
 		Name = "SandboxMenu", Size = UDim2.fromOffset(W, H),
 		Position = UDim2.new(0.08, 0, 0.5, 0), AnchorPoint = Vector2.new(0, 0.5),
@@ -175,17 +292,13 @@ local function showSandbox(onPlay: () -> ())
 			part.ZIndex = 6
 		end
 	end
-	local title = Ui.label(face, "ZDC MOVES · SANDBOX", UDim2.fromOffset(W - 48, 56), {
+	local title = Ui.label(face, "MOVE · FIND · GROW", UDim2.fromOffset(W - 48, if slotsOn then 44 else 56), { -- (8.9: the mark above says DELIVEROS)
 		Name = "Title", Position = UDim2.fromOffset(24, 62), TextSize = 42, TextScaled = true, Font = Theme.DisplayFont, ZIndex = 6,
 	})
-	Ui.make("UITextSizeConstraint", { MaxTextSize = 42 }, title)
-	local play = Ui.button(face, "PLAY", UDim2.fromOffset(W - 48, 72), K.red, function() end)
-	play.Position = UDim2.fromOffset(24, 136)
-	play.TextSize = 26
-	play.ZIndex = 7
+	Ui.make("UITextSizeConstraint", { MaxTextSize = if slotsOn then 34 else 42 }, title)
 	local touchLayout = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
-	Ui.label(face, if touchLayout then "Tap PLAY to begin" else "Press ENTER to begin", UDim2.fromOffset(W - 48, 36), {
-		Position = UDim2.fromOffset(24, 224), TextSize = 15, TextColor3 = C.dim, TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 7,
+	local hint = Ui.label(face, if touchLayout then "Tap PLAY to begin" else "Press ENTER to begin", UDim2.fromOffset(W - 48, 36), {
+		Position = UDim2.fromOffset(24, H - 68), TextSize = 15, TextColor3 = C.dim, TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 7,
 	})
 	local version = Ui.make("TextLabel", {
 		Name = "Version", Size = UDim2.fromOffset(0, 24), AutomaticSize = Enum.AutomaticSize.X, Position = UDim2.new(1, -12, 1, -10), AnchorPoint = Vector2.new(1, 1),
@@ -218,6 +331,7 @@ local function showSandbox(onPlay: () -> ())
 	}, gui)
 	local pressed = false
 	local keyConnection: RBXScriptConnection? = nil
+	local slotConnection: RBXScriptConnection? = nil
 	local function start()
 		if pressed then
 			return
@@ -228,6 +342,10 @@ local function showSandbox(onPlay: () -> ())
 		if keyConnection then
 			keyConnection:Disconnect()
 		end
+		if slotConnection then
+			slotConnection:Disconnect()
+		end
+		CharacterCreator.close()
 		fade.Visible = true
 		TweenService:Create(fade, TweenInfo.new(0.4), { BackgroundTransparency = 0 }):Play()
 		task.wait(0.45)
@@ -259,20 +377,212 @@ local function showSandbox(onPlay: () -> ())
 		gui:Destroy()
 		gui = nil
 	end
-	play.Activated:Connect(start)
+
+	-- 10.1: the slots (or PLAY without them)
+	local enter: () -> () = function()
+		task.spawn(start)
+	end
+	if slotsOn then
+		local remote = Net.get("Slots")
+		local area = Ui.make("Frame", { Name = "Slots", Size = UDim2.fromOffset(W, H - 190), Position = UDim2.fromOffset(0, 120), BackgroundTransparency = 1, ZIndex = 6 }, face)
+		Ui.caps(face, "Your saves", UDim2.fromOffset(200, 16), { Position = UDim2.fromOffset(24, 112), ZIndex = 7 })
+		local status = Ui.label(face, "Loading your saves…", UDim2.fromOffset(W - 260, 36), {
+			Position = UDim2.fromOffset(24, H - 68), TextSize = 14, Font = Theme.Font, TextColor3 = C.dim, ZIndex = 7,
+		})
+		hint.Size = UDim2.fromOffset(200, 36)
+		hint.Position = UDim2.fromOffset(W - 224, H - 68)
+		hint.Text = ""
+		local phase = "list" -- "list" | "loading" | "creator"
+		local summaries: { any } = {}
+		local latest: number? = nil
+		local offline = false
+		local asked = 0
+		local rows: any = nil
+		local sent: { [string]: any }? = nil -- the pick sent last, and when; sent again while the server has not taken it
+		local sentAt, taken = 0, false
+		local slotAction: (string, number) -> () = function() end -- (below: CONTINUE, NEW GAME, LOOK, START OVER)
+		local function ask()
+			asked = os.clock()
+			remote:FireServer({ kind = "list" })
+		end
+		local function render()
+			if rows then
+				rows:Destroy()
+			end
+			rows = Ui.make("Frame", { Name = "Rows", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1 }, area)
+			if phase ~= "list" or #summaries == 0 then
+				return
+			end
+			local first = latest
+			if not first then
+				for _, summary in summaries do
+					if summary.empty then
+						first = summary.slot
+						break
+					end
+				end
+			end
+			for i, summary in summaries do
+				slotCard(rows, summary, 8 + (i - 1) * 100, summary.slot == first, function(action: string, slot: number)
+					if phase == "list" then
+						slotAction(action, slot)
+					end
+				end)
+			end
+			status.Text = if offline then "Saving is off here (Studio without API access): games are not kept." else ""
+			hint.Text = if touchLayout then "" elseif latest then `ENTER: continue slot {latest}` else "ENTER: a new game"
+		end
+		local function choose(kind: string, slot: number, look: any?)
+			phase = "loading"
+			render()
+			status.Text = if kind == "new" then `Starting a new game in slot {slot}…` else `Loading slot {slot}…`
+			hint.Text = ""
+			sent, sentAt, taken = { kind = kind, slot = slot, look = look }, os.clock(), false
+			remote:FireServer(sent)
+		end
+		local function summaryOf(slot: number): any
+			for _, summary in summaries do
+				if summary.slot == slot then
+					return summary
+				end
+			end
+			return nil
+		end
+		local function creator(title: string, action: string, look: any?, onDone: (any) -> ())
+			phase = "creator"
+			render()
+			face.Parent.Visible = false
+			CharacterCreator.open(gui, {
+				title = title, action = action, look = look,
+				onDone = function(chosen)
+					face.Parent.Visible = true
+					onDone(chosen)
+				end,
+				onBack = function()
+					face.Parent.Visible = true
+					phase = "list"
+					render()
+				end,
+			})
+		end
+		local confirm: any = nil
+		slotAction = function(action: string, slot: number)
+			local summary = summaryOf(slot)
+			if action == "play" then
+				choose("play", slot, nil)
+			elseif action == "new" then
+				creator(`New courier · slot {slot}`, "START THE GAME", nil, function(look)
+					choose("new", slot, look)
+				end)
+			elseif action == "look" then
+				creator(`Your courier · slot {slot}`, "SAVE & CONTINUE", summary and summary.look, function(look)
+					choose("play", slot, look)
+				end)
+			elseif action == "restart" and summary then
+				if confirm then
+					confirm:Destroy()
+				end
+				phase = "confirm"
+				confirm = Ui.make("Frame", {
+					Name = "Confirm", Size = UDim2.fromOffset(512, 150), Position = UDim2.fromOffset(24, 150),
+					BackgroundColor3 = K.raised, BorderSizePixel = 0, ZIndex = 20,
+				}, face)
+				Ui.stroke(confirm, K.red, 1)
+				Ui.label(confirm, `START OVER IN SLOT {slot}?`, UDim2.fromOffset(480, 26), { Position = UDim2.fromOffset(16, 12), TextSize = 19, ZIndex = 21 })
+				Ui.label(confirm, `Level {summary.level} · {summary.levelName}, {SaveSlotRules.money(summary.money)}, {summary.pieces} pieces and everything else in this save are gone for good. You make your courier again.`, UDim2.fromOffset(480, 44), {
+					Position = UDim2.fromOffset(16, 40), TextSize = 14, Font = Theme.Font, TextColor3 = K.secondary, ZIndex = 21,
+				})
+				local yes = Ui.button(confirm, "START OVER", UDim2.fromOffset(200, 40), Theme.Colors.red, function()
+					confirm:Destroy()
+					confirm = nil
+					phase = "list"
+					creator(`Start over · slot {slot}`, "START OVER", summary.look, function(look)
+						choose("new", slot, look)
+					end)
+				end)
+				yes.Position, yes.ZIndex = UDim2.fromOffset(16, 96), 22
+				local no = Ui.ghostButton(confirm, "CANCEL", UDim2.fromOffset(120, 40), nil, function()
+					confirm:Destroy()
+					confirm = nil
+					phase = "list"
+				end)
+				no.Position, no.ZIndex = UDim2.fromOffset(376, 96), 22
+			end
+		end
+		enter = function()
+			if phase ~= "list" or #summaries == 0 then
+				return
+			end
+			if latest then
+				slotAction("play", latest)
+				return
+			end
+			for _, summary in summaries do
+				if summary.empty then
+					slotAction("new", summary.slot)
+					return
+				end
+			end
+		end
+		slotConnection = remote.OnClientEvent:Connect(function(message: any)
+			if type(message) ~= "table" then
+				return
+			end
+			if message.kind == "list" and type(message.slots) == "table" then
+				summaries, latest, offline = message.slots, message.latest, message.offline == true
+				if type(message.picked) == "number" and phase == "list" then
+					phase = "loading" -- (a pick from before this screen: the fallback)
+					status.Text = `Loading slot {message.picked}…`
+				end
+				render()
+			elseif message.kind == "loading" then
+				phase, taken = "loading", true
+				render()
+				status.Text = `Loading slot {message.slot}…`
+			elseif message.kind == "ready" then
+				status.Text = ""
+				task.spawn(start)
+			elseif message.kind == "refused" then
+				status.Text = tostring(message.text)
+				if phase ~= "loading" or message.text ~= "Your save is already loading." then
+					phase = "list"
+					ask()
+				end
+			end
+		end)
+		ask()
+		task.spawn(function() -- (a list that never came: asked again; a pick the server never took: sent again)
+			while gui and not pressed do
+				task.wait(1)
+				if #summaries == 0 and os.clock() - asked > 6 then
+					ask()
+				elseif phase == "loading" and sent and not taken and os.clock() - sentAt > 5 then
+					sentAt = os.clock()
+					remote:FireServer(sent)
+				end
+			end
+		end)
+	else
+		local play = Ui.button(face, "PLAY", UDim2.fromOffset(W - 48, 72), K.red, function() end)
+		play.Position = UDim2.fromOffset(24, 136)
+		play.TextSize = 26
+		play.ZIndex = 7
+		play.Activated:Connect(start)
+	end
 	keyConnection = UserInputService.InputBegan:Connect(function(input, processed)
-		if processed or UserInputService:GetFocusedTextBox() then
+		if processed or UserInputService:GetFocusedTextBox() or CharacterCreator.isOpen() then
 			return
 		end
 		local key = input.KeyCode
 		if key == Enum.KeyCode.Return or key == Enum.KeyCode.KeypadEnter or key == Enum.KeyCode.ButtonA then
-			task.spawn(start)
+			enter()
 		end
 	end)
 
 	task.spawn(controls, false)
 	shots, shotSeconds = sandboxShots(), 12
 	fly()
+	player:SetAttribute("StartScreen", true) -- 10.1: the loading screen (ReplicatedFirst) may go: the start screen is up
 end
 
 function Menu.show(onPlay: () -> ())
@@ -550,6 +860,7 @@ function Menu.show(onPlay: () -> ())
 
 	task.spawn(controls, false)
 	fly()
+	player:SetAttribute("StartScreen", true) -- 10.1: the loading screen (ReplicatedFirst) may go
 end
 
 return Menu

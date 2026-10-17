@@ -284,7 +284,7 @@ R.player = function()
 		end)
 	end
 
-	heading("Spawn a car", "It comes right now on the road next to the target (7.x: the ZDC Van and the bikes, the only vehicles a player has).")
+	heading("Spawn a car", "It comes right now on the road next to the target (7.x: the Deliveros Van and the bikes, the only vehicles a player has).")
 	local cars = grid(150)
 	for _, def in Config.Cars do
 		action(cars, def.name, if def.company then C.yellow else C.blue, function()
@@ -549,7 +549,7 @@ R.events = function()
 		send("liveEvent", "end")
 	end)
 	-- 7.0, MOVES (server/Moving.luau admin): your own house move, the prologue's (Marge's House)
-	heading("Moves · 7.0 prototype", "Your own move in your ZDC Van: the contract card (as the depot's board opens it), or START at once; HOUSE takes you (and the car you drive) to its door; the FARM row is Walt's Farm's (chapter 1). HORDE now, 1 MIN left, TRIP (the van's load delivered, as at the Wall), DELIVER (that and finished) or END (called off).")
+	heading("Moves · 7.0 prototype", "Your own move in your Deliveros Van: the contract card (as the depot's board opens it), or START at once; HOUSE takes you (and the car you drive) to its door; the FARM row is Walt's Farm's (chapter 1). HORDE now, 1 MIN left, TRIP (the van's load delivered, as at the Wall), DELIVER (that and finished) or END (called off).")
 	local moves = grid(200)
 	action(moves, "🏠 MOVE: CONTRACT CARD", P.gold, function()
 		send("move", "card")

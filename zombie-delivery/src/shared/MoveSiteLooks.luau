@@ -250,8 +250,8 @@ function MoveSiteLooks.checkpoint(): { Piece }
 	add(p, "GantryBeam", { 2 * gx + 1, 0.7, 0.7 }, { 0, clear + 4.35, gz }, STEEL, "Metal")
 	local title = line("SAFE ZONE — EVACUATION CHECKPOINT", SIGN_YELLOW, 0.44, "Black")
 	add(p, "CheckpointSign", { 2 * gx - 2, 4, 0.4 }, { 0, clear + 2, gz }, OLIVE_DARK, "Metal", { words = {
-		{ face = "Back", lit = true, lines = { title, line("THE WALL · ZDC MOVING DROP-OFF · DRIVE THE TRUCK IN", ORANGE, 0.22, "Bold") } },
-		{ face = "Front", lit = true, lines = { title, line("THE WALL · ZDC MOVING DROP-OFF", ORANGE, 0.24, "Bold") } },
+		{ face = "Back", lit = true, lines = { title, line("THE WALL · DELIVEROS MOVING DROP-OFF · DRIVE THE TRUCK IN", ORANGE, 0.22, "Bold") } },
+		{ face = "Front", lit = true, lines = { title, line("THE WALL · DELIVEROS MOVING DROP-OFF", ORANGE, 0.24, "Bold") } },
 	} })
 	add(p, "SignTrim", { 2 * gx - 2, 0.3, 0.46 }, { 0, clear - 0.15, gz }, RED, "Metal")
 
@@ -351,7 +351,7 @@ local function sandboxPins(p: { Piece }, top: number, low: number)
 	} } }, YELLOW)
 	pinned(p, "PhotoStand", { 1.3, 1.15 }, 0.85, top, -4, PAPER, photo("🏺", "PUT IT ON SHOW", { 170, 206, 140 }), { 60, 110, 200 })
 	add(p, "Logo", { 1.4, 1.4, 0.06 }, { 2.55, top, 0.42 }, CHARCOAL, "SmoothPlastic", { words = {
-		{ face = "Front", lit = true, lines = { line("ZDC", ORANGE, 0.5, "Black"), line("MOVING", INK, 0.2, "Bold") } },
+		{ face = "Front", lit = true, lines = { line("DELIVEROS", ORANGE, 0.5, "Black"), line("MOVING", INK, 0.2, "Bold") } },
 	} })
 	pinned(p, "FlyerRare", { 1.3, 1.1 }, -2.55, low, 4, { 255, 236, 150 }, { { face = "Front", lines = {
 		line("RARE FINDS", RED, 0.26, "Black"),
@@ -374,7 +374,7 @@ function MoveSiteLooks.board(sandbox: boolean?): { Piece }
 	add(p, "Backing", { 7.4, 5.4, 0.3 }, { 0, 4.9, 0.8 }, { 44, 52, 50 }, "Metal", { solid = true })
 	add(p, "Board", { 6.8, 3.6, 0.2 }, { 0, 4.9, 0.55 }, CORK, "Fabric", { solid = true })
 	add(p, "Header", { 7.4, 1.1, 0.3 }, { 0, 8.15, 0.8 }, ORANGE, "Metal", { words = {
-		{ face = "Front", lit = true, lines = { line(if sandbox then "ZDC DISPATCH" else "MOVING CONTRACTS", CHARCOAL, 0.54, "Black"), line(if sandbox then "ZDC MOVING" else "ZDC MOVING & EVACUATION", CHARCOAL, 0.28, "Bold") } },
+		{ face = "Front", lit = true, lines = { line(if sandbox then "DELIVEROS DISPATCH" else "MOVING CONTRACTS", CHARCOAL, 0.54, "Black"), line(if sandbox then "DELIVEROS MOVING" else "DELIVEROS MOVING & EVACUATION", CHARCOAL, 0.28, "Bold") } },
 	} })
 	add(p, "Canopy", { 8.4, 0.25, 2.4 }, { 0, 9.0, 0.4 }, CHARCOAL, "Metal", { rotation = { -6, 0, 0 } })
 	add(p, "LampArm", { 0.12, 0.12, 1.4 }, { 0, 8.82, -0.95 }, CHARCOAL, "Metal")
@@ -399,7 +399,7 @@ function MoveSiteLooks.board(sandbox: boolean?): { Piece }
 	} } }, YELLOW)
 	pinned(p, "PhotoRanch", { 1.3, 1.15 }, 0.85, top, -4, PAPER, photo("🐄", "WALT'S RANCH", { 170, 206, 140 }), { 60, 110, 200 })
 	add(p, "Logo", { 1.4, 1.4, 0.06 }, { 2.55, top, 0.42 }, CHARCOAL, "SmoothPlastic", { words = {
-		{ face = "Front", lit = true, lines = { line("ZDC", ORANGE, 0.5, "Black"), line("MOVING", INK, 0.2, "Bold") } },
+		{ face = "Front", lit = true, lines = { line("DELIVEROS", ORANGE, 0.5, "Black"), line("MOVING", INK, 0.2, "Bold") } },
 	} })
 	pinned(p, "FlyerThieves", { 1.3, 1.1 }, -2.55, low, 4, { 255, 236, 150 }, { { face = "Front", lines = {
 		line("WARNING", RED, 0.26, "Black"),
@@ -424,7 +424,7 @@ function MoveSiteLooks.house(title: string, park: number): { Piece }
 	-- The yard sign left of the path (the mailbox stands right of it), facing the street.
 	add(p, "YardSign", { 4.6, 2.3, 0.15 }, { -6.5, 3.35, -4.6 }, CHARCOAL, "SmoothPlastic", { words = {
 		{ face = "Front", lit = true, lines = {
-			line("ZDC MOVING", ORANGE, 0.34, "Black"),
+			line("DELIVEROS MOVING", ORANGE, 0.34, "Black"),
 			line(string.upper(title), INK, 0.28, "Bold"),
 			line("Moving day · We move your life.", GREY, 0.13),
 		} },
@@ -450,7 +450,7 @@ function MoveSiteLooks.house(title: string, park: number): { Piece }
 	add(p, "Rug", { 3.0, 0.8, 0.8 }, { 5.6, 1.45, -0.55 }, { 150, 60, 52 }, "Fabric", { shape = "Cylinder", rotation = { 0, 0, 78 } })
 	-- MOVING DAY over the door.
 	add(p, "DayBanner", { 8.4, 1.3, 0.06 }, { 0, 8.55, -0.1 }, { 250, 246, 236 }, "Fabric", { words = {
-		{ face = "Front", lines = { line("MOVING DAY!", ORANGE, 0.58, "Black"), line("ZDC MOVING & EVACUATION", CHARCOAL, 0.24, "Bold") } },
+		{ face = "Front", lines = { line("MOVING DAY!", ORANGE, 0.58, "Black"), line("DELIVEROS MOVING & EVACUATION", CHARCOAL, 0.24, "Bold") } },
 	} })
 	-- The realtor's sign right of the mailbox: FOR SALE, and the army's EVACUATED strip across it.
 	add(p, "RealtorPost", { 0.22, 4.4, 0.22 }, { 8.9, 2.2, -5.0 }, WHITE, "Wood")
@@ -482,7 +482,7 @@ function MoveSiteLooks.banner(): { Piece }
 	local p: { Piece } = {}
 	add(p, "Banner", { b.Width, b.Height, 0.12 }, { 0, 0, 0 }, ORANGE, "Fabric", { words = {
 		{ face = "Front", lines = {
-			line("ZDC MOVING & EVACUATION", CHARCOAL, 0.54, "Black"),
+			line("DELIVEROS MOVING & EVACUATION", CHARCOAL, 0.54, "Black"),
 			line("We move your life. They eat everything else.", CHARCOAL, 0.26, "Bold"),
 		} },
 	} })
@@ -563,13 +563,13 @@ function MoveSiteLooks.farm(title: string): { Piece }
 		add(p, "Geraniums" .. tag, { 3.4, 0.5, 0.5 }, { x, 3.6, front + 0.45 }, GERANIUM, "Fabric")
 	end
 	add(p, "DayBanner", { 8.4, 1.2, 0.06 }, { hx, h - 1.3, front + 0.35 }, { 250, 246, 236 }, "Fabric", { yaw = 180, words = {
-		{ face = "Front", lines = { line("MOVING DAY!", ORANGE, 0.58, "Black"), line("ZDC MOVING & EVACUATION", CHARCOAL, 0.24, "Bold") } },
+		{ face = "Front", lines = { line("MOVING DAY!", ORANGE, 0.58, "Black"), line("DELIVEROS MOVING & EVACUATION", CHARCOAL, 0.24, "Bold") } },
 	} })
 	-- The ZDC yard sign left of the house's way out (facing the yard: turned 180°).
 	local sx, sz = hx - 7.5, front + 9
 	add(p, "YardSign", { 4.6, 2.3, 0.15 }, { sx, 3.35, sz }, CHARCOAL, "SmoothPlastic", { yaw = 180, words = {
 		{ face = "Front", lit = true, lines = {
-			line("ZDC MOVING", ORANGE, 0.34, "Black"),
+			line("DELIVEROS MOVING", ORANGE, 0.34, "Black"),
 			line(string.upper(title), INK, 0.28, "Bold"),
 			line("Moving day · We move your life.", GREY, 0.13),
 		} },

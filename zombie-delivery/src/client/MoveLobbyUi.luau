@@ -245,7 +245,7 @@ local function truckRows(parent: Instance, v: any, order: number)
 		picture = { emoji = "🚐" },
 		thumb = KIT.Icon,
 		emojiSize = 26,
-		title = string.upper(tostring(card.truck or "ZDC Van")),
+		title = string.upper(tostring(card.truck or "Deliveros Van")),
 		titleColor = C.title,
 		facts = `Bay {bed[1]} × {bed[2]} studs · as many trips as it takes`,
 		word = "✔ SELECTED",
@@ -262,7 +262,7 @@ local function truckRows(parent: Instance, v: any, order: number)
 		emojiSize = 26,
 		shut = true,
 		title = "BIGGER VEHICLES",
-		facts = "Box van, trailer: as ZDC Moving grows",
+		facts = "Box van, trailer: as Deliveros Moving grows",
 		lock = "🔒 SOON",
 		silent = true,
 		onOpen = function() end,
@@ -378,7 +378,7 @@ local function draw()
 	Ui.make("UIStroke", { Color = ORANGE, Thickness = 1, Transparency = 0.3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, frame)
 
 	-- the header: what this is, the house, the chips; ✕ folds it away
-	label(frame, "ZDC MOVING · PLANNING", UDim2.new(1, -60, 0, 16), { Name = "Kicker", Position = UDim2.fromOffset(18, 12), Font = Theme.HeadingFont, TextSize = 12, TextColor3 = ORANGE })
+	label(frame, "DELIVEROS MOVING · PLANNING", UDim2.new(1, -60, 0, 16), { Name = "Kicker", Position = UDim2.fromOffset(18, 12), Font = Theme.HeadingFont, TextSize = 12, TextColor3 = ORANGE })
 	label(frame, `{card.icon or "🏠"} {string.upper(tostring(card.name or "MOVE"))}`, UDim2.new(if wide then 0.5 else 1, -70, 0, 28), {
 		Name = "Title",
 		Position = UDim2.fromOffset(18, 28),

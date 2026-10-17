@@ -88,7 +88,7 @@ P.MESH_CREAM = Mock.Color3.fromRGB(217, 204, 176)
 -- (a ZDC RIDE scooter or a company vehicle: Car.rental, Car.lent).
 function P.van(player: any, ground: any, meshed: boolean?, rental: boolean?): any
 	local model = Mock.Instance.new("Model")
-	model.Name = `{player.Name}'s ZDC Sprinter`
+	model.Name = `{player.Name}'s Deliveros Sprinter`
 	model:SetAttribute("OwnerId", player.UserId)
 	model:SetAttribute("CarId", "sprinter")
 	model:SetAttribute("SprinterArt", true)

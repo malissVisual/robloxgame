@@ -166,7 +166,7 @@ for _, def in Config.Kit do
 	shops[shop] = shops[shop] or {}
 	table.insert(shops[shop], def.id)
 end
-check("ZDC Bags: the five bags", table.concat(shops.bags or {}, ",") == "bag,tote,thermal,padded,duffel", table.concat(shops.bags or {}, ","))
+check("Deliveros Bags: the five bags", table.concat(shops.bags or {}, ",") == "bag,tote,thermal,padded,duffel", table.concat(shops.bags or {}, ","))
 check("Last Stop Supplies: the vest, the armour (6.12.2: no shoes)", table.concat(shops.supplies or {}, ",") == "hivis,kevlar,heavy", table.concat(shops.supplies or {}, ","))
 check("Lead & Co.: the bat", table.concat(shops.guns or {}, ",") == "bat")
 check("the starter is never sold ($0): the pistol (6.23: the plastic bag is sold for each game, $20)", (Transport.findKit("bag") :: Config.KitDef).starter == nil

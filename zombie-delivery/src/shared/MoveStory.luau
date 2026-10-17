@@ -84,7 +84,7 @@ export type Chapter = {
 MoveStory.Outcomes = { "great", "ok", "late", "failed" }
 MoveStory.Sender = "Marge" -- who the phone texts are from (client/Phone.luau's MESSAGES)
 MoveStory.Tagline = "We move your life. The rest they eat."
-MoveStory.Company = "ZDC Moving & Evacuation"
+MoveStory.Company = "Deliveros Moving & Evacuation"
 
 -- Dana runs Big Move Movers (Config.Employers "movers"); her look is the world's ("mover": her NPC at their board).
 MoveStory.Villain = {
@@ -108,7 +108,7 @@ MoveStory.CardKeys = { "intro" }
 MoveStory.Intro = {
 	{ who = "marge", text = "Sit down, rookie. The army is evacuating the city, one district at a time. Captain Maria is building a Wall round what's left." },
 	{ who = "maria", text = "Civilians cross with what fits in one vehicle. Whatever stays outside the Wall belongs to the dead. That is not a suggestion." },
-	{ who = "marge", text = "Nobody needs parcels any more. Everybody needs a truck. So we're ZDC Moving & Evacuation now. New sign and everything." },
+	{ who = "marge", text = "Nobody needs parcels any more. Everybody needs a truck. So we're Deliveros Moving & Evacuation now. New sign and everything." },
 	{ who = "marge", text = "We move your life. The rest they eat. The first job's an easy one: my house. Don't make me regret the word 'easy'." },
 } :: { Line }
 
@@ -159,7 +159,7 @@ MoveStory.Chapters = {
 		},
 		-- 7.0 greeters: Marge on her porch (server/MoveGreeters.luau)
 		greeter = {
-			hello = { "Oh thank heavens, ZDC!", "The door's open. Everything inside goes.", "And mind Grandpa's clock!" },
+			hello = { "Oh thank heavens, Deliveros!", "The door's open. Everything inside goes.", "And mind Grandpa's clock!" },
 			star = "Careful with that!",
 			horde = "They're coming! Hurry!",
 			leave = "Thank you… see you behind the Wall.",
@@ -208,7 +208,7 @@ MoveStory.Chapters = {
 		},
 		-- 7.x farm move: Walt at his farmhouse's door (server/MoveGreeters.luau)
 		greeter = {
-			hello = { "Howdy, ZDC! About time.", "House and barn are open. Take it all.", "The wagon goes out the barn doors!" },
+			hello = { "Howdy, Deliveros! About time.", "House and barn are open. Take it all.", "The wagon goes out the barn doors!" },
 			star = "Easy with that, partner!",
 			stars = {
 				thunders_saddle = "Easy with Thunder's saddle!",
@@ -422,18 +422,18 @@ MoveStory.Chapters = {
 		number = 7,
 		title = "Last One Out",
 		clientId = "marge",
-		client = "ZDC, all of us",
-		place = "The ZDC depot",
+		client = "Deliveros, all of us",
+		place = "The Deliveros depot",
 		icon = "🚚",
 		color = { 240, 132, 44 },
 		soon = true,
 		requires = { "prologue", "ranch", "clinic", "hotel", "villa", "lab", "museum" },
-		hook = "Maria's Wall closes at dawn, and the ZDC depot is on the wrong side of it. Every truck, every trophy, every friend you moved waits in the yard. Big Move Movers are coming for the files, and for you.",
+		hook = "Maria's Wall closes at dawn, and the Deliveros depot is on the wrong side of it. Every truck, every trophy, every friend you moved waits in the yard. Big Move Movers are coming for the files, and for you.",
 		blurb = "The last move is our own: the trucks, the trophies, the coffee machine. And the people. Always the people.",
 		keepsakes = {
 			{ item = "dispatch_desk", name = "Marge's desk", story = "The dispatch desk since day one. It moves with her, or she doesn't move." },
 			{ item = "trophy_shelf", name = "The trophy shelf", story = "Every keepsake you saved: a saddle, a jukebox, one of Rex's teeth." },
-			{ item = "company_sign", name = "The ZDC sign", story = "Painted over twice: Dead End Dispatch, then ZDC Moving. One more coat to go." },
+			{ item = "company_sign", name = "The Deliveros sign", story = "Painted over twice: Dead End Dispatch, then Deliveros Moving. One more coat to go." },
 		},
 		briefing = {
 			{ who = "maria", text = "The Wall closes at dawn, civilian. When the gate shuts, it doesn't open again. For anyone." },
@@ -444,7 +444,7 @@ MoveStory.Chapters = {
 		taunt = "Lights out, Marge. Your files, your trucks, your Wall. We're moving in.",
 		dispatch = "The last move. My desk goes first, the coffee machine second, you third. Don't make me choose the rest.",
 		debrief = {
-			great = "The gate is shut and we're all on the right side of it. Behind the Wall the sign is up: ZDC. Some things don't move.",
+			great = "The gate is shut and we're all on the right side of it. Behind the Wall the sign is up: Deliveros. Some things don't move.",
 			ok = "We made it in, most of us and most of it. The sign is crooked. Leave it. It's ours.",
 			late = "The gate shut on the yard. We got the people out. Trucks can be replaced. You can't. Get some sleep.",
 			failed = "The yard fell and Dana drove off with our trucks. But we're alive, and the Wall still has a gate. Again.",

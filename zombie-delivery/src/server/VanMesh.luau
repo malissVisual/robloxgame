@@ -86,7 +86,7 @@ local function loadArt()
 	end
 	local o, x, y, z, w = at("mark_o"), at("mark_x"), at("mark_y"), at("mark_z"), at("mark_w")
 	if not (o and x and y and z and w) then
-		say("the markers mark_o, mark_x, mark_y, mark_z and mark_w are missing; the ZDC Van keeps its panelled look")
+		say("the markers mark_o, mark_x, mark_y, mark_z and mark_w are missing; the Deliveros Van keeps its panelled look")
 		return
 	end
 	local scale = (x - o).Magnitude / 10
@@ -94,14 +94,14 @@ local function loadArt()
 	local uz = ux:Cross((y - o).Unit).Unit
 	local uy = uz:Cross(ux).Unit
 	if scale < 0.01 or uz:Dot((z - o).Unit) < 0.9 then
-		say("the import came out mirrored or flat; the ZDC Van keeps its panelled look")
+		say("the import came out mirrored or flat; the Deliveros Van keeps its panelled look")
 		return
 	end
 	local function off(v: Vector3): number
 		return math.abs(v.Magnitude / 10 - scale) / scale
 	end
 	if off(y - o) > 0.02 or off(z - o) > 0.02 or math.abs(ux:Dot((y - o).Unit)) > 0.02 or math.abs(ux:Dot((z - o).Unit)) > 0.02 then
-		say(`the markers moved before the game read them (the import unanchored in Workspace?): put it in ServerStorage and save; the ZDC Van keeps its panelled look`)
+		say(`the markers moved before the game read them (the import unanchored in Workspace?): put it in ServerStorage and save; the Deliveros Van keeps its panelled look`)
 		return
 	end
 	local frame = CFrame.fromMatrix(o, ux, uy, uz) -- the car's axes as the importer placed them
@@ -148,10 +148,10 @@ local function loadArt()
 		table.insert(list, { finish = finish, part = d, cf = rel - rel.Position + rel.Position / scale, size = d.Size / scale })
 	end
 	if not (found.body and found.wheel and found.doorL and found.doorR and found.rearL and found.rearR) then
-		say("a body, a wheel and the four doors are needed; the ZDC Van keeps its panelled look")
+		say("a body, a wheel and the four doors are needed; the Deliveros Van keeps its panelled look")
 		return
 	elseif moved then
-		say("its pieces moved before the game read them (the import unanchored in Workspace?): put it in ServerStorage and save; the ZDC Van keeps its panelled look")
+		say("its pieces moved before the game read them (the import unanchored in Workspace?): put it in ServerStorage and save; the Deliveros Van keeps its panelled look")
 		return
 	end
 	groups = found
