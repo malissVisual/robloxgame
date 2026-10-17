@@ -1,7 +1,7 @@
 --!strict
 -- 6.22, every thing in the inventory has a look (the owner: "každá věc musí nějak vypadat a ne mít jen ikonku": every
--- thing must look like something, not only an icon). Each thing the bottom bar (client/Hotbar.luau) and BAG & ITEMS
--- (client/BagUi.luau) show is a small native model, drawn by client/ItemModel.luau in a ViewportFrame:
+-- thing must look like something, not only an icon). Each thing is a small native model, drawn by client/ItemModel.luau
+-- in a ViewportFrame (client/CardKit.luau's picture `model`):
 --   gun:<id>     a gun (Config.Weapons): shared/GunModels.luau's own look, as the hands hold it
 --   melee:bat    the Baseball Bat, from Config.Melee.BatLook (the bat CloseCombat puts in the hand)
 --   fists        your fists: a courier's glove clenched, its red cuff

@@ -1,6 +1,6 @@
 --!strict
--- 5.9.2: the per-frame loops over everybody's characters (client/ArmPose.luau, client/BusRide.luau, client/ZipRide.luau,
--- client/CarBoarding.luau) share this, so a frame does no child lookups and builds no new player list:
+-- 5.9.2: the per-frame loops over everybody's characters (client/ArmPose.luau, client/ZombieLife.luau …) share this,
+-- so a frame does no child lookups and builds no new player list:
 --   * Bodies.players(): the players in the game, a list kept up to date by PlayerAdded / PlayerRemoving (read it, never
 --     change it).
 --   * Bodies.of(character): its Humanoid and HumanoidRootPart, looked up once and kept while both are still in the

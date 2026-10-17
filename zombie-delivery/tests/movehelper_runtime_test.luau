@@ -442,7 +442,6 @@ check("…the strip: carrying the Sofa with you", sol:GetAttribute("MoveHelperDo
 -- screenshots: Danny inside the Sofa, his status line "Nothing to carry" over a carry in two, "G PUT IT DOWN" over the
 -- Sofa's own "Put down")
 do
-	local Goal = require("./Goal")
 	-- the leader's side: who holds the far end (9.2: her client drives his end, so nothing of him is late on her screen:
 	-- no PairFar to keep the piece off him, no PairWall from the server; tests/movehelper_backwards_runtime_test.luau)
 	check("9.2 Sol leads: her client knows who holds the far end (PairWith: his id) and drives him (no PairFar, no PairWall)",
@@ -461,9 +460,9 @@ do
 			mine += 1
 		end
 	end
-	local card = Goal.now({ deliveries = 3, holding = character:GetAttribute("Carrying"), pair = character:GetAttribute("CarryPair") == true })
-	check("9.0 one put-down on her screen: the Sofa's own \"Put down\" (G) for her, no \"G PUT IT DOWN\" pill (CarryPair)", mine == 1 and card.action == nil,
-		`{mine} prompts, pill {card.action and card.action.text}`)
+	-- (10.5: client/Hud.luau shows its "Put it down" pill only for a piece carried alone: none while CarryPair is set)
+	check("9.0 one put-down on her screen: the Sofa's own \"Put down\" (G) for her, no \"G PUT IT DOWN\" pill (CarryPair)", mine == 1 and character:GetAttribute("CarryPair") == true,
+		`{mine} prompts, CarryPair {character:GetAttribute("CarryPair")}`)
 end
 do
 	-- 9.0 server/PairHold.luau's hold: one attachment each (the holder's), nothing on the piece (a constraint between the

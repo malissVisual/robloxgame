@@ -86,26 +86,7 @@ end
 M.MUi.MinTouch = 44
 M.MTheme.PanelTransparency = 0.12
 M.MTheme.WindowTransparency = 0.02
-M.keys = {}
-M.MKeys = {
-	open = function(id, advance, options)
-		M.keys[id] = { advance = advance, options = options }
-	end,
-	close = function(id)
-		M.keys[id] = nil
-	end,
-	isOpen = function(id)
-		return M.keys[id] ~= nil
-	end,
-	hint = function()
-		return "SPACE"
-	end,
-}
 M.MFade = { out = function() end, into = function() end, arrival = function() return nil end } -- (8.3: a trip's arrival)
-M.MapView.waypointAt = function()
-	return M.waypoint
-end
-M.MapView.onWaypoint = function() end
 local camera = M.workspace.CurrentCamera
 
 -- ── A layout: where a recorded piece sits (px from the screen's top left) ──
@@ -251,7 +232,6 @@ local panel = named(M.gui, "MovePanel")
 local panelBox = box(panel)
 check("the panel shows at the top in the middle, on the screen", panel.Visible and inside(panelBox) and math.abs((panelBox.x0 + panelBox.x1) / 2 - M.width / 2) < 1, show(panelBox))
 check("… clear of the touch buttons, the thumbstick and the jump", clearOfTouch(panelBox))
-check("… no GPS from the move (the guide's chevron and path point the way)", M.waypoint == nil)
 attribute("MoveHelper", "hired") -- (8.3: Danny hired)
 local strip = MoveHelperHud.strip()
 local stripBox = box(strip)
@@ -351,8 +331,7 @@ local said = all(panel, function(object)
 end)
 check("after 0:00: TIME'S UP with its countdown", #said == 1 and string.find(said[1].Text, "01:30", 1, true) ~= nil, said[1] and said[1].Text)
 
--- ── No GPS, no result card of its own ───────────────────────────────────────
-check("late with the horde: still no GPS", M.waypoint == nil)
+-- ── No result card of its own ───────────────────────────────────────────────
 moving.OnClientEvent:Fire("result", { name = "The Old Farmstead", icon = "🏡", how = "done", run = { name = "Normal" } })
 check("a run's result on the Moving remote: no card of the move's (client/RunUi.luau's results card)", named(M.gui, "MoveResult") == nil and not MovingHud.isOpen())
 moving.OnClientEvent:Fire("state", nil)

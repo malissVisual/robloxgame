@@ -1,10 +1,8 @@
 --!strict
 -- 7.0 review: the panels that hold the top of the screen in the middle (the move's panel, client/MovingHud.luau; the
--- depot helper's strip under it, client/MoveHelperHud.luau; the planning's pill, client/MoveLobbyUi.luau), so what
--- else draws there keeps clear of them: the grind chips (client/GrindChips.luau) and the live event's banner
--- (client/EventBanner.luau) take them as blocks, the location caption (client/LocationTag.luau) as obstacles, the
--- "new place" banner (client/Discovery.luau), the bus's banner (client/BusRide.luau) and the quick chat's lines
--- (client/QuickChat.luau) go under them. Every ScreenGui has its own origin: the rectangles come relative to the one
+-- depot helper's strip under it, client/MoveHelperHud.luau), so what else draws there keeps clear of them: the guide's
+-- line (client/SandboxGuide.luau), the grip check, the quick chat's lines (client/QuickChat.luau), Danny's card and
+-- orders mode, a visitor's offer, the run's danger strip and the minimap go under them or beside them. Every ScreenGui has its own origin: the rectangles come relative to the one
 -- given (a gui's AbsolutePosition), from the panels' AbsolutePosition / AbsoluteSize.
 --   TopBlocks.set(name, object?)        a panel (nil: gone); its moves, sizes and showing are watched
 --   TopBlocks.get(name)                 the panel by name

@@ -329,15 +329,6 @@ M.MHud = {
 	topSlot = function(name)
 		return M.make("Frame", { Name = name .. "Slot" }, M.gui)
 	end,
-	resultOpen = function()
-		return false
-	end,
 }
-M.MCrewPanel = { open = function()
-	M.crewOpened = true
-end }
-M.MDialogKeys = { hint = function()
-	return "SPACE"
-end, watch = function() end }
 
 return M

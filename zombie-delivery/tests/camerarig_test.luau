@@ -161,9 +161,6 @@ local function world(touch: boolean?): World
 			update = function(): boolean
 				return false
 			end,
-			sprintBoost = function(): number
-				return 1
-			end,
 			canSprintNow = function(): boolean
 				return true
 			end,

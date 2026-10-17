@@ -483,8 +483,8 @@ local function leanBody(character: Model, humanoid: Humanoid?, root: BasePart?, 
 	local now = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
 	local braking = math.max(0, state.speed - now) / math.max(dt, 1 / 240)
 	state.speed = now
-	-- 6.8 review: on its feet as client/GaitPose.luau sees it (not seated, platform-standing, on a zip line or a
-	-- ladder, in a move of client/Interact.luau, climbing, swimming, dead …; a jump or a fall still eases the lean out).
+	-- 6.8 review: on its feet as client/GaitPose.luau sees it (not seated, platform-standing, climbing, swimming,
+	-- dead …; a jump or a fall still eases the lean out).
 	-- Otherwise the waist is let go at once: an interaction move reads the waist back every frame and a braking lean
 	-- built up on it (about 7°).
 	if not humanoid or not GaitPose.onFoot(character, humanoid, mine, true) then

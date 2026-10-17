@@ -1,12 +1,9 @@
 #!/usr/bin/env python3
 """The game's windows and HUD pieces run for real against a narrow UI instance recorder (callbacks, construction, the
 server's data, resizing and cleanup; not Studio's layout or fonts). 10.5: the old city's phone, MISSIONS window and
-bottom bar went with the city.
-7.0: the moves' story (MoveStoryUi) with its hooks in the real MovingHud (movestory.luau, on missions_mock.luau).
-7.0 review: the move's screen at 844 x 390 (MovingHud, MoveHelperHud, QuickChat, MoveLobbyUi: movehud.luau): nothing on
-the touch buttons or on each other, a finger's sizes, the list a sheet, the keys, ESC, the GPS, a resize.
-7.2: the maps' alpine look (the real MapView with MapStyle and AlpineLayout: mapview.luau on mapmock.luau): built once,
-within Config.MapStyle.Budget, everything there in its order, nothing made frame after frame.
+bottom bar went with the city; so did the city's map, the moves' story cards and the drive pedals.
+7.0 review: the move's screen at 844 x 390 (MovingHud, MoveHelperHud, QuickChat: movehud.luau): nothing on the touch
+buttons or on each other, a finger's sizes, the list a sheet, the keys, ESC, a resize.
 8.0 SANDBOX: the sandbox's HUD and the warehouse picker (the real SandboxHud and WarehouseUi: sandbox.luau on
 sandbox_mock.luau) at 844 x 390, 1280 x 800 and 1920 x 1080: the money, the stock chip, the toasts, the picker on
 "pick", DISPLAY / SELL / TAKE DOWN's requests, the 3D pictures capped, clear of the touch controls, texts that fit.
@@ -46,9 +43,6 @@ offer card with a player's offer (OfferCard's queue) and the STOCK list's 🏷 (
 show and no FOR SALE sign, a player's offer: the real SandboxHintsUi beside SandboxHud, DannyOrders, OfferCard, TradeUi):
 sandboxhints.luau: when each comes, once, held back while a window covers the screen, the device's words, their toasts
 at 844 x 390, 667 x 375, 1280 x 800 and 1920 x 1080 clear of the rest; the guide's sell step in sandboxguide.luau.
-9.1 the drive pedals (the real DrivePedals beside the HUD's pieces and the real OfferCard: drivepedals.luau) on phones
-held sideways and upright, tablets and computers: shown only in your own driver's seat with the HUD up, clear of the touch
-controls, the speed and the offer card, held to drive on a touch screen, the feet and a gamepad's R2 / L2 on a computer.
 9.7 runs: the pad panel (the host's difficulty buttons, another player's line) and the run's results card (the real
 RunUi beside SandboxHud and SandboxTasksUi: runs.luau) on phones, a computer and a big screen: on the screen, clear of the
 rest, the words fitting, a finger's size, the requests.
@@ -94,7 +88,7 @@ local NumberSequence, NumberSequenceKeypoint = mock.NumberSequence, mock.NumberS
         text = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', text)
         (dest / f"{name}.luau").write_text(prefix + text)
     (dest / "ItemModel.luau").write_text("return { view = function() return nil end, has = function() return false end }")
-    for name, field in (("Ui", "MUi"), ("Theme", "MTheme"), ("Net", "Net"), ("Sounds", "Sounds"), ("DialogKeys", "MKeys"), ("Fade", "MFade")):
+    for name, field in (("Ui", "MUi"), ("Theme", "MTheme"), ("Net", "Net"), ("Sounds", "Sounds"), ("Fade", "MFade")):
         (dest / f"{name}.luau").write_text(f'return require("./missions_mock").{field}')
     for name in ("mock.luau", "missions_mock.luau", "movehud.luau"):
         (dest / name).write_bytes((Path(__file__).parent / name).read_bytes())
@@ -143,19 +137,6 @@ local Instance, CFrame, ColorSequence = mock.Instance, mock.CFrame, mock.ColorSe
     subprocess.run([args.luau, "adminpanel.luau"], cwd=dest, check=True)
 
 
-# 7.2, the Alps on the maps: the real client/MapView.luau (shared/MapStyle.luau, AlpineLayout, Map, Roads, Explore and
-# the rest of the real shared data) on mapmock.luau's recorder (missions_mock.luau's, the services, the camera, your
-# character, Discovery's grid, DeviceBudget): tools/phone-ui/mapview.luau checks the paper map and the Alps (built once,
-# within Config.MapStyle.Budget, everything there and in its order) and that the frame loop leaves them alone.
-# (mapenv.py builds the folder; mapview_preview.py draws the same map's scenes.)
-sys.dont_write_bytecode = True
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from mapenv import map_env  # noqa: E402
-
-with tempfile.TemporaryDirectory() as folder:
-    map_env(Path(folder))
-    subprocess.run([args.luau, "mapview.luau"], cwd=folder, check=True)
-
 # 8.0 SANDBOX, the guide: client/SandboxGuide.luau (shared/SandboxSteps.luau, SandboxMap) beside the real
 # client/MovingHud.luau and client/MoveHelperHud.luau (TopBlocks, MoveLayout, TouchLayout) on missions_mock.luau's
 # recorder: tools/phone-ui/sandboxguide.luau checks the hint line at 844 x 390 and on a computer (clear of the money at
@@ -178,13 +159,12 @@ local NumberSequence, NumberSequenceKeypoint = mock.NumberSequence, mock.NumberS
     found = '''local __require = require
 local function require(module) if type(module) == "table" and module.fakeModule ~= nil then return module.fakeModule end return __require(module) end
 '''
-    for name in ("SandboxGuide", "MovingHud", "MoveHelperHud", "MoveStoryUi", "Portrait", "CardKit", "TouchLayout", "MoveLayout", "TopBlocks", "PadGlyph", "RunUi"):  # (8.3 keys: PadGlyph; 9.7: RunUi's pad)
+    for name in ("SandboxGuide", "MovingHud", "MoveHelperHud", "CardKit", "TouchLayout", "MoveLayout", "TopBlocks", "PadGlyph", "RunUi"):  # (8.3 keys: PadGlyph; 9.7: RunUi's pad)
         text = (ROOT / f"src/client/{name}.luau").read_text()
         text = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', text)
         (dest / f"{name}.luau").write_text(prefix + (found if name == "SandboxGuide" else "") + text)
     (dest / "ItemModel.luau").write_text("return { view = function() return nil end, has = function() return false end }")
-    (dest / "EnemyOutline.luau").write_text("return { setXray = function() end }")
-    for name, field in (("Ui", "MUi"), ("Theme", "MTheme"), ("Net", "Net"), ("MapView", "MapView"), ("Sounds", "Sounds"), ("DialogKeys", "MKeys"), ("Fade", "MFade")):
+    for name, field in (("Ui", "MUi"), ("Theme", "MTheme"), ("Net", "Net"), ("Sounds", "Sounds"), ("Fade", "MFade")):
         (dest / f"{name}.luau").write_text(f'return require("./missions_mock").{field}')
     for name in ("mock.luau", "missions_mock.luau", "sandboxguide.luau"):
         (dest / name).write_bytes((Path(__file__).parent / name).read_bytes())
@@ -290,25 +270,14 @@ with tempfile.TemporaryDirectory() as folder:
     sandboxhints_env(Path(folder))
     subprocess.run([args.luau, "sandboxhints.luau"], cwd=folder, check=True)
 # 8.3 keys: the key hints (client/KeyHints.luau with shared/SandboxPad.luau's actions and client/PadGlyph.luau) in
-# sandboxenv.py's folder (keyhintsenv.py: the real KeyHints, its HudContract, Holster and Drive stand-ins):
+# sandboxenv.py's folder (keyhintsenv.py: the real KeyHints and its HudContract stand-in):
 # tools/phone-ui/keyhints.luau on a computer (1280 x 800) with its keys and with a gamepad (the platform's glyphs, at
-# once when it is picked up or put down), a console, a phone (none) and a phone with a gamepad; the city's strip as before.
+# once when it is picked up or put down), a console, a phone (none) and a phone with a gamepad.
 from keyhintsenv import keyhints_env  # noqa: E402
 
 with tempfile.TemporaryDirectory() as folder:
     keyhints_env(Path(folder))
     subprocess.run([args.luau, "keyhints.luau"], cwd=folder, check=True)
-# 9.1 the drive pedals (client/DrivePedals.luau with shared/PedalRules.luau: GAS and BRAKE while you drive) beside the
-# HUD's pieces where client/Hud.luau puts them and the real client/OfferCard.luau: tools/phone-ui/drivepedals.luau on
-# phones held sideways and upright, tablets and computers (drivepedalsenv.py builds the folder; drivepedals_preview.py
-# draws the same scenes): when they show, clear of the jump button, the thumbstick, EXIT, the speed and the fuel and a
-# visitor's offer card, a finger's size, held to drive on a touch screen (two touches, sliding), the feet and the mouse
-# on a computer, a gamepad's R2 / L2, the press drawn and eased back, no warnings.
-from drivepedalsenv import drivepedals_env  # noqa: E402
-
-with tempfile.TemporaryDirectory() as folder:
-    drivepedals_env(Path(folder))
-    subprocess.run([args.luau, "drivepedals.luau"], cwd=folder, check=True)
 # 9.7 runs: the pad panel and the run's results card (client/RunUi.luau) beside the real SandboxHud and SandboxTasksUi
 # and Hud's groups: tools/phone-ui/runs.luau (runsenv.py builds the folder) at 844 x 390, 667 x 375, 1280 x 800 and
 # 1920 x 1080: on the screen, clear of the chips, the groups and the touch controls, the words fitting, a finger's size

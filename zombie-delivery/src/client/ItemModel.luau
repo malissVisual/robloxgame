@@ -3,9 +3,8 @@
 -- a thing (a shared/ItemLooks.luau key: "gun:pistol", "item:medkit", "kit:tote", "cargo:pizza", "fists" …) drawn as
 -- a small 3D model in a ViewportFrame, the same studio look everywhere: the 3/4 angle, a soft key light and fill
 -- (Config.ItemModel: Ambient, LightColor, LightDirection), a transparent background, the camera fitted to the model's
--- box. The bottom bar's slots (client/Hotbar.luau), BAG & ITEMS (client/BagUi.luau: the hero, the rows, the cargo
--- stack; client/CardKit.luau's picture `model`) use it; the icon or the emoji is only the fallback when a model can't
--- be built.
+-- box. client/CardKit.luau's picture `model` uses it; the icon or the emoji is only the fallback when a model can't be
+-- built.
 --   ItemModel.view(parent, key, spec?) -> ViewportFrame?   a ViewportFrame "ItemModel" in `parent` (its Look attribute
 --       the key) with a copy of the model; nil when the key has no look or its build failed (the caller shows the
 --       icon). spec: size (UDim2, default the parent), position, anchor, z, aspect (width over height, default 1),

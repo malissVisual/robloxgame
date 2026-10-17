@@ -30,7 +30,7 @@
 --     B left to the window.
 --   * 9.0 E gives a piece (the owner: "When I hold the clipboard (Q), the E shouldn't show 'pick up'; E should mark the
 --     piece for Danny"): while it is out the Pick up / Lift / Help lift (and any carry prompt) of your move's pieces
---     hide on this screen only, through their reach (never Enabled: the server's; client/CarBoarding.luau's way), new
+--     hide on this screen only, through their reach (never Enabled: the server's; client/CargoPrompts.luau's way), new
 --     ones too, every look; the moment it goes (put away, a new body, the move's end) each gets its own reach back. In
 --     their place the pieces near you (Clipboard.PromptNear studs, the nearest Clipboard.Prompts) that he can take get
 --     a prompt of this client's on Clipboard.GiveKey (E): "Give to Danny" (green in the outline's rule), "Take back" (on
@@ -372,7 +372,7 @@ local function pieceOf(prompt: ProximityPrompt): Model?
 end
 
 -- A piece's own prompt hidden on this screen through its reach (never Enabled: the server switches that, and the
--- outline above and client/MoveHelperCard.luau read it as the server's word; client/CarBoarding.luau's way),
+-- outline above and client/MoveHelperCard.luau read it as the server's word; client/CargoPrompts.luau's way),
 -- remembered to give back.
 local function mute(prompt: ProximityPrompt)
 	if muted[prompt] then

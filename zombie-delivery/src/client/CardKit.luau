@@ -1,7 +1,7 @@
 --!strict
--- 6.18, the UI kit (the owner, after 6.17's JOBS: "I need it unified so the phone looks like that, and the other popups
--- too"). The look of JOBS (client/JobsView.luau) as parts every popup and the phone's home draw with; the rules are in
--- design/ui-kit/README.md, the sizes in Config.UiKit, the pure maths in shared/CardLayout.luau:
+-- 6.18, the UI kit (the owner: "I need it unified so the phone looks like that, and the other popups too"): the parts
+-- the game's windows and cards draw with; the rules are in design/ui-kit/README.md, the sizes in Config.UiKit, the
+-- pure maths in shared/CardLayout.luau:
 --   * dark charcoal cards, a big picture or icon, ONE big number an item (money green, gold for something special),
 --     coloured danger / state accents, almost no text: the details come on a tap;
 --   * CardKit.hero(parent, spec)       the big card: a picture filling it, a ribbon and a corner chip on top, ⓘ, and at
@@ -80,8 +80,8 @@ CardKit.Danger = {
 	[4] = Color3.fromRGB(180, 108, 240),
 } :: { [number]: Color3 }
 
--- What a thumb or a hero shows: an uploaded picture, else an emoji on charcoal, else an app's glyph (`glyph`: draws it
--- in a frame, e.g. client/PhoneContract.luau glyph).
+-- What a thumb or a hero shows: an uploaded picture, else an emoji on charcoal, else a glyph (`glyph`: draws it in a
+-- frame).
 -- 6.18 wave 2: `icon` an Icons name (its silhouette once uploaded, before the emoji).
 -- 6.22: `model` a shared/ItemLooks.luau key (the thing as a 3D model, before its icon and emoji).
 export type Picture = { image: string?, emoji: string?, glyph: ((face: Instance, size: number) -> ())?, face: Color3?, icon: string?, model: string? }
@@ -723,7 +723,7 @@ function CardKit.columns(list: Instance, spec: Columns): (any, any, any)
 	return holder, left, right
 end
 
--- A tap-for-details sub-view: its "‹ BACK" button (`back`: its words, "‹ JOBS"; `look`: the app's kit, OrdersUi.Kit)
+-- A tap-for-details sub-view: its "‹ BACK" button (`back`: its words; `look`: the window's kit)
 -- then what `draw` puts under it (from `order` + 1).
 export type Details = { back: string?, name: string?, order: number?, onBack: () -> (), draw: ((list: Instance, order: number) -> ())? }
 
@@ -767,8 +767,8 @@ function CardKit.chips(parent: Instance, name: string?, order: number?): any
 	return strip
 end
 
--- A chips strip (CardKit.chips) into the popup header's strip right of the title when they fit there (`bar`, `room`:
--- PhonePopup.bar), else heading the body `list` (rule 6). Returns the px the strip takes from the body (0 or a chip
+-- A chips strip (CardKit.chips) into the window header's strip right of the title when they fit there (`bar`, `room`),
+-- else heading the body `list` (rule 6). Returns the px the strip takes from the body (0 or a chip
 -- and its gap): a hero under it is that much shorter, its button still in view.
 function CardKit.toHeader(strip: any, bar: Instance?, room: number, list: Instance): number
 	local need = 0

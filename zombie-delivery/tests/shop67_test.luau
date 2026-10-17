@@ -1,5 +1,5 @@
--- 6.7, the shops cleaned up, in the standalone Luau CLI: the Energy Drink (Config.Items "energy", client/Stamina.luau
--- energized / refill), the Baseball Bat (Config.Kit "bat", Config.Melee.Kinds bat, shared/Melee.luau), the Thermal
+-- 6.7, the shops cleaned up, in the standalone Luau CLI: the Energy Drink (Config.Items "energy"; client/Stamina.luau's
+-- breath), the Baseball Bat (Config.Kit "bat", Config.Melee.Kinds bat, shared/Melee.luau), the Thermal
 -- Jacket's refund (Config.RetiredKit, shared/Transport.luau retiredRefunds), the car-only items (Config.Items car,
 -- shared/Economy.luau ownsCar / itemShown / itemsFor), the Courier Vest's tips (Config.Kit tips, Transport.tipShare,
 -- shared/JobRules.luau kitTip), where each piece of kit is sold (Transport.kitShop), the gun upgrades at Lead & Co.
@@ -55,17 +55,8 @@ local function sprintFor(cost: number?): number
 	return seconds
 end
 local plain = sprintFor(nil)
-local boosted = sprintFor(Stamina.energized(nil, true, T.EnergyBreath))
-check("a full breath lasts Stamina seconds without it", near(plain, M.Stamina, 2 * DT), plain)
-check("… and ×1.3 longer with it (7.8 s)", near(boosted, M.Stamina * T.EnergyBreath, 3 * DT), boosted)
-check("energized: the drain ÷ 1.3 while it works, as it was after", near(Stamina.energized(nil, true, 1.3), 1 / 1.3) and Stamina.energized(nil, false, 1.3) == 1
-	and Stamina.energized(1.15, false, 1.3) == 1.15)
-check("… with the duffel's breath too: 1.15 ÷ 1.3", near(Stamina.energized(1.15, true, 1.3), 1.15 / 1.3))
-local dry = Stamina.step(Stamina.new(), M.Stamina + 1, true, true, M)
-local refilled = Stamina.refill(dry)
-check("the drink fills an empty breath at once and the sprint may start again", dry.exhausted and refilled.breath == 1 and not refilled.exhausted
-	and Stamina.canSprint(refilled))
-check("… the given state is left as it was", dry.breath == 0 and dry.exhausted)
+-- (10.5: client/Stamina.luau has no Energy Drink any more: the city's items went)
+check("a full breath lasts Stamina seconds", near(plain, M.Stamina, 2 * DT), plain)
 check("a drain under 1 is kept (not clamped back to 1)", Stamina.step(Stamina.new(), 1, true, true, M, 0.5).breath > Stamina.step(Stamina.new(), 1, true, true, M).breath)
 
 -- ── The Baseball Bat ─────────────────────────────────────────────────────────────────────────────────────────────

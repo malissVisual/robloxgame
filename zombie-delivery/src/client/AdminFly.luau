@@ -6,7 +6,7 @@
 --                a car seat ends the flight (it comes back when you get out).
 --   AdminNoclip  the character's parts do not collide (through walls; the Humanoid still stands on the floor).
 --   AdminJump    super jump (JumpPower × JUMP_POWER, JumpHeight × JUMP_HEIGHT; back to the character's own values).
--- The walk multiplier (AdminSpeed) is in client/CameraRig.luau, the car boost (AdminCarBoost) in client/Drive.luau.
+-- The walk multiplier (AdminSpeed) is in client/CameraRig.luau.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")

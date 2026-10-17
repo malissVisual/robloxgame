@@ -1,7 +1,7 @@
 --!strict
 -- 10.x THE MAP (the owner: "I need you to add a way to look at the map"; Config.SandboxMapUi): the sandbox's big map, a
--- window in the game's contract look (client/Theme.luau; the city's map window, client/MapView.luau, its model: a
--- charcoal window, the map glyph and MAP, a fine line, the square ✕). What it shows is client/SandboxMapData.luau's,
+-- window in the game's contract look (client/Theme.luau: a charcoal window, the map glyph and MAP, a fine line, the
+-- square ✕). What it shows is client/SandboxMapData.luau's,
 -- drawn by client/SandboxMapDraw.luau; where it all goes is shared/SandboxMapRules.luau's (window, fit).
 --   * In the lobby: its plan (SandboxMap.Lobby): the plaza and the hedge, the four plots (yours in gold: YOUR
 --     WAREHOUSE, its UPGRADES desk), the PAINT shop, the TOP MOVERS board, the ZDC DISPATCH, the six portals with their
