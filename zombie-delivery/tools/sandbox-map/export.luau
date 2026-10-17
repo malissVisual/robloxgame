@@ -8,7 +8,6 @@ local SandboxMap = require("./shared/SandboxMap")
 local SandboxLeadersRules = require("./shared/SandboxLeadersRules")
 local WarehouseLayout = require("./shared/WarehouseLayout") -- (8.3: each level's stands and building)
 local SandboxWorld = require("./server/SandboxWorld")
-local MoveSites = require("./server/MoveSites")
 local Collection = require("./server/Collection") -- (the stand-in)
 local SandboxPlots = require("./server/SandboxPlots") -- (the stand-in)
 local Upgrades = require("./server/Upgrades") -- (the stand-in: plot n at warehouse level n)
@@ -18,9 +17,7 @@ local world = SandboxWorld.build()
 local kiosks = Instance.new("Folder")
 kiosks.Name = "MovingBoards"
 kiosks.Parent = workspace
-for _, plot in SandboxMap.Plots do
-	MoveSites.plotBoard(kiosks, plot)
-end
+-- (10.x: no plot kiosks any more; the lobby's ZDC dispatch kiosk is the map's, server/LobbyWorld.luau)
 
 for _, plot in SandboxMap.Plots do
 	local owner = { UserId = plot.id, DisplayName = `Player{plot.id}`, Name = `Player{plot.id}`, Parent = workspace }

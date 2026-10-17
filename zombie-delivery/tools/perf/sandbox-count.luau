@@ -3,8 +3,8 @@
 -- worst case is summed on the Python side). Server/Collection, SandboxPlots and Upgrades are sandbox_count.py's
 -- stand-ins: four owners, each with every display stand open and full.
 --   world/<folder>       server/SandboxWorld.luau's map, folder by folder
---   kiosks               the four Moving contracts kiosks (server/MoveSites.luau plotBoard, server/Moving.luau's
---                        sandbox boards)
+--   kiosks               none since 10.x: the plots' contract kiosks went (the lobby's ZDC dispatch kiosk is the map's,
+--                        server/LobbyWorld.luau, counted under world/); the row stays, empty, for sandbox_count.py
 --   warehouses/building  the four ZDC warehouses (server/Warehouse.luau): the hall, every stand open, the prompts
 --   warehouses/shown     the pieces on show in them: every stand full, the heaviest pieces (FurnitureLooks' part count;
 --                        8.3: each on a stand it fits, WarehouseLayout.fits)
@@ -22,7 +22,6 @@ local FurnitureLooks = require("./shared/FurnitureLooks")
 local WarehouseLayout = require("./shared/WarehouseLayout")
 local HouseLayout = require("./shared/HouseLayout")
 local SandboxWorld = require("./server/SandboxWorld")
-local MoveSites = require("./server/MoveSites")
 local HouseInterior = require("./server/HouseInterior")
 local Npcs = require("./server/Npcs")
 local Collection = require("./server/Collection") -- (the stand-in)
@@ -83,9 +82,6 @@ end
 local kiosks = Instance.new("Folder")
 kiosks.Name = "MovingBoards"
 kiosks.Parent = workspace
-for _, plot in SandboxMap.Plots do
-	MoveSites.plotBoard(kiosks, plot)
-end
 emit("kiosks", Census.under(kiosks))
 modes("kiosks", kiosks)
 detail("kiosks", Census.list(kiosks))
