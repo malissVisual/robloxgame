@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Runs the logic tests of the pure shared modules (Config, Economy, Map, Roads, Icons, Levels, TrafficLanes, Crossings, SoundSheet, Missions, Challenges, Melee, Boarding, BuddyBrain, Goal, Tasks, 6.14: Regulars, SpecialOrders, 6.15: LiveEvents, 6.17: JobPick ...) in the
+Runs the logic tests of the pure shared modules (Config, Economy, Map, Roads, Icons, Levels, TrafficLanes, Crossings, SoundSheet, Missions, Challenges, Melee, Boarding, Goal, Tasks, 6.14: Regulars, SpecialOrders, 6.15: LiveEvents, 6.17: JobPick ...) in the
 standalone Luau CLI: every tests/*_test.luau file, each must print "ALL CHECKS PASSED".
 
     python3 zombie-delivery/tests/run_tests.py [path to the luau binary]
@@ -9,7 +9,7 @@ import glob, json, os, re, shutil, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SHARED = os.path.join(os.path.dirname(HERE), "src", "shared")
-PURE = ("Config", "ZombieKinds", "Economy", "Map", "FootbridgeShape", "Explore", "Roads", "Icons", "Levels", "TrafficLanes", "Crossings", "SoundSheet", "Cast", "NpcLooks", "Missions", "Challenges", "TutorialSteps", "Melee", "Boarding", "Freight", "BuddyBrain", "Career", "JobRules", "Transport", "VanQuest", "KitFit", "RiderPose", "Bag", "Deliveries", "FuelMath", "Residents", "BusLines", "Shortcuts", "RentalDocks", "ZipLines", "Gestures", "FootEvents", "TowerLooks", "StreetProps", "WeatherPlan", "InteractPose", "Armour", "Throws", "RunCycle", "Holding", "BagFill", "Goal", "BodyMotion", "AvatarLook", "ScooterRide", "CurbShape", "Tasks", "SoundPlan", "Style", "StyleLooks", "JobQueue", "JobThumbs", "MissionArt", "AnalyticsPlan", "RenderBudget", "Shift", "Regulars", "SpecialOrders", "Readiness", "OutlinePick", "MissionPlan", "LiveEvents", "ShotFeel", "Suspension", "DriveFeel", "ZombieStyle", "CardLayout", "ShopPick", "Skills", "Inventory", "KitArt", "CarUpright", "SpawnSpot", "Gait", "MovingRules", "MoveStory", "MoveHelperBrain", "MoveRoles", "CarryGrip", "ChaletLooks", "AlpineLayout", "SandboxMap", "SandboxAdmin", "CollectionRules", "SandboxSteps", "WarehouseLayout", "SprinterLooks")
+PURE = ("Config", "ZombieKinds", "Economy", "Map", "Explore", "Roads", "Icons", "Levels", "TrafficLanes", "Crossings", "SoundSheet", "Cast", "NpcLooks", "Missions", "Challenges", "TutorialSteps", "Melee", "Boarding", "Freight", "Career", "JobRules", "Transport", "KitFit", "RiderPose", "Bag", "Deliveries", "FuelMath", "Residents", "BusLines", "Shortcuts", "RentalDocks", "ZipLines", "Gestures", "StreetProps", "InteractPose", "Armour", "Throws", "RunCycle", "Holding", "Goal", "BodyMotion", "AvatarLook", "ScooterRide", "CurbShape", "Tasks", "SoundPlan", "Style", "StyleLooks", "JobQueue", "JobThumbs", "MissionArt", "AnalyticsPlan", "RenderBudget", "Regulars", "SpecialOrders", "Readiness", "OutlinePick", "LiveEvents", "ShotFeel", "Suspension", "DriveFeel", "ZombieStyle", "CardLayout", "ShopPick", "Skills", "Inventory", "KitArt", "CarUpright", "SpawnSpot", "Gait", "MovingRules", "MoveStory", "MoveHelperBrain", "MoveRoles", "CarryGrip", "ChaletLooks", "AlpineLayout", "SandboxMap", "SandboxAdmin", "CollectionRules", "SandboxSteps", "WarehouseLayout", "SprinterLooks")
 PURE += ("SandboxScenery",)  # 8.0 sandbox, the map (tests/sandboxworld_test.luau)
 PURE += ("PairCarry",)  # 8.1 carrying in two: the leader's steering (tests/paircarry_test.luau)
 PURE += ("UpgradeRules",)  # 8.1 sandbox, the upgrades (tests/upgrades_test.luau)
@@ -118,17 +118,6 @@ with tempfile.TemporaryDirectory() as tmp:
         source = open(os.path.join(os.path.dirname(SHARED), "server", module + ".luau"), encoding="utf-8").read()
         source = re.sub(r"^export type ", "type ", source, flags=re.M)  # (only at a module's top level)
         open(os.path.join(tmp, built + ".luau"), "w", encoding="utf-8").write(bind + source + "\nend\n")
-    # 6.23 (Codex's codex/cargo-missions-fix): the real server/Cargo.luau as CargoServer.luau for
-    # tests/cargo_runtime_test.luau: its server modules, Net and services from tests/runtime/CargoRuntime.luau (on the
-    # same recorder as CargoLooks), its shared modules the copies above.
-    shutil.copy(os.path.join(HERE, "runtime", "CargoRuntime.luau"), os.path.join(tmp, "CargoRuntime.luau"))
-    source = open(os.path.join(os.path.dirname(SHARED), "server", "Cargo.luau"), encoding="utf-8").read()
-    source = re.sub(r"require\(Shared\.(\w+)\)", lambda m: "E.Net" if m[1] == "Net" else f'require("./{m[1]}")', source)
-    source = re.sub(r"require\(script\.Parent\.(\w+)\)", r"E.\1", source)
-    head = ('local E = require("./CargoRuntime")\nlocal M = E.Mock\nlocal game, workspace, task = E.game, M.workspace, E.task\n'
-            'local Instance, Vector3, Color3, CFrame, Enum = M.Instance, M.Vector3, M.Color3, M.CFrame, M.Enum\n'
-            'local Random, RaycastParams, UDim2, TweenInfo, typeof = M.Random, M.RaycastParams, M.UDim2, M.TweenInfo, M.typeof\n')
-    open(os.path.join(tmp, "CargoServer.luau"), "w", encoding="utf-8").write(head + source)
     # 7.0: the real server/Moving.luau as MovingServer.luau for tests/moving_runtime_test.luau: its server modules, Net,
     # the services and a fake of the house art from tests/runtime/MovingRuntime.luau (on the same recorder), its shared
     # modules (Config, Economy, Map, MovingRules) the copies above; os.clock and the server time are the test's.
@@ -259,12 +248,8 @@ with tempfile.TemporaryDirectory() as tmp:
                'local game = { GetService = function(_, name) if name == "ServerStorage" then return storage end return M.game:GetService(name) end }\n'
                'local workspace = M.workspace\n')
     open(os.path.join(tmp, "WarehouseMesh.luau"), "w", encoding="utf-8").write(prefix + storage + source)
-    # 7.1 review: the real server/Alpine.luau as AlpineServer.luau on tools/perf/world-mock.luau (WorldMock.luau) for
-    # tests/alpinebuild_test.luau (the forests stand on World's parts only; SkipInStudio), its shared modules the copies.
+    # tools/perf/world-mock.luau (WorldMock.luau): the world's builders' mock (tests/sandboxworld_test.luau and the rest)
     shutil.copy(os.path.join(tools, "perf", "world-mock.luau"), os.path.join(tmp, "WorldMock.luau"))
-    source = open(os.path.join(os.path.dirname(SHARED), "server", "Alpine.luau"), encoding="utf-8").read()
-    source = re.sub(r"require\(Shared\.(\w+)\)", r'require("./\1")', source)
-    open(os.path.join(tmp, "AlpineServer.luau"), "w", encoding="utf-8").write('setfenv(1, require("./WorldMock").env)\n' + source)
     # 8.0 SANDBOX: the real server/Admin.luau as AdminServer.luau for tests/adminsandbox_runtime_test.luau (the SANDBOX
     # tab's "sandbox" command: a non-admin refused, the checks, the rate limit, each button): its server modules, Net and
     # the services from tests/runtime/AdminRuntime.luau (on the item recorder), its shared modules the copies above.
@@ -834,7 +819,7 @@ if not pad_check():
 # Jinočany (design/jinocany/NAVRH.md: the sandbox in Jinočany in place of the Alps): the sandbox's big house is The Old
 # Farmstead and its street Pražská, so no "Old Chalet" and no "Main Street" is left in src (comments too, a name broken
 # over two comment lines too). The city's own files (Config.Sandbox.On = false, on hold) may keep their own names.
-CITY_ONLY = {"shared/Map.luau", "shared/BusLines.luau", "server/World.luau", "server/Alpine.luau", "server/Chalets.luau", "server/Hauptplatz.luau"}
+CITY_ONLY = {"shared/Map.luau", "shared/BusLines.luau"}
 def jinocany_names_check():
     src = os.path.join(os.path.dirname(HERE), "src")
     old = re.compile(r"\bold(?:\s|--)*chalet|\bmain(?:\s|--)*street\b", re.I)

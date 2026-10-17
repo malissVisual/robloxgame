@@ -1,14 +1,12 @@
 -- 6.24, the special zombies (the owner: "new zombies, so the fighting isn't always the same"): shared/ZombieKinds.luau,
 -- Config.Zombies' runner / brute / bloater and Config.ZombieTypes in the standalone Luau CLI: the spawn weights (the
 -- night, the danger, the level, the Blood Moon, the caps), the brute's armour maths, the bloater's blast falloff and
--- fuse, the fixed missions still always the same with their bloaters (the kill-all counts unchanged), the moves, and
--- the parts budget of every look of every kind.
+-- fuse, the moves, and the parts budget of every look of every kind. (10.5: the city's fixed missions and their
+-- plans went with shared/MissionPlan.luau.)
 -- Run: python3 tests/run_tests.py [path to the luau binary]
 
 local Config = require("./Config")
 local Economy = require("./Economy")
-local Missions = require("./Missions")
-local MissionPlan = require("./MissionPlan")
 local ZombieKinds = require("./ZombieKinds")
 local ZombieStyle = require("./ZombieStyle")
 local Geometry = require("./CharacterGeometry")
@@ -206,119 +204,6 @@ do
 	check("fuse: never in the past", ZombieKinds.fuseLeft(nil, 5, -3) == 5)
 	-- shot from range is safe: the farthest a gun reaches is far outside the blast
 	check("blast: shooting it from range is safe (a pistol's range is several radii)", Config.Weapons[1].range >= blast.radius * 3, Config.Weapons[1].range)
-end
-
--- ── The fixed missions: still always the same, every one killable ──────────
-do
-	local Fixed = Config.Missions.Fixed
-	check("missions: no bloater in the first chapter's missions before its finale", Fixed.Bloaters[1] == 0 and Fixed.FinaleBloaters >= 1)
-	check("missions: the later chapters have more", Fixed.Bloaters[10] > Fixed.Bloaters[2] and #Fixed.Bloaters == 10)
-	local grew = true
-	for tier = 1, #Fixed.Kinds do
-		grew = grew and MissionPlan.kindsOf(tier, 10).runner > MissionPlan.kindsOf(tier, 1).runner and MissionPlan.kindsOf(tier, 1).runner == Fixed.Kinds[tier].runner
-	end
-	check("missions: the runners grow with the story (the tier's mix in chapter 1 unchanged)", grew)
-	-- the plans with and without the bloaters: the same totals, the same labels, the same anchors' sums
-	local saved, savedFinale = table.clone(Fixed.Bloaters), Fixed.FinaleBloaters
-	local plain: { [string]: MissionPlan.Plan } = {}
-	for _, def in Missions.List do
-		local stops = MissionPlan.stopsOf(def)
-		if stops then
-			for i = 1, #Fixed.Bloaters do
-				Fixed.Bloaters[i] = 0
-			end
-			Fixed.FinaleBloaters = 0
-			plain[def.id] = MissionPlan.make(def, stops)
-			for i, n in saved do
-				Fixed.Bloaters[i] = n
-			end
-			Fixed.FinaleBloaters = savedFinale
-		end
-	end
-	local totals, labels, sums, anchors, counts, twice, inFirst, finale, wanted = {}, {}, {}, {}, {}, {}, {}, 0, {}
-	local withBloaters = 0
-	for _, def in Missions.List do
-		local stops = MissionPlan.stopsOf(def)
-		local before = plain[def.id]
-		if not stops or not before then
-			continue
-		end
-		local plan = MissionPlan.make(def, stops)
-		local again = MissionPlan.make(def, MissionPlan.stopsOf(def) or stops)
-		local sum, bloaters = 0, 0
-		local byAnchor: { [string]: number } = {}
-		local plainAnchor: { [string]: number } = {}
-		for index, group in plan.groups do
-			sum += group.count
-			if group.kind == "bloater" then
-				bloaters += group.count
-				if group.anchor ~= "pickup" and group.anchor ~= "drop" then
-					table.insert(anchors, def.id)
-				end
-			end
-			local key = `{group.anchor}:{group.stop}:{group.wave}:{group.point}`
-			byAnchor[key] = (byAnchor[key] or 0) + group.count
-			local other = again.groups[index]
-			if not other or other.kind ~= group.kind or other.count ~= group.count or other.spots[1].x ~= group.spots[1].x or other.spots[1].z ~= group.spots[1].z then
-				table.insert(twice, def.id)
-			end
-		end
-		for _, group in before.groups do
-			local key = `{group.anchor}:{group.stop}:{group.wave}:{group.point}`
-			plainAnchor[key] = (plainAnchor[key] or 0) + group.count
-		end
-		for key, n in plainAnchor do
-			if byAnchor[key] ~= n then
-				table.insert(sums, `{def.id} {key} {byAnchor[key]}/{n}`)
-			end
-		end
-		if plan.total ~= before.total or sum ~= plan.total or MissionPlan.size(def) ~= plan.total then
-			table.insert(totals, `{def.id} {plan.total}/{before.total}/{sum}`)
-		end
-		if plan.label ~= before.label then
-			table.insert(labels, def.id)
-		end
-		local want = MissionPlan.bloaters(def)
-		local walkersBefore = 0
-		for _, group in before.groups do
-			if group.kind == "walker" and (group.anchor == "pickup" or group.anchor == "drop") then
-				walkersBefore += group.count
-			end
-		end
-		if bloaters ~= math.min(want, walkersBefore) then
-			table.insert(wanted, `{def.id} {bloaters}/{want} ({walkersBefore} walkers)`)
-		end
-		if bloaters > 0 then
-			withBloaters += 1
-		end
-		if MissionPlan.chapter(def.campaign) == 1 and not def.duo then
-			local lastStep = 0
-			for _, other in Missions.List do
-				if other.campaign == def.campaign then
-					lastStep = math.max(lastStep, other.number)
-				end
-			end
-			if def.number == lastStep then
-				finale = bloaters
-			elseif bloaters > 0 then
-				table.insert(inFirst, def.id)
-			end
-		end
-		for _, group in plan.groups do
-			if group.count < 1 or #group.spots ~= group.count then
-				table.insert(counts, `{def.id} #{group.id}`)
-			end
-		end
-	end
-	check("missions: the same id and stops, the same kinds at the same spots (with the bloaters)", #twice == 0, table.concat(twice, ", "))
-	check("missions: the bloaters never change a mission's count (kill all: the plan's total, its size)", #totals == 0, table.concat(totals, ", "))
-	check("missions: … nor any stop's horde, wave or post", #sums == 0, table.concat(sums, ", "))
-	check("missions: … nor the HUD's word", #labels == 0, table.concat(labels, ", "))
-	check("missions: the chapter's bloaters, as many as it has walkers for", #wanted == 0, table.concat(wanted, ", "))
-	check("missions: the bloaters stand at the stops (not on the road, not in HOLD OUT's waves)", #anchors == 0, table.concat(anchors, ", "))
-	check("missions: First Shift has none before its finale, one there", #inFirst == 0 and finale == Fixed.FinaleBloaters, `{table.concat(inFirst, ", ")} / {finale}`)
-	check("missions: most missions after the first chapter meet a bloater", withBloaters >= 40, withBloaters)
-	check("missions: every group one spot an enemy", #counts == 0, table.concat(counts, ", "))
 end
 
 -- ── The moves ─────────────────────────────────────────────────────────────
