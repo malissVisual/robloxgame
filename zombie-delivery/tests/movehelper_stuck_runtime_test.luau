@@ -436,7 +436,6 @@ for index, house in SandboxMap.Houses do
 	truck.chassis.CFrame = CF(house.curb.x, 2, house.curb.z) * M.CFrame.Angles(0, math.rad(house.curb.yaw), 0)
 	truck.model:SetAttribute("BackOpen", true)
 	E.place(p, V3(plot.spawn.x, 3, plot.spawn.z + 3000)) -- (out of sight: Danny is put at the van at the house, faded in)
-	E.request(p, "helper", "hire")
 	for _ = 1, 10 do
 		E.clock += 0.1
 		MoveHelper.step(0.1)

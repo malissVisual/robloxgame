@@ -3391,11 +3391,104 @@ Config.Shortcuts = {
 }
 
 -- Crews (server/Crew.luau): invite another player into your job (they ride along or follow, share the pay).
+-- 10.1 THE HELPERS' CREW (the owner: "you'll be able to get different employees who can do something different. There
+-- don't have to be many, but Danny will be the base, so I'd cancel having to buy him. Because you'll have to get them
+-- somehow. And maybe when one dies, then … something"): the same table holds the NPC helpers a player has (the rules
+-- shared/CrewRules.luau, tests/crewrules_test.luau; the server server/HelperCrew.luau with its hooks in
+-- server/MoveHelper.luau; the CREW window and the down ring client/CrewUi.luau). Danny is free and everybody's from the
+-- start; the others are rescued in runs. One of them (the run host's pick) comes into a run as its MoveHelper.
+--   Order      the kinds in the CREW window's order (Default first: Danny)
+--   Default    the helper everybody has from the start and who comes when nothing else is picked
+--   Kinds      each kind: Name, Role (the name tag's "<Role> · ZDC Moving", the window's line), Icon, She (her words),
+--              Ability (the window's words), Speed (× the helper's walk: Config.MoveHelper.Speed × Walk), Health,
+--              Carry (Hand: one-hand pieces; Both: the heaviest two-hands piece by its weight 1 … 10, 0 none; Pair:
+--              "with" lifts a piece for two with you, "alone" carries it alone too, false never), Solo (× his carry's
+--              drag when he carries a piece for two alone), Guard (Gus: Damage a hit, Reach studs, Every s between hits,
+--              Range studs round him or his boss he goes after a zombie in, Leash studs from his boss at most, Follow
+--              studs he walks behind his boss), Sense (Lucy: studs the party sees Epic and Legendary loot through walls
+--              in; the players' and the run's inside attribute CrewSense), Look (shared/NpcLooks.luau's Look over the
+--              mover's: shirt, pants, hat, hatColor, apron, vest, shortSleeves, boots, shoes), Hello (his first words of
+--              a move), Freed (his words when the party unties him), Up (his words when revived)
+--   Rescue     a run's trapped helper: Chance (a run's odds of one, by its difficulty), Hold (s E is held to untie him),
+--              Reach (the prompt's studs), Bonus (the money each party player who has him already gets instead, by the
+--              difficulty), Away (studs from the house's way in the chair stands at least), Help (s between his
+--              "Help!" while a party player is within Call studs), Follow (the freed one walks after the party: Near
+--              studs he stops at, Far studs or another world and he is put by them, Every s between his looks, Speed)
+--   Down       a helper at 0 health in a run: Seconds to revive him (hold E for Revive s within Reach studs), up again
+--              with Health × his full health; nobody did: out of the run and to hospital
+--   Hospital   Seconds out of the crew after a run's out (the save's crew.hospital: os.time() until); discharging him
+--              early costs Base + PerMinute × the minutes left, to Round dollars
+--   Lobby      your picked helper waits at your warehouse: Stand (studs across and out from its door), Reach (the
+--              "Crew" prompt's studs: it opens the CREW window), Every (s between the server's looks at the stands)
+--   Window     the CREW window (client/CrewUi.luau): Width (px at scale 1), Row (a helper's row's height), TouchScale
+--   Ring       the down ring over a helper (client/CrewUi.luau): Size (px), Range (studs it shows within), Every (s)
+--   Flag       the save's mark: profile.crew is read only from a real save written with it
+-- The Crew remote (Config.Robust.Limits.Crew): client → server { kind = "state" } | { kind = "pick", id } |
+-- { kind = "discharge", id }; server → client { kind = "state", rows, pick, comes, money } | { kind = "open" }.
+export type CrewKind = {
+	Name: string,
+	Role: string,
+	Icon: string,
+	She: boolean,
+	Ability: string,
+	Speed: number,
+	Health: number,
+	Carry: { Hand: boolean, Both: number, Pair: string | boolean },
+	Solo: number,
+	Sense: number,
+	Guard: { Damage: number, Reach: number, Every: number, Range: number, Leash: number, Follow: number }?,
+	Look: { [string]: any },
+	Hello: string,
+	Freed: string,
+	Up: string,
+}
 Config.Crew = {
 	MaxMembers = 3,
 	InviteRange = 60, -- studs to the player you invite (or use the crew button from anywhere)
 	InviteTimeout = 30,
 	RiderRange = 250, -- a rider who got out stays on the owner's job (paid, credited) within this of the owner
+	-- 10.1 the helpers' crew (see above)
+	Order = { "danny", "bruno", "zip", "gus", "lucy" } :: { string },
+	Default = "danny",
+	Kinds = {
+		danny = { Name = "Danny", Role = "Mover", Icon = "🧑‍🔧", She = false, Ability = "Carries what you give him; lifts the heavy pieces with you",
+			Speed = 1, Health = 100, Carry = { Hand = true, Both = 10, Pair = "with" }, Solo = 1, Sense = 0,
+			Look = { shirt = { 230, 120, 40 }, pants = { 60, 60, 70 }, hat = "cap", hatColor = { 230, 120, 40 }, shortSleeves = true, boots = true },
+			Hello = "Danny from ZDC. Where do we start, boss?", Freed = "Thanks, boss!", Up = "Thanks! Back on my feet!" },
+		bruno = { Name = "Bruno", Role = "Strong", Icon = "💪", She = false, Ability = "Carries two-person pieces alone, slowly",
+			Speed = 0.9, Health = 160, Carry = { Hand = true, Both = 10, Pair = "alone" }, Solo = 1.6, Sense = 0,
+			Look = { shirt = { 158, 42, 40 }, pants = { 46, 46, 52 }, hat = "beanie", hatColor = { 36, 36, 40 }, apron = { 112, 76, 46 }, shortSleeves = true, boots = true },
+			Hello = "Bruno here. Point me at the heavy stuff.", Freed = "Finally! I'm Bruno - leave the heavy stuff to me.", Up = "Takes more than that to stop Bruno!" },
+		zip = { Name = "Zip", Role = "Quick", Icon = "⚡", She = false, Ability = "Fast with one-hand and small pieces; no heavy or two-person ones",
+			Speed = 1.4, Health = 80, Carry = { Hand = true, Both = 3, Pair = false }, Solo = 1, Sense = 0,
+			Look = { shirt = { 250, 204, 48 }, pants = { 52, 92, 160 }, hat = "cap", hatColor = { 40, 170, 230 }, shortSleeves = true, boots = false, shoes = { 240, 240, 240 } },
+			Hello = "Zip's here! Small stuff? I'm on it!", Freed = "Woo, free! I'm Zip - I'll run the small stuff out for you!", Up = "Okay, okay, I'm up!" },
+		gus = { Name = "Gus", Role = "Guard", Icon = "🛡", She = false, Ability = "Carries nothing: walks with you and fights the zombies",
+			Speed = 1.1, Health = 220, Carry = { Hand = false, Both = 0, Pair = false }, Solo = 1, Sense = 0,
+			Guard = { Damage = 30, Reach = 5, Every = 0.9, Range = 36, Leash = 45, Follow = 7 },
+			Look = { shirt = { 70, 84, 62 }, pants = { 50, 56, 46 }, hat = "helmet", hatColor = { 64, 74, 56 }, vest = { 38, 42, 38 }, boots = true, shoes = { 30, 28, 26 } },
+			Hello = "Gus. Stay close - I've got your back.", Freed = "Thanks. Name's Gus. Nothing gets past me now.", Up = "I'm good. Where are they?" },
+		lucy = { Name = "Lucy", Role = "Finder", Icon = "🔍", She = true, Ability = "Carries small pieces; shows the party Epic and Legendary loot through walls",
+			Speed = 1.1, Health = 90, Carry = { Hand = true, Both = 2, Pair = false }, Solo = 1, Sense = 160,
+			Look = { shirt = { 120, 84, 176 }, pants = { 48, 50, 62 }, hat = "beanie", hatColor = { 214, 70, 140 }, apron = { 214, 186, 120 }, shortSleeves = true },
+			Hello = "Lucy here. I can smell the good stuff from here!", Freed = "You found me! I'm Lucy - I'll find the treasures for you.", Up = "Phew! Thank you!" },
+	} :: { [string]: CrewKind },
+	Rescue = {
+		Chance = { easy = 0.15, normal = 0.25, hard = 0.4, insane = 0.5, nightmare = 0.65 } :: { [string]: number },
+		Hold = 3,
+		Reach = 8,
+		Bonus = { easy = 150, normal = 250, hard = 400, insane = 600, nightmare = 900 } :: { [string]: number },
+		Away = 12,
+		Help = 9,
+		Call = 45,
+		Follow = { Near = 6, Far = 70, Every = 0.25, Speed = 14 },
+	},
+	Down = { Seconds = 15, Revive = 3, Reach = 8, Health = 0.5 },
+	Hospital = { Seconds = 240, Base = 50, PerMinute = 50, Round = 10 },
+	Lobby = { Stand = { 16, 9 } :: { number }, Reach = 10, Every = 1 },
+	Window = { Width = 680, Row = 78, TouchScale = 0.78 },
+	Ring = { Size = 92, Range = 90, Every = 0.2 },
+	Flag = "crewKept",
 }
 
 -- 4.5: the admin's test buddies (server/Buddy.luau, shared/BuddyBrain.luau): NPC couriers that follow their owner on
@@ -5698,7 +5791,7 @@ Config.Robust = {
 		SandboxTasks = 4, -- 8.2: the SandboxTasks remote's state / claim (server/SandboxTasks.luau)
 		Auction = 4, -- 8.8: the Auction remote's state / consign / withdraw (the server's step: design/auction/PLAN.md)
 		AuctionBid = 3, -- 8.8: and its bids (one step a tap)
-		MoveHelper = 4, -- 8.3: Danny's HIRE, CLEAR QUEUE and STOP (the Moving remote's "helper": server/MoveHelper.luau)
+		MoveHelper = 4, -- 8.3: Danny's CLEAR QUEUE and STOP (the Moving remote's "helper": server/MoveHelper.luau; 10.1 no HIRE)
 		MoveHelperAssign = 5, -- 8.3: a piece clicked into (or out of) Danny's list (the Moving remote's ("helper", "assign"))
 		Clipboard = 4, -- 8.5: Danny's clipboard out or away (the Clipboard remote: server/Clipboard.luau)
 		MoveHelperOrder = 3, -- 8.6: an order to Danny, PUT IT DOWN / GET OUT (the Moving remote's ("helper", "putdown" | "getout"))
@@ -5707,6 +5800,7 @@ Config.Robust = {
 		PlayerTrade = 4, -- 8.7: the PlayerTrade remote's offer / answer / price / buy (server/PlayerTrade.luau)
 		TradeOffer = 0.2, -- 8.7: and a new offer to a player on top: one every 5 s at most (no offer spam)
 		Runs = 4, -- 9.7: the Runs remote's state / difficulty / vote / leave (a run's pad and the run: server/Runs.luau)
+		Crew = 4, -- 10.1: the Crew remote's state / pick / discharge (the CREW window: server/HelperCrew.luau)
 	},
 }
 
@@ -6853,11 +6947,14 @@ Config.MoveStory = {
 -- carries with you. 8.3 for hire (the owner: "I have to PAY for him when I want help … you click on something, and that
 -- assigns it to him, and the rest you carry yourself"; "he must sit in my car with me"): he waits by the van until a
 -- crew player hires him for the move (Hire), then carries the pieces the crew clicks (Queue) to the van, lifts the
--- two-person ones with you and rides in the van's passenger seat.
---   Solo / Duo         a crew of one / of two players has him by the van for hire (Duo: off); once hired he stays with
---                      any crew until the move ends (or his hirer leaves it)
---   Name / Title       his name tag
---   Health / Respawn   his health; at 0 he drops what he holds and is back at the van Respawn s later
+-- two-person ones with you and rides in the van's passenger seat. 10.1 (Config.Crew): no hire any more: he is free and
+-- every player's from the start, with every run's party (its host's pick of their crew comes, Danny or one of
+-- the helpers rescued in runs, each a MoveHelper of his own kind: shared/CrewRules.luau, server/HelperCrew.luau).
+--   Solo / Duo         the city's moves (Config.Sandbox.On false): a crew of one / of two players has him (Duo: off); 10.1
+--                      the sandbox's runs: every party has its host's helper; once with a move he stays with any crew
+--   Name / Title       his name tag (10.1: Danny's; the crew's kinds have their own names, the title "<Role> · Title")
+--   Health / Respawn   his health; at 0 he drops what he holds and is back at the van Respawn s later (10.1: in a run he
+--                      goes down instead: Config.Crew.Down, revived by the party or out to hospital)
 --   Speed              × the walk (Config.Movement.Walk), and × the carry's (MovingRules.speedFactor) with a piece:
 --                      slower than a player; Sprint: × the walk on his way to your lift (8.3: and to the van's seat)
 --   KeepUp / Flee      × the pair's carry speed (his speed's word for "with you"); × the walk running away
@@ -7029,17 +7126,12 @@ Config.MoveStory = {
 --                      the last resort, he fades over (a door's own walk-through is not a fade-over)
 --   CallLeave / CallIdle   your call ends when you walk CallLeave studs past the Lift's reach, or he stood ready
 --                      CallIdle s and you never lifted (Lift again, G or the STOP button end it too)
---   8.3 for hire (shared/MoveHelperBrain.luau's hirePrice, hireCheck, assignCheck, nextQueued, pickSeat, getOut;
---   server/MoveHelper.luau's hire, list and ride; client/MoveHelperCard.luau his card and the clicks on the pieces;
---   the rate limits Config.Robust.Limits.MoveHelper (HIRE, CLEAR QUEUE, STOP) and MoveHelperAssign (a piece clicked)):
---   Hire               the hire, for one move, paid by the crew player who hires him (PlayerData.spend, the analytics
---                      reason HelperHire): Base + PerPiece × the house's pieces (the bigger the house, the more he
---                      saves you), to Round dollars, Min … Max. The tuning: the sandbox starts you with $500 and a
---                      first haul on show earns about $40 – 50 a minute (8.3 economy), so the Old Farmstead's big
---                      house (36 – 43 pieces: $230 – 270) is a real choice on the first move and five or six minutes of
---                      the warehouse's income later; a smaller house (20 or so pieces: about $150) costs less, Max at
---                      most. Danny's training (Config.SandboxUpgrades danny) makes him faster, not cheaper. No
---                      refund: a hire lasts the move (CLEAR QUEUE stops him working; nothing more is charged)
+--   8.3 his list (shared/MoveHelperBrain.luau's assignCheck, nextQueued, pickSeat, getOut; server/MoveHelper.luau's list
+--   and ride; client/MoveHelperCard.luau his card and the clicks on the pieces; the rate limits
+--   Config.Robust.Limits.MoveHelper (CLEAR QUEUE, STOP) and MoveHelperAssign (a piece clicked)). 10.1: no hire any more
+--   (8.3 – 10.0 he cost $100 – 400 a move, Hire): Danny is free and every player's from the start, and the run host's
+--   pick of their crew comes into a run instead of him (Config.Crew: Bruno, Zip, Gus, Lucy, each a MoveHelper with
+--   his own carry, speed and look)
 --   Queue              the pieces on his list at most (a click on one more: "his list is full"); he carries them in
 --                      the order they were clicked, the rest is yours
 --   RideReach          studs from his spot at the van's passenger door (RideStand) where he starts getting in (your seat
@@ -7210,8 +7302,7 @@ Config.MoveHelper = {
 	CallBlink = 15,
 	CallLeave = 4,
 	CallIdle = 25,
-	-- 8.3 for hire
-	Hire = { Base = 50, PerPiece = 5, Round = 10, Min = 100, Max = 400 },
+	-- 8.3 his list (10.1: no hire, Config.Crew)
 	Queue = 6,
 	RideReach = 1.2,
 	RideStand = 2.8, -- 8.5 getting in like a player
@@ -7769,7 +7860,7 @@ Config.Loot = {
 --   SoftSeconds   s a soft step shows before it counts as done (said long enough)
 --   SoftGap       s after a soft step ended (done, dismissed, covered) before the next one may show
 --   PaintMoney    $ from which the PAINT shop's step may show (else once a warehouse level is bought)
---   8.4, Danny for hire's steps (hire him, give him a piece, a heavy piece: SandboxSteps.Danny; said once as a soft step):
+--   8.4, Danny's steps (give him a piece, a heavy piece: SandboxSteps.Danny; said once as a soft step; 10.1 no hire):
 --   HeavyNear     studs: a two-person piece of your move this near you (its Lift shown) says "press Lift and wait for
 --                 Danny" (looked for at most once a second, only while that step may still show)
 --   8.9, trading between players' step ("🏷 Sell to players: set a price on a piece on show", the last soft step):

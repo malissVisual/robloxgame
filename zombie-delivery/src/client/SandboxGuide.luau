@@ -35,13 +35,12 @@
 --     busy), Config.SandboxGuide.SoftGap s apart; each shows SoftSeconds at most,
 --     and the ✕ on one dismisses that step alone for the session (the guide stays on; on a core step the ✕ hides the
 --     guide as before).
---   * 8.4, Danny for hire (SandboxSteps.danny: in a move, before its own step, each said once as a soft step):
---     "Hire Danny to carry with you" while he is for hire and your money pays him (the chevron over his body: the
---     model in workspace.Npcs whose MoveHelper is your player attribute MoveHelperId, as client/MoveHelperCard.luau
---     finds it), "Pick a piece to give it to Danny" in the house once he is hired with his list empty, "Heavy piece:
+--   * 8.4, Danny (SandboxSteps.danny: in a move, before its own step, each said once as a soft step; 10.1 no "Hire
+--     Danny" step: he is free, the words his name's, the crew's helper's): "Pick a piece to give it to Danny" in the
+--     house while his list is empty, "Heavy piece:
 --     press Lift and wait for Danny" the first time a two-person piece of your move is within Config.SandboxGuide
 --     .HeavyNear studs (its own Lift prompt, tagged MovePrompt, looked for at most once a second and only while that
---     step may still show). Read from your player attributes (MoveHelper, MoveHelperPrice, MoveHelperQueue,
+--     step may still show). Read from your player attributes (MoveHelper, MoveHelperName, MoveHelperQueue,
 --     MoveHelperCall: every look) and the Moving state (its two-person pieces left: readMove). In a move with him, what
 --     covers the screen and what talks are asked too (his card, the move's cards, a grip check, a hint): his steps
 --     wait for them. A gamepad's words end in its button: "(L1)" at him, "(R1)" at a piece (SandboxSteps.onDevice).
@@ -153,8 +152,8 @@ local state: SandboxSteps.State = {
 	window = nil,
 	covered = false,
 	hush = false,
-	helper = nil, -- 8.4, Danny for hire (SandboxSteps.State)
-	helperPrice = nil,
+	helper = nil, -- 8.4, Danny (SandboxSteps.State)
+	helperName = nil, -- 10.1
 	helperQueue = nil,
 	waiting = false,
 	heavy = 0,
@@ -191,15 +190,15 @@ local function seated(): boolean
 	return humanoid ~= nil and humanoid.SeatPart ~= nil
 end
 
--- 8.4: Danny on your move, from your player attributes (server/MoveHelper.luau's: for hire or hired, his price, his
--- list, your call to him): every look and every Moving state (they change without one). 8.5: your clipboard out (your
+-- 8.4: Danny on your move, from your player attributes (server/MoveHelper.luau's: with you, 10.1 his name, his list,
+-- your call to him): every look and every Moving state (they change without one). 8.5: your clipboard out (your
 -- character's ClipboardHeld, server/Clipboard.luau's: the give step's words then).
 local function readHelper()
 	local helper = player:GetAttribute("MoveHelper")
-	local price, queue = player:GetAttribute("MoveHelperPrice"), player:GetAttribute("MoveHelperQueue")
+	local name, queue = player:GetAttribute("MoveHelperName"), player:GetAttribute("MoveHelperQueue")
 	local call = player:GetAttribute("MoveHelperCall")
-	state.helper = if move ~= nil and (helper == "offer" or helper == "hired") then helper else nil
-	state.helperPrice = if type(price) == "number" then price else nil
+	state.helper = if move ~= nil and helper == "hired" then helper else nil
+	state.helperName = if type(name) == "string" and name ~= "" then name else nil
 	state.helperQueue = if type(queue) == "number" then queue else nil
 	state.waiting = type(call) == "string" and call ~= ""
 	local character = player.Character
@@ -573,7 +572,7 @@ local function targetOf(kind: string?, px: number, pz: number): (Vector3?, strin
 	elseif kind == "paint" then -- 9.7: the lobby's PAINT shop booth (its counter: SandboxMap.Lobby.shops.paint)
 		local stand = SandboxMap.Lobby.shops.paint.stand
 		return Vector3.new(stand.x, SandboxMap.GroundTop + 3, stand.z), LABELS.paint
-	elseif kind == "danny" then -- 8.4: Danny, for hire on your move
+	elseif kind == "danny" then -- 8.4: Danny on your move (10.1 no hire step aims here any more)
 		local root = dannyRoot()
 		if root then
 			return root.Position + Vector3.new(0, 2, 0), LABELS.danny

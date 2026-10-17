@@ -47,8 +47,9 @@ end
 --                                      and BRAKE while you drive: a touch screen's driving buttons, a computer's feet),
 --                                      9.x's LootOutline and LootStars (the loot's coloured outlines, its stars and
 --                                      its toasts; the stars step aside under a window), 10.x's SandboxMapUi (the big
---                                      map, M: a window too, its 🗺 MAP chip) and SandboxMiniMap (a run's corner map:
---                                      it steps aside under a window):
+--                                      map, M: a window too, its 🗺 MAP chip), SandboxMiniMap (a run's corner map: it
+--                                      steps aside under a window) and 10.1's CrewUi (the CREW window: a window too; the
+--                                      ring over a helper down in a run):
 --                                      each started only when it is there; 8.7's TradePrompts (the trade prompts on
 --                                      your own stands hidden, a big sale's chat line) next to CargoPrompts
 -- 8.5.1: Studio kept old scripts after a sync? This side's stamp (client/BuildStamp.luau) against the shared Config's
@@ -132,7 +133,7 @@ if Config.Sandbox.On then
 	-- The sandbox's own modules (other workers write them at the same time): only when they are there, and one that
 	-- fails to load is skipped with a warning.
 	local own: { { name: string, module: any } } = {}
-	for _, name in { "SandboxHud", "WarehouseUi", "SandboxGuide", "UpgradeUi", "CollectionBookUi", "SandboxTasksUi", "MoveHelperCard", "DannyOrders", "OfferCard", "VanPaintUi", "TradeUi", "AuctionUi", "VillageTraffic", "DrivePedals", "RunUi", "LootOutline", "LootStars", "RunDangerUi", "SandboxMapUi", "SandboxMiniMap" } do -- (8.1: the UPGRADES desk's window; 8.2: the collection book, the TASKS panel; 8.3: Danny's command card, a visitor's offer, the PAINT shop; 8.5: Danny's clipboard, orders mode; 8.7: trading between players; 8.8: the Auction House's window, only while Config.Auction.On; 8.9: the D5's cars, Jinočany; 9.1: the drive pedals; 9.x loot: the outlines, the stars and the toasts; 10.x the map: the big map (M) and a run's minimap, after the TASKS chip its 🗺 MAP chip stands beside)
+	for _, name in { "SandboxHud", "WarehouseUi", "SandboxGuide", "UpgradeUi", "CollectionBookUi", "SandboxTasksUi", "MoveHelperCard", "DannyOrders", "OfferCard", "VanPaintUi", "TradeUi", "AuctionUi", "VillageTraffic", "DrivePedals", "RunUi", "LootOutline", "LootStars", "RunDangerUi", "SandboxMapUi", "SandboxMiniMap", "CrewUi" } do -- (8.1: the UPGRADES desk's window; 8.2: the collection book, the TASKS panel; 8.3: Danny's command card, a visitor's offer, the PAINT shop; 8.5: Danny's clipboard, orders mode; 8.7: trading between players; 8.8: the Auction House's window, only while Config.Auction.On; 8.9: the D5's cars, Jinočany; 9.1: the drive pedals; 9.x loot: the outlines, the stars and the toasts; 10.x the map: the big map (M) and a run's minimap, after the TASKS chip its 🗺 MAP chip stands beside)
 		local found = Client:FindFirstChild(name)
 		if found and found:IsA("ModuleScript") then
 			local ok, module = pcall(function(): any
@@ -163,7 +164,7 @@ if Config.Sandbox.On then
 	local TradeUi = ownModule("TradeUi") -- (8.7: trading between players: the composer, the price picker, the buy question)
 	local AuctionUi = ownModule("AuctionUi") -- (8.8: the Auction House's window: the live lot, the consign picker, the results)
 	local MapUi = ownModule("SandboxMapUi") -- (10.x the big map: a window like the others)
-	local windows = { WarehouseUi, UpgradeUi, BookUi, TasksUi, DannyCard, OfferCard, PaintUi, TradeUi, AuctionUi, ownModule("RunUi"), MapUi } -- (9.7: a run's results card; 10.x: the map)
+	local windows = { WarehouseUi, UpgradeUi, BookUi, TasksUi, DannyCard, OfferCard, PaintUi, TradeUi, AuctionUi, ownModule("RunUi"), MapUi, ownModule("CrewUi") } -- (9.7: a run's results card; 10.x: the map; 10.1: the CREW window)
 
 	safely("Drive", Drive.start)
 	safely("ZombieAnimator", require(Client.ZombieAnimator).start)
@@ -272,7 +273,7 @@ if Config.Sandbox.On then
 	CameraRig.windowOpen = function(): boolean
 		return Hud.anyWindowOpen() or AdminPanel.isOpen() or CrewPanel.isOpen() or MovingHud.isOpen() or MoveLobbyUi.isOpen()
 			or QuickChat.isOpen() or ownOpen(WarehouseUi) or ownOpen(UpgradeUi) or ownOpen(BookUi) or ownOpen(TasksUi) or ownOpen(DannyCard) or ownOpen(PaintUi)
-			or ownOpen(OfferCard) or ownOpen(TradeUi) or ownOpen(AuctionUi) or ownOpen(windows[10]) or ownOpen(MapUi)
+			or ownOpen(OfferCard) or ownOpen(TradeUi) or ownOpen(AuctionUi) or ownOpen(windows[10]) or ownOpen(MapUi) or ownOpen(windows[12])
 	end
 	CameraRig.mouseNeeded = CameraRig.windowOpen
 	-- 9.0 (the owner: "aiming with the crosshair only when I want to shoot or have pistols; the mouse normally free, so

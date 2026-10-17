@@ -1,4 +1,4 @@
-"""8.3 Danny for hire: the folder tools/phone-ui/dannycard.luau runs in (check.py runs its checks there,
+"""8.3 Danny's card (10.1 free, no hire): the folder tools/phone-ui/dannycard.luau runs in (check.py runs its checks there,
 dannycard_preview.py its scenes): sandboxenv.py's folder (sandbox_mock.luau's recorder, the real client/SandboxHud.luau,
 client/SandboxTasksUi.luau, client/CardKit.luau, client/TouchLayout.luau, client/MoveLayout.luau and the real shared
 modules) with the real client/MoveHelperCard.luau, client/MoveHelperHud.luau and client/TopBlocks.luau on the same

@@ -444,6 +444,7 @@ local function sandbox()
 		Moving.parkVan = SandboxBoot.parkVan -- (a run's truck comes this way: at its house's curb, repaired)
 		Moving.start()
 	end)
+	optional("HelperCrew", "start") -- 10.1: the helpers' crew (the CREW window's remote, your helper at your warehouse)
 	optional("Runs", "start") -- 9.7: the lobby's portals and the runs (after Moving: it wraps the crews, hears the ends)
 end
 

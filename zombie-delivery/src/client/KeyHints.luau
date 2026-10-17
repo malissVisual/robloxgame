@@ -130,7 +130,8 @@ local function sandboxLines(character: Model, humanoid: Humanoid): { { Chip } }
 	if orders then
 		-- 9.0 the clipboard out: E by a piece gives it to Danny (client/DannyOrders.luau's prompts in place of Pick up), a
 		-- click the one you point at (a gamepad: R1, the action's)
-		add(first, chipText("E/LMB", "Give to Danny", true, "dannygive"))
+		local who = player:GetAttribute("MoveHelperName") -- (10.1 the crew's helper: his own name)
+		add(first, chipText("E/LMB", `Give to {if type(who) == "string" and who ~= "" then who else Config.MoveHelper.Name}`, true, "dannygive"))
 	else
 		add(first, chipText("E", "Use", nil, "use"))
 	end

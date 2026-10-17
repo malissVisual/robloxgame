@@ -229,6 +229,10 @@ export type Profile = {
 	-- 9.7 RUNS: how many of the runs' difficulties are open (shared/RunRules.luau: Config.Runs.Open at first, one more
 	-- for a run finished at the hardest open one): read only from a real save written with its flag (runUnlockedKept)
 	runUnlocked: number,
+	-- 10.1 the helpers' crew (shared/CrewRules.luau; server/HelperCrew.luau keeps it): who you have (Danny always), your
+	-- pick for runs, who is in hospital until when (os.time()): read only from a real save written with its flag
+	-- (Config.Crew.Flag); anything else, an older save too, starts with Danny alone (nothing of the old hire was saved)
+	crew: any,
 	deliveries: number,
 	kills: number,
 	earned: number,
@@ -351,6 +355,7 @@ local function newProfile(): Profile
 		sandboxHouseSeed = nil, -- 8.4: no house rolled yet
 		sandboxHouse = nil, -- none of the six yet
 		runUnlocked = Config.Runs.Open, -- 9.7: Easy and Normal
+		crew = require(Shared.CrewRules).empty(), -- 10.1: Danny, free, picked
 		deliveries = 0,
 		kills = 0,
 		earned = 0,
@@ -717,6 +722,9 @@ local function applySaved(profile: Profile, saved: any)
 	-- 9.7 RUNS: the difficulties open, only from a real save written with its flag (runUnlockedKept: Config.Runs.Flag);
 	-- a save from before 9.7 (or a lock-only record) starts with Easy and Normal (RunRules.fromSave)
 	profile.runUnlocked = require(Shared.RunRules).fromSave(saved)
+	-- 10.1 the helpers' crew, only from a real save written with its flag (crewKept: Config.Crew.Flag); a save from
+	-- before 10.1 (or a lock-only record) starts with Danny alone, free (CrewRules.fromSave: the hire was never saved)
+	profile.crew = require(Shared.CrewRules).fromSave(saved)
 	-- (6.4: the bag chosen was read here; 6.23: it is per game, never saved: a game starts with the best bag you have)
 	if saved.xpCurve ~= Config.Levels.Curve then
 		profile.xp = Levels.fromLegacy(profile.xp) -- 3.2: a 3.1 save, the old XP curve: it keeps its level
@@ -1148,6 +1156,8 @@ build = function(profile: Profile, lock: any): { [string]: any }
 		sandboxHouseKept = true, -- 8.9 (applySaved reads which house only with it)
 		runUnlocked = profile.runUnlocked, -- 9.7
 		runUnlockedKept = true, -- 9.7: Config.Runs.Flag (applySaved reads the difficulties open only with it)
+		crew = require(Shared.CrewRules).toSave(profile.crew), -- 10.1
+		crewKept = true, -- 10.1: Config.Crew.Flag (applySaved reads the crew only with it)
 		deliveries = profile.deliveries,
 		kills = profile.kills,
 		earned = profile.earned,

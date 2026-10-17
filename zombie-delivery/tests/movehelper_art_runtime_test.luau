@@ -5,7 +5,7 @@
 -- each step, as the constraints hold him in Roblox), a carried piece goes where its carrier is (the test moves it).
 -- A solo move into Marge's real house: Ann lifts the real sofa, Danny takes the far end within 2 s; they carry it out
 -- of the living room through its doorway ("Watch the doorframe!"), out of the front door and across the yard to the van
--- without a drop, he opens the van's back for the two of them, Ann loads it (8.3: Danny hired first); Danny carries a real
+-- without a drop, he opens the van's back for the two of them, Ann loads it (10.1: Danny with her from the start); Danny carries a real
 -- two-hands piece Ann gave him (a click: his list) to the van at his slower walk; a real two-person piece on his list:
 -- he waits at it for her, never in a doorway.
 -- 8.1 carrying in two: Ann's walk is the leader's client's (shared/PairCarry.luau steer, client/PairSteer.luau's: the
@@ -206,8 +206,7 @@ danny = MoveHelper.find(ann)
 local truck = E.cars[ann]
 local cargoDoor = truck.chassis:FindFirstChild("CargoDoor")
 check("Danny comes with the van", danny ~= nil and danny.body ~= nil and distance(danny.body.root.Position, cargoDoor.WorldPosition) < 8)
-E.request(ann, "helper", "hire")
-check("8.3 Ann hires him for the move", danny.hirer == ann)
+check("10.1 Danny is Ann's from the start (free, no hire)", danny.hirer == ann)
 -- 8.3 a click on a piece: Ann beside it (the server checks she could see it)
 local function give(model: any)
 	local was = E.rootOf(ann).Position

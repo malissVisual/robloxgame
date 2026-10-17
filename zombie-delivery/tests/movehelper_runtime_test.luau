@@ -3,10 +3,9 @@
 -- fakes). The runtime has no physics and no pathfinding: his walk here is a straight step of speed × dt (useMover, no
 -- `keep`: carrying together he is put at your piece's far end each step, as the constraints hold him in Roblox), and a
 -- carried piece is moved with its carrier by the test (a weld is only a record).
--- 8.3 Danny for hire: a solo move; Danny comes with the van and waits there for hire ("Hire Danny · $100" over his
--- head; the house's 6 pieces: Hire.Min). Not hired: the sofa is dragged alone, no call, he does not come; a click on a
--- piece: "Hire Danny first". HIRE without the money: refused, nothing taken; a stranger's HIRE: nothing; with the
--- money: $100 taken (PlayerData.spend, HelperHire), he works for the move; HIRE again: nothing more taken. Then: the
+-- 8.3 Danny's list, 10.1 free (no hire): a solo move; Danny comes with the van, with you from the start (no price, no
+-- sign over his head, "Danny is with you"); an old client's HIRE request takes nothing; far from the van he comes to it.
+-- Then: the
 -- player's Lift on the sofa calls him ("Danny, give me a hand!": no drag alone, the player waits at their end, "Stop
 -- waiting" on its prompt) and he WALKS over from the van (through the front door his own way, never faded over), "On
 -- three... lift!" at its far end and up it goes with him there (no pause, no snap), turned to the player, his arms on
@@ -19,7 +18,7 @@
 -- (he opens it himself, or, not allowed, asks and sets the piece down after WaitShut s); he opens it for the player
 -- coming with a piece; a bite, his death (his piece back on his list) and comeback, running from a zombie; garbage
 -- requests, the rate limits, CLEAR QUEUE; his door trips (8.1 walk-in doors); the van parked far off; the crew growing
--- (a hired Danny stays; the crew mate gives him a piece too). Riding with you: the player at the wheel, he walks out of
+-- (Danny stays; the crew mate gives him a piece too). Riding with you: the player at the wheel, he walks out of
 -- the house round the van (8.5: never over its footprint, though the straight way runs through it) to his spot by
 -- the passenger door and gets in as a player does (the seat his, the door swung open, a step to the handle facing the
 -- van, the slide in, ducking, posed every frame; BoardSeconds later Seat:Sit, massless, no hold, the door shut; no
@@ -27,12 +26,12 @@
 -- the slide out to his spot) and goes on with his list; the van driven off without him: RideFar studs off, the last
 -- resort fades him into the seat; the van driving off while he gets in: called off (at his spot, the door shut), he
 -- goes after it, and in once it stops; the seat taken by a crew mate: he follows on foot; the van wrecked: out at once.
--- The end of the move ends the hire. A second move (for hire again) where the room goes while he carries his piece ("Van's
+-- The end of the move: he goes. A second move (with you again) where the room goes while he carries his piece ("Van's
 -- full, boss - drive it to the Wall?": set down beside the van), a third where nothing of his list fits, a fourth with
 -- the marble slab (two people) on his list: he waits at it ("needs you", the toast, "Lift with Danny"), long, and the
 -- player lifts it with him through the grip's lift check; stuck (9.3: a new way, his ways out walked, a fade only at
 -- the end); his body taken away while he
--- carries; an unhired Danny heads back when the crew grows; a crew mate's hire ends when they leave the move.
+-- carries; 10.1 once with a move he stays when the crew grows and shrinks (nothing to end: no hire).
 local E = require("./MovingRuntime")
 local Moving = require("./MovingServer")
 local MoveHelper = require("./MoveHelperServer")
@@ -297,7 +296,7 @@ local function walk(model: any, to: any): number
 	return worst
 end
 
--- Danny comes: for hire ------------------------------------------------------------------------------------------------------
+-- Danny comes: free, with you (10.1: no hire) ---------------------------------------------------------------------------
 
 local started = Moving.admin(sol, "start")
 check("a solo move starts", string.find(started, "started", 1, true) ~= nil, started)
@@ -305,22 +304,21 @@ local truck = E.cars[sol]
 local cargoDoor = truck.chassis:FindFirstChild("CargoDoor")
 Moving.step()
 danny = MoveHelper.find(sol)
-check("8.3 Danny comes with a crew of one: for hire, not working (nobody hired him, nothing on his list)", danny ~= nil and danny.body ~= nil and danny.hirer == nil
-	and #danny.queue == 0)
+check("10.1 Danny comes with a crew of one, free: with you from the start (his boss the move's owner), nothing on his list", danny ~= nil and danny.body ~= nil
+	and danny.hirer == sol and #danny.queue == 0 and danny.kind == "danny" and danny.name == "Danny")
 local body = danny.body
 local npc = body.model
 check("his body: Danny, ZDC Moving, his id in the rules (no player's)", npc.Name == "Danny" and npc:GetAttribute("MoveHelper") == danny.id and danny.id < -1000000
-	and body.humanoid.MaxHealth == H.Health and body.humanoid.Health == H.Health)
+	and body.humanoid.MaxHealth == H.Health and body.humanoid.Health == H.Health and npc:GetAttribute("CrewKind") == "danny" and npc:GetAttribute("CrewSolo") == nil)
 check("…at the van's back", distance(body.root.Position, cargoDoor.WorldPosition) < 8, distance(body.root.Position, cargoDoor.WorldPosition))
-check("he says: Need a hand? Hire me!", E.saidSince("Danny from the depot. Need a hand? Hire me!", 0))
-check("the player hears it: he waits by the van for hire ($100)", string.find(E.lastNotice(sol), "waits by your van", 1, true) ~= nil
-	and string.find(E.lastNotice(sol), "$100", 1, true) ~= nil, E.lastNotice(sol))
-check("8.3 the status line: MoveHelper = offer, the price (6 pieces: Hire.Min, $100), what he does; his id (his card finds his body by it)",
-	sol:GetAttribute("MoveHelper") == "offer" and sol:GetAttribute("MoveHelperPrice") == 100 and danny.price == Brain.hirePrice(6) and danny.price == H.Hire.Min
-	and sol:GetAttribute("MoveHelperDoing") == "Waiting by the van for hire" and sol:GetAttribute("MoveHelperId") == danny.id and sol:GetAttribute("MoveHelperQueue") == nil
-	and sol:GetAttribute("MoveHelperCall") == nil, sol:GetAttribute("MoveHelperDoing"))
-local sign = body.root:FindFirstChild("HireSign")
-check("8.3 a sign over his head: \"🧑‍🔧 Hire Danny · $100\"", sign ~= nil and sign:FindFirstChild("Label") ~= nil and sign:FindFirstChild("Label").Text == "🧑‍🔧 Hire Danny · $100")
+check("10.1 he says hello and asks for nothing (no \"Hire me!\")", E.saidSince(Brain.Lines.hello, 0) and string.find(Brain.Lines.hello, "Hire", 1, true) == nil)
+check("10.1 the player hears it: Danny is with you, no price", string.find(E.lastNotice(sol), "Danny is with you", 1, true) ~= nil
+	and string.find(E.lastNotice(sol), "$", 1, true) == nil, E.lastNotice(sol))
+check("10.1 the status line: MoveHelper = hired (with you: the 8.3 word), nothing to carry, no price, what he does; his id (his card finds his body by it), name and kind",
+	sol:GetAttribute("MoveHelper") == "hired" and sol:GetAttribute("MoveHelperPrice") == nil and sol:GetAttribute("MoveHelperDoing") == "Waiting at the van"
+	and sol:GetAttribute("MoveHelperId") == danny.id and sol:GetAttribute("MoveHelperQueue") == 0 and sol:GetAttribute("MoveHelperCall") == nil
+	and sol:GetAttribute("MoveHelperName") == "Danny" and sol:GetAttribute("MoveHelperKind") == "danny", sol:GetAttribute("MoveHelperDoing"))
+check("10.1 no \"Hire Danny\" sign over his head", body.root:FindFirstChild("HireSign") == nil)
 check("his name in the rules' list", MoveHelper.nameOf(danny.id) == "Danny" and MoveHelper.nameOf(44) == nil)
 local targets = E.Zombies.extraTargets()
 local hunted = false
@@ -331,7 +329,7 @@ for _, t in targets do
 end
 check("the zombies go after him too (Zombies.extraTargets)", hunted)
 
--- Not hired: today's rules ---------------------------------------------------------------------------------------------------
+-- 10.1 no hire: an old client's HIRE is nothing; far from the van he comes to it ------------------------------------------
 
 local site = workspace:FindFirstChild("Moves"):FindFirstChild("Move_marge")
 local enter = promptIn(site, "Enter house")
@@ -344,43 +342,17 @@ check("Sol is inside", (E.rootOf(sol).Position - origin.Position).Magnitude < 10
 local sofa = itemModel(3)
 local SOFA = E.items.sofa.size
 local character = sol.Character
-E.place(sol, sofa.PrimaryPart.Position + V3(0, 0, 3))
-trigger(promptIn(sofa, "Lift"), sol)
-check("8.3 not hired: the sofa's Lift is today's: dragged alone, no call, nobody waits", character:GetAttribute("MoveCarry") == 3 and danny.call == nil
-	and sol:GetAttribute("MoveHelperCall") == nil and not helped())
-run(4)
-check("…and he does not come to it: he waits by the van for hire", Rules.holding(danny.s.move, danny.id) == nil and distance(body.root.Position, cargoDoor.WorldPosition) < 8)
-E.Net.get("PutDown").OnServerEvent:Fire(sol)
 local noticeAt = #E.messages
-give(sofa)
-check("8.3 …a click on a piece: \"Hire Danny first\", nothing on his list", #danny.queue == 0 and told(sol, "Hire Danny first", noticeAt) and sofa:GetAttribute("DannyQueue") == nil)
-
--- 8.3 the hire -----------------------------------------------------------------------------------------------------------------
-
-E.wallet[sol] = 50
+E.wallet[sol] = 500
 E.request(sol, "helper", "hire")
-check("8.3 HIRE without the money ($50 of $100): refused, nothing taken, still for hire", danny.hirer == nil and #E.spent == 0 and E.wallet[sol] == 50
-	and E.lastNotice(sol) == "Not enough money: Danny costs $100 for this move." and sol:GetAttribute("MoveHelper") == "offer", E.lastNotice(sol))
 local rex = E.player(66, "Rex", outside)
 E.request(rex, "helper", "hire")
-check("8.3 a player not of the move's crew: nothing (no hire, nothing taken, no word)", danny.hirer == nil and #E.spent == 0 and E.lastNotice(rex) == "")
--- 8.4 (the owner: "Danny always has to be hired, he isn't free"): not hired and far from the van (left at the warehouse),
--- he stays there: he never turns up at the house by himself
+check("10.1 a HIRE request (an old client's) is nothing: nothing taken, no word, still with you", #E.spent == 0 and E.wallet[sol] == 500 and #E.messages == noticeAt
+	and danny.hirer == sol and sol:GetAttribute("MoveHelper") == "hired")
+-- (8.4's Danny left at the warehouse unhired is gone with the hire: far from the van, he comes to it)
 body.root.CFrame = body.root.CFrame + V3(0, 0, 400)
-run(3)
-check("8.4 not hired, left far from the van: he stays (no turning up at the house)", distance(body.root.Position, cargoDoor.WorldPosition) > 300)
-E.wallet[sol] = 500
-noticeAt = #E.messages
 local said = #E.said
-E.request(sol, "helper", "hire")
-check("8.3 HIRE with the money: $100 taken (PlayerData.spend: HelperHire, the contract's id), he works for the move", danny.hirer == sol and #E.spent == 1
-	and E.spent[1].player == sol and E.spent[1].amount == 100 and E.spent[1].reason == "HelperHire" and E.spent[1].sku == "marge" and E.wallet[sol] == 400)
-check("…the crew hears it, he says so; the status line: hired, nothing to carry, the price gone; the sign gone", told(sol, "Sol hired Danny for this move ($100)", noticeAt)
-	and E.saidSince(Brain.Lines.hired, said) and sol:GetAttribute("MoveHelper") == "hired" and sol:GetAttribute("MoveHelperPrice") == nil
-	and sol:GetAttribute("MoveHelperQueue") == 0 and body.root:FindFirstChild("HireSign") == nil)
-E.request(sol, "helper", "hire")
-check("8.3 once a move: HIRE again takes nothing more", #E.spent == 1 and E.wallet[sol] == 400 and E.lastNotice(sol) == "Danny works for this move already.", E.lastNotice(sol))
-E.wallet[sol] = 2000 -- (the moves below hire him again)
+E.wallet[sol] = 2000
 do
 	-- 9.3 (the owner: no visible teleports): Sol by the van sees where he would appear, so he walks; nobody near, he is
 	-- put there (Far), faded in
@@ -388,7 +360,7 @@ do
 	local fadesAt = fades
 	run(3)
 	local walked = from - distance(body.root.Position, cargoDoor.WorldPosition)
-	check("9.3 hired far from the van, Sol by it: he walks to it (never put there in her sight)", walked > 20 and fades == fadesAt and (danny.teleports.far or 0) == 0, walked)
+	check("9.3 far from the van, Sol by it: he walks to it (never put there in her sight)", walked > 20 and fades == fadesAt and (danny.teleports.far or 0) == 0, walked)
 	local was: { [any]: any } = {}
 	for _, player in E.Players:GetPlayers() do
 		was[player] = E.rootOf(player).Position
@@ -400,7 +372,7 @@ do
 	for player, at in was do
 		E.place(player, at)
 	end
-	check("8.4 …hired: he comes to the van at the house (9.3 nobody near: put there, faded in)", distance(body.root.Position, cargoDoor.WorldPosition) < 8
+	check("8.4 …he comes to the van at the house (9.3 nobody near: put there, faded in)", distance(body.root.Position, cargoDoor.WorldPosition) < 8
 		and fades == fadesAt + 1 and danny.teleports.far == 1)
 end
 
@@ -410,8 +382,8 @@ E.place(sol, sofa.PrimaryPart.Position + V3(0, 0, 3))
 said = #E.said
 local outsideAt = body.root.Position
 trigger(promptIn(sofa, "Lift"), sol)
-check("8.3 hired: Lift calls him, no drag alone, Sol waits at her end", character:GetAttribute("MoveCarry") == nil
-	and character:GetAttribute("CarrySpeed") == nil and danny.s.move.things[3].state == "ground" and danny.call ~= nil and danny.call.spot == 3
+check("8.3 Lift calls him (10.1 free: from the start), no drag alone, Sol waits at her end", character:GetAttribute("MoveCarry") == nil
+	and character:GetAttribute("CarrySpeed") == nil and danny.s.move.things[3].state == "home" and danny.call ~= nil and danny.call.spot == 3
 	and sol:GetAttribute("MoveHelperCall") == "Sofa")
 check("…\"Danny, give me a hand!\" (her toast; a bubble over her head) and his answer", string.find(E.lastNotice(sol), "\"Danny, give me a hand!\"", 1, true) ~= nil
 	and E.saidSince("Hold it, I'll get the other end!", said), E.lastNotice(sol))
@@ -481,7 +453,7 @@ do
 	local queue = sol:GetAttribute("MoveHelperQueue")
 	check("9.0 his status line says what his bubble says (\"Carrying: Sofa with you\", never \"Nothing to carry\"), no hint how to give him pieces",
 		bubble == "🤝 Carrying: Sofa with you" and Brain.title(queue, bubble) == "Carrying: Sofa with you" and not Brain.idle(bubble)
-		and Brain.status(true, 0, queue, sol:GetAttribute("MoveHelperDoing")) == "Carrying the Sofa with you", `{bubble} / {Brain.title(queue, bubble)}`)
+		and Brain.status(queue, sol:GetAttribute("MoveHelperDoing")) == "Carrying the Sofa with you", `{bubble} / {Brain.title(queue, bubble)}`)
 	-- one put-down on her screen: the Sofa's own G prompt (hers), no pill saying it again
 	local mine = 0
 	for _, d in sofa:GetDescendants() do
@@ -1046,7 +1018,7 @@ asked = false
 for _, l in limits do
 	asked = asked or (l.player == sol and l.name == "MoveHelper" and l.rate == Config.Robust.Limits.MoveHelper)
 end
-check("8.3 HIRE, CLEAR QUEUE and STOP ask their rate limit (MoveHelper, Config.Robust.Limits.MoveHelper); over it: dropped", asked and listIs({ 6 })
+check("8.3 CLEAR QUEUE and STOP (10.1 no HIRE) ask their rate limit (MoveHelper, Config.Robust.Limits.MoveHelper); over it: dropped", asked and listIs({ 6 })
 	and Config.Robust.Limits.MoveHelper == 4)
 allow = true
 noticeAt = #E.messages
@@ -1099,12 +1071,12 @@ local rejoined = run(20, function()
 end)
 check("…parked by the house again: he goes to it", rejoined)
 
--- The crew grows: a hired Danny stays ----------------------------------------------------------------------------------------
+-- The crew grows: Danny stays (10.1 free: as a hired one did) ------------------------------------------------------------
 
 local bob = E.player(55, "Bob", outside)
 E.crew[sol] = { bob }
 Moving.step()
-check("8.3 a crew of two: a hired Danny stays (paid for the move; Duo off), Bob gets his status line too", MoveHelper.find(sol) == danny and npc.Parent ~= nil
+check("8.3 a crew of two: Danny stays (10.1 Sol's, free; Duo off), Bob gets his status line too", MoveHelper.find(sol) == danny and npc.Parent ~= nil
 	and bob:GetAttribute("MoveHelper") == "hired" and bob:GetAttribute("MoveHelperId") == danny.id and sol:GetAttribute("MoveHelper") == "hired")
 E.place(bob, outside)
 trigger(enter, bob)
@@ -1365,7 +1337,7 @@ end
 
 Moving.admin(sol, "end")
 run(0.2)
-check("the move ends: the hire with it, he goes, the strip goes, his marker off the slab", MoveHelper.find(sol) == nil and npc.Parent == nil and sol:GetAttribute("MoveHelper") == nil
+check("the move ends: he goes, the strip goes, his marker off the slab", MoveHelper.find(sol) == nil and npc.Parent == nil and sol:GetAttribute("MoveHelper") == nil
 	and sol:GetAttribute("MoveHelperDoing") == nil and sol:GetAttribute("MoveHelperId") == nil and sol:GetAttribute("MoveHelperQueue") == nil and markOf(slab) == nil)
 
 -- A second move: no room for his piece ----------------------------------------------------------------------------------------
@@ -1380,11 +1352,8 @@ cargoDoor = truck.chassis:FindFirstChild("CargoDoor")
 truck.model:SetAttribute("BackOpen", true)
 Moving.step()
 danny = MoveHelper.find(sol)
-check("8.3 the next move: Danny again, for hire again (the end of the last one ended its hire)", danny ~= nil and danny.body ~= nil and danny.hirer == nil
-	and sol:GetAttribute("MoveHelper") == "offer")
-local spent = #E.spent
-E.request(sol, "helper", "hire")
-check("…hired for this one: its price taken again", danny.hirer == sol and #E.spent == spent + 1)
+check("10.1 the next move: Danny again, with you from its start (free: nothing taken)", danny ~= nil and danny.body ~= nil and danny.hirer == sol
+	and sol:GetAttribute("MoveHelper") == "hired" and #E.spent == 0)
 E.place(sol, outside)
 trigger(promptIn(workspace:FindFirstChild("Moves"):FindFirstChild("Move_marge"), "Enter house"), sol)
 give(itemModel(1))
@@ -1417,7 +1386,6 @@ Moving.admin(sol, "start")
 T.Beds[E.carId].Height = bedHeight
 Moving.step()
 danny = MoveHelper.find(sol)
-E.request(sol, "helper", "hire")
 E.place(sol, outside)
 trigger(promptIn(workspace:FindFirstChild("Moves"):FindFirstChild("Move_marge"), "Enter house"), sol)
 give(itemModel(1))
@@ -1442,7 +1410,6 @@ Moving.step()
 danny = MoveHelper.find(sol)
 body = danny.body
 npc = body.model
-E.request(sol, "helper", "hire")
 site = workspace:FindFirstChild("Moves"):FindFirstChild("Move_marge")
 E.place(sol, outside)
 trigger(promptIn(site, "Enter house"), sol)
@@ -1459,7 +1426,7 @@ end)
 check("8.3 the slab on his list (two people): he goes to it and waits at one end", asking and danny.action == "needs"
 	and distance(body.root.Position, slab.PrimaryPart.Position) <= math.max(SLAB.X, SLAB.Z) / 2 + H.PickReach + 0.6)
 check("…\"This one's too heavy for me alone, give me a hand!\"", E.saidSince("This one's too heavy for me alone, give me a hand!", said))
-check("…the crew's toast, the marker \"🙋 Danny needs you\", its prompt \"Lift with Danny\", the strip", told(sol, "Danny is at the Marble slab: lift it with him.", noticeAt)
+check("…the crew's toast, the marker \"🙋 Danny needs you\", its prompt \"Lift with Danny\", the strip", told(sol, "Danny is at the Marble slab: lift it together.", noticeAt)
 	and markOf(slab) == "🙋 Danny needs you" and slab:GetAttribute("DannyNeeds") == true and promptIn(slab, "Lift with Danny") ~= nil
 	and sol:GetAttribute("MoveHelperDoing") == "Waiting for you at the Marble slab", sol:GetAttribute("MoveHelperDoing"))
 noticeAt = #E.messages
@@ -1565,7 +1532,6 @@ do
 	Moving.admin(sol, "start")
 	Moving.step()
 	danny = MoveHelper.find(sol)
-	E.request(sol, "helper", "hire")
 	E.place(sol, outside)
 	trigger(promptIn(workspace:FindFirstChild("Moves"):FindFirstChild("Move_marge"), "Enter house"), sol)
 	give(itemModel(1))
@@ -1651,7 +1617,6 @@ end
 Moving.admin(sol, "start")
 Moving.step()
 danny = MoveHelper.find(sol)
-E.request(sol, "helper", "hire")
 E.place(sol, outside)
 trigger(promptIn(workspace:FindFirstChild("Moves"):FindFirstChild("Move_marge"), "Enter house"), sol)
 give(itemModel(5))
@@ -1668,7 +1633,8 @@ check("his body gone: what he held fell (never 'carried' by nobody)", Rules.hold
 Moving.admin(sol, "end")
 run(0.2)
 
--- 8.3 an unhired Danny heads back when the crew grows; a crew mate's hire ends when they leave the move -------------------------
+-- 10.1 free: once with a move he stays when the crew grows and when it shrinks again (the city's Solo: a crew that starts
+-- with two players has none; tests/moving_runtime_test.luau); nothing to end when a crew mate leaves (no hire) -----------
 
 Moving.admin(sol, "start")
 Moving.step()
@@ -1676,21 +1642,12 @@ danny = MoveHelper.find(sol)
 npc = danny.body.model
 E.crew[sol] = { bob }
 Moving.step()
-check("8.3 not hired, a crew of two: Danny heads home (Duo is off: your crew has it now)", MoveHelper.find(sol) == nil and npc.Parent == nil
-	and sol:GetAttribute("MoveHelper") == nil and string.find(E.lastNotice(sol), "your crew has it now", 1, true) ~= nil)
-H.Duo = true
-Moving.step()
-danny = MoveHelper.find(sol)
-check("Duo on: he comes for two as well, for hire", danny ~= nil and sol:GetAttribute("MoveHelper") == "offer" and bob:GetAttribute("MoveHelper") == "offer"
-	and bob:GetAttribute("MoveHelperId") == danny.id)
-E.wallet[bob] = 300
-E.request(bob, "helper", "hire")
-check("8.3 Bob (the crew mate) hires him: Bob's money, Bob's hire", danny.hirer == bob and E.wallet[bob] == 300 - danny.price and sol:GetAttribute("MoveHelper") == "hired")
-H.Duo = false
+check("10.1 a crew of two once he is with the move: he stays (Sol's, free), Bob gets his status line", MoveHelper.find(sol) == danny and npc.Parent ~= nil
+	and bob:GetAttribute("MoveHelper") == "hired" and bob:GetAttribute("MoveHelperId") == danny.id and sol:GetAttribute("MoveHelper") == "hired")
 E.crew[sol] = {}
 Moving.step()
-check("8.3 Bob leaves the move: his hire with him (whoever hired him owns it), Danny for hire again for Sol", MoveHelper.find(sol) == danny and danny.hirer == nil
-	and sol:GetAttribute("MoveHelper") == "offer" and string.find(E.lastNotice(sol), "Bob left the move", 1, true) ~= nil, E.lastNotice(sol))
+check("10.1 Bob leaves the move: Danny stays Sol's (no hire to end), Bob's strip goes", MoveHelper.find(sol) == danny and danny.hirer == sol
+	and sol:GetAttribute("MoveHelper") == "hired" and bob:GetAttribute("MoveHelper") == nil and #E.spent == 0)
 E.leave(sol)
 run(0.2)
 check("the owner leaves: the move and Danny are gone", MoveHelper.find(sol) == nil and E.destroyed == E.built)

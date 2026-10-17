@@ -29,7 +29,7 @@
 -- strip, client/CarryGripUi.luau's grip check, client/MovingHud.luau's next step, client/SandboxGuide.luau's line).
 -- The gamepad's map: X the prompts (Use, Pick up, Load, Display; out of a seat), Y held for Sell and the van's Take out,
 -- R2 the grip, B Put down and closing (held: the guide on and off, as a held G), L1 "Talk to Danny" (reserved for
--- him; 8.3 Danny for hire: R1 his "Give to Danny" at a piece), R2 / L2 and the left stick Roblox's driving. A word names
+-- him; 8.3 Danny: R1 his "Give to Danny" at a piece), R2 / L2 and the left stick Roblox's driving. A word names
 -- a gamepad button as Roblox does ("X", "R2").
 -- 8.5 Danny's clipboard (orders mode: client/DannyOrders.luau, server/Clipboard.luau): "clipboard" takes it out, on a
 -- computer Config.MoveHelper.Clipboard.Key (Q: free in the sandbox, where E, F, C, J, K, B, G, P, O, T, Z, H and Tab are
@@ -73,7 +73,7 @@ SandboxPad.Actions = {
 	takeout = { key = "Z", pad = { "ButtonY" }, hold = true }, -- the van's Take out
 	grip = { key = "LMB / F", pad = { "ButtonR2" }, tap = "GRIP" }, -- the grip check's one press (a phone: its GRIP button)
 	danny = { key = "E", pad = { "ButtonL1" } }, -- "Talk to Danny" (L1 his)
-	dannygive = { key = `{Config.MoveHelper.Clipboard.GiveKey} / LMB`, pad = { "ButtonR1" } }, -- 8.3 Danny for hire: a piece onto his list or off it (a click, a tap, R1 at it; 9.0 E by it)
+	dannygive = { key = `{Config.MoveHelper.Clipboard.GiveKey} / LMB`, pad = { "ButtonR1" } }, -- 8.3 Danny: a piece onto his list or off it (a click, a tap, R1 at it; 9.0 E by it)
 	clipboard = { key = Config.MoveHelper.Clipboard.Key, pad = { "ButtonR1" }, tap = "📋" }, -- 8.5 Danny's clipboard out (orders mode)
 	stow = { key = Config.MoveHelper.Clipboard.Key, pad = { "ButtonB" }, tap = "📋" }, -- 8.5 … and put away again
 	drive = { key = "W/S", pad = { "ButtonR2", "ButtonL2" } }, -- Roblox's driving: R2 on, L2 back

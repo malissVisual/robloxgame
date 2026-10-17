@@ -523,6 +523,47 @@ check("a piece gone: its Highlight back in the pool", #lit() == before - 1)
 M.touch = true
 pick()
 check("a phone: DeviceBudget's share", #lit() == math.max(1, math.floor(O.Count * Lite.Count + 0.5)))
+-- 10.1 Lucy the finder in your run (your player attribute CrewSense: her Sense studs, server/HelperCrew.luau): the Epic
+-- and Legendary pieces within it of you outlined first, past the range too, through the walls (AlwaysOnTop)
+M.touch = false
+local SENSE = Config.Crew.Kinds.lucy.Sense
+local far = piece(90, "arcade_cabinet", "epic", 2800, 0, 140) -- (past Outline.Range, within her Sense)
+local farRare = piece(91, "piano", "rare", 1200, 2, 140)
+local farAway = piece(92, "oil_painting", "legendary", 6000, 0, SENSE + 60) -- (past her Sense too)
+stream(far)
+stream(farRare)
+stream(farAway)
+pick()
+local function outlineOf(model)
+	for _, h in lit() do
+		if h.Adornee == model then
+			return h
+		end
+	end
+	return nil
+end
+local function depthsRight(sensing)
+	for _, h in lit() do
+		local model = h.Adornee
+		local through = sensing and LootRules.rank(model:GetAttribute("Rarity")) >= LootRules.rank("epic")
+			and (model.PrimaryPart.Position - M.root.Position).Magnitude <= SENSE
+		if h.DepthMode ~= (if through then M.Enum.HighlightDepthMode.AlwaysOnTop else M.Enum.HighlightDepthMode.Occluded) then
+			return false
+		end
+	end
+	return true
+end
+check(`10.1 without Lucy: an Epic piece {O.Range}+ studs away wears none, every outline Occluded`, outlineOf(far) == nil and depthsRight(false))
+M.player:SetAttribute("CrewSense", SENSE)
+pick()
+local sensed = outlineOf(far)
+check(`10.1 Lucy in your run (CrewSense {SENSE}): that Epic piece outlined through the walls (AlwaysOnTop), past the range`,
+	sensed ~= nil and sensed.DepthMode == M.Enum.HighlightDepthMode.AlwaysOnTop)
+check("… a Rare one as far none, a Legendary past her sense none; only the Epic and Legendary within it through walls",
+	outlineOf(farRare) == nil and outlineOf(farAway) == nil and depthsRight(true))
+M.player:SetAttribute("CrewSense", nil)
+pick()
+check("… she is gone (out, or the run over): as before, nothing through walls", outlineOf(far) == nil and depthsRight(false))
 LootOutline.setOn(false)
 check("off (this client): every loot outline off at once", #lit() == 0)
 

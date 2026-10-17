@@ -29,10 +29,10 @@
 --   covered       something covers the screen (client/SandboxHintsUi.luau isCovered: a grip check, the move's cards,
 --                 a sandbox window, Danny's card, the start screen)
 --   hush          something else talks now (a first-time hint waits or just showed; a soft step just ended)
---   8.4, Danny for hire (server/MoveHelper.luau; nil or false: not known, nothing said):
---   helper        Danny on your move: "offer" (for hire) | "hired" (the player attribute MoveHelper; nil: none)
---   helperPrice   his price while he is for hire (MoveHelperPrice)
---   helperQueue   the pieces on his list while he is hired (MoveHelperQueue)
+--   8.4, Danny (server/MoveHelper.luau; nil or false: not known, nothing said):
+--   helper        a helper on your move: "hired" (the player attribute MoveHelper: 10.1 always so, free; nil: none)
+--   helperName    10.1 his name (MoveHelperName: the crew's helper's; nil: Danny's)
+--   helperQueue   the pieces on his list (MoveHelperQueue)
 --   waiting       you wait for him at a two-person piece (MoveHelperCall: you pressed its Lift)
 --   heavy         the two-person pieces still to carry out (the Moving state's items: class "pair", home or set down)
 --   heavyNear     one of them within Config.SandboxGuide.HeavyNear studs of you, its Lift shown (the client's look)
@@ -111,8 +111,8 @@
 --   SandboxSteps.growPrice(state) -> number?           the next warehouse level's price when `grow` fits (nil: not now)
 --   SandboxSteps.upgradeFor(state) -> (id?, price?)    the upgrade `upgrade` names (nil: none in reach)
 --
--- 8.4, Danny for hire (server/MoveHelper.luau, client/MoveHelperCard.luau; the owner: "I have to PAY for him when I want
--- help … click on something, and that assigns it to him"): three steps of the move, each said once as a soft step is
+-- 8.4, Danny (server/MoveHelper.luau, client/MoveHelperCard.luau; the owner: "… click on something, and that assigns it
+-- to him"): two steps of the move (10.1: the third, "Hire Danny", is gone with the hire), each said once as a soft step is
 -- (SoftSeconds at most, its ✕ dismisses it, SoftGap after the one before; never while something covers the screen, his
 -- card too, or something else talks). In a move the first that fits and is not done comes before the move's own step
 -- (SandboxSteps.decide with `done`; he only comes with a move: nothing before LAUNCH). None while you sit in a vehicle,
@@ -123,11 +123,9 @@
 --          8.5 (orders mode, shared/ClipboardRules.luau): "Take out your clipboard (Q) and pick a piece for Danny"
 --          (the device's way: "(R1)", "(tap 📋)"); with your clipboard out (`clipboard`) "Pick a piece to give it to
 --          Danny" (a gamepad's "(R1)": it points at nothing)                      (the hint only)
---   hire   for hire, his price in your money (money ≥ helperPrice)
---          "Hire Danny to carry with you" (a gamepad's "(L1)")                    Danny (his body)
--- Done by what the player did (doneBy): hire once he is hired or his card opened while he is for hire (the offer seen);
--- give once his list went up while you play or his card opened while he is hired (it says how); lift once you waited
--- for him at a piece (your Lift called him).
+-- (10.1: the words name the crew's helper, helperName, Danny's without one: SandboxSteps.words.)
+-- Done by what the player did (doneBy): give once his list went up while you play or his card opened (it says how);
+-- lift once you waited for him at a piece (your Lift called him).
 --   SandboxSteps.danny(state, done) -> Step?           Danny's step now (nil: none)
 --   SandboxSteps.onDevice(step, words?, device) -> string   the words for "keys" | "pad" | "touch": a prompt's E a
 --                                                      phone's "tap", a gamepad's X; a Danny step's gamepad button
@@ -170,9 +168,9 @@ export type State = {
 	window: string?,
 	covered: boolean?,
 	hush: boolean?,
-	-- 8.4, Danny for hire (all optional: a state without them has no Danny step)
+	-- 8.4, Danny (all optional: a state without them has no Danny step)
 	helper: string?,
-	helperPrice: number?,
+	helperName: string?, -- 10.1 his name (the crew's helper's)
 	helperQueue: number?,
 	waiting: boolean?,
 	heavy: number?,
@@ -241,11 +239,11 @@ SandboxSteps.Steps = {
 	hot = step("hot", "🔥 Your piece is hot today: sell it or show it", "hot", false, false, true),
 	upgrade = step("upgrade", "New upgrade in reach at the UPGRADES desk", "desk", false, false, true),
 	paint = step("paint", "🎨 Make your truck your own at the PAINT SHOP", "paint", false, false, true),
-	-- 8.4, Danny for hire (soft: said once; their words the same on every device, a gamepad's button added: onDevice)
+	-- 8.4, Danny (soft: said once; their words the same on every device, a gamepad's button added: onDevice; 10.1 no
+	-- "hire" step: he is free)
 	lift = step("lift", `Heavy piece: press Lift and wait for {DANNY}`, nil, false, false, true),
 	-- (8.5 orders mode: its words say the clipboard's key, SandboxSteps.words without it out)
 	give = step("give", `Take out your clipboard ({Config.MoveHelper.Clipboard.Key}) and pick a piece for {DANNY}`, nil, false, false, true, "clipboard"),
-	hire = step("hire", `Hire {DANNY} to carry with you`, "danny", false, false, true, "danny"),
 	-- 8.9, trading between players (8.7): the last soft step (its words the same on every device: the stand's Set price
 	-- prompt shows its own key)
 	sell = step("sell", "🏷 Sell to players: set a price on a piece on show", "sale", false, false, true),
@@ -255,15 +253,16 @@ SandboxSteps.Steps = {
 -- move or its planning, as every soft step).
 SandboxSteps.Soft = { "grow", "hot", "upgrade", "paint", "sell" } :: { string }
 
--- 8.4: Danny's steps in their order (the first that fits and is not done shows, before the move's own step).
-SandboxSteps.Danny = { "lift", "give", "hire" } :: { string }
+-- 8.4: Danny's steps in their order (the first that fits and is not done shows, before the move's own step; 10.1 no
+-- "hire" any more).
+SandboxSteps.Danny = { "lift", "give" } :: { string }
 
 local S = SandboxSteps.Steps
 local G = Config.SandboxGuide
 
 function SandboxSteps.decide(s: State, done: { [string]: boolean }?): Step
 	if s.move then
-		-- 8.4 Danny for hire (see the header): his step that fits and is not done comes first
+		-- 8.4 Danny (see the header): his step that fits and is not done comes first
 		local danny = if done then SandboxSteps.danny(s, done) else nil
 		if danny then
 			return danny
@@ -387,13 +386,10 @@ function SandboxSteps.doneBy(s: State, done: { [string]: boolean }, last: Last)
 	if day ~= nil then
 		last.day = day
 	end
-	-- 8.4 Danny for hire: hired, or his card opened (it shows his offer, then how to give him pieces); a piece given him
-	-- while you play (his list went up); your Lift called him to a heavy piece (you wait for him)
+	-- 8.4 Danny: his card opened (it says how to give him pieces), or a piece given him while you play (his list went
+	-- up); your Lift called him to a heavy piece (you wait for him). (10.1: no hire step any more.)
 	local helper, queue = s.helper, s.helperQueue
 	if s.move and helper ~= nil then
-		if helper == "hired" or window == "MoveHelperCard" then
-			done.hire = true
-		end
 		if helper == "hired" and (window == "MoveHelperCard" or (queue ~= nil and rose(last.queue, queue))) then
 			done.give = true
 		end
@@ -439,15 +435,12 @@ function SandboxSteps.onDevice(s: Step, words: string?, device: string): string
 	return if s.pad and not named then SandboxPad.withKey(said, s.pad, device) else said
 end
 
--- ── 8.4, Danny for hire ────────────────────────────────────────────────────
+-- ── 8.4, Danny ─────────────────────────────────────────────────────────────
 
 -- Does Danny's step fit (never while you sit, carry or wait for him; each only with what it needs known)?
 local function dannyFits(id: string, s: State): boolean
 	if s.seated or s.carrying or s.waiting == true then
 		return false
-	elseif id == "hire" then
-		local price, money = s.helperPrice, s.money
-		return s.helper == "offer" and price ~= nil and money ~= nil and money >= price
 	elseif id == "give" then
 		return s.helper == "hired" and s.helperQueue == 0 and s.inside
 	elseif id == "lift" then
@@ -561,8 +554,11 @@ function SandboxSteps.detail(step: Step, s: State): (string?, number?)
 		return SandboxSteps.upgradeFor(s)
 	elseif step.id == "hot" then
 		return s.hot, nil
-	elseif step.id == "give" and s.clipboard == true then
-		return "clipboard", nil -- (8.5: its words change once the clipboard is out)
+	elseif step.id == "give" or step.id == "lift" then
+		-- (8.5: its words change once the clipboard is out; 10.1 and with the crew's helper's name)
+		local clip = if step.id == "give" and s.clipboard == true then "clipboard" else nil
+		local name = if s.helperName and s.helperName ~= DANNY then s.helperName else nil
+		return if clip and name then `{clip}:{name}` else clip or name, nil
 	end
 	return nil, nil
 end
@@ -588,7 +584,9 @@ function SandboxSteps.words(step: Step, s: State): string
 	elseif step.id == "hot" and s.hot then
 		return `🔥 Your {s.hot} is hot today: sell it or show it`
 	elseif step.id == "give" and s.clipboard == true then
-		return `Pick a piece to give it to {DANNY}` -- (8.5: the clipboard out, orders mode)
+		return `Pick a piece to give it to {s.helperName or DANNY}` -- (8.5: the clipboard out, orders mode; 10.1 his name)
+	elseif (step.id == "give" or step.id == "lift") and s.helperName and s.helperName ~= DANNY then
+		return (string.gsub(step.hint, DANNY, s.helperName)) -- (10.1 the crew's helper's name)
 	end
 	return step.hint
 end
