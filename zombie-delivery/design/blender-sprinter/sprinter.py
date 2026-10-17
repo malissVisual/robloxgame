@@ -18,14 +18,15 @@ from mathutils import Vector, Matrix
 from mathutils.bvhtree import BVHTree
 
 # ───────────────────────────────────────────────────────────── NASTAVENÍ (změň a spusť znovu)
-PAINT = "#D9CCB0"      # lak karoserie (béžová ZDC, jako ZDC Van)
+PAINT = "#D9CCB0"      # lak karoserie (béžová Deliveros, jako ZDC Van)
 STRIPE = "#B3261E"     # pruhy a logo
 TRIM = "#202326"       # černé plasty: nárazníky, lemy blatníků, lišty, kliky, zrcátka
 RIM = "#B9BDC1"        # disky kol
 GLASS = "#16212A"      # okna
 PLYWOOD = "#B8996C"    # překližka na stěnách nákladového prostoru
-LOGO, NAME, SLOGAN = "ZDC", "ZOMBIE DELIVERY CO.", "WE DELIVER. THEY DON'T."
-PLATE = "ZDC 08"       # SPZ
+LOGO, NAME, SLOGAN = "DELIVEROS", "MOVING & STORAGE", "MOVE · FIND · GROW"   # (8.9: the game is Deliveros, not ZDC)
+BADGE = "D"            # písmeno ve znaku na masce
+PLATE = "DLV 08"       # SPZ
 EXPORT = False         # True = po postavení uloží FBX pro Roblox do složky "roblox" vedle uloženého .blend souboru
 
 # ───────────────────────────────────────────────────────────── míry ze hry (NEMĚŇ: hra má stejná čísla)
@@ -289,8 +290,9 @@ def rounded(x0, z0, x1, z1, r, seg=4):
     return pts
 
 
-def text(name, body, size, matrix, mat, col, lift=0.006):
-    """Nápis převedený na plochou síť (nízké rozlišení, ať má model v Robloxu málo trojúhelníků)."""
+def text(name, body, size, matrix, mat, col, lift=0.006, fit=None):
+    """Nápis převedený na plochou síť (nízké rozlišení, ať má model v Robloxu málo trojúhelníků). fit: nejvýš tak
+    široký (studů); delší nápis se celý zmenší."""
     cu = bpy.data.curves.new(name, "FONT")
     cu.body, cu.size, cu.align_x, cu.align_y = body, size, "CENTER", "CENTER"
     cu.resolution_u, cu.offset = 2, size * 0.025
@@ -300,6 +302,9 @@ def text(name, body, size, matrix, mat, col, lift=0.006):
     me = bpy.data.meshes.new_from_object(tmp.evaluated_get(dg))
     bpy.data.objects.remove(tmp)
     bpy.data.curves.remove(cu)
+    xs = [v.co.x for v in me.vertices]
+    if fit and xs and max(xs) - min(xs) > fit:
+        me.transform(Matrix.Scale(fit / (max(xs) - min(xs)), 4))
     me.materials.clear()
     me.materials.append(mat)
     o = bpy.data.objects.new(name, me)
@@ -690,10 +695,9 @@ def back_doors():
                                M["stripe"], col))
         back = lambda x, z: frame((x, FACE, z), (-1, 0, 0), (0, 1, 0))
         if s == LEFT:
-            parts.append(text("Logo", LOGO, 1.45, back(1.8, 5.95), M["stripe"], col, lift=0.008))
+            parts.append(text("Logo", LOGO, 1.45, back(1.8, 5.95), M["stripe"], col, lift=0.008, fit=2.9))
         else:
-            parts.append(text("Slogan", "WE DELIVER.", 0.42, back(-1.8, 6.25), M["trim"], col, lift=0.008))
-            parts.append(text("Slogan", "THEY DON'T.", 0.42, back(-1.8, 5.7), M["trim"], col, lift=0.008))
+            parts.append(text("Slogan", SLOGAN, 0.42, back(-1.8, 5.95), M["trim"], col, lift=0.008, fit=2.9))
         for part in parts:
             attach(part, leaf)
         doors[name] = leaf
@@ -708,7 +712,7 @@ def details(col, groups):
         box("Grille bar", (3.6, 0.06, 0.08), (0, SHELL_FRONT - 0.02, z), M["chrome"], col, 0.02)
     disc("Badge ring", (0, SHELL_FRONT - 0.07, 3.0), (0, 1, 0), 0.3, 0.06, M["chrome"], col)
     disc("Badge", (0, SHELL_FRONT - 0.09, 3.0), (0, 1, 0), 0.24, 0.06, M["stripe"], col)
-    text("Badge text", "ZDC", 0.2, frame((0, SHELL_FRONT - 0.125, 3.0), (1, 0, 0), (0, -1, 0)), M["plate"], col, lift=0.0)
+    text("Badge text", BADGE, 0.3, frame((0, SHELL_FRONT - 0.125, 3.0), (1, 0, 0), (0, -1, 0)), M["plate"], col, lift=0.0)
     front = lambda q: Vector((q[0], 0, q[1]))
     for s in (LEFT, RIGHT):
         sx = lambda pts, s=s: [(s * x, z) for x, z in pts] if s > 0 else [(s * x, z) for x, z in reversed(pts)]
@@ -755,9 +759,9 @@ def details(col, groups):
         for z0, z1 in ((4.35, 4.75), (4.88, 4.98)):
             side_bands(s, z0, z1, M["stripe"], "Stripe", -9.3, 10.8, groups)
         yc = 4.0 if s == LEFT else (SLIDE_BACK + R) / 2 + 0.1
-        text("Logo", LOGO, 2.2, side_frame(s, yc, 7.95), M["stripe"], col)
-        text("Name", NAME, 0.62, side_frame(s, yc, 6.4), M["trim"], col)
-        text("Slogan", SLOGAN, 0.42, side_frame(s, yc, 5.8), M["trim"], col)
+        text("Logo", LOGO, 2.2, side_frame(s, yc, 7.6), M["stripe"], col, fit=6.4)
+        text("Name", NAME, 0.62, side_frame(s, yc, 6.4), M["trim"], col, fit=6.4)
+        text("Slogan", SLOGAN, 0.42, side_frame(s, yc, 5.8), M["trim"], col, fit=6.4)
     span_box("Sliding door sill", (RIGHT * HOLLOW, SLIDE_FRONT, SLIDE_BOTTOM - GAP), (RIGHT * (SIDE - 0.02), SLIDE_BACK, SLIDE_BOTTOM),
              M["rail"], col)   # hliníkový práh pod posuvnými dveřmi (schod do nákladového prostoru)
     prism("Slide rail cover", [(SLIDE_BACK + 0.12, 5.12), (9.4, 5.12), (9.4, 5.3), (SLIDE_BACK + 0.12, 5.3)],
@@ -1054,7 +1058,7 @@ def sheet(folder, out):
         return ImageFont.load_default()
 
     draw.rectangle((40, 34, 46, 84), fill=(179, 38, 30))
-    draw.text((62, 30), "ZDC SPRINTER / BLENDER", font=font(38), fill=(236, 236, 236))
+    draw.text((62, 30), "DELIVEROS SPRINTER / BLENDER", font=font(38), fill=(236, 236, 236))
     draw.text((64, 80), f"design/blender-sprinter/sprinter.py · {WIDTH} × {HEIGHT} × {LENGTH} studs · bay {BAY_WIDTH} × {BAY_HEIGHT} × "
                         f"{BAY_LENGTH} · roblox/ZDCSprinterArt.fbx", font=font(21), fill=(150, 156, 164))
     for name, xy in (("front", (40, 110)), ("rear", (40, 1210)), ("side", (912, 1210))):

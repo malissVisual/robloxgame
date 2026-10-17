@@ -242,7 +242,7 @@ end
 -- ── The phone ───────────────────────────────────────────────────────────────
 cardChecks("844 x 390")
 local warehouse, stands, lights, engine, danny = table.unpack(cards())
-check("the cards in Config's order: ZDC Warehouse (8.3), More stands, Showroom lights, Van engine, Danny's training", named(warehouse, "UpgradeName").Text == "ZDC Warehouse"
+check("the cards in Config's order: Deliveros Warehouse (8.3), More stands, Showroom lights, Van engine, Danny's training", named(warehouse, "UpgradeName").Text == "Deliveros Warehouse"
 	and named(warehouse, "Emoji").Text == "🏭" and named(stands, "UpgradeName").Text == "More stands" and named(lights, "UpgradeName").Text == "Showroom lights"
 	and named(engine, "UpgradeName").Text == "Van engine" and named(danny, "UpgradeName").Text == "Danny's training")
 local function litOf(card, color)
@@ -256,7 +256,7 @@ end
 local money = require("./CardKit").Color.money
 local P = Config.SandboxUpgrades.List -- (the prices: Config's, 8.3 economy)
 local cash = UpgradeRules.money
-check("8.3: the ZDC Warehouse at its level 4 (upgrade 3): LV 4/5, five segments, four lit", named(warehouse, "Level").Text == "LV 4/5" and named(warehouse, "Level5") ~= nil
+check("8.3: the Deliveros Warehouse at its level 4 (upgrade 3): LV 4/5, five segments, four lit", named(warehouse, "Level").Text == "LV 4/5" and named(warehouse, "Level5") ~= nil
 	and named(warehouse, "Level6") == nil and litOf(warehouse, money) == 4, named(warehouse, "Level").Text)
 check(`… "Big Warehouse · 12 stands" now, "Logistics Center · 24 stands" next, {cash(P.warehouse.prices[4])}, NEED {cash(P.warehouse.prices[4] - 2000)}`, named(warehouse, "Now").Text == "Big Warehouse · 12 stands"
 	and named(warehouse, "Next").Text == "Next: Logistics Center · 24 stands" and named(warehouse, "Price").Text == cash(P.warehouse.prices[4])
@@ -344,7 +344,7 @@ press(named(warehouse, "Buy"))
 sent = sentOn("Upgrades")
 check("the warehouse's BUY sends { kind = \"buy\", id = \"warehouse\", level = 1 } (its upgrade level)", #sent == before + 1 and sent[#sent][1].kind == "buy" and sent[#sent][1].id == "warehouse" and sent[#sent][1].level == 1)
 remote.OnClientEvent:Fire({ kind = "bought", id = "warehouse", level = 1 })
-check("\"bought\": \"ZDC Warehouse: level 2 · Workshop · 4 stands\" (its own level, the effect with the levels)", M.toasts[#M.toasts] == "ZDC Warehouse: level 2 · Workshop · 4 stands", M.toasts[#M.toasts])
+check("\"bought\": \"Deliveros Warehouse: level 2 · Workshop · 4 stands\" (its own level, the effect with the levels)", M.toasts[#M.toasts] == "Deliveros Warehouse: level 2 · Workshop · 4 stands", M.toasts[#M.toasts])
 remote.OnClientEvent:Fire({ kind = "state", levels = { warehouse = 3 }, money = 2000 })
 M.flush()
 stands = cards()[2]

@@ -75,7 +75,7 @@ local Shops = {}
 
 local notice = Net.get("Notice")
 local openShop = Net.get("OpenShop")
-local NO_CAR = "Your ZDC Van is not ready yet: try again in a moment." -- (7.x: every courier has it; a save still loading)
+local NO_CAR = "Your Deliveros Van is not ready yet: try again in a moment." -- (7.x: every courier has it; a save still loading)
 local ON_BIKE = "That's your bike: bikes take bike gear at Dead End Motors' BIKES counter, no car upgrades, paint or car guns. CALL CAR on your phone for your car."
 
 -- 5.1: the cars of your own (not a company vehicle, not a bike) and the bikes you own, in Config.Cars' order.
@@ -228,7 +228,7 @@ local function onBuy(player: Player, kind: any, id: any, amount: any)
 		end
 		if def and not Economy.isPlayerCar(def.id) then
 			-- 7.x: one car: the others left the game (Config.AmbientCars)
-			notice:FireClient(player, `The {def.name} is not sold any more: the ZDC Van is the company's only car.`)
+			notice:FireClient(player, `The {def.name} is not sold any more: the Deliveros Van is the company's only car.`)
 			return
 		end
 		if not def or def.company or profile.cars[id] or refuse(player, "dealer") or notYet(player, profile, def) or tooLow(player, def.name, if def.mission then nil else def.level) or noSlot(player) then

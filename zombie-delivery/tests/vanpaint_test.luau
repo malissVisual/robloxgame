@@ -50,10 +50,10 @@ for _, item in Rules.Liveries do
 end
 check(`8 – 12 body colours ({normal}) and one or two premium items ({premium})`, normal >= 8 and normal <= 12 and premium >= 1 and premium <= 2, `{normal} {premium}`)
 check("a few liveries (3 – 6)", #Rules.Liveries >= 3 and #Rules.Liveries <= 6)
-check("the factory's first: ZDC cream and ZDC classic, free for everybody", Rules.Default.paint == "cream" and Rules.Default.livery == "zdc" and Rules.free(Rules.find("cream") :: any)
-	and Rules.free(Rules.find("zdc") :: any) and Rules.find("cream").name == "ZDC cream" and Rules.find("zdc").name == "ZDC classic")
-check("ZDC classic is the ZDC red of the parts look (SprinterLooks.Finish.stripe)", same(Rules.look(Rules.Default).stripe, SprinterLooks.Finish.stripe.color))
-check("ZDC cream is the van's Config.Cars colour (the parts look's factory paint)", (function()
+check("the factory's first: Deliveros cream and Deliveros classic, free for everybody", Rules.Default.paint == "cream" and Rules.Default.livery == "zdc" and Rules.free(Rules.find("cream") :: any)
+	and Rules.free(Rules.find("zdc") :: any) and Rules.find("cream").name == "Deliveros cream" and Rules.find("zdc").name == "Deliveros classic")
+check("Deliveros classic is the Deliveros red of the parts look (SprinterLooks.Finish.stripe)", same(Rules.look(Rules.Default).stripe, SprinterLooks.Finish.stripe.color))
+check("Deliveros cream is the van's Config.Cars colour (the parts look's factory paint)", (function()
 	for _, def in Config.Cars do
 		if def.id == Config.Sandbox.Van then
 			return same(def.color, Rules.find("cream").color)
@@ -139,7 +139,7 @@ check("wearing a livery leaves the paint", Rules.wear(saved, "zdc") and saved.wo
 
 -- ── The look ────────────────────────────────────────────────────────────────
 local factory = Rules.look(Rules.Default)
-check("the factory's look: cream, SmoothPlastic, the ZDC red band, no roof stripes", factory.factoryPaint and factory.factoryLivery and same(factory.body, { 232, 226, 210 })
+check("the factory's look: cream, SmoothPlastic, the Deliveros red band, no roof stripes", factory.factoryPaint and factory.factoryLivery and same(factory.body, { 232, 226, 210 })
 	and factory.bodyMaterial == "SmoothPlastic" and factory.bodyReflectance == 0 and #factory.roof == 0)
 local red = Rules.look({ paint = "red", livery = "racing" })
 check("Fire red with racing stripes: a light contrast on the dark red, two roof stripes in it", same(red.body, { 176, 32, 32 }) and same(red.stripe, P.Contrast.Light) and #red.roof == 2
@@ -184,7 +184,7 @@ check("a roof's pieces: no roof id, no pieces", #Rules.roof(nil, { 1, 1, 1 }) ==
 
 -- the labels whose letters take the stripe's colour: the ZDC logo on both sides and the back door, not the name
 local inked = Rules.inked()
-check("the parts look's stripe-inked labels: the ZDC logos (Logo, LeafLogo), not the company's name or the plates", inked.Logo == true and inked.LeafLogo == true and inked.CompanyName == nil and inked.FrontPlate == nil)
+check("the parts look's stripe-inked labels: the Deliveros logos (Logo, LeafLogo), not the company's name or the plates", inked.Logo == true and inked.LeafLogo == true and inked.CompanyName == nil and inked.FrontPlate == nil)
 
 -- ── The window's swatches ───────────────────────────────────────────────────
 local mine = Rules.empty()

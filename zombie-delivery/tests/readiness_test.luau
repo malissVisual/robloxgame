@@ -97,11 +97,11 @@ local VAN = Config.CompanyVan.Car
 local fresh = Readiness.evaluate({ xp = 0, money = 40, cars = { [VAN] = true }, car = VAN, tutorial = "board", phone = true })
 check("a new courier: the mission is Paper Trail, First Shift 1/6", fresh.mission ~= nil and fresh.mission.name == "Paper Trail" and fresh.mission.number == 1 and fresh.mission.total == 6
 	and Readiness.chapterLine(fresh.mission) == "First Shift · 1/6", fresh.mission and Readiness.chapterLine(fresh.mission))
-check("its rows: the level to reach, the van and its room done (7.x: everybody's ZDC Van), the kits recommended", ids(fresh) == "level-,vehicle+,cargo+,medkit-,repair-", ids(fresh))
+check("its rows: the level to reach, the van and its room done (7.x: everybody's Deliveros Van), the kits recommended", ids(fresh) == "level-,vehicle+,cargo+,medkit-,repair-", ids(fresh))
 local levelRow = find(fresh, "level") :: Readiness.Check
 check("the level row: Reach level 4, the XP have / need, JOBS", levelRow.text == "Reach level 4" and levelRow.required and levelRow.have == 0 and levelRow.need == Levels.xpFor(4) and levelRow.action == "jobs")
 local van = find(fresh, "vehicle") :: Readiness.Check
-check("the van row: your ZDC Van, done, nothing to buy", van.done and van.cost == nil and van.place == nil and string.find(van.detail or "", "ZDC Van", 1, true) ~= nil, Readiness.line(van))
+check("the van row: your Deliveros Van, done, nothing to buy", van.done and van.cost == nil and van.place == nil and string.find(van.detail or "", "Deliveros Van", 1, true) ~= nil, Readiness.line(van))
 check("not ready: 2 of 3", not fresh.ready and fresh.done == 2 and fresh.required == 3 and Readiness.status(fresh) == "2 of 3 ready", Readiness.status(fresh))
 check("7.x: no car to save up for: the kits are no savings goal, nothing else costs", fresh.goal == nil, fresh.goal and fresh.goal.name)
 check("Marge's first day: quiet (no HUD line, no toast)", fresh.quiet)
@@ -110,7 +110,7 @@ check("the marks: ✖ required, ☆ recommended, ✔ done", Readiness.mark(level
 -- (a state still loading has no car yet: the row asks for the van, CAR brings it, never a buy)
 local loading = Readiness.evaluate({ xp = Levels.xpFor(5), money = 0, cars = {} })
 local noCar = find(loading, "vehicle") :: Readiness.Check
-check("7.x: no car in the state yet: Your ZDC Van, CAR brings it (GARAGE), nothing to buy, no goal", noCar.text == "Your ZDC Van" and noCar.action == "garage" and noCar.cost == nil and not noCar.done and loading.goal == nil, Readiness.line(noCar))
+check("7.x: no car in the state yet: Your Deliveros Van, CAR brings it (GARAGE), nothing to buy, no goal", noCar.text == "Your Deliveros Van" and noCar.action == "garage" and noCar.cost == nil and not noCar.done and loading.goal == nil, Readiness.line(noCar))
 
 -- ── The words (6.14), on a savings goal: the Shotgun after First Shift (6.19: its finale unlocks it) ─────
 
@@ -145,7 +145,7 @@ check("… short of the money too: the money as before", short.locked and not sh
 local ready = Readiness.evaluate({ xp = Levels.xpFor(4), money = 300, cars = { [VAN] = true }, car = VAN, items = { medkit = 2 }, progress = {} })
 check("the van at level 4: Paper Trail is READY (the level, the van, room for 2)", ready.ready and ready.done == 3 and ready.required == 3 and Readiness.status(ready) == "READY · START", ids(ready))
 check("… the repair kit recommended once you drive, the medkit done", ids(ready) == "level+,vehicle+,cargo+,repair-,medkit+", ids(ready))
-check("… room for 2: your ZDC Van holds 4", (find(ready, "cargo") :: Readiness.Check).text == "Room for 2 pieces" and (find(ready, "cargo") :: Readiness.Check).detail == "Your ZDC Van holds 4")
+check("… room for 2: your Deliveros Van holds 4", (find(ready, "cargo") :: Readiness.Check).text == "Room for 2 pieces" and (find(ready, "cargo") :: Readiness.Check).detail == "Your Deliveros Van holds 4")
 check("… a repair kit is no savings goal (Config.Readiness.NotGoals): nothing to save up for", ready.goal == nil)
 check("the READY toast's words", Readiness.readyToast(ready.mission :: Readiness.MissionInfo) == "Ready for Paper Trail · open MISSIONS (U)" and Readiness.readyToast(ready.mission :: Readiness.MissionInfo, true) == "Ready for Paper Trail · open MISSIONS")
 
@@ -165,8 +165,8 @@ for _, mission in Missions.List do
 		table.insert(tooBig, mission.id)
 	end
 end
-check("7.x: no mission needs more room than the ZDC Van (no stage, no other car to buy)", #tooBig == 0, table.concat(tooBig, ", "))
-check("… keptAt: the ZDC Van at the depot lot (the starting van)", (Readiness.keptAt({ garages = { "garage_rented" }, cars = { [VAN] = true } }, VAN)) == "depot")
+check("7.x: no mission needs more room than the Deliveros Van (no stage, no other car to buy)", #tooBig == 0, table.concat(tooBig, ", "))
+check("… keptAt: the Deliveros Van at the depot lot (the starting van)", (Readiness.keptAt({ garages = { "garage_rented" }, cars = { [VAN] = true } }, VAN)) == "depot")
 local mess = Missions.find("army_2") :: Missions.MissionDef
 check("Mess Hall: four pots of stew, a full van (7.x: six before)", mess ~= nil and Economy.cargoNeed(mess.load, mess.items) == 4 and mess.vehicle == nil)
 -- A mission whose people board (Code Blue's patient): no room row; 7.x: nothing lent, your van is asked for.
@@ -282,7 +282,7 @@ for _, mission in Missions.List do
 		table.insert(stuck, mission.id)
 	end
 end
-check("every story mission: ready with level 15 and the ZDC Van (7.x: the one car)", #stuck == 0, table.concat(stuck, ", "))
+check("every story mission: ready with level 15 and the Deliveros Van (7.x: the one car)", #stuck == 0, table.concat(stuck, ", "))
 
 if failures == 0 then
 	print("ALL CHECKS PASSED")

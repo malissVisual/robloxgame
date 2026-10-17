@@ -309,7 +309,7 @@ safely("FurnitureMesh", require(Server.FurnitureMesh).start)
 safely("FixtureMesh", require(Server.FixtureMesh).start) -- 8.9.1: the houses' fixtures in the owner's Blender model
 safely("HouseMesh", require(Server.HouseMesh).start) -- 7.2: Marge's house in the owner's Blender model (World dresses it)
 safely("Moving", require(Server.Moving).start)
-print(`[Server] Zombie Delivery {Config.Version} is running`) -- (5.8.1: the version, to check that Studio has every file of it)
+print(`[Server] Deliveros {Config.Version} is running`) -- (5.8.1: the version, to check that Studio has every file of it)
 -- 5.7: the city is big (thousands of parts): without streaming every client loads all of it at once.
 if not workspace.StreamingEnabled then
 	warn("[Server] workspace.StreamingEnabled is off: turn it on in the place (Workspace → StreamingEnabled) or big parts of the city load on every client at once")

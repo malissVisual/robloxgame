@@ -443,13 +443,13 @@ local function zdcbag()
 	end
 	-- The logo (front: n = 1 at -Z, read from there; back: n = 2): the patch, the red square, ZDC beside it.
 	local redLit, white, whiteLit = { 255, 70, 60 }, { 248, 246, 240 }, { 255, 255, 255 }
-	local letters = textWidth("ZDC") * 0.24
+	local letters = textWidth("DELIVEROS") * 0.24
 	local start = -(1.25 + 0.25 + letters) / 2
 	for n, side in { -1, 1 } do
 		local face = child(bag, { 0, 2.85, side * 2 }, if side < 0 then { 0, 180, 0 } else nil)
 		put(face, `LogoPatch{n}`, { 4.6, 1.9, 0.08 }, { 0, 0, 0.04 }, black, "SmoothPlastic")
 		glow(put(face, `LogoSquare{n}`, { 1.25, 1.25, 0.06 }, { start + 0.625, 0, 0.11 }, ZDC_RED, "SmoothPlastic"), redLit)
-		text(child(face, { start + 1.5 + letters / 2, 0, 0.08 }), `Logo{n}_`, "ZDC", 0.24, 0.1, white, "SmoothPlastic", whiteLit)
+		text(child(face, { start + 1.5 + letters / 2, 0, 0.08 }), `Logo{n}_`, "DELIVEROS", 0.24, 0.1, white, "SmoothPlastic", whiteLit)
 	end
 	-- The straps and the grip.
 	for n, side in { -1, 1 } do
@@ -637,7 +637,7 @@ local function depot()
 		-- (front: n = 1 at -Z, its letters read from +X; back: n = 2)
 		local face = child(box, { -side * 3.6, 8.6, side * 6.56 })
 		glow(put(face, `Logo{n}`, { 7, 7, 0.12 }, { 0, 0, 0 }, ZDC_RED, "SmoothPlastic"), redLit)
-		text(child(face, { 0, 0, side * 0.06 }, if side < 0 then { 0, 180, 0 } else nil), `ZDC{n}_`, "ZDC", 0.5, 0.24, white, "SmoothPlastic", { 255, 255, 255 })
+		text(child(face, { 0, 0, side * 0.06 }, if side < 0 then { 0, 180, 0 } else nil), `ZDC{n}_`, "DELIVEROS", 0.5, 0.24, white, "SmoothPlastic", { 255, 255, 255 })
 	end
 	-- The label on the front (the reader's right).
 	put(box, "Label", { 4.4, 3.2, 0.1 }, { -4.6, 9.8, -6.55 }, { 236, 234, 226 }, "SmoothPlastic")

@@ -48,7 +48,7 @@ python post.py icon out/icon_raw.png ../../art/store/icon.png
 python post.py icon-box out/iconbox_raw.png ../../art/store/icon-box.png
 ```
 - `zdk.py`: společná sada: obloha, louka, hory, smrky, stěhovací krabice, kostičková postava (Roblox styl) v oblečení
-  ZDC a načítání modelů hry z `.blend` souborů (dodávka, chata, sklad, nábytek a sběratelské kousky).
+  Deliveros a načítání modelů hry z `.blend` souborů (dodávka, chata, sklad, nábytek a sběratelské kousky).
 - `logo.py`: 3D nápis DELIVEROS (vysunutá písmena, zlatá tvář, červený bok, mírný oblouk), průhledné pozadí.
 - `t0_key.py`, `t1_move.py`, `t2_find.py`, `t3_shop.py`, `icon.py`, `icon_box.py`: scény. Každá k obrázku zapíše i
   `.json` s místy kousků na obrázku (podle nich `post.py` dá štítky přesně nad ně); `-- --marks-only` jen spočítá

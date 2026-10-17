@@ -344,7 +344,7 @@ do
 	for _ in vehicles do
 		vehicleCount += 1
 	end
-	check("7.x: every mission goes in your own car (the ZDC Van: nothing lent)", vehicleCount == 1 and vehicles.own == true, vehicleCount)
+	check("7.x: every mission goes in your own car (the Deliveros Van: nothing lent)", vehicleCount == 1 and vehicles.own == true, vehicleCount)
 	check("three unload modes (7.x: no horse led: carry, board, serve)", modes.carry and modes.board and modes.serve and not modes.lead or false)
 	check("rushes", rushes >= 4, rushes)
 	check("a vehicle that starts loaded, but rarely", loaded >= 1 and loaded <= 4, loaded)

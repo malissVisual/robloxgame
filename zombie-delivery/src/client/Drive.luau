@@ -62,7 +62,7 @@ local function tell(text: string)
 		return
 	end
 	pcall(function()
-		game:GetService("StarterGui"):SetCore("SendNotification", { Title = "Zombie Delivery", Text = text, Duration = 3 })
+		game:GetService("StarterGui"):SetCore("SendNotification", { Title = "Deliveros", Text = text, Duration = 3 })
 	end)
 end
 

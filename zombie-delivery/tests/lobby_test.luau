@@ -210,7 +210,7 @@ do
 		folder ~= nil and #folder:GetChildren() == 6 and bad == nil, bad)
 	local dispatch = lobby and lobby:FindFirstChild("ZdcDispatch")
 	local board = dispatch and dispatch:FindFirstChild("Board", true)
-	check("the ZDC dispatch kiosk at Lobby.dispatch, its corkboard marked RunDispatch (server/Runs.luau's prompt there)", dispatch ~= nil and board ~= nil
+	check("the Deliveros dispatch kiosk at Lobby.dispatch, its corkboard marked RunDispatch (server/Runs.luau's prompt there)", dispatch ~= nil and board ~= nil
 		and board:GetAttribute("RunDispatch") == true and math.abs(dispatch:GetPivot().Position.X - L.dispatch.x) < 1)
 	local paint: any = nil
 	for _, d in lobby:GetDescendants() do

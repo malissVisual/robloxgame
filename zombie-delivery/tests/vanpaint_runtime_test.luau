@@ -123,7 +123,7 @@ local styledBefore = #P.styled
 local car = P.van(A, home)
 check("the hook before VanPaint's (Vehicles.onStyle) still runs", #P.styled == styledBefore + 1 and P.styled[#P.styled] == car)
 local model = car.model
-check("the factory's look: the panels cream, the stripes ZDC red, no roof stripes, the ids on the model", isRgb(find(model, "CargoSide").Color, { 232, 226, 210 }) and isRgb(find(model, "Stripe").Color, { 179, 38, 30 })
+check("the factory's look: the panels cream, the stripes Deliveros red, no roof stripes, the ids on the model", isRgb(find(model, "CargoSide").Color, { 232, 226, 210 }) and isRgb(find(model, "Stripe").Color, { 179, 38, 30 })
 	and model:FindFirstChild("VanLivery") == nil and model:GetAttribute("VanPaint") == "cream" and model:GetAttribute("VanLivery") == "zdc" and model:GetAttribute("PaintColor") == nil
 	and model:GetAttribute("StripeColor") == nil)
 local roles = 0
@@ -246,7 +246,7 @@ for _, s in all(model, "Stripe") do
 end
 local logo = find(model, "Logo")
 local name = find(model, "CompanyName")
-check("… the ZDC band and the badge in the light contrast on the red, the ZDC logo's letters too, the company's name not", stripesOk and isRgb(find(model, "Badge").Color, light)
+check("… the Deliveros band and the badge in the light contrast on the red, the Deliveros logo's letters too, the company's name not", stripesOk and isRgb(find(model, "Badge").Color, light)
 	and isRgb(logo:FindFirstChild("FleetLabel"):FindFirstChildOfClass("TextLabel").TextColor3, light) and isRgb(name:FindFirstChild("FleetLabel"):FindFirstChildOfClass("TextLabel").TextColor3, { 32, 35, 38 })
 	and isRgb(model:GetAttribute("StripeColor"), light))
 local livery = model:FindFirstChild("VanLivery")
@@ -266,7 +266,7 @@ check("… on the high roof: a hair over Config.Sprinter.Height, along the van",
 check("… still nothing that collides changed", physics(model) == before)
 E.advance(1)
 E.fire(A, "VanPaint", { kind = "wear", id = "zdc" })
-check("the ZDC classic again: the red band, no roof stripes, StripeColor gone", isRgb(find(model, "Stripe").Color, { 179, 38, 30 }) and model:FindFirstChild("VanLivery") == nil and model:GetAttribute("StripeColor") == nil)
+check("the Deliveros classic again: the red band, no roof stripes, StripeColor gone", isRgb(find(model, "Stripe").Color, { 179, 38, 30 }) and model:FindFirstChild("VanLivery") == nil and model:GetAttribute("StripeColor") == nil)
 E.advance(1)
 E.fire(A, "VanPaint", { kind = "wear", id = "racing" })
 
@@ -326,7 +326,7 @@ P.Vehicles.onStyle(van2) -- (Vehicles.refreshStats, a repaint: the hook again on
 check("the hook again on the same van: still one prompt, one set of roof stripes", #all(van2.model, "PaintPrompt") == 1 and #all(van2.model, "VanLivery") == 1
 	and #van2.model:FindFirstChild("VanLivery"):GetChildren() == 2)
 local rented = P.van(B, home, false, true)
-check("a rental (ZDC RIDE, a lent vehicle): never painted, no prompt", promptOf(rented) == nil and rented.model:GetAttribute("VanPaint") == nil)
+check("a rental (Deliveros RIDE, a lent vehicle): never painted, no prompt", promptOf(rented) == nil and rented.model:GetAttribute("VanPaint") == nil)
 P.cars[B] = vanB
 
 -- ── The admin's UNLOCK PAINTS / RESET PAINTS ──────────────────────────────

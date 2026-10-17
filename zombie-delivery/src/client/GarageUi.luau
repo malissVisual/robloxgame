@@ -309,7 +309,7 @@ render = function()
 	local used = tonumber(state.used) or 0
 	local place = tostring(state.name or "Garage")
 	chrome.title.Text = if state.depot then "The depot lot" else "Your garage"
-	chrome.subtitle.Text = if state.depot then `{place} · your ZDC Van, the company's car` else `{place} · vehicle status and cargo capacity`
+	chrome.subtitle.Text = if state.depot then `{place} · your Deliveros Van, the company's car` else `{place} · vehicle status and cargo capacity`
 	-- The footer: the car you drive, your rank and level.
 	local driving = nil
 	for _, car in cars do
@@ -355,8 +355,8 @@ render = function()
 			-- 7.x (one car): no slots to count any more, the chip says what the company runs on
 			{ name = "SlotsChip", text = if #cars <= 1 then "🚐 THE COMPANY'S ONE CAR" else `FREE {math.max(0, slots - used)} / {slots}`, static = true, ink = if #cars <= 1 or slots - used > 0 then CardKit.Color.money else K.secondary },
 		},
-		foot = `Repairs: {table.concat(shops, " or ")}. Park in a bay, get out and wait.{if state.depot then " The depot lot keeps your ZDC Van." else ""} Paint and upgrades: Wrench Garage.`,
-		empty = "Your ZDC Van is on its way: try again in a moment.",
+		foot = `Repairs: {table.concat(shops, " or ")}. Park in a bay, get out and wait.{if state.depot then " The depot lot keeps your Deliveros Van." else ""} Paint and upgrades: Wrench Garage.`,
+		empty = "Your Deliveros Van is on its way: try again in a moment.",
 		redraw = render,
 		toast = Hud.toast,
 		heroArt = function(card: any, item: ShopView.Item)

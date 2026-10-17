@@ -2,6 +2,11 @@
   "name": "ZombieDelivery",
   "tree": {
     "$className": "DataModel",
+    "ReplicatedFirst": {
+      "Loading": {
+        "$path": "zombie-delivery/src/first/Loading.client.luau"
+      }
+    },
     "ReplicatedStorage": {
       "Shared": {
         "$path": "zombie-delivery/src/shared"

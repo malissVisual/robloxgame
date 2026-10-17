@@ -308,7 +308,7 @@ check("10.1 Danny comes with a crew of one, free: with you from the start (his b
 	and danny.hirer == sol and #danny.queue == 0 and danny.kind == "danny" and danny.name == "Danny")
 local body = danny.body
 local npc = body.model
-check("his body: Danny, ZDC Moving, his id in the rules (no player's)", npc.Name == "Danny" and npc:GetAttribute("MoveHelper") == danny.id and danny.id < -1000000
+check("his body: Danny, Deliveros Moving, his id in the rules (no player's)", npc.Name == "Danny" and npc:GetAttribute("MoveHelper") == danny.id and danny.id < -1000000
 	and body.humanoid.MaxHealth == H.Health and body.humanoid.Health == H.Health and npc:GetAttribute("CrewKind") == "danny" and npc:GetAttribute("CrewSolo") == nil)
 check("…at the van's back", distance(body.root.Position, cargoDoor.WorldPosition) < 8, distance(body.root.Position, cargoDoor.WorldPosition))
 check("10.1 he says hello and asks for nothing (no \"Hire me!\")", E.saidSince(Brain.Lines.hello, 0) and string.find(Brain.Lines.hello, "Hire", 1, true) == nil)

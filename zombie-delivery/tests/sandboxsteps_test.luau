@@ -302,7 +302,7 @@ do
 	local level2, level3 = wprices[1], wprices[2]
 	check(`the warehouse full, the next level affordable: "Your warehouse is full: grow it at the UPGRADES desk ({UpgradeRules.money(level2)})" (the desk)`,
 		step.id == "grow" and SandboxSteps.words(step, rich()) == `Your warehouse is full: grow it at the UPGRADES desk ({UpgradeRules.money(level2)})` and step.target == "desk", show(step))
-	check(`… its price the next level's (the ZDC Warehouse: level 2 costs {UpgradeRules.money(level2)})`, SandboxSteps.growPrice(rich()) == UpgradeRules.price("warehouse", 0)
+	check(`… its price the next level's (the Deliveros Warehouse: level 2 costs {UpgradeRules.money(level2)})`, SandboxSteps.growPrice(rich()) == UpgradeRules.price("warehouse", 0)
 		and UpgradeRules.price("warehouse", 0) == level2 and level2 <= 2000)
 	check(`… at level 2 (the Workshop) the next one's ({UpgradeRules.money(level3)}) when the money reaches it`, SandboxSteps.growPrice(rich({ levels = { warehouse = 1 }, money = level3 })) == level3
 		and SandboxSteps.words(Steps.grow, rich({ levels = { warehouse = 1 }, money = level3 })) == `Your warehouse is full: grow it at the UPGRADES desk ({UpgradeRules.money(level3)})`)

@@ -39,7 +39,7 @@ end
 check("every name is a sign's name (no brackets)", #badName == 0, table.concat(badName, ", "))
 check("every second line is in caps", #badSub == 0, table.concat(badSub, ", "))
 local depot = byId.depot
-check("the depot reads like its sign", depot ~= nil and depot.name == "Zombie Delivery Co." and depot.sub == "DEPOT · JOBS · GARAGE", depot and depot.name)
+check("the depot reads like its sign", depot ~= nil and depot.name == "Deliveros" and depot.sub == "DEPOT · JOBS · GARAGE", depot and depot.name)
 check("a shop says what it sells", byId.guns ~= nil and byId.guns.sub == "GUN SHOP · RANGE" and byId.dealer.sub == "CARS · VANS · BIKES")
 -- 6.12.14: Lead & Co. at its range, out of the safe zone: its tag on the range shop's counter, near from its radius (the
 -- gate and the street in front come within it), still "Lead & Co.".
@@ -84,7 +84,7 @@ check("a shop (its block's centre) is near from SHOP_NEAR, the rest from NEAR", 
 check("a shop's front (the road beside its block) is within SHOP_NEAR", Map.Cell / 2 <= L.SHOP_NEAR, Map.Cell / 2)
 local bags = byId.bags
 -- (the spawn: 26 south of the depot's middle, server/World.luau DepotSpawn; 6.11: the depot is Map.Depot)
-check("6.6: ZDC Bags says BAGS, near only at its kiosk (not from the spawn)", bags ~= nil and bags.sub == "BAGS" and bags.near < LocationTags.distance(bags, Map.Depot.x, Map.Depot.z + 26), bags and bags.near)
+check("6.6: Deliveros Bags says BAGS, near only at its kiosk (not from the spawn)", bags ~= nil and bags.sub == "BAGS" and bags.near < LocationTags.distance(bags, Map.Depot.x, Map.Depot.z + 26), bags and bags.near)
 local garage = byId.garage_rented
 check("a garage says GARAGE", garage ~= nil and garage.sub == "GARAGE", garage and garage.sub)
 check("an office tower says OFFICES", byId.dispatchtower ~= nil and byId.dispatchtower.sub == "OFFICES")
@@ -152,7 +152,7 @@ check("... and then comes", action == "show")
 local s6 = L.new()
 local real = L.build()
 action, t = L.step(s6, real, Map.Depot.x, Map.Depot.z + 60, 0, true)
-check("on the street in front of the depot: ZOMBIE DELIVERY CO.", action == "show" and t ~= nil and t.id == "depot", t and t.id)
+check("on the street in front of the depot: DELIVEROS", action == "show" and t ~= nil and t.id == "depot", t and t.id)
 -- 6.11: by the pond in the middle, the park names itself (and the safe zone); in front of a shop round it, the shop.
 local park = byId.park
 check("6.11: the Central Park says SAFE ZONE", park ~= nil and park.name == "Central Park" and park.sub == "SAFE ZONE", park and park.sub)
@@ -170,7 +170,7 @@ local gear = Map.Shops.supplies
 action, t = L.step(L.new(), real, gear.x + 3, gear.z, 0, true)
 check("6.12.2: at the gear stall's GEAR counter: LAST STOP SUPPLIES", action == "show" and t ~= nil and t.id == "supplies" and t.sub == "GEAR", t and t.id)
 action, t = L.step(L.new(), real, Map.Shops.bags.x + 3, Map.Shops.bags.z, 0, true)
-check("6.12.2: at its BAGS counter: ZDC BAGS", action == "show" and t ~= nil and t.id == "bags", t and t.id)
+check("6.12.2: at its BAGS counter: Deliveros BAGS", action == "show" and t ~= nil and t.id == "bags", t and t.id)
 
 -- ── Where it sits ──────────────────────────────────────────────────────────
 

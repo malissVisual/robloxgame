@@ -128,7 +128,7 @@ function Geometry.body(p: Profile): { Piece }
 		local sideHeight = math.max(.25, p.cargoTop - archTop)
 		add(out, "CargoSide", { .14, sideHeight, p.cargoBack - p.cargoFront }, { side * half, archTop + sideHeight / 2, (p.cargoFront + p.cargoBack) / 2 }, "paint")
 		if not pickup and not muscle then
-			add(out, "CargoStamp", { 3.5, .65, .025 }, { side * (half + .095), p.cargoTop * .66, p.cargoFront + (p.cargoBack - p.cargoFront) * .52 }, "dark", { 0, -side * 90, 0 }, nil, if p.id == "van" then "ZDC / 01" elseif p.id == "courier" then "EXPRESS / 02" elseif truck then "FREIGHT / ZDC" else "ZDC / DELIVERY")
+			add(out, "CargoStamp", { 3.5, .65, .025 }, { side * (half + .095), p.cargoTop * .66, p.cargoFront + (p.cargoBack - p.cargoFront) * .52 }, "dark", { 0, -side * 90, 0 }, nil, if p.id == "van" then "DLV / 01" elseif p.id == "courier" then "EXPRESS / 02" elseif truck then "FREIGHT / DELIVEROS" else "DELIVEROS")
 			add(out, "DispatchStripe", { .045, .1, p.cargoBack - p.cargoFront - .5 }, { side * (half + .11), p.cargoTop * .66 - .49, (p.cargoFront + p.cargoBack) / 2 }, "red")
 		end
 		add(out, "RearCornerPost", { .2, p.cargoTop, .2 }, { side * (half - .06), p.cargoTop / 2, p.cargoBack - .02 }, "steel")

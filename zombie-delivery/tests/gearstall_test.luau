@@ -26,7 +26,7 @@ local D, S = Map.Depot, Config.GearStall
 local bags, gear = Map.Shops.bags, Map.Shops.supplies
 check("both counters are shops with the stall's radius", bags ~= nil and gear ~= nil and bags.radius == S.Radius and gear.radius == S.Radius
 	and Map.shopRadius("bags") == S.Radius and Map.shopRadius("supplies") == S.Radius)
-check("the names stay: ZDC Bags and Last Stop Supplies", bags.name == "ZDC Bags" and gear.name == "Last Stop Supplies")
+check("the names stay: Deliveros Bags and Last Stop Supplies", bags.name == "Deliveros Bags" and gear.name == "Last Stop Supplies")
 check("side by side on the stall's front: BAGS to the north, GEAR to the south", bags.x == gear.x and bags.x == D.x + S.X + S.Depth / 2
 	and math.abs(gear.z - bags.z - 2 * S.Counter) < 1e-9 and math.abs((bags.z + gear.z) / 2 - (D.z + S.Z)) < 1e-9)
 check("Config.BagShop is the BAGS counter (in the depot's studs)", bags.x == D.x + Config.BagShop.X and bags.z == D.z + Config.BagShop.Z and Config.BagShop.Radius == S.Radius)

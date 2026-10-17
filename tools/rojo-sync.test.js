@@ -392,7 +392,7 @@ for (const length of [0, 1, 14, 15, 16, 254, 255, 269, 270, 271, 524, 525, 65535
 		check(typeof sync.diskVersion(tree) === "string", "zombie-delivery: verze na disku");
 		check(
 			JSON.stringify(tree.pathRoots.map((id) => sync.fullName(tree, id))) ===
-				JSON.stringify(["ReplicatedStorage.Shared", "ServerScriptService.Server", "StarterPlayer.StarterPlayerScripts.Client"]),
+				JSON.stringify(["ReplicatedFirst.Loading", "ReplicatedStorage.Shared", "ServerScriptService.Server", "StarterPlayer.StarterPlayerScripts.Client"]), // (10.1: the loading screen)
 			"zombie-delivery: kořeny ze $path"
 		);
 		const model = modelById(sync.writeRbxm(sync.serializeIds(tree, sync.probeIds(tree, fresh.map((piece) => piece.updated[0].id)))));

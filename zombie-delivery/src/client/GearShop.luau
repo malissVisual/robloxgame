@@ -64,7 +64,7 @@ function GearShop.items(state: any, here: boolean, forBike: boolean?, bikeId: st
 		if forBike then
 			return {}, nil, "Bike gear goes on a bike of your own: buy one in the BIKES tab first."
 		end
-		return {}, nil, "Gear goes on your ZDC Van: it is not ready yet, try again in a moment." -- (7.x: every courier has it)
+		return {}, nil, "Gear goes on your Deliveros Van: it is not ready yet, try again in a moment." -- (7.x: every courier has it)
 	end
 	if not forBike and Transport.isBike(vehicleId) then
 		return {}, nil, "You ride your bike: bike gear is at Dead End Motors' BIKES counter. CALL CAR for your car's gear."

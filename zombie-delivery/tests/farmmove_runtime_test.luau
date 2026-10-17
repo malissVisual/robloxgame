@@ -198,7 +198,7 @@ trigger(promptIn(piece, "Pick up"), ann)
 E.place(ann, (prologueBuild.origin * M.CFrame.new(prologueBuild.plan.exit)).Position + V3(0, 3, 0))
 trigger(promptIn(workspace, "Leave house"), ann)
 local van = E.cars[ann]
-check("7.x van moves: the prologue goes with Ann's own ZDC Van", van ~= nil and van.id == "zdcvan" and not van.lent)
+check("7.x van moves: the prologue goes with Ann's own Deliveros Van", van ~= nil and van.id == "zdcvan" and not van.lent)
 van.model:SetAttribute("BackOpen", true)
 E.place(ann, van.chassis:FindFirstChild("CargoDoor").WorldPosition + V3(0, 0, 2))
 tick()
@@ -320,7 +320,7 @@ end)())
 E.request(ann, "start", "walt")
 local lobby = E.last(ann, "MoveLobby", "lobby")
 local bay = T.Beds.zdcvan
-check("START: the planning lobby, the van's bay in it (the ZDC Van's: 6.2 × 6.4)", lobby ~= nil and lobby.a ~= nil and lobby.a.card.id == "walt" and lobby.a.card.bed[1] == bay.Width
+check("START: the planning lobby, the van's bay in it (the Deliveros Van's: 6.2 × 6.4)", lobby ~= nil and lobby.a ~= nil and lobby.a.card.id == "walt" and lobby.a.card.bed[1] == bay.Width
 	and lobby.a.card.bed[2] == bay.Length and lobby.a.card.contracts == nil)
 lobbyRequest(bob, "role", "mover")
 lobbyRequest(bob, "ready", true)
@@ -782,7 +782,7 @@ local loadedBefore = Rules.counts(s.move).out
 local opened = steps(90, function()
 	return solVan.model:GetAttribute("BackOpen") == true and Rules.counts(s.move).out > loadedBefore
 end)
-check("the ZDC Van's back shut: Danny opens it himself (\"I'll get the doors!\") and loads his piece", opened and E.saidSince("I'll get the doors!", saidBefore),
+check("the Deliveros Van's back shut: Danny opens it himself (\"I'll get the doors!\") and loads his piece", opened and E.saidSince("I'll get the doors!", saidBefore),
 	Rules.counts(s.move).out)
 Moving.admin(sol, "end")
 

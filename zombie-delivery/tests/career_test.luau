@@ -48,7 +48,7 @@ end
 check("a new rank is marked where it starts", road[1].newRank and road[5].newRank and not road[7].newRank and road[8].newRank)
 -- 5.0: you start on foot; the Old Van, the ★ car jobs and First Shift come at level 4.
 -- 7.x (one car, Config.CompanyVan): the ZDC Van is yours at level 1; the ★ car jobs still open at 4.
-check("level 1: the Pistol and the ZDC Van (yours from day one), no car jobs yet", has(road[1].unlocks, "gun", "pistol") and has(road[1].unlocks, "car", "zdcvan")
+check("level 1: the Pistol and the Deliveros Van (yours from day one), no car jobs yet", has(road[1].unlocks, "gun", "pistol") and has(road[1].unlocks, "car", "zdcvan")
 	and not has(road[1].unlocks, "car", "van") and not has(road[1].unlocks, "tier", "1"))
 check("level 2: the Rented Lockup", has(road[2].unlocks, "garage", "garage_rented"))
 -- 5.7: the Hand Trolley (gear for a car, level 3) shows on the road with the first car (7.x: the ZDC Van, level 1: at 3).
@@ -98,7 +98,7 @@ for _, stepOf in road do
 		end
 	end
 end
-check("7.x: the only car on the road is the ZDC Van at level 1, no stage", #carsOnRoad == 1 and carsOnRoad[1] == "1:zdcvan", table.concat(carsOnRoad, ", "))
+check("7.x: the only car on the road is the Deliveros Van at level 1, no stage", #carsOnRoad == 1 and carsOnRoad[1] == "1:zdcvan", table.concat(carsOnRoad, ", "))
 check("level 5: the Cooler Box, the Roof Machine Gun, the Cash Transport", has(road[5].unlocks, "gear", "cooler") and has(road[5].unlocks, "cargun", "roofmg")
 	and has(road[5].unlocks, "job", "cashrun"))
 check("level 7: the Roof Rack, Birch Cottage (6.19: the Box Truck is the Empty Shelves finale's)", has(road[7].unlocks, "gear", "roofrack") and has(road[7].unlocks, "estate", "birch")
@@ -361,7 +361,7 @@ do
 	local function where(kind: string, id: string): Career.Where?
 		return Career.whereOf({ kind = kind, id = id, name = id })
 	end
-	check("7.x: the ZDC Van needs no trip (yours from the start); Earl's lot is still on the map", where("car", "zdcvan") == nil and landmarks.earl == true)
+	check("7.x: the Deliveros Van needs no trip (yours from the start); Earl's lot is still on the map", where("car", "zdcvan") == nil and landmarks.earl == true)
 	check("6.14: a dealer's car at Dead End Motors", (where("car", "boxtruck") :: Career.Where).place == "dealer" and (where("car", "boxtruck") :: Career.Where).label == "Dead End Motors")
 	local bike = where("bike", "rustbike") :: Career.Where
 	check("6.14: a bike at Dead End Motors' BIKES counter (Map.Shops.bikes)", bike.place == "bikes" and Map.Shops.bikes ~= nil and bike.label == "Dead End Motors' BIKES counter")
@@ -370,7 +370,7 @@ do
 			and (where("stage", "van:2") :: Career.Where).place == "mechanic" and (where("cargun", Config.CarGuns[1].id) :: Career.Where).label == "Wrench Garage")
 	check("6.14: a gun at Lead & Co.'s range; the starter pistol and a reward gun need no trip", (where("gun", "shotgun") :: Career.Where).place == "guns" and (where("gun", "shotgun") :: Career.Where).label == Config.GunRange.Shop
 		and where("gun", "pistol") == nil and where("gun", "carbine") == nil)
-	check("6.14: kit at its counter of the gear stall (a bag at ZDC Bags, a vest at Last Stop Supplies), the bat at the range (6.23: the plastic bag too, bought for each game)",
+	check("6.14: kit at its counter of the gear stall (a bag at Deliveros Bags, a vest at Last Stop Supplies), the bat at the range (6.23: the plastic bag too, bought for each game)",
 		(where("kit", "tote") :: Career.Where).place == "bags" and (where("kit", "kevlar") :: Career.Where).place == "supplies" and (where("kit", "kevlar") :: Career.Where).label == "Last Stop Supplies"
 			and (where("kit", "bat") :: Career.Where).place == "guns" and (where("kit", "bag") :: Career.Where).place == "bags")
 	check("6.14: an employer's job at the employer's place (its landmark), a board job and a danger level on JOBS",
@@ -413,7 +413,7 @@ do
 		end
 		return table.concat(out, " | ")
 	end
-	check("6.14: level 4's card: the Padded Messenger Bag at ZDC Bags, Wrench Garage, the BIKES counter, then MISSIONS (7.x: no car to fetch from Earl)",
+	check("6.14: level 4's card: the Padded Messenger Bag at Deliveros Bags, Wrench Garage, the BIKES counter, then MISSIONS (7.x: no car to fetch from Earl)",
 		#rows == 4 and rows[1].place == "bags" and rows[2].place == "mechanic" and rows[3].place == "bikes"
 			and rows[4].window == "missions" and rows[4].id == "dispatch" and rows[4].names[1] == "First Shift", labels())
 	local grouped = Career.whereRows(road[5].unlocks, 9, 9)

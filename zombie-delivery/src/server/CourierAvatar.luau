@@ -12,12 +12,21 @@
 -- the torso, the arms, the legs, the proportions and the animations reset (AvatarLook.Body), the head, the face, the
 -- clothes, the skin colours and the accessories kept (Humanoid:ApplyDescriptionAsync; KitWear dresses the kit again when a
 -- part is replaced). The 6.7 native courier (CharacterArt) only if Roblox's body cannot be made at the start.
+-- 10.1, the courier you make (the start screen's character creator; Config.Characters, shared/CharacterLooks.luau): once
+-- a save slot is loaded, server/SaveSlots.luau calls Avatar.setLook with the slot's courier. A made one (base
+-- "custom") is worn instead of the player's own look: the classic body in its colours (a HumanoidDescription: the skin,
+-- the top, the trousers; no clothes, no accessories, the classic head and face) and its pieces welded on
+-- (StyleBuild.character: the hair, a hat, the sleeves or a jacket, the belt, the face's extra); none (or base "own"):
+-- the player's own look as before. A look changed while one is going on waits for it, then goes on (never two at once).
+--   Avatar.setLook(player, look?)   the slot's courier (nil: their own avatar), on the body at once and at every spawn
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterPlayer = game:GetService("StarterPlayer")
 local Geometry = require(script.Parent.CharacterArt.Geometry)
 local Rig = require(script.Parent.CharacterArt.Rig)
 local AvatarLook = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("AvatarLook"))
+local CharacterLooks = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("CharacterLooks")) -- 10.1
+local StyleBuild = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("StyleBuild")) -- 10.1: a made courier's pieces
 local Avatar = {}
 
 local watches: { [Player]: { RBXScriptConnection } } = {}
@@ -26,6 +35,10 @@ local replacing: { [Player]: boolean } = {}
 local looks: { [Player]: HumanoidDescription | false } = {}
 local loading: { [Player]: boolean } = {}
 local dressed: { [Model]: boolean } = setmetatable({}, { __mode = "k" }) :: any
+-- 10.1: the courier made for the slot played (base "custom"); a body being dressed, and one to dress again after it
+local made: { [Player]: CharacterLooks.Look } = {}
+local busy: { [Model]: boolean } = setmetatable({}, { __mode = "k" }) :: any
+local again: { [Model]: boolean } = setmetatable({}, { __mode = "k" }) :: any
 local classicBody = false -- the template is Roblox's classic R15 (not the native fallback: no own look goes on that)
 local started = false
 
@@ -84,33 +97,89 @@ local function templateBody(): (Model, boolean)
 	return Rig.build(Geometry.spec("courier")), false
 end
 
--- The player's own look on a courier body, once the body is in the world and the look has loaded.
+-- 10.1: a made courier's body: the classic one in its colours (no clothes, no accessories, the classic head and face).
+local function madeDescription(look: CharacterLooks.Look): HumanoidDescription
+	local description = classic(Instance.new("HumanoidDescription"))
+	for field, c in CharacterLooks.colors(look) do
+		(description :: any)[field] = Color3.fromRGB(c[1], c[2], c[3])
+	end
+	return description
+end
+
+-- What the player wears now: their made courier (10.1), else their own look (nil: not loaded yet).
+local function wanted(player: Player): (HumanoidDescription?, CharacterLooks.Look?)
+	local look = made[player]
+	if look then
+		return madeDescription(look), look
+	end
+	local own = looks[player]
+	return if own then own :: HumanoidDescription else nil, nil
+end
+
+-- The player's look on a courier body, once the body is in the world and the look has loaded. 10.1: again (the same
+-- thread) when the look changed while it went on.
 local function dress(player: Player, model: Model)
-	local look = looks[player]
-	if not classicBody or not look or dressed[model] then
+	if not classicBody or dressed[model] or not wanted(player) then
 		return
 	end
-	local description = look :: HumanoidDescription
 	dressed[model] = true
+	busy[model] = true
 	task.spawn(function()
 		local waited = 0
 		while model.Parent ~= workspace and waited < WAIT_FOR_WORLD do
 			waited += task.wait(0.1)
 		end
-		local humanoid = model:FindFirstChildOfClass("Humanoid")
-		if player.Character ~= model or model.Parent ~= workspace or not humanoid or humanoid.Health <= 0 then
-			return
-		end
-		local ok, err = pcall(function()
-			humanoid:ApplyDescriptionAsync(description:Clone())
-		end)
-		if not ok then
-			warn(`[CourierAvatar] {player.Name}'s own look did not go on: {err}`)
-		end
-		if model.Parent then
-			settle(model)
-		end
+		repeat
+			again[model] = nil
+			local humanoid = model:FindFirstChildOfClass("Humanoid")
+			local description, look = wanted(player)
+			if player.Character ~= model or model.Parent ~= workspace or not humanoid or humanoid.Health <= 0 or not description then
+				break
+			end
+			local ok, err = pcall(function()
+				humanoid:ApplyDescriptionAsync((description :: HumanoidDescription):Clone())
+			end)
+			if not ok then
+				warn(`[CourierAvatar] {player.Name}'s look did not go on: {err}`)
+			end
+			if model.Parent then
+				local built, why = pcall(function()
+					if look then
+						StyleBuild.character(model, look) -- (10.1: the hair, the hat, the top, the belt, the extra)
+					else
+						local old = model:FindFirstChild(StyleBuild.Look)
+						if old then
+							old:Destroy()
+						end
+					end
+				end)
+				if not built then
+					warn(`[CourierAvatar] {player.Name}'s courier pieces did not go on: {why}`)
+				end
+				settle(model)
+			end
+		until not again[model]
+		busy[model] = nil
 	end)
+end
+
+function Avatar.setLook(player: Player, look: any?)
+	local clean = if type(look) == "table" then CharacterLooks.clean(look) else nil
+	if clean and CharacterLooks.custom(clean) then
+		made[player] = clean
+	else
+		made[player] = nil
+	end
+	local character = player.Character
+	if not character or character:GetAttribute("CharacterArt") ~= "courier" then
+		return
+	end
+	if busy[character] then
+		again[character] = true
+	else
+		dressed[character] = nil
+		dress(player, character)
+	end
 end
 
 -- Once per player: their avatar's description, made classic. A body that spawned meanwhile is dressed when it comes.
@@ -131,7 +200,7 @@ local function loadLook(player: Player)
 			looks[player] = classic(result)
 		else
 			looks[player] = false
-			print(`[CourierAvatar] {player.Name} wears the ZDC workwear (their own look did not load: {result})`)
+			print(`[CourierAvatar] {player.Name} wears the Deliveros workwear (their own look did not load: {result})`)
 		end
 		local character = player.Character
 		if character and character:GetAttribute("CharacterArt") == "courier" then
@@ -190,7 +259,7 @@ function Avatar.start()
 	Players.PlayerRemoving:Connect(function(player)
 		local list: { RBXScriptConnection } = watches[player] or {}
 		for _, connection in list do connection:Disconnect() end
-		watches[player], replacing[player], looks[player], loading[player] = nil, nil, nil, nil
+		watches[player], replacing[player], looks[player], loading[player], made[player] = nil, nil, nil, nil, nil
 	end)
 	for _, player in Players:GetPlayers() do watch(player) end
 end

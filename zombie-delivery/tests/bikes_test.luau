@@ -44,7 +44,7 @@ for _, stub in STUBS do
 	check(`{stub.id}: a bike, level {stub.level}, ${stub.price} base (6.19: × Prices.Bikes), room {stub.capacity}, {stub.gearSlots} gear slots`, def.bike == true and def.level == stub.level
 		and def.price == Config.priced(stub.price, Config.Prices.Bikes) and def.capacity == stub.capacity and def.gearSlots == stub.gearSlots)
 end
-check("the ZDC Van is the first car (7.x: the only one; the bikes after it)", Config.Cars[1].id == Config.CompanyVan.Car and Config.Cars[1].id == "zdcvan" and not Config.Cars[1].bike)
+check("the Deliveros Van is the first car (7.x: the only one; the bikes after it)", Config.Cars[1].id == Config.CompanyVan.Car and Config.Cars[1].id == "zdcvan" and not Config.Cars[1].bike)
 
 -- The bike gear ------------------------------------------------------------------------------------------------------
 

@@ -551,7 +551,7 @@ local said = Moving.admin(bob, "start")
 local bobSeed = built[#built] -- (8.3 economy: Bob's house, kept while his moves bring nothing home)
 local van = E.cars[bob]
 local wanted = if Economy.findCar(Config.Sandbox.Van) then Config.Sandbox.Van else T.Van
-check("no van out: the player's own comes to their plot's vanSpot (the Sprinter, else the ZDC Van)", string.find(said, "started", 1, true) ~= nil and van ~= nil
+check("no van out: the player's own comes to their plot's vanSpot (the Sprinter, else the Deliveros Van)", string.find(said, "started", 1, true) ~= nil and van ~= nil
 	and van.id == wanted and flatDistance(van.chassis.Position, V3(plot2.vanSpot.x, 0, plot2.vanSpot.z)) < 1, said)
 local how = parked[#parked]
 check("8.0.1: …the sandbox's way (SandboxBoot.parkVan, the hook Moving.parkVan): at his vanSpot, not seated, his own van, repaired (not the save's 0.2)",

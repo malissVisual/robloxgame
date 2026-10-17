@@ -75,7 +75,7 @@ function Geometry.pieces(id: string): { Piece }
 		if cargo then
 			add(p, "CargoFloor", { 1.5, .12, 1.55 }, { 0, 2.14, -.575 }, "Frame", "worn")
 			for _, side in { -1, 1 } do add(p, "BoxSide" .. side, { .09, .58, 1.55 }, { side * .755, 2.48, -.575 }, "Frame", "charcoal") end
-			add(p, "BoxFront", { 1.5, .58, .08 }, { 0, 2.48, -1.39 }, "Frame", "charcoal", nil, nil, "ZDC / CARGO")
+			add(p, "BoxFront", { 1.5, .58, .08 }, { 0, 2.48, -1.39 }, "Frame", "charcoal", nil, nil, "DELIVEROS / CARGO")
 			add(p, "BoxBack", { 1.5, .58, .08 }, { 0, 2.48, .24 }, "Frame", "charcoal")
 			if id == "cargobike_loaded" then for n = 1, 6 do
 				add(p, "SampleParcel" .. n, { .46, .56, .36 }, { if n % 2 == 1 then -.35 else .35, 2.49, -1.06 + math.floor((n - 1) / 2) * .48 }, "Frame", "parcel")

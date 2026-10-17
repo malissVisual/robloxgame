@@ -176,7 +176,7 @@ check("8.3: WarehouseMesh dresses each in its own level (the garage in level 1, 
 local sign1 = Warehouse.model(1):FindFirstChild("OwnerSign")
 local sign2 = Warehouse.model(2):FindFirstChild("OwnerSign")
 check("a free plot's sign: FOR RENT", line(sign1, 1) == "FOR RENT", line(sign1, 1))
-check("an owner from before the start: Ana's Warehouse", line(sign2, 1) == "Ana's Warehouse" and line(sign2, 2) == "ZDC STORAGE · PLOT 2", line(sign2, 1))
+check("an owner from before the start: Ana's Warehouse", line(sign2, 1) == "Ana's Warehouse" and line(sign2, 2) == "DELIVEROS STORAGE · PLOT 2", line(sign2, 1))
 
 -- the prompts: the owner's only
 local free = stand(1, 1):FindFirstChild("Prompts")

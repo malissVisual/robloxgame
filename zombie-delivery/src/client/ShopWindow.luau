@@ -513,7 +513,7 @@ local function mechanic(ctx: Ctx): ({ Item }, string?, string?, { CardKit.Chip }
 	local note: string? = nil
 	if not carOk then
 		-- 5.0: on foot, no vehicle yet
-		note = if carDef then `Your {carDef.name} is a company vehicle: it can't be upgraded.` else "Your ZDC Van is not ready yet: try again in a moment."
+		note = if carDef then `Your {carDef.name} is a company vehicle: it can't be upgraded.` else "Your Deliveros Van is not ready yet: try again in a moment."
 	end
 	-- 3.5: the STAGE: the car's next stage (its new look, its room, before → after) or its last one.
 	if carOk and carDef and Economy.maxStage(carDef.id) > 0 then

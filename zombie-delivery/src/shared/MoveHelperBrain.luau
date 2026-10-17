@@ -1233,7 +1233,7 @@ MoveHelperBrain.Lines = {
 
 -- 8.0 SANDBOX (Config.Sandbox.On): the lines that would name the city's depot or the Wall.
 MoveHelperBrain.SandboxLines = {
-	hello = "Danny from ZDC. Where do we start, boss?",
+	hello = "Danny from Deliveros. Where do we start, boss?",
 	full = "Van's full, boss - drive it home?",
 } :: { [string]: string }
 
