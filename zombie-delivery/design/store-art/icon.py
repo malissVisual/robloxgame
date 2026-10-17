@@ -24,7 +24,7 @@ for ob in tcol.all_objects:
             p.inputs["Base Color"].default_value = zdk.lin((255, 214, 110))
             p.inputs["Roughness"].default_value = 0.2
 zdk.glow((h.x - 0.4, h.y - 2.2, h.z + 2.0), (255, 226, 160), energy=500, size=1.2)
-zdk.moving_box((-1.0, -3.0, 0.9), (2.8, 2.6, 2.2), rot_z=18, open_top=True)
-zdk.glow((-1.0, -3.0, 2.5), (255, 222, 150), energy=500, size=0.6)
+zdk.moving_box((-2.4, -2.4, 0.0), (2.8, 2.6, 2.2), rot_z=24, open_top=True)  # (low, left: its flaps clear of the face)
+zdk.glow((-2.4, -2.4, 1.6), (255, 222, 150), energy=500, size=0.6)
 zdk.camera((1.6, -15.5, 5.6), (2.0, 0, 5.9), lens=54)
 zdk.render(o["out"])
