@@ -14,6 +14,10 @@
 --                6.7: with the Baseball Bat owned (profile.kit, Config.Melee.BatKit) the punch is a bat swing
 --                (Melee.kindOf: its damage, cooldown, push and longer reach); MeleeKind says the gun's strike (Melee.pose)
 --                and a bat is welded into the right hand for that swing only (showBat, Config.Melee.BatLook).
+--   10.x danger: CloseCombat.swing(player, kind, direction?, held?)   one swing of `kind` (Config.Melee.Kinds) with
+--                the same checks (alive, on foot, the hands free, the cooldown) and the same hit: a run's bat
+--                (server/RunDanger.luau: its Tool's click; `held`: the bat is in the hand already, none welded for the
+--                swing). True when it swung.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -98,35 +102,37 @@ local function swingDirection(direction: any, root: BasePart): Vector3
 	return if flat.Magnitude > 1e-3 then flat.Unit else Vector3.new(0, 0, -1)
 end
 
-local function onMelee(player: Player, direction: any)
+function CloseCombat.swing(player: Player, kind: string?, direction: any, held: boolean?): boolean
 	local character = player.Character
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 	local root = character and character:FindFirstChild("HumanoidRootPart")
 	if not character or not humanoid or not root or not root:IsA("BasePart") or humanoid.Health <= 0 then
-		return
+		return false
 	end
 	if humanoid.SeatPart ~= nil or humanoid.Sit then
-		return -- on foot only
+		return false -- on foot only
 	end
 	if character:GetAttribute("Carrying") ~= nil then
-		return -- the hands are full
+		return false -- the hands are full
 	end
-	local profile = PlayerData.get(player)
-	local kind = Melee.kindOf(character:GetAttribute("Holstered") == true, profile ~= nil and Melee.hasBat(profile.kit)) -- 6.7: the bat
-	local def = Melee.def(kind)
+	if not kind then
+		local profile = PlayerData.get(player)
+		kind = Melee.kindOf(character:GetAttribute("Holstered") == true, profile ~= nil and Melee.hasBat(profile.kit)) -- 6.7: the bat
+	end
+	local def = Melee.def(kind :: string)
 	local now = os.clock()
 	if lastSwing[player] and now - lastSwing[player] < def.cooldown * 0.8 then
-		return -- faster than the swing allows (a little slack for the network)
+		return false -- faster than the swing allows (a little slack for the network)
 	end
 	lastSwing[player] = now
 	-- Everybody sees the arm swing (the kind first: the clients read it when MeleeAt changes). 6.7: the bat swings like
 	-- the gun's strike (Melee.pose), with the bat in the hand.
-	character:SetAttribute("MeleeKind", Melee.pose(kind))
+	character:SetAttribute("MeleeKind", Melee.pose(kind :: string))
 	character:SetAttribute("MeleeAt", workspace:GetServerTimeNow())
-	if kind == "bat" then
+	if kind == "bat" and not held then
 		showBat(character)
 	end
-	local range = Melee.reachOf(kind) -- 6.7: the bat reaches further
+	local range = Melee.reachOf(kind :: string) -- 6.7: the bat reaches further
 
 	local dir = swingDirection(direction, root)
 	local from = root.Position
@@ -149,7 +155,7 @@ local function onMelee(player: Player, direction: any)
 		end
 	end
 	if not best then
-		return
+		return true
 	end
 	local push = dir * def.push + Vector3.new(0, def.push * 0.4, 0)
 	-- 6.20: Hard Fist (Config.Skills) adds to the fist's punch (not the gun's strike nor the bat)
@@ -161,6 +167,11 @@ local function onMelee(player: Player, direction: any)
 		best.root.AssemblyLinearVelocity += dir * (def.push * 0.6 / scale) + Vector3.new(0, 4, 0)
 	end
 	Net.get("Hit"):FireClient(player, best.torso.Position, damage, false, killed)
+	return true
+end
+
+local function onMelee(player: Player, direction: any)
+	CloseCombat.swing(player, nil, direction)
 end
 
 local function watch(player: Player)

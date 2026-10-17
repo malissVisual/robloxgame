@@ -57,7 +57,9 @@ held sideways and upright, tablets and computers: shown only in your own driver'
 controls, the speed and the offer card, held to drive on a touch screen, the feet and a gamepad's R2 / L2 on a computer.
 9.7 runs: the pad panel (the host's difficulty buttons, another player's line) and the run's results card (the real
 RunUi beside SandboxHud and SandboxTasksUi: runs.luau) on phones, a computer and a big screen: on the screen, clear of the
-rest, the words fitting, a finger's size, the requests.
+rest, the words fitting, a finger's size, the requests. 10.x danger: the results card's danger line and the run's
+danger strip (the real RunDangerUi under a stand-in move panel: the keys, the vault, the zombies, the events, the horde's
+banner) in the same scene.
 """
 import argparse
 from pathlib import Path

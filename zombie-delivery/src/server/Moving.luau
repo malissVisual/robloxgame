@@ -333,6 +333,7 @@ type Session = {
 	loaders: { [number]: number }?, -- 9.7 runs: spot → the user id of whoever loaded it into the truck last (Danny's: his hirer's)
 	homeTo: { [number]: number }?, -- 9.7 runs: spot → the user id whose stock it went into (SB.store)
 	rarity: { [number]: string }?, -- 9.7 runs: spot → its model's Rarity attribute as it went home (the loot's own, when it has one)
+	danger: any?, -- 10.x danger: server/RunDanger.luau's state of this run (its sealed vault pieces, Danny's shut doorways)
 }
 
 local art: Art? = nil
@@ -730,7 +731,7 @@ end
 -- `extra`); a grip check's holds only its own. The moments: startMove's end, a door trip in (travel), Load (onLoad,
 -- Danny's helperLoad), a trip (deliverTrip), the end (finish) and a grip check's outcome (Grip.result).
 -- (stored / result: the daily tasks' hooks with the move itself, Moving.onStored / onResult below)
-SB.listeners = { start = {}, enter = {}, load = {}, trip = {}, finish = {}, grip = {}, stored = {}, result = {}, run = {} } :: { [string]: { any } }
+SB.listeners = { start = {}, enter = {}, load = {}, trip = {}, finish = {}, grip = {}, stored = {}, result = {}, run = {}, runStart = {} } :: { [string]: { any } } -- (10.x danger: runStart)
 
 -- A move started (LAUNCH, the admin's start): fn(owner, facts).
 function Moving.onStart(fn: (Player?, { [string]: any }) -> ())
@@ -2113,6 +2114,8 @@ function Moving.helperTake(s: Session, spot: number, npc: Model): (boolean, stri
 	local humanoid = npc:FindFirstChildOfClass("Humanoid")
 	if s.ended or not who or not item or not thing or not root or not humanoid then
 		return false, "gone"
+	elseif s.danger and s.danger.sealed[spot] then
+		return false, "sealed" -- 10.x danger: in the run's vault
 	end
 	if thing.class == "pair" or (thing.class == "both" and thing.state == "carried") then -- (7.x: a both thing's other side)
 		local ok, why = Rules.help(s.move, spot, who, true)
@@ -2985,6 +2988,11 @@ local function onPick(s: Session, spot: number, player: Player, lifted: boolean?
 	end
 	if character:GetAttribute("Carrying") ~= nil or character:GetAttribute("Pushing") ~= nil then
 		say(player, "Your hands are full: put down what you carry first (G).")
+		return
+	end
+	local sealed = if s.danger then s.danger.sealed[spot] else nil -- 10.x danger: in the run's vault (server/RunDanger.luau)
+	if sealed then
+		say(player, sealed)
 		return
 	end
 	-- 8.3 Danny's orders (Config.MoveHelper.WaitForHelper): a two-person piece with Danny on the move calls him, you wait
@@ -4631,9 +4639,35 @@ end
 --   Moving.onRunEnd(fn)       fn(host, facts) at a run's end: { contract, house, difficulty, phase, why, crew (the
 --                             players still on it), pieces ({ spot, item, name, icon, value (× its condition), to (the
 --                             user id whose stock it went into), rarity? (its model's Rarity attribute) }) }
+--   10.x danger (server/RunDanger.luau; marked "10.x danger" here, in onPick and in helperTake):
+--   Moving.onRunStart(fn)     fn(s, Moving) once a run's move has started (its interior built, its pieces tagged)
+--   Moving.runDrop(player, why, hp)   what `player` holds on a run goes down where they are (why: "bite", "stumble"),
+--                             the piece knocked as by a bite of `hp` (MovingRules.hitDamage: a fragile one more); true
+--                             when they held something
+--   A piece the run's vault seals (s.danger.sealed[spot]: the words) is never picked up, lifted or taken by Danny.
 
 function Moving.onRunEnd(fn: (Player, { [string]: any }) -> ())
 	table.insert(SB.listeners.run, fn)
+end
+
+-- 10.x danger: the run's danger (server/RunDanger.luau) hears every run's start.
+function Moving.onRunStart(fn: (any, any) -> ())
+	table.insert(SB.listeners.runStart, fn)
+end
+
+-- 10.x danger: a bite or a stumble on a run: what `player` holds goes down where they are, knocked as by `hp`.
+function Moving.runDrop(player: Player, why: string, hp: number): boolean
+	local s = sessionOf(player)
+	local spot = if s and s.contract.difficulty and not s.ended then Rules.holding(s.move, player.UserId) else nil
+	if not s or not spot then
+		return false
+	end
+	local thing = s.move.things[spot]
+	release(s, player, why)
+	if hp > 0 and thing then
+		hurtThing(s, spot, Rules.hitDamage(hp, thing.fragile))
+	end
+	return true
 end
 
 -- Who loaded the piece at `spot` (a player; nil: nobody known, the host's then).
@@ -4772,6 +4806,13 @@ function Moving.startRun(host: Player, house: string, difficulty: string): strin
 	local failed = startMove(host, house, true, nil, made)
 	if failed and seed ~= kept then
 		SB.keep(host, card, kept) -- (no run: the card as it was)
+	end
+	local s = if failed then nil else sessions[host]
+	for _, fn in (if s then SB.listeners.runStart else {}) :: { any } do -- 10.x danger: the run's danger (server/RunDanger.luau)
+		local ok, err = pcall(fn, s, Moving)
+		if not ok then
+			warn(`[Moving] a run's start listener failed: {err}`)
+		end
 	end
 	return failed
 end

@@ -43,6 +43,9 @@
 --                                      for `player` alone, at the difficulty `admin` picked, locks ignored) | "difficulty"
 --                                      (its id) | "end" (`player`'s run) → what to say
 --   Runs.step()                        one look at the pads (the loop's; the tests')
+-- 10.x danger (server/RunDanger.luau: the locks and keys, the vault, the hazards, the zombies, the bat): started with the
+-- runs (Runs.start); the results card's `danger` ({ vault = true / false / nil: none, stopped = zombies killed }) is
+-- RunDanger.result's (the blocks marked "10.x danger").
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -532,6 +535,10 @@ local function onEnd(host: Player, facts: { [string]: any })
 			table.insert(everyone, p)
 		end
 	end
+	local danger: any = nil -- 10.x danger: the vault opened, the zombies stopped (server/RunDanger.luau)
+	pcall(function()
+		danger = require(Server.RunDanger).result(host)
+	end)
 	for _, p in everyone do
 		local sum = RunRules.summary(list :: any, p.UserId)
 		local opened: string? = nil
@@ -563,6 +570,7 @@ local function onEnd(host: Player, facts: { [string]: any })
 			me = p.UserId,
 			opened = opened,
 			openedName = if opened then (RunRules.def(opened) :: any).name else nil,
+			danger = danger, -- 10.x danger
 		})
 		if opened then
 			send(p, { kind = "unlocked", id = opened, name = (RunRules.def(opened) :: any).name })
@@ -810,6 +818,12 @@ function Runs.start()
 	findSigns()
 	wrapCrew()
 	moving().onRunEnd(onEnd)
+	local ok, err = pcall(function() -- 10.x danger: every run's locks, vault, hazards and zombies
+		require(Server.RunDanger).start(moving())
+	end)
+	if not ok then
+		warn(`[Runs] the runs' danger did not start: {err}`)
+	end
 	;(remote :: RemoteEvent).OnServerEvent:Connect(onRequest)
 	-- the dispatch kiosk's prompt: how runs work
 	local world = workspace:FindFirstChild("Sandbox")

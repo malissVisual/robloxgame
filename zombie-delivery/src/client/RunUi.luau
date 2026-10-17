@@ -9,7 +9,9 @@
 --   * The results card (the middle of the screen, over the game, until OK or ESC): how the run ended, the pieces that
 --     went home (each with its rarity's colour stripe and stars, ★ common … ★★★★★ legendary, its value and whose
 --     warehouse it went to; the best first, the rest in a list that scrolls), the total value, yours, a difficulty
---     that opened ("🔓 HARD is open"). On a phone it fits the screen (the list scrolls).
+--     that opened ("🔓 HARD is open"). On a phone it fits the screen (the list scrolls). 10.x danger: a line for the
+--     run's danger when it had any (the result's `danger`, server/RunDanger.luau: "🗝 VAULT OPENED ✓ · 🧟 ZOMBIES
+--     STOPPED: 7").
 --   RunUi.start()     the remote, the screen
 --   RunUi.pad()       the pad you stand on now ({ house, mine, … }: the server's view) or nil (client/SandboxGuide.luau)
 --   RunUi.run()       the run you are in now ({ house, mine, … }) or nil
@@ -212,6 +214,24 @@ function RunUi.close()
 	end
 end
 
+-- 10.x danger: the results card's danger line (the result's `danger`: vault true / false / nil, stopped), nil none.
+local function dangerText(danger: any): string?
+	if type(danger) ~= "table" then
+		return nil
+	end
+	local parts: { string } = {}
+	if danger.vault == true then
+		table.insert(parts, "🗝 VAULT OPENED ✓")
+	elseif danger.vault == false then
+		table.insert(parts, "🗝 VAULT OPENED ✗")
+	end
+	local stopped = tonumber(danger.stopped) or 0
+	if stopped > 0 or danger.zombies == true then
+		table.insert(parts, `🧟 ZOMBIES STOPPED: {stopped}`)
+	end
+	return if #parts > 0 then table.concat(parts, " · ") else nil
+end
+
 local function tierOf(rarity: any): (Config.CollectionTier, number)
 	local tier = Config.Collection.Tiers[if type(rarity) == "string" then rarity else "common"] or Config.Collection.Tiers.common
 	return tier, tier.rank
@@ -234,7 +254,8 @@ local function showResult(r: { [string]: any })
 	local pieces = if type(r.pieces) == "table" then r.pieces else {}
 	local def = RunRules.def(r.difficulty)
 	local opened = type(r.openedName) == "string"
-	local fixed = 12 + 22 + 34 + 30 + 20 + 8 + (if opened then 24 else 0) + OK + 8 + 12
+	local danger = dangerText(r.danger) -- 10.x danger
+	local fixed = 12 + 22 + 34 + 30 + 20 + 8 + (if opened then 24 else 0) + (if danger then 22 else 0) + OK + 8 + 12
 	local room = math.max(ROW * 2, math.floor((screenH - 16) / S) - fixed)
 	local listH = math.min(#pieces, R.Result.Rows) * ROW
 	listH = math.max(if #pieces > 0 then ROW else 0, math.min(listH, room))
@@ -268,6 +289,11 @@ local function showResult(r: { [string]: any })
 	label(frame, "Yours", `YOURS: {mine} · {Ui.money(mineValue)} → your warehouse`, UDim2.new(1, -24, 0, 18),
 		{ Position = UDim2.fromOffset(12, y), Font = Theme.HeadingFont, TextSize = 13, TextColor3 = K.text, TextXAlignment = Enum.TextXAlignment.Center })
 	y += 20 + 8
+	if danger then
+		label(frame, "Danger", danger, UDim2.new(1, -24, 0, 18),
+			{ Position = UDim2.fromOffset(12, y - 4), Font = Theme.HeadingFont, TextSize = 12, TextColor3 = GOLD, TextXAlignment = Enum.TextXAlignment.Center })
+		y += 22
+	end
 	local list = Ui.make("ScrollingFrame", {
 		Name = "Pieces",
 		Size = UDim2.new(1, -16, 0, listH),

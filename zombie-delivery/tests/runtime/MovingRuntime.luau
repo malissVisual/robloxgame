@@ -117,7 +117,7 @@ O.__newindex = function(self: any, key: string, value: any)
 		end
 	end
 end
-local SIGNALS = { "Triggered", "AncestryChanged", "Died", "HealthChanged", "StateChanged", "AttributeChanged", "CharacterAdded", "Destroying" }
+local SIGNALS = { "Triggered", "AncestryChanged", "Died", "HealthChanged", "StateChanged", "AttributeChanged", "CharacterAdded", "Destroying", "Activated", "Equipped" } -- (10.x danger: a Tool's too)
 local create = Mock.Instance.new
 Mock.Instance.new = function(class: string): any
 	local obj = create(class)
