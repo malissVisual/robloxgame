@@ -55,9 +55,9 @@ at 844 x 390, 667 x 375, 1280 x 800 and 1920 x 1080 clear of the rest; the guide
 9.1 the drive pedals (the real DrivePedals beside the HUD's pieces and the real OfferCard: drivepedals.luau) on phones
 held sideways and upright, tablets and computers: shown only in your own driver's seat with the HUD up, clear of the touch
 controls, the speed and the offer card, held to drive on a touch screen, the feet and a gamepad's R2 / L2 on a computer.
-9.7 runs: the pad panel (the host's difficulty buttons, another player's line) and the run's results card (the real
-RunUi beside SandboxHud and SandboxTasksUi: runs.luau) on phones, a computer and a big screen: on the screen, clear of the
-rest, the words fitting, a finger's size, the requests.
+9.7 runs: the run's results card (the real RunUi beside SandboxHud and SandboxTasksUi: runs.luau) on phones, a computer
+and a big screen: on the screen, clear of the rest, the words fitting, a finger's size. 10.4: the PLAY panel (create,
+join, your lobby) and the lobby bar (the real PlayUi: play.luau) the same way, every request.
 10.x the map: the big map in the lobby and in a run and a run's minimap (the real SandboxMapUi, SandboxMapDraw,
 SandboxMapData and SandboxMiniMap beside SandboxHud, SandboxTasksUi and RunUi: sandboxmap.luau) on phones, a computer and
 a big screen: on the screen, clear of the rest, nothing on each other, the words fitting, a finger's size, the fog.
@@ -272,7 +272,7 @@ local NumberSequence, NumberSequenceKeypoint = mock.NumberSequence, mock.NumberS
     found = '''local __require = require
 local function require(module) if type(module) == "table" and module.fakeModule ~= nil then return module.fakeModule end return __require(module) end
 '''
-    for name in ("SandboxGuide", "MovingHud", "MoveHelperHud", "MoveStoryUi", "Portrait", "CardKit", "TouchLayout", "MoveLayout", "TopBlocks", "PadGlyph", "RunUi"):  # (8.3 keys: PadGlyph; 9.7: RunUi's pad)
+    for name in ("SandboxGuide", "MovingHud", "MoveHelperHud", "MoveStoryUi", "Portrait", "CardKit", "TouchLayout", "MoveLayout", "TopBlocks", "PadGlyph", "RunUi", "PlayUi"):  # (8.3 keys: PadGlyph; 10.4: RunUi's lobby, its PlayUi)
         text = (ROOT / f"src/client/{name}.luau").read_text()
         text = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', text)
         (dest / f"{name}.luau").write_text(prefix + (found if name == "SandboxGuide" else "") + text)
@@ -403,15 +403,26 @@ from drivepedalsenv import drivepedals_env  # noqa: E402
 with tempfile.TemporaryDirectory() as folder:
     drivepedals_env(Path(folder))
     subprocess.run([args.luau, "drivepedals.luau"], cwd=folder, check=True)
-# 9.7 runs: the pad panel and the run's results card (client/RunUi.luau) beside the real SandboxHud and SandboxTasksUi
-# and Hud's groups: tools/phone-ui/runs.luau (runsenv.py builds the folder) at 844 x 390, 667 x 375, 1280 x 800 and
-# 1920 x 1080: on the screen, clear of the chips, the groups and the touch controls, the words fitting, a finger's size
-# on a phone (the difficulty buttons, OK), the host's pick sent, a locked one said, the card's list scrolling.
+# 9.7 runs: the run's results card (client/RunUi.luau) beside the real SandboxHud and SandboxTasksUi and Hud's groups:
+# tools/phone-ui/runs.luau (runsenv.py builds the folder) at 844 x 390, 667 x 375, 1280 x 800 and 1920 x 1080: on the
+# screen, clear of the chips, the groups and the touch controls, the words fitting, a finger's size on a phone (OK), the
+# card's list scrolling.
 from runsenv import runs_env  # noqa: E402
 
 with tempfile.TemporaryDirectory() as folder:
     runs_env(Path(folder))
     subprocess.run([args.luau, "runs.luau"], cwd=folder, check=True)
+# 10.4 the PLAY panel and the lobby bar (client/PlayUi.luau, RunUi starts it) beside the real SandboxHud and
+# SandboxTasksUi and Hud's groups: tools/phone-ui/play.luau (runsenv.py's play_env builds the folder; play_preview.py
+# draws the same scenes) at 844 x 390, 667 x 375, 1280 x 800 and 1920 x 1080: OPEN LOBBIES (JOIN), CREATE A LOBBY (the
+# houses, the difficulty, PUBLIC / FRIENDS ONLY, CREATE), YOUR LOBBY (the host's KICK, READY, START, CANCEL, CHANGE HOUSE,
+# LEAVE; a member's READY), the lobby bar away from the circle (OPEN, ✕, ESC): whole on the screen, the bar clear of the
+# rest, the words fitting, a finger's size on a phone, every request.
+from runsenv import play_env  # noqa: E402
+
+with tempfile.TemporaryDirectory() as folder:
+    play_env(Path(folder))
+    subprocess.run([args.luau, "play.luau"], cwd=folder, check=True)
 # 9.x loot: the stars over the pieces, the toast and the outlines (client/LootStars.luau, client/LootOutline.luau with
 # shared/LootRules.luau and shared/OutlinePick.luau) beside client/Hud.luau's column: tools/phone-ui/loot.luau on phones
 # held sideways (844 x 390, 667 x 375) and computers (1280 x 800, 1920 x 1080) (lootenv.py builds the folder;
@@ -425,11 +436,11 @@ with tempfile.TemporaryDirectory() as folder:
     loot_env(Path(folder))
     subprocess.run([args.luau, "loot.luau"], cwd=folder, check=True)
 # 10.x the map: the big map (client/SandboxMapUi.luau with client/SandboxMapDraw.luau, client/SandboxMapData.luau and
-# shared/SandboxMapRules.luau: the lobby's plan with the portals' live states, a run's house with its yard, the loot's
+# shared/SandboxMapRules.luau: the lobby's plan with the PLAY circle and its open lobbies (10.4), a run's house with its yard, the loot's
 # fog) and a run's minimap (client/SandboxMiniMap.luau) beside the real SandboxHud, SandboxTasksUi and RunUi:
 # tools/phone-ui/sandboxmap.luau (sandboxmapenv.py builds the folder; sandboxmap_preview.py draws the same scenes) at
 # 844 x 390, 667 x 375, 1280 x 800 and 1920 x 1080: on the screen, nothing on each other, the words fitting, a finger's
-# size, the 🗺 MAP chip, M / ESC / L2 / B, a portal's pick for the guide, the minimap clear of the HUD, no warnings.
+# size, the 🗺 MAP chip, M / ESC / L2 / B, the PLAY circle's pick for the guide, the minimap clear of the HUD, no warnings.
 from sandboxmapenv import sandboxmap_env  # noqa: E402
 
 with tempfile.TemporaryDirectory() as folder:

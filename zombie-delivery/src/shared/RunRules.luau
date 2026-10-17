@@ -1,7 +1,8 @@
 --!strict
 -- 9.7 RUNS (Config.Runs; the owner: "like Dungeon Quest: from the lobby you go into a house, alone, with friends or with
--- Danny"): the rules of a run, pure (no Roblox: tests/runrules_test.luau). server/Runs.luau runs the pads and the runs
--- with them, client/RunUi.luau shows them.
+-- Danny"): the rules of a run, pure (no Roblox: tests/runrules_test.luau). server/Runs.luau runs the runs with them,
+-- client/RunUi.luau shows them. 10.4: the parties gather in lobbies at the PLAY circle first (shared/PartyRules.luau;
+-- the portals' pads and their countdowns are gone).
 --
 -- The difficulties (Config.Runs.Difficulties, in order: easy, normal, hard, insane, nightmare): a run's
 -- contract.difficulty. A player has the first `count` of them open (profile.runUnlocked: Open at first); finishing a
@@ -17,16 +18,7 @@
 --   RunRules.unlock(count, id) -> (count, opened?)   a run finished at `id`: the count after it and the id it opened
 --                                    (nil: none new)
 --   RunRules.choose(count, want) -> id   the difficulty a host gets: `want` when open, else the hardest open one under
---                                    it (a host's pick checked again when the host changes)
---
--- A portal's pad (one per house): who stands on it in the order they stepped on, the host (the first), the countdown.
---   RunRules.newPad() -> Pad
---   RunRules.padStep(pad, here, now, countdown) -> changed   `here`: the user ids on the pad now (any order: the ones
---                                    already there keep their places, newcomers join at the end in `here`'s order);
---                                    the first on an empty pad starts the countdown (endsAt); nobody left clears it
---   RunRules.party(pad, most) -> { id }   who goes: the first `most` on the pad
---   RunRules.due(pad, now) -> bool   the countdown is over (somebody on it)
---   RunRules.left(pad, now) -> s     whole seconds left of the countdown (0: none or over)
+--                                    it (10.4: a party lobby's host's pick: shared/PartyRules.luau)
 --
 -- In a run:
 --   RunRules.voteDone(votes, members) -> bool   everybody in the run (still there) asked to FINISH
@@ -41,7 +33,6 @@ local RunRules = {}
 local R = Config.Runs
 local LIST = R.Difficulties
 
-export type Pad = { order: { number }, endsAt: number?, difficulty: string, host: number? }
 export type Piece = { value: number, to: number }
 export type Summary = { count: number, value: number, mine: number, mineValue: number }
 
@@ -104,76 +95,6 @@ function RunRules.choose(count: number, want: any): string
 	local n = RunRules.index(want) or (RunRules.index(R.Default) :: number)
 	local open = math.clamp(count, R.Open, #LIST)
 	return LIST[math.min(n, open)].id
-end
-
--- ── The pads ───────────────────────────────────────────────────────────────
-
-function RunRules.newPad(): Pad
-	return { order = {}, endsAt = nil, difficulty = R.Default, host = nil }
-end
-
-function RunRules.padStep(pad: Pad, here: { number }, now: number, countdown: number): boolean
-	local present: { [number]: boolean } = {}
-	for _, id in here do
-		present[id] = true
-	end
-	local changed = false
-	local kept: { number } = {}
-	local seen: { [number]: boolean } = {}
-	for _, id in pad.order do
-		if present[id] and not seen[id] then
-			table.insert(kept, id)
-			seen[id] = true
-		else
-			changed = true
-		end
-	end
-	local wasEmpty = #kept == 0
-	for _, id in here do
-		if not seen[id] then
-			table.insert(kept, id)
-			seen[id] = true
-			changed = true
-		end
-	end
-	pad.order = kept
-	if #kept == 0 then
-		if pad.endsAt ~= nil or pad.host ~= nil then
-			changed = true
-		end
-		pad.endsAt, pad.host, pad.difficulty = nil, nil, R.Default
-		return changed
-	end
-	if wasEmpty or pad.endsAt == nil then
-		pad.endsAt = now + countdown
-		changed = true
-	end
-	if pad.host ~= kept[1] then
-		pad.host = kept[1]
-		changed = true
-	end
-	return changed
-end
-
-function RunRules.party(pad: Pad, most: number): { number }
-	local out: { number } = {}
-	for n, id in pad.order do
-		if n > most then
-			break
-		end
-		table.insert(out, id)
-	end
-	return out
-end
-
-function RunRules.due(pad: Pad, now: number): boolean
-	local at = pad.endsAt
-	return at ~= nil and #pad.order > 0 and now >= at
-end
-
-function RunRules.left(pad: Pad, now: number): number
-	local at = pad.endsAt
-	return if at then math.max(0, math.ceil(at - now)) else 0
 end
 
 -- ── In a run ───────────────────────────────────────────────────────────────

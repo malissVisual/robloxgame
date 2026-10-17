@@ -19,7 +19,7 @@
 --     holds fewer pieces than the big house (Config.Furniture's Spots and collectibles, and the plans themselves:
 --     HouseLayout.plan), gets less time, about the same minutes a piece
 --   * the guide's words and places per house: its name ("The Pond Cabin"), at the place by its own lot
---   * the places spread apart (each its own spot, 250 studs and more); 9.7 the lobby's portals a short walk from its
+--   * the places spread apart (each its own spot, 250 studs and more); 10.4 the lobby's PLAY circle a short walk from its
 --     spawn
 -- Run with tests/run_tests.py.
 local Config = require("./Config")
@@ -324,19 +324,20 @@ do
 	end
 	check("every door on its box's face (a place's 1.2 behind it), looking out to its own yard (9.7 the farmstead's too: no turnaround), its curb there", bad == nil, bad)
 end
--- 9.7 runs: nobody drives; the guide's path is straight (in the lobby to a portal, in a zone to the door or the truck)
+-- 9.7 runs: nobody drives; the guide's path is straight (10.4 in the lobby to the PLAY circle, in a zone to the door or the
+-- truck)
 do
 	local out: { number } = {}
 	local bad: string? = nil
 	local spawn = SandboxMap.Lobby.spawn
 	local farthest = 0
-	for _, portal in SandboxMap.Lobby.portals do
-		local px, pz = (portal.pad.x0 + portal.pad.x1) / 2, (portal.pad.z0 + portal.pad.z1) / 2
+	do
+		local px, pz = SandboxMap.Lobby.play.x, SandboxMap.Lobby.play.z
 		local n = SandboxSteps.route(spawn.x, spawn.z, px, pz, out, Config.SandboxGuide.Direct)
 		if n ~= 2 or out[3] ~= px or out[4] ~= pz then
-			bad = `to {portal.house}'s pad: {n} points`
+			bad = `to the PLAY circle: {n} points`
 		end
-		farthest = math.max(farthest, math.sqrt((px - spawn.x) ^ 2 + (pz - spawn.z) ^ 2))
+		farthest = math.sqrt((px - spawn.x) ^ 2 + (pz - spawn.z) ^ 2)
 	end
 	for _, z in SandboxMap.Zones do
 		local h = SandboxMap.house(z.id) :: SandboxMap.House
@@ -345,8 +346,8 @@ do
 			bad = `{z.id}: from its arrival to its curb {n} points`
 		end
 	end
-	check("9.7: the guide's path straight (no road to follow): from the lobby's spawn to every portal's pad, from a zone's arrival to its truck", bad == nil, bad)
-	check(`…every portal a short walk from the spawn (the farthest {math.floor(farthest)} studs: under 15 s on foot)`, farthest < 15 * 16, farthest)
+	check("9.7: the guide's path straight (no road to follow): 10.4 from the lobby's spawn to the PLAY circle, from a zone's arrival to its truck", bad == nil, bad)
+	check(`…10.4 the PLAY circle a short walk from the spawn ({math.floor(farthest)} studs: under 4 s on foot)`, farthest < 4 * Config.Movement.Walk, farthest)
 end
 
 -- ── The contracts and the economy ──────────────────────────────────────────

@@ -17,15 +17,15 @@
 --     with MoveHelper; the zombies within Config.SandboxMapUi.Zombies studs of you), loot() (seen, not carried out, its
 --     rarity, its pulse), dangers() (the tags of Config.SandboxMapUi.Danger with their Open and Kind), truck() (the van
 --     in workspace.Cars with Config.Runs.Truck.Attribute in the house's run zone, else its curb), status() (the clock,
---     IN THE TRUCK n / total, the van's fill, the difficulty), portals() (their models' RunState, RunEndsAt, RunWho,
---     RunDifficulty: server/Runs.luau), plots() (whose they are: the players' Plot; their level: workspace.Warehouses'
---     Level<n>). You and your party pinned to the yard's strip when out of it (`pinned`).
+--     IN THE TRUCK n / total, the van's fill, the difficulty), 10.4 lobbies() (the PLAY circle model's attribute
+--     Config.Runs.Party.Attribute: server/Parties.luau's open lobbies and the runs now, shared/PartyRules.luau decode),
+--     plots() (whose they are: the players' Plot; their level: workspace.Warehouses' Level<n>). You and your party pinned to the yard's strip when out of it (`pinned`).
 -- Kept by signals (the tags' added / removed, the folders' ChildAdded / ChildRemoved): no GetDescendants.
 --   SandboxMapData.start()                     once (Main starts client/SandboxMapUi.luau, which starts it)
 --   SandboxMapData.place() -> Place
 --   SandboxMapData.locate(place, at) -> (x, z, where)   a world point in the place's studs; where "lobby" | "house" |
 --                                              "yard" | "zone" (in the run's zone, off the strip) | nil (not there)
---   SandboxMapData.people(place) / loot(place) / dangers(place) / truck(place) / status(place) / portals() / plots()
+--   SandboxMapData.people(place) / loot(place) / dangers(place) / truck(place) / status(place) / lobbies() / plots()
 --   SandboxMapData.look()                      one look of the fog (the loop's; the checks')
 --   SandboxMapData.seen(model) -> boolean      seen in this interior
 
@@ -36,6 +36,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Net = require(Shared.Net)
+local PartyRules = require(Shared.PartyRules)
 local RunRules = require(Shared.RunRules)
 local SandboxMap = require(Shared.SandboxMap)
 local Rules = require(Shared.SandboxMapRules)
@@ -60,7 +61,6 @@ export type Person = { name: string, kind: string, x: number, z: number, lookX: 
 export type Loot = { model: Instance, x: number, z: number, rarity: string, state: string?, pulse: boolean, where: string }
 export type Danger = { tag: string, x: number, z: number, open: boolean, kind: string?, where: string }
 export type Status = { left: number?, out: number, total: number, fill: number, difficulty: string?, color: { number }? }
-export type PortalState = { house: string, name: string, state: string, endsAt: number?, who: string?, difficulty: string? }
 export type PlotView = { id: number, owner: string?, mine: boolean, level: number }
 
 local started = false
@@ -434,37 +434,12 @@ function SandboxMapData.status(place: Place): Status?
 	}
 end
 
-function SandboxMapData.portals(): { PortalState }
-	local out: { PortalState } = {}
-	local models: { [string]: Instance } = {}
+-- 10.4: the PLAY circle's open lobbies and the runs now (server/Parties.luau's attribute on the PLAY circle's model).
+function SandboxMapData.lobbies(): { PartyRules.Entry }
 	local world = workspace:FindFirstChild("Sandbox")
 	local lobby = world and world:FindFirstChild("Lobby")
-	local folder = lobby and lobby:FindFirstChild("Portals")
-	if folder then
-		for _, model in folder:GetChildren() do
-			local house = model:GetAttribute("RunPortal")
-			if type(house) == "string" then
-				models[house] = model
-			end
-		end
-	end
-	for _, p in SandboxMap.Lobby.portals do
-		local model = models[p.house]
-		local state = if model then model:GetAttribute("RunState") else nil
-		local endsAt = if model then model:GetAttribute("RunEndsAt") else nil
-		local who = if model then model:GetAttribute("RunWho") else nil
-		local difficulty = if model then model:GetAttribute("RunDifficulty") else nil
-		local def = RunRules.def(difficulty)
-		table.insert(out, {
-			house = p.house,
-			name = p.name,
-			state = (if state == "wait" or state == "use" then state else "free") :: string,
-			endsAt = if type(endsAt) == "number" then endsAt else nil,
-			who = if type(who) == "string" then who else nil,
-			difficulty = if def then def.name else nil,
-		})
-	end
-	return out
+	local circle = lobby and lobby:FindFirstChild("PlayCircle")
+	return PartyRules.decode(if circle then circle:GetAttribute(Config.Runs.Party.Attribute) else nil)
 end
 
 function SandboxMapData.plots(): { PlotView }

@@ -7,10 +7,10 @@
 --   * The lobby (SandboxMap.Lobby, north up): the meadow in its hedge, the plaza and the fountain, the trees and the
 --     lamps, the four plots with their warehouses at their level (WarehouseLayout.site) and their UPGRADES desks (yours
 --     outlined in gold: YOUR WAREHOUSE, the others' their owner's name or FREE), the PAINT shop, the TOP MOVERS board,
---     the ZDC DISPATCH (and the Auction House while Config.Auction.On), the six portals: the gate in its house's colours
---     (Config.Runs.Portal.Styles), the pad in its state's colour (Free, Waiting, InUse) and its name with its state's
---     line beside it on the plaza's side (a button: onPortal). The words are placed one by one, each at the first of its
---     spots that is on the map and on no other (the portals' first; a map too crowded for their lines: their names).
+--     the DISPATCH (and the Auction House while Config.Auction.On), 10.4 the PLAY circle (its ring in its state's
+--     colour: Config.Runs.Play's Free, Waiting while a lobby counts down; PLAY on a dark pill and its line, "2 OPEN
+--     LOBBIES", beside it; a button: onPlay). The words are placed one by one, each at the first of its spots that is
+--     on the map and on no other (PLAY's first, then your warehouse, then the rest).
 --   * A run's house (its plan, the front door at the bottom): the yard's strip (its grass, its asphalt), the house's
 --     walls (its box) with the rooms' floors in them (their kinds' colours, their names where they fit), the doorways
 --     (the ways out green: FRONT DOOR, BACK DOOR), the windows, the fixtures that stand in the way.
@@ -18,9 +18,10 @@
 --     pulses: a looping tween, no frame loop), the dangers (their icons: Config.SandboxMapUi.Danger, a hazard's by its
 --     Kind), the truck, the zombies (red dots), the helpers (orange) and the party or the players (gold / blue) with
 --     their names, you a white ▲ turned your way (on top). A pinned one (out of the yard's strip) is drawn faded.
---   SandboxMapDraw.lobby(parent, frame, u, w, h, onPortal?, plots?) -> Canvas   a w × h px canvas (plots: SandboxMapData's)
+--   SandboxMapDraw.lobby(parent, frame, u, w, h, onPlay?, plots?) -> Canvas   a w × h px canvas (plots: SandboxMapData's)
 --   SandboxMapDraw.house(parent, frame, u, w, h, place, mini?) -> Canvas        (the minimap's: no names, its own size)
---   SandboxMapDraw.portals(canvas, states, now)      the pads' colours and the lines (a look)
+--   SandboxMapDraw.play(canvas, entries)             10.4: the PLAY circle's colour and line (a look; entries:
+--                                                    SandboxMapData.lobbies)
 --   SandboxMapDraw.marks(canvas, people, loot, dangers, truck)   the markers (a look)
 --   SandboxMapDraw.width(text, size, font) -> px     a text's width (TextService)
 -- Presentation only.
@@ -48,13 +49,10 @@ export type Canvas = {
 	frame: Rules.Frame,
 	u: number,
 	mini: boolean,
-	portals: { [string]: { pad: Frame, line: TextLabel, name: TextLabel, key: string } },
+	play: { ring: Frame, stroke: UIStroke, name: TextLabel, line: TextLabel, key: string }?, -- (10.4: the PLAY circle)
 	pool: { people: { any }, loot: { any }, danger: { any }, truck: any?, me: any? },
-	onPortal: ((house: string) -> ())?,
+	onPlay: (() -> ())?,
 	placed: { { x0: number, y0: number, x1: number, y1: number } }, -- (the lobby's words placed: none on another)
-	long: boolean, -- (a roomy lobby: its portals' lines with who is there; a small one's short: the side column says who)
-	portalWords: { { name: TextLabel, line: TextLabel, spots: { { number } } } }, -- (the portals' words, placed together)
-	lines: boolean, -- (the portals' state lines on the map: false when they would cover each other)
 }
 
 local function rgb(c: { number }): Color3
@@ -134,14 +132,14 @@ local function newCanvas(parent: Instance, frame: Rules.Frame, u: number, mini: 
 		BorderSizePixel = 0,
 		ClipsDescendants = not mini,
 	}, parent)
-	return { root = root, frame = frame, u = u, mini = mini, portals = {}, pool = { people = {}, loot = {}, danger = {}, truck = nil, me = nil }, onPortal = nil, placed = {}, long = frame.scale >= C.LongScale, portalWords = {}, lines = true }
+	return { root = root, frame = frame, u = u, mini = mini, play = nil, pool = { people = {}, loot = {}, danger = {}, truck = nil, me = nil }, onPlay = nil, placed = {} }
 end
 
 -- ── The lobby ────────────────────────────────────────────────────────────────
 
 -- Words where they are clear: the first of `spots` ({ x, y, ax, ay } px: an AnchorPoint at that point) where the labels
 -- (stacked, 2 px apart, aligned by ax) stay in the canvas and off every label placed before; none: the first spot when
--- they must show, else they hide. The portals go first, then your warehouse, then the rest.
+-- they must show, else they hide. PLAY goes first (10.4), then your warehouse, then the rest.
 type Spot = { number }
 local function settle(canvas: Canvas, labels: { TextLabel }, spots: { Spot }, must: boolean): boolean
 	local w, h = 0, 0
@@ -212,55 +210,30 @@ local function around(x0: number, y0: number, x1: number, y1: number, gap: numbe
 	}
 end
 
-local function portal(canvas: Canvas, p: SandboxMap.Portal, size: number)
-	local style = R.Portal.Styles[p.house] or R.Portal.Styles.sandbox_house
-	local foot = area(canvas, `Portal_{p.house}`, p.foot.x0, p.foot.z0, p.foot.x1, p.foot.z1, rgb(style.wall), 3)
-	edge(foot, rgb(style.trim), 2)
-	local pad = area(canvas, `Pad_{p.house}`, p.pad.x0, p.pad.z0, p.pad.x1, p.pad.z1, rgb(R.Portal.Free), 3)
-	edge(pad, K.charcoal, 1, 0.3)
-	-- its name (on a dark pill) over its state's line (its colour's words with a dark edge) on the plaza's side of the pad
-	-- (the way the gate looks), else on another side where they are clear; the line's room is kept for the longest
-	-- words it says (a roomy map's: LineEm × its size, cut at their end past it; a small map's short line: FREE,
-	-- STARTING IN 10, IN USE · NIGHTMARE)
+-- 10.4 the PLAY circle: a round floor with its ring (Play.Free; Waiting while a lobby counts down), PLAY on a dark pill
+-- and its line under it ("STEP IN", "2 OPEN LOBBIES", "STARTING") beside the circle where they are clear (placed first),
+-- a button over it (onPlay: the guide shows the way).
+local function playCircle(canvas: Canvas, size: number): { labels: { TextLabel }, spots: { Spot } }
+	local p = SandboxMap.Lobby.play
+	local x0, y0, x1, y1 = pxBox(canvas, p.x - p.r, p.z - p.r, p.x + p.r, p.z + p.r)
+	local ring = block(canvas.root, "PlayCircle", x0, y0, x1, y1, color("PlayFloor"), 4)
+	round(ring)
+	local stroke = Ui.make("UIStroke", { Name = "Ring", Color = rgb(R.Play.Free), Thickness = math.max(2, math.floor(R.Play.Ring * canvas.frame.scale + 0.5)),
+		ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, ring)
 	local small = Rules.textSize(C.Text.Small, canvas.u)
-	local name = words(canvas.root, `PortalName_{p.house}`, string.upper(p.name), 0, 0, 0, 0, size, K.text, 6, true)
-	local line = words(canvas.root, `PortalLine_{p.house}`, if canvas.long then "FREE · WALK ONTO THE PAD" else "FREE", 0, 0, 0, 0, small, rgb(R.Portal.Free), 6, false, true)
-	line.TextStrokeColor3 = K.charcoal
-	line.TextStrokeTransparency = 0.15
-	local room = math.floor(small * C.LineEm + 2)
-	if not canvas.long then
-		room = SandboxMapDraw.width("STARTING IN 10", small, Theme.HeadingFont) + 2
-		for _, def in R.Difficulties do
-			room = math.max(room, SandboxMapDraw.width(`IN USE · {string.upper(def.name)}`, small, Theme.HeadingFont) + 2)
-		end
-	end
-	line.Size = UDim2.fromOffset(math.max(line.Size.X.Offset, room), line.Size.Y.Offset)
-	line.TextTruncate = Enum.TextTruncate.AtEnd
-	local x0, y0, x1, y1, cx, cy = pxBox(canvas, p.pad.x0, p.pad.z0, p.pad.x1, p.pad.z1)
-	local yaw = p.yaw % 360
-	local gap = 3
-	local right: { Spot } = { { x1 + gap, cy, 0, 0.5 }, { x1 + gap, y1, 0, 0 }, { x1 + gap, y0, 0, 1 } }
-	local left: { Spot } = { { x0 - gap, cy, 1, 0.5 }, { x0 - gap, y1, 1, 0 }, { x0 - gap, y0, 1, 1 } }
-	local over: { Spot } = { { cx, y0 - gap, 0.5, 1 }, { x1, y0 - gap, 0, 1 }, { x0, y0 - gap, 1, 1 } }
-	local under: { Spot } = { { cx, y1 + gap, 0.5, 0 }, { x1, y1 + gap, 0, 0 }, { x0, y1 + gap, 1, 0 } }
-	local order: { { Spot } } = if yaw == 270 then { right, over, under, left } elseif yaw == 90 then { left, over, under, right } elseif yaw == 180 then { under, right, left, over } else { over, right, left, under }
-	local spots: { Spot } = {}
-	for _, side in order do
-		for _, spot in side do
-			table.insert(spots, spot)
-		end
-	end
-	table.insert(canvas.portalWords, { name = name, line = line, spots = spots })
-	canvas.portals[p.house] = { pad = pad, line = line, name = name, key = "" }
-	-- a button over the gate and the pad: a click or a tap guides you there
-	local onPortal = canvas.onPortal
-	if onPortal then
-		local bx0, by0, bx1, by1 = Rules.rectOn(canvas.frame, math.min(p.foot.x0, p.pad.x0), math.min(p.foot.z0, p.pad.z0), math.max(p.foot.x1, p.pad.x1), math.max(p.foot.z1, p.pad.z1))
+	local name = words(canvas.root, "PlayName", "▶ PLAY", 0, 0, 0, 0, size, rgb(R.Play.Free), 6, true)
+	local line = words(canvas.root, "PlayLine", "STEP IN", 0, 0, 0, 0, small, K.text, 6, true)
+	-- (the line's room kept for its longest words)
+	line.Size = UDim2.fromOffset(math.max(line.Size.X.Offset, SandboxMapDraw.width("6 OPEN LOBBIES", small, Theme.HeadingFont) + 10), line.Size.Y.Offset)
+	name.Size = UDim2.fromOffset(math.max(name.Size.X.Offset, line.Size.X.Offset), name.Size.Y.Offset)
+	canvas.play = { ring = ring, stroke = stroke, name = name, line = line, key = "" }
+	local onPlay = canvas.onPlay
+	if onPlay then
 		local least = if Ui.touchLayout() then Ui.MinTouch else 24
-		local mx, my = (bx0 + bx1) / 2, (by0 + by1) / 2
-		local w, h = math.max(least, bx1 - bx0), math.max(least, by1 - by0)
+		local mx, my = (x0 + x1) / 2, (y0 + y1) / 2
+		local w, h = math.max(least, x1 - x0), math.max(least, y1 - y0)
 		local button = Ui.make("TextButton", {
-			Name = `PortalButton_{p.house}`,
+			Name = "PlayButton",
 			Text = "",
 			BackgroundTransparency = 1,
 			AutoButtonColor = false,
@@ -268,18 +241,17 @@ local function portal(canvas: Canvas, p: SandboxMap.Portal, size: number)
 			Position = UDim2.fromOffset(math.floor(mx - w / 2 + 0.5), math.floor(my - h / 2 + 0.5)),
 			ZIndex = 7,
 		}, canvas.root)
-		button:SetAttribute("Portal", p.house)
-		button.Activated:Connect(function()
-			onPortal(p.house)
-		end)
+		button.Activated:Connect(onPlay)
 	end
+	-- its words: right of it, left of it, under it, over it
+	return { labels = { name, line }, spots = around(x0, y0, x1, y1, 4) }
 end
 
 type Named = { labels: { TextLabel }, spots: { Spot }, must: boolean }
 
-function SandboxMapDraw.lobby(parent: Instance, frame: Rules.Frame, u: number, w: number, h: number, onPortal: ((string) -> ())?, plots: { any }?): Canvas
+function SandboxMapDraw.lobby(parent: Instance, frame: Rules.Frame, u: number, w: number, h: number, onPlay: (() -> ())?, plots: { any }?): Canvas
 	local canvas = newCanvas(parent, frame, u, false, w, h)
-	canvas.onPortal = onPortal
+	canvas.onPlay = onPlay
 	local L = SandboxMap.Lobby
 	local b = L.bounds
 	local label = Rules.textSize(C.Text.Label, u)
@@ -358,27 +330,10 @@ function SandboxMapDraw.lobby(parent: Instance, frame: Rules.Frame, u: number, w
 	if Config.Auction.On then
 		shop("Auction", shops.auction.rect, color("Auction"), "AUCTION HOUSE")
 	end
-	-- the words: the portals first (each its name over its state's line; when one of them finds no clear place, every
-	-- portal's name alone: their pads' colours and the side column's HOUSES say the state), your warehouse, then the
-	-- rest where they are clear
-	for _, p in L.portals do
-		portal(canvas, p, label)
-	end
+	-- the words: PLAY first (its name over its line, 10.4), your warehouse, then the rest where they are clear
+	local play = playCircle(canvas, label)
 	canvas.placed = {}
-	for _, pw in canvas.portalWords do
-		if not settle(canvas, { pw.name, pw.line }, pw.spots, false) then
-			canvas.lines = false
-			break
-		end
-	end
-	if not canvas.lines then
-		canvas.placed = {}
-		for _, pw in canvas.portalWords do
-			pw.line.Visible = false
-			pw.name.Visible = true
-			settle(canvas, { pw.name }, pw.spots, true)
-		end
-	end
+	settle(canvas, play.labels, play.spots, true)
 	if mineFirst then
 		settle(canvas, mineFirst.labels, mineFirst.spots, true)
 	end
@@ -388,26 +343,22 @@ function SandboxMapDraw.lobby(parent: Instance, frame: Rules.Frame, u: number, w
 	return canvas
 end
 
-function SandboxMapDraw.portals(canvas: Canvas, states: { any }, now: number)
-	local P = R.Portal
-	for _, s in states do
-		local view = canvas.portals[s.house]
-		if view then
-			local who: { string } = {}
-			if type(s.who) == "string" then
-				who = string.split(s.who, ", ")
-			end
-			local text, tone = Rules.portal(s.state, s.endsAt, now, Rules.names(who, C.MapNames), s.difficulty, if canvas.long then "long" else "short")
-			local key = `{text}|{tone}`
-			if key ~= view.key then
-				view.key = key
-				local c = rgb(if tone == "use" then P.InUse elseif tone == "wait" then P.Waiting else P.Free)
-				view.pad.BackgroundColor3 = c
-				view.line.Text = text
-				view.line.TextColor3 = c
-			end
-		end
+function SandboxMapDraw.play(canvas: Canvas, entries: { any })
+	local view = canvas.play
+	if not view then
+		return
 	end
+	local text, tone = Rules.playLine(entries)
+	local key = `{text}|{tone}`
+	if key == view.key then
+		return
+	end
+	view.key = key
+	local c = rgb(if tone == "starting" then R.Play.Waiting else R.Play.Free)
+	view.stroke.Color = c
+	view.name.TextColor3 = c
+	view.line.Text = text
+	view.line.TextColor3 = if tone == "starting" then c else K.text
 end
 
 -- ── A run's house ────────────────────────────────────────────────────────────

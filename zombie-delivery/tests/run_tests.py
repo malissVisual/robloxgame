@@ -34,7 +34,8 @@ PURE += ("CountryLooks",)  # 9.4 sandbox, the countryside's art kit (tests/count
 PURE += ("HouseRoute",)  # 9.0 Danny's way inside a house, on its plan's grid (tests/houseroute_test.luau, tests/dannynav_runtime_test.luau; 9.3 his walk along it, audited against the built parts: tests/movehelper_stuck_runtime_test.luau)
 PURE += ("PedalRules",)  # 9.1 the drive pedals: the input, the press, where they go (tests/drivepedals_test.luau)
 PURE += ("CharacterLooks", "SaveSlotRules")  # 10.1 the start: the courier you make, the save slots (tests/characterlooks_test.luau, tests/saveslots_test.luau, tests/saveslots_runtime_test.luau)
-PURE += ("RunRules",)  # 9.7 runs: the difficulties and their unlocks, the pads, the votes, whose stock (tests/runrules_test.luau)
+PURE += ("RunRules",)  # 9.7 runs: the difficulties and their unlocks, the votes, whose stock (tests/runrules_test.luau)
+PURE += ("PartyRules",)  # 10.4 the party lobbies at the PLAY circle: make, join, leave, kick, READY, START, the map's copy (tests/partyrules_test.luau)
 PURE += ("LootRules",)  # 9.x loot: a house's pieces' rarities by the difficulty, the stars, the toasts (tests/loot_test.luau)
 PURE += ("SandboxMapRules",)  # 10.x the map: the plan's code, the frames, the yard, the fog, the words, the layout (tests/sandboxmaprules_test.luau)
 PURE += ("DangerRules",)  # 10.x danger: a run's locks, keys, vault and hazards on the real plans (tests/danger_test.luau; it requires FurnitureLooks, the recorder's copy below)
@@ -515,12 +516,12 @@ with tempfile.TemporaryDirectory() as tmp:
            "\n".join(c_spots), "\n".join(c_marks), "\n".join(c_fields), "\n".join(c_lawns), "\n".join(c_woods), rect(country["orchard"]),
            "\n".join(c_streams), "\n".join(c_lines), "\n".join(c_area_lines), "\n".join(c_zones)))
     # 9.7 runs: the lobby's plan (design/lobby/plan.json, design/lobby/plan.py writes it) as LobbyPlan.luau for
-    # tests/lobby_test.luau (SandboxMap.Lobby against it, the Auction House and the TOP MOVERS board in it)
+    # tests/lobby_test.luau (SandboxMap.Lobby against it: 10.4 its PLAY circle; the Auction House and the TOP MOVERS board in it)
     lobby_plan = json.load(open(os.path.join(os.path.dirname(HERE), "design", "lobby", "plan.json"), encoding="utf-8"))
     open(os.path.join(tmp, "LobbyPlan.luau"), "w", encoding="utf-8").write(
-        "return {\nbounds = %s,\nfar = %r,\nportals = {\n%s\n},\nauction = %s,\nleaders = %s,\npaint = %s,\n}\n"
-        % (rect(lobby_plan["bounds"]), lobby_plan["far"],
-           "\n".join("\t{ house = %s, x = %r, z = %r, yaw = %r, pad = %s }," % (q(p["house"]), p["x"], p["z"], p["yaw"], rect(p["pad"])) for p in lobby_plan["portals"]),
+        "return {\nbounds = %s,\nfar = %r,\nplay = { x = %r, z = %r, r = %r, back = %s },\nauction = %s,\nleaders = %s,\npaint = %s,\n}\n"
+        % (rect(lobby_plan["bounds"]), lobby_plan["far"], lobby_plan["play"]["x"], lobby_plan["play"]["z"], lobby_plan["play"]["r"],
+           spot_text(lobby_plan["play"]["back"]),
            spot_text(lobby_plan["shops"]["auction"]["spot"]), spot_text(lobby_plan["shops"]["leaders"]["spot"]), rect(lobby_plan["shops"]["paint"]["rect"])))
     # 8.0.1 review: the real server/SandboxPlots.luau as SandboxPlotsServer.luau for tests/sandboxplots_runtime_test.luau:
     # a function of the globals it reads (the test's own Players, ReplicatedStorage and task, and a `require` that gives

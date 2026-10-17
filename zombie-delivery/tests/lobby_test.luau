@@ -1,17 +1,20 @@
 -- 9.7 RUNS, the lobby (design/lobby/plan.py, plan.json; shared/SandboxMap.luau Lobby, written by tools/lobby/sandboxmap.py;
 -- server/LobbyWorld.luau builds it, server/SandboxWorld.luau calls it): the owner's "shrink the map and put things quite
--- close together, so that it's one little lobby".
+-- close together, so that it's one little lobby"; 10.4 "make the map smaller, and on the map just one circle where you'd
+-- stand, like PLAY".
 --   * the data: SandboxMap.Lobby is the plan's (LobbyPlan.luau, tests/run_tests.py writes it from plan.json): its
---     bounds, its six portals (one a place to empty, their pads), the Auction House's, the TOP MOVERS board's and the
---     PAINT shop's spots; small (crossed in under a minute), every run zone far from it (Lobby.far), the plots in it,
---     the spawn on its plaza; every pad apart, a party's back spot off every pad;
+--     bounds (smaller than 9.7's 480 × 400), its PLAY circle (its radius Config.Runs.Play.Radius, on the plaza, the way
+--     back off it facing it), the Auction House's, the TOP MOVERS board's and the PAINT shop's spots; every run zone far
+--     from it (Lobby.far), the plots in it, the spawn on its plaza; a few seconds' walk from the circle to the spawn,
+--     every warehouse's door and every shop;
 --   * the world the real server/SandboxWorld.luau builds (SandboxWorldServer.luau on tools/perf/world-mock.luau, the
 --     Auction House on): the Lobby model (Persistent) in workspace.Sandbox, every part of it in the lobby's bounds and
---     anchored; the plaza flush with the meadow; the hedge round it and the invisible walls on its bounds; each portal
---     its gate, facade (its house's detail), sign (its name, WALK ONTO THE PAD) and glowing pad (RunPad: Neon, no
---     collision); the ZDC dispatch (RunDispatch), the PAINT shop's booth (its prompt), the lamps and the trees as the
---     plan has them; nothing that collides on a pad, a back spot, the spawns, the dispatch's or the paint shop's front;
---     the Auction House in the lobby off every portal; nothing of the countryside in the lobby.
+--     anchored; the plaza flush with the meadow; the hedge round it and the invisible walls on its bounds; the PLAY
+--     circle (its glowing ring, its floor and glow, PLAY on the ground, its four lit posts outside it, the floating sign:
+--     ▶ PLAY, STEP IN TO PLAY; nothing on its ground collides; the map's attribute "[]"); no portals any more; the
+--     Deliveros dispatch (RunDispatch), the PAINT shop's booth (its prompt), the lamps and the trees as the plan has
+--     them; nothing that collides in the circle, on the way back, the spawns, the dispatch's or the paint shop's front;
+--     the Auction House in the lobby off the circle; nothing of the countryside in the lobby.
 -- Run with tests/run_tests.py.
 local Mock = require("./WorldMock")
 local G = Mock.globals
@@ -55,29 +58,22 @@ end
 
 do
 	check("SandboxMap.Lobby's bounds and Far the plan's", same(L.bounds, Plan.bounds) and L.far == Plan.far and L.far >= 1000)
-	local portalsOk = #L.portals == #Plan.portals and #L.portals == 6
-	for n, p in Plan.portals do
-		local mine = L.portals[n]
-		portalsOk = portalsOk and mine ~= nil and mine.house == p.house and mine.x == p.x and mine.z == p.z and mine.yaw == p.yaw and same(mine.pad, p.pad)
-	end
-	check("…its six portals the plan's (house, gate, yaw, pad)", portalsOk)
+	local p = L.play
+	check("10.4 …its PLAY circle the plan's (its middle, its radius, the way back); its radius Config.Runs.Play.Radius", p.x == Plan.play.x and p.z == Plan.play.z
+		and p.r == Plan.play.r and p.back.x == Plan.play.back.x and p.back.z == Plan.play.back.z and p.back.yaw == Plan.play.back.yaw and p.r == Config.Runs.Play.Radius
+		and p.r >= 12)
+	check("…no portals any more (one circle for every house)", (L :: any).portals == nil and (SandboxMap :: any).portal == nil)
 	local spotsOk = L.shops.auction.spot.x == Plan.auction.x and L.shops.auction.spot.z == Plan.auction.z and L.shops.leaders.spot.x == Plan.leaders.x
 		and L.shops.leaders.spot.z == Plan.leaders.z and same(L.shops.paint.rect, Plan.paint)
 	check("…the Auction House's, the TOP MOVERS board's and the PAINT shop's spots the plan's; Config.Auction.House.Spot the lobby's", spotsOk
-		and Config.Auction.House.Spot.x == L.shops.auction.spot.x and Config.Auction.House.Spot.z == L.shops.auction.spot.z)
-	local houses: { [string]: number } = {}
-	for _, p in L.portals do
-		houses[p.house] = (houses[p.house] or 0) + 1
-	end
-	local each = true
-	for _, h in SandboxMap.Houses do
-		each = each and houses[h.id] == 1 and SandboxMap.portal(h.id) ~= nil and SandboxMap.portal(h.id).name == h.name
-	end
-	check("a portal for each of the six places to empty, once (SandboxMap.portal: by its house's id, its name the place's)", each and SandboxMap.portal("nowhere") == nil)
+		and Config.Auction.House.Spot.x == L.shops.auction.spot.x and Config.Auction.House.Spot.z == L.shops.auction.spot.z
+		and Config.Auction.House.Spot.yaw == L.shops.auction.spot.yaw)
+	check("SandboxMap.inPlay: the circle's middle and its edge in it, a stud past it not (nor a margin's worth more)", SandboxMap.inPlay(p.x, p.z)
+		and SandboxMap.inPlay(p.x + p.r - 0.01, p.z) and not SandboxMap.inPlay(p.x + p.r + 1, p.z) and SandboxMap.inPlay(p.x + p.r + 1, p.z, 2))
 	local b = L.bounds
 	local diagonal = math.sqrt((b.x1 - b.x0) ^ 2 + (b.z1 - b.z0) ^ 2)
-	check(`small: {b.x1 - b.x0} × {b.z1 - b.z0} studs (the four plots side by side its width), corner to corner in under 45 s on foot`,
-		diagonal / Config.Movement.Walk < 45 and b.x1 - b.x0 <= 500 and b.z1 - b.z0 <= 500, diagonal / Config.Movement.Walk)
+	check(`10.4 small: {b.x1 - b.x0} × {b.z1 - b.z0} studs (the four plots side by side its width; 9.7: 480 × 400), corner to corner in under 40 s on foot`,
+		diagonal / Config.Movement.Walk < 40 and b.x1 - b.x0 <= 460 and b.z1 - b.z0 <= 240, diagonal / Config.Movement.Walk)
 	local far = math.huge
 	for _, z in SandboxMap.Zones do
 		far = math.min(far, distance(z.rect, b))
@@ -89,23 +85,42 @@ do
 			and SandboxMap.inLobby(plot.warehouse.x, plot.warehouse.z) and SandboxMap.inLobby(plot.vanSpot.x, plot.vanSpot.z)
 	end
 	check("SandboxMap.inLobby: the spawn, the four plots (their warehouses) in it; a house to empty not", inside)
-	local p = L.plaza
-	check("the spawn on the plaza; the dispatch at its edge", L.spawn.x > p.x0 and L.spawn.x < p.x1 and L.spawn.z > p.z0 and L.spawn.z < p.z1
-		and math.abs(L.dispatch.z - p.z0) < 15 and L.dispatch.x > p.x0 and L.dispatch.x < p.x1)
-	local apart, backs = true, true
-	for i, a in L.portals do
-		for j, c in L.portals do
-			if j > i and overlaps(a.pad, c.pad, 4) then
-				apart = false
-			end
-			if overlaps(around(a.back.x, a.back.z, 2), c.pad, 1) then
-				backs = false
-			end
-		end
-		backs = backs and SandboxMap.inLobby(a.back.x, a.back.z) and a.back.yaw == a.yaw
+	local plaza = L.plaza
+	local function inside(x: number, z: number, r: Rect): boolean
+		return x > r.x0 and x < r.x1 and z > r.z0 and z < r.z1
 	end
-	check("every pad 4 studs and more from the next; a party's back spot in the lobby, off every pad, facing the plaza (the portal's way)", apart and backs)
+	check("the spawn on the plaza, looking north at the PLAY circle; the circle on the plaza; the dispatch beside the circle, looking at it",
+		inside(L.spawn.x, L.spawn.z, plaza) and L.spawn.yaw == 0 and L.spawn.z > p.z + p.r and inside(p.x - p.r, p.z - p.r, plaza) and inside(p.x + p.r, p.z + p.r, plaza)
+		and math.abs(L.dispatch.z - p.z) < 1 and L.dispatch.x < p.x - p.r and L.dispatch.yaw == 270)
+	local back = p.back
+	local clear = back.yaw == 0 and SandboxMap.inLobby(back.x, back.z)
+	for n = 0, 3 do
+		local across = (if n % 2 == 1 then -1 else 1) * math.ceil(n / 2) * Config.Runs.Apart
+		clear = clear and not SandboxMap.inPlay(back.x + across, back.z, 2)
+	end
+	check("the way back from a run: in the lobby, a party of four off the circle (2 studs to spare), facing it", clear and back.z > p.z + p.r)
+	local walk = Config.Movement.Walk
+	local function far(ax: number, az: number, bx: number, bz: number): number
+		return math.sqrt((ax - bx) ^ 2 + (az - bz) ^ 2) / walk
+	end
+	local slow: string? = nil
+	if far(L.spawn.x, L.spawn.z, p.x, p.z) > 4 then
+		slow = "the spawn"
+	end
+	for _, plot in SandboxMap.Plots do
+		if far(p.x, p.z, plot.door.x, plot.door.z) > 14 then
+			slow = `plot {plot.id}'s door`
+		end
+	end
+	for name, shop in L.shops do
+		if far(p.x, p.z, shop.spot.x, shop.spot.z) > 10 then
+			slow = `the {name}`
+		end
+	end
+	check("10.4 a few seconds' walk: the spawn to PLAY in 4 s, PLAY to every warehouse's door in 14 s, to every shop in 10 s", slow == nil, slow)
 end
+
+-- ── The worldend
 
 -- ── The world ──────────────────────────────────────────────────────────────
 
@@ -150,12 +165,12 @@ do
 		end
 		anchored = anchored and b.part.Anchored
 	end
-	check(`every part of it ({#parts}) in the lobby's bounds, anchored`, out == nil and anchored and #parts > 100, out)
-	check(`…a lobby within its share of the map's budget ({#parts} parts, at most 700)`, #parts <= 700, #parts)
+	check(`every part of it ({#parts}) in the lobby's bounds, anchored`, out == nil and anchored and #parts > 60, out)
+	check(`…a lobby within its share of the map's budget ({#parts} parts, at most 400)`, #parts <= 400, #parts)
 	local plaza = named("Plaza")[1]
 	check("the plaza: its slab on SandboxMap.Lobby.plaza, its top flush with the meadow", plaza ~= nil and math.abs(plaza.y1 - SandboxMap.GroundTop) < EPS
 		and math.abs(plaza.x0 - L.plaza.x0) < 0.01 and math.abs(plaza.x1 - L.plaza.x1) < 0.01 and math.abs(plaza.z0 - L.plaza.z0) < 0.01, plaza and plaza.y1)
-	check("…its fountain in the middle of it", #named("FountainBasin") == 1 and math.abs((named("FountainBasin")[1].x0 + named("FountainBasin")[1].x1) / 2 - L.fountain.x) < 0.01)
+	check("…its fountain where the plan has it", #named("FountainBasin") == 1 and math.abs((named("FountainBasin")[1].x0 + named("FountainBasin")[1].x1) / 2 - L.fountain.x) < 0.01)
 	local hedges, walls = named("LobbyHedge"), named("LobbyWall")
 	local wallsOk = #walls == 4
 	for _, w in walls do
@@ -170,44 +185,47 @@ do
 end
 
 do
-	local folder = lobby and lobby:FindFirstChild("Portals")
-	local detail: { [string]: string } = { sandbox_house = "Bale", pond_cabin = "Boat", lone_house = "Mailbox", forest_lodge = "Antler", old_mill = "MillWheel",
-		orchard_cottage = "AppleTrunk" }
-	local bad: string? = nil
-	for _, p in L.portals do
-		local model = folder and folder:FindFirstChild(`Portal_{p.house}`)
-		if not model then
-			bad = `{p.house}: no portal`
-			continue
-		end
-		local function has(name: string): any
-			for _, d in model:GetDescendants() do
-				if d.Name == name then
-					return d
-				end
-			end
-			return nil
-		end
-		local pad = model:FindFirstChild("RunPad")
-		local sign = model:FindFirstChild("GateSign")
-		local words = sign and sign:FindFirstChild("Words")
-		local title = words and words:FindFirstChild("Title")
-		local status = words and words:FindFirstChild("Status")
-		if model:GetAttribute("RunPortal") ~= p.house or not has("GatePost") or not has("GateLintel") or not has("Facade") or not has(detail[p.house]) then
-			bad = `{p.house}: its gate, facade or detail`
-		elseif not pad or pad:GetAttribute("RunPad") ~= p.house or pad.CanCollide ~= false or pad.Material ~= Enum.Material.Neon then
-			bad = `{p.house}: its pad`
-		elseif not title or title.Text ~= string.upper(p.name) or not status or status.Text ~= "WALK ONTO THE PAD" then
-			bad = `{p.house}: its sign`
-		else
-			local b = boxOf(pad)
-			if math.abs(b.x0 - p.pad.x0) > 0.01 or math.abs(b.x1 - p.pad.x1) > 0.01 or math.abs(b.z0 - p.pad.z0) > 0.01 or math.abs(b.z1 - p.pad.z1) > 0.01 then
-				bad = `{p.house}: its pad off its rect`
+	local p = L.play
+	local circle = lobby and lobby:FindFirstChild("PlayCircle")
+	local function all(name: string): { any }
+		local out = {}
+		for _, d in (if circle then circle:GetDescendants() else {}) do
+			if d.Name == name then
+				table.insert(out, d)
 			end
 		end
+		return out
 	end
-	check("six portals (Portal_<house>, RunPortal), each its gate and a facade with its house's detail (bales, a boat, a mailbox, antlers, a mill wheel, an apple tree), its sign (its name, WALK ONTO THE PAD) and its glowing pad on its rect (RunPad: Neon, no collision)",
-		folder ~= nil and #folder:GetChildren() == 6 and bad == nil, bad)
+	check("10.4 no portals any more: the PLAY circle (PlayCircle) in their place, the map's attribute empty", lobby and lobby:FindFirstChild("Portals") == nil and circle ~= nil
+		and circle:GetAttribute("PlayCircle") == true and circle:GetAttribute(Config.Runs.Party.Attribute) == "[]")
+	local ring = all("PlayRing")[1]
+	local rb = ring and boxOf(ring)
+	check("…its glowing ring (Neon, Play.Free) on the ground round its middle, its radius; nothing on the ground collides", ring ~= nil and ring.Material == Enum.Material.Neon
+		and ring.CanCollide == false and rb ~= nil and math.abs((rb.x0 + rb.x1) / 2 - p.x) < 0.01 and math.abs((rb.z0 + rb.z1) / 2 - p.z) < 0.01
+		and math.abs((rb.x1 - rb.x0) - 2 * p.r) < 0.05 and rb.y1 < SandboxMap.GroundTop + 0.5 and all("PlayFloor")[1] ~= nil and all("PlayFloor")[1].CanCollide == false
+		and all("PlayGlow")[1] ~= nil and all("PlayRim")[1] ~= nil)
+	local letters = all("PlayLetter")
+	local lettersIn = #letters == 14
+	for _, l in letters do
+		local lb = boxOf(l)
+		lettersIn = lettersIn and not l.CanCollide and SandboxMap.inPlay(lb.x0, lb.z0) and SandboxMap.inPlay(lb.x1, lb.z1) and lb.y1 < SandboxMap.GroundTop + 0.5
+	end
+	check("…PLAY on the ground in it (14 bars of light, inside the ring, read from the south)", lettersIn, #letters)
+	local posts = all("PlayPost")
+	local postsOk = #posts == 4 and #all("PlayLamp") == 4
+	for _, post in posts do
+		local pb = boxOf(post)
+		local dx, dz = (pb.x0 + pb.x1) / 2 - p.x, (pb.z0 + pb.z1) / 2 - p.z
+		postsOk = postsOk and post.CanCollide and math.sqrt(dx * dx + dz * dz) > p.r + 1 and math.abs(math.abs(dx) - math.abs(dz)) < 0.01
+	end
+	check("…four lit posts outside it at its corners (the four ways in open)", postsOk)
+	local sign = all("PlaySign")[1]
+	local gui = sign and sign:FindFirstChild("Words")
+	local title = gui and gui:FindFirstChild("Title")
+	local status = gui and gui:FindFirstChild("Status")
+	check("…the floating sign over it: ▶ PLAY, STEP IN TO PLAY (server/Parties.luau's line)", sign ~= nil and sign.Transparency == 1 and not sign.CanCollide
+		and gui ~= nil and gui.ClassName == "BillboardGui" and title ~= nil and title.Text == "▶ PLAY" and status ~= nil and status.Text == "STEP IN TO PLAY"
+		and boxOf(sign).y0 > SandboxMap.GroundTop + 8)
 	local dispatch = lobby and lobby:FindFirstChild("ZdcDispatch")
 	local board = dispatch and dispatch:FindFirstChild("Board", true)
 	check("the Deliveros dispatch kiosk at Lobby.dispatch, its corkboard marked RunDispatch (server/Runs.luau's prompt there)", dispatch ~= nil and board ~= nil
@@ -227,9 +245,10 @@ end
 -- nothing that collides where people stand: the pads, the back spots, the spawns, the dispatch's and the paint shop's fronts
 do
 	local spots: { { name: string, rect: Rect } } = {}
-	for _, p in L.portals do
-		table.insert(spots, { name = `{p.house}'s pad`, rect = p.pad })
-		table.insert(spots, { name = `{p.house}'s back spot`, rect = around(p.back.x, p.back.z, 3) })
+	local back = L.play.back
+	for n = 0, 3 do
+		local across = (if n % 2 == 1 then -1 else 1) * math.ceil(n / 2) * Config.Runs.Apart
+		table.insert(spots, { name = `the way back {n}`, rect = around(back.x + across, back.z, 1.5) })
 	end
 	for n = -2, 2 do
 		local a = math.rad(L.spawn.yaw)
@@ -255,14 +274,25 @@ do
 			end
 		end
 	end
-	check("nothing that collides on a pad, a back spot, the spawns, the dispatch's front or the paint shop's stand", blocked == nil, blocked)
-	-- the Auction House in the lobby, off every portal and pad
-	local site = AuctionHouseLayout.site()
-	local clear = SandboxMap.inLobby(site.x0, site.z0) and SandboxMap.inLobby(site.x1, site.z1)
-	for _, p in L.portals do
-		clear = clear and not overlaps(site, p.pad, 2) and not overlaps(site, p.foot, 2)
+	local inPlay: string? = nil
+	for _, d2 in world:GetDescendants() do
+		if d2:IsA("BasePart") and d2.CanCollide and d2.Name ~= "LobbyWall" and d2.Name ~= "Plaza" then
+			local b = boxOf(d2)
+			local dx = math.max(b.x0 - L.play.x, 0, L.play.x - b.x1)
+			local dz = math.max(b.z0 - L.play.z, 0, L.play.z - b.z1)
+			if b.y1 > SandboxMap.GroundTop + 0.3 and b.y0 < 8 and dx * dx + dz * dz < L.play.r * L.play.r then
+				inPlay = d2.Name
+			end
+		end
 	end
-	check("the Auction House (on) in the lobby, off every portal and its pad", clear and world:FindFirstChild("AuctionHouse", true) ~= nil)
+	check("nothing that collides in the PLAY circle, on the way back, the spawns, the dispatch's front or the paint shop's stand", blocked == nil and inPlay == nil,
+		blocked or inPlay)
+	-- the Auction House in the lobby, off the PLAY circle
+	local site = AuctionHouseLayout.site()
+	local play = L.play
+	local clear = SandboxMap.inLobby(site.x0, site.z0) and SandboxMap.inLobby(site.x1, site.z1)
+		and not overlaps(site, { x0 = play.x - play.r, x1 = play.x + play.r, z0 = play.z - play.r, z1 = play.z + play.r }, 8)
+	check("the Auction House (on) in the lobby, off the PLAY circle (8 studs and more)", clear and world:FindFirstChild("AuctionHouse", true) ~= nil)
 	-- nothing of the countryside in the lobby
 	local village = world:FindFirstChild("Village")
 	local stray: string? = nil

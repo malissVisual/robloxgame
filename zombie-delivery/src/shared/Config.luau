@@ -5801,7 +5801,8 @@ Config.Robust = {
 		PlayerTrade = 4, -- 8.7: the PlayerTrade remote's offer / answer / price / buy (server/PlayerTrade.luau)
 		TradeOffer = 0.2, -- 8.7: and a new offer to a player on top: one every 5 s at most (no offer spam)
 		Slots = 4, -- 10.1: the Slots remote's list / play / new (the start screen's save slots: server/SaveSlots.luau)
-		Runs = 4, -- 9.7: the Runs remote's state / difficulty / vote / leave (a run's pad and the run: server/Runs.luau)
+		Runs = 4, -- 9.7: the Runs remote's state / vote / leave (the run: server/Runs.luau)
+		Party = 6, -- 10.4: the Party remote's state / create / join / leave / ready / house / difficulty / kick / start / cancel (server/Parties.luau)
 		Crew = 4, -- 10.1: the Crew remote's state / pick / discharge (the CREW window: server/HelperCrew.luau)
 	},
 }
@@ -7572,21 +7573,23 @@ Config.Collection = {
 
 -- 9.7 RUNS (the owner: "like Dungeon Quest: from the lobby you go into a house, alone, with friends or with Danny. In
 -- the house you carry loot into the truck standing right at the house. When you leave, the loot is taken to your
--- warehouse in the lobby on its own"): the lobby's portals (shared/SandboxMap.luau Lobby.portals, design/lobby/plan.py),
--- the runs (server/Runs.luau; their rules shared/RunRules.luau, tests/runrules_test.luau; client/RunUi.luau). A run is
--- a sandbox move (server/Moving.luau) of one house by a party, its truck parked at the house's curb, no driving.
+-- warehouse in the lobby on its own"; 10.4: "on the map just one circle where you'd stand, like PLAY, and you'd create a
+-- lobby"): the lobby's PLAY circle (shared/SandboxMap.luau Lobby.play, design/lobby/plan.py), its party lobbies
+-- (server/Parties.luau; their rules shared/PartyRules.luau, tests/partyrules_test.luau; the PLAY panel
+-- client/PlayUi.luau), the runs (server/Runs.luau; their rules shared/RunRules.luau, tests/runrules_test.luau;
+-- client/RunUi.luau). A run is a sandbox move (server/Moving.luau) of one house by a party, its truck parked at the
+-- house's curb, no driving.
 --   Difficulties   in order: id (the run's contract.difficulty, the house's RunDifficulty attribute), name, time (× the
---                  house's clock, Config.Moving.Sandbox.Houses' Time), color (the pad panel's and the results card's).
+--                  house's clock, Config.Moving.Sandbox.Houses' Time), color (the PLAY panel's and the results card's).
 --                  The difficulty does nothing else yet: traps and zombies (harder ones) and the loot's rarity read it
 --   Default        a run's difficulty when nobody picked one
 --   Open           the difficulties open from the start (Easy, Normal); each next one opens for a player who finished
 --                  a run at the one before it (any house: a run ended done or late, with something home)
 --   Flag           the save's mark: profile.runUnlocked (how many are open) is read only from a real save written with it
---   Countdown      s from the first player on a portal's pad to the run (everybody on the pad then goes)
---   MaxParty       the players a run takes at most (the first on the pad first)
---   PadHeight      studs over the pad a body's root may be and still stand on it
---   Every          s between two looks at the pads (the server's loop)
---   Apart          studs between the party's arrival spots in the house's front yard (across the way they look)
+--   MaxParty       the players a run takes at most (a party lobby's members, the host first)
+--   Every          s between two looks at the PLAY circle and the lobbies (server/Parties.luau's loop)
+--   Apart          studs between the party's arrival spots in the house's front yard and beside the PLAY circle on the
+--                  way back (across the way they look)
 --   Fade           s: the screen's fade out before a jump (the run's start, its end, leaving), its fade in after
 --   EndHold        s from a run's end (its results card) to the fade back to the lobby (the house's own door trips of
 --                  whoever was inside, Config.Moving.Doors' FadeOut + Margin + Stream, are over by then)
@@ -7597,16 +7600,31 @@ Config.Collection = {
 --   Zone           a run zone's edge (SandboxMap.Zones): Screen (CountryLooks' "screen" hedge: Height, Width, its colour),
 --                  Wall (the invisible walls' height on it), View (studs: the forest's and the orchard's trees, the
 --                  stream's pieces kept within this of a zone, the rest of them never built)
---   Portal         the lobby's gates (server/LobbyWorld.luau): Gate { width, height }, the pad's glow by its state (Free,
---                  Waiting: a countdown, InUse: a run in that house), Styles: each house's colours for its gate and
---                  facade (wall, trim, roof, accent: RGB), SignRange (its words' MaxDistance)
---   Panel          the pad panel (client/RunUi.luau): Width (px at scale 1), TouchScale (its least scale on a phone)
+--   Play           10.4 the PLAY circle (server/LobbyWorld.luau builds it, server/Parties.luau watches it): Radius
+--                  (studs: SandboxMap.Lobby.play.r, the same), Height (studs over the ground a body's root may be and
+--                  still stand in it), Ring (studs: the glowing ring's width), its glow's colours (Free: no lobby
+--                  counting down; Waiting: one is), Letters (studs: PLAY on the ground in it, a letter's height), Sign
+--                  (the floating PLAY sign: Height studs over the ground, Range its MaxDistance, Size { w, h } studs),
+--                  Pulse (s: a breath of its glow, client/PlayUi.luau)
+--   Party          10.4 the party lobbies (shared/PartyRules.luau): Countdown (s from START to the run), MaxLobbies (open
+--                  at once), Friends (s a "friends?" answer is kept: Player:IsFriendsWithAsync), Kicked (s a kicked player
+--                  cannot join that lobby again), Attribute (the PLAY circle's attribute with the lobbies and the runs
+--                  for the map: PartyRules.encode)
+--   Houses         10.4 each house's card in the PLAY panel: icon (an emoji), line (a short line about it), wall and
+--                  roof (RGB: the card's little picture)
+--   Panel          10.4 the PLAY panel (client/PlayUi.luau): Width × Height (px at scale 1), Margin (px to the screen's
+--                  edge), Bar (the lobby bar's width: you in a lobby with the panel shut), TouchScale (its least scale
+--                  on a phone: its buttons a finger's size)
 --   Result         the results card: Width, Rows (pieces listed at most; the rest summed up), TouchScale
--- The Runs remote (Config.Robust.Limits.Runs): client → server { kind = "state" } | { kind = "difficulty", id } (the
--- host on the pad) | { kind = "vote" } (to finish) | { kind = "leave" } (out of your run alone); server → client
--- { kind = "pad", ... } | { kind = "pad" } (off a pad), { kind = "run", ... } | { kind = "run" } (not in a run),
+-- The Runs remote (Config.Robust.Limits.Runs): client → server { kind = "state" } | { kind = "vote" } (to finish) |
+-- { kind = "leave" } (out of your run alone); server → client { kind = "run", ... } | { kind = "run" } (not in a run),
 -- { kind = "result", ... } (the results card), { kind = "unlocked", id } (a difficulty opened). 10.x danger: server →
 -- client { kind = "danger", ... } (the run's keys, vault, zombies and its events: client/RunDangerUi.luau).
+-- 10.4 the Party remote (Config.Robust.Limits.Party): client → server { kind = "state" } | { kind = "create", house,
+-- difficulty, friends } | { kind = "join", id } | { kind = "leave" } | { kind = "ready", on } | { kind = "house", id }
+-- | { kind = "difficulty", id } | { kind = "kick", id } | { kind = "start" } | { kind = "cancel" } (the last four the
+-- host's); server → client { kind = "play", circle, houses, open, lobbies, lobby? } (you in the circle or in a lobby:
+-- server/Parties.luau's view) | { kind = "play" } (neither).
 -- 10.x DANGER (the owner: "both: on the easier difficulties only a timer and traps, on the harder ones zombies too ... it
 -- has to be designed to be fun"; the pure rules shared/DangerRules.luau, tests/danger_test.luau; the server
 -- server/RunDanger.luau, tests/danger_runtime_test.luau; the HUD client/RunDangerUi.luau):
@@ -7673,9 +7691,7 @@ Config.Runs = {
 	Default = "normal",
 	Open = 2,
 	Flag = "runUnlockedKept",
-	Countdown = 10,
 	MaxParty = 4,
-	PadHeight = 8,
 	Every = 0.2,
 	Apart = 3.5,
 	Fade = { Out = 0.45, In = 0.6 },
@@ -7683,22 +7699,26 @@ Config.Runs = {
 	LeaveHold = 3,
 	Truck = { Attribute = "RunParked", Reach = 9, At = { -4.6, 3.4, -1.5 } :: { number } },
 	Zone = { Screen = { Height = 14, Width = 4, Color = { 44, 82, 38 } :: { number } }, Wall = 80, View = 110 },
-	Portal = {
-		Gate = { 16, 15 } :: { number },
+	Play = {
+		Radius = 16,
+		Height = 8,
+		Ring = 1.6,
 		Free = { 90, 210, 255 } :: { number },
 		Waiting = { 255, 190, 70 } :: { number },
-		InUse = { 220, 64, 64 } :: { number },
-		SignRange = 180,
-		Styles = {
-			sandbox_house = { wall = { 226, 214, 186 }, trim = { 120, 58, 44 }, roof = { 150, 62, 44 }, accent = { 196, 160, 96 } },
-			pond_cabin = { wall = { 132, 94, 60 }, trim = { 60, 96, 120 }, roof = { 72, 76, 82 }, accent = { 176, 72, 52 } },
-			lone_house = { wall = { 236, 226, 200 }, trim = { 110, 80, 56 }, roof = { 172, 72, 52 }, accent = { 90, 130, 70 } },
-			forest_lodge = { wall = { 112, 76, 46 }, trim = { 60, 42, 28 }, roof = { 74, 92, 60 }, accent = { 226, 214, 186 } },
-			old_mill = { wall = { 150, 148, 142 }, trim = { 96, 70, 48 }, roof = { 92, 88, 86 }, accent = { 120, 90, 60 } },
-			orchard_cottage = { wall = { 244, 240, 230 }, trim = { 80, 112, 60 }, roof = { 198, 166, 98 }, accent = { 200, 60, 60 } },
-		} :: { [string]: { wall: { number }, trim: { number }, roof: { number }, accent: { number } } },
+		Letters = 6,
+		Sign = { Height = 12, Range = 260, Size = { 18, 7 } :: { number } },
+		Pulse = 1.6,
 	},
-	Panel = { Width = 380, TouchScale = 0.8 },
+	Party = { Countdown = 5, MaxLobbies = 6, Friends = 120, Kicked = 30, Attribute = "RunLobbies" },
+	Houses = {
+		sandbox_house = { icon = "🚜", line = "The big farm: ten rooms and a barn", wall = { 226, 214, 186 }, roof = { 150, 62, 44 } },
+		pond_cabin = { icon = "🎣", line = "A fishing cabin by the pond: rods, nets, a boat", wall = { 132, 94, 60 }, roof = { 72, 76, 82 } },
+		lone_house = { icon = "🏡", line = "A family house alone among the fields", wall = { 236, 226, 200 }, roof = { 172, 72, 52 } },
+		forest_lodge = { icon = "🦌", line = "A log lodge deep in the forest", wall = { 112, 76, 46 }, roof = { 74, 92, 60 } },
+		old_mill = { icon = "🌾", line = "A stone watermill: millstones and flour", wall = { 150, 148, 142 }, roof = { 92, 88, 86 } },
+		orchard_cottage = { icon = "🍎", line = "A thatched cottage among the apple trees", wall = { 244, 240, 230 }, roof = { 198, 166, 98 } },
+	} :: { [string]: { icon: string, line: string, wall: { number }, roof: { number } } },
+	Panel = { Width = 720, Height = 408, Margin = 6, Bar = 400, TouchScale = 0.8 },
 	Result = { Width = 420, Rows = 8, TouchScale = 0.8 },
 	-- 10.x DANGER (the block above Config.Runs): per difficulty, what a run's house holds besides the loot
 	Danger = {
@@ -7762,7 +7782,7 @@ Config.Runs = {
 -- .rarityOf: a collectible's own, uncommon … legendary; the furniture's by its value), and the contract's difficulty
 -- (contract.difficulty; nil or unknown: Default) rolls on it. The house's seed and the difficulty decide the dice: the
 -- same house at the same difficulty always holds the same loot (giving up and taking it again rolls nothing new).
---   Order        the difficulties, the easiest first (the lobby's portals: "easy" … "nightmare")
+--   Order        the difficulties, the easiest first (the PLAY panel's: "easy" … "nightmare")
 --   Default      a contract without one (and the city's moves): Normal, the rarities as before 9.x
 --   Difficulty   per difficulty: Down, the chance a piece comes a tier under its own (never under Common; a collectible
 --                never under Least); Up, the chance a roll lifts it a tier, Again the chance of each tier more, Most tiers
@@ -8300,7 +8320,7 @@ Config.SandboxLeaders = {
 -- (client/SandboxMapUi.luau, client/SandboxMiniMap.luau, drawn by client/SandboxMapDraw.luau from what
 -- client/SandboxMapData.luau reads of the world; the pure rules shared/SandboxMapRules.luau, tests/sandboxmaprules_test.luau).
 -- In the lobby a plan of it from SandboxMap.Lobby (the plaza, the hedge, the plots and your warehouse, the shops and
--- desks, the six portals with their live state, the players, you); in a run the house's floor plan (its interior's
+-- desks, 10.4 the PLAY circle and the open lobbies, the players, you); in a run the house's floor plan (its interior's
 -- MapPlan: server/HouseInterior.luau) over a strip of its front yard with the truck, who is where, the loot under fog
 -- and the danger markers (the CollectionService tags Danger: none there, none drawn).
 --   Key / Button   M opens and closes it; the gamepad's Button (on foot: L2 is the brake only in a seat; the D-pad is
@@ -8319,10 +8339,8 @@ Config.SandboxLeaders = {
 --                  nearest first); it stays until carried out (in the truck, home or lost)
 --   Pulse          the uncarried pieces of From's tier and up pulse (Seconds a beat)
 --   Zombies        studs: the zombies within this of you show (a run's), the others not
---   Names          most names on a portal's line before "+n" (the side column's HOUSES); MapNames on the map, where a
---                  portal's line keeps LineEm × its text size px (its words cut at their end past it) on a lobby drawn
---                  at LongScale px a stud or more; a smaller one's (a phone's) says only its state (FREE, STARTING IN 7,
---                  IN USE · HARD): its labels would cover each other, the side column says who
+--   Rows           10.4: the side column's OPEN LOBBIES and IN A RUN rows at most (the lobbies and the runs now:
+--                  server/Parties.luau's attribute on the PLAY circle)
 --   Mini           the minimap in a run (its plan, you, your party, the loot you saw near you): Size px at the HUD's
 --                  scale (a computer: the bottom right corner), TouchSize px on a touch screen (its top right), shrunk by
 --                  Step to Least to keep clear of the HUD (else none); Scale px a stud (TouchScale on a touch screen);
@@ -8344,10 +8362,7 @@ Config.SandboxMapUi = {
 	Fog = { See = 40, Eye = 1.5, Every = 0.25, Most = 16 },
 	Pulse = { From = "epic", Seconds = 0.7 },
 	Zombies = 60,
-	Names = 3,
-	MapNames = 2,
-	LineEm = 17,
-	LongScale = 1.2,
+	Rows = 12,
 	Mini = { Size = 190, TouchSize = 140, Least = 96, Step = 8, Scale = 2.4, TouchScale = 2, Margin = 16, Top = 8, Every = 0.15 },
 	Danger = {
 		RunLock = { icon = "🔒", open = "🔓", name = "LOCKED DOOR" },
@@ -8362,6 +8377,7 @@ Config.SandboxMapUi = {
 		Meadow = { 74, 112, 62 },
 		Hedge = { 38, 70, 34 },
 		Plaza = { 178, 170, 156 },
+		PlayFloor = { 44, 66, 86 }, -- (10.4: the PLAY circle's floor; its ring Config.Runs.Play's)
 		Water = { 76, 140, 190 },
 		Tree = { 54, 96, 48 },
 		Lamp = { 240, 232, 200 },
@@ -8864,7 +8880,7 @@ Config.Auction = {
 	Salt = 8808,
 	Grand = { On = false, Hour = 19, Lots = 3, Reserve = 1.5, Items = {} :: { string } },
 	House = {
-		Spot = { x = 1800, y = 0, z = 156, yaw = 0 } :: AuctionSpot, -- (9.7: the lobby's, SandboxMap.Lobby.shops.auction)
+		Spot = { x = 1930, y = 0, z = 44, yaw = 90 } :: AuctionSpot, -- (9.7: the lobby's, SandboxMap.Lobby.shops.auction; 10.4 east of the PLAY circle, its door to it)
 		Width = 48,
 		Depth = 32,
 		Wall = 16,

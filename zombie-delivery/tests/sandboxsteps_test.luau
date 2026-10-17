@@ -1,6 +1,6 @@
 -- 8.0 SANDBOX, the guide's steps (shared/SandboxSteps.luau; client/SandboxGuide.luau draws them): every row of the
--- owner's table gives its words and its target (9.7 runs: the lobby's: walk to a portal, pick a difficulty, load the
--- truck, finish or beat the clock; no driving), a step done once goes quiet, the path (straight), the collection's state
+-- owner's table gives its words and its target (9.7 runs: the lobby's; 10.4: step into PLAY, a party lobby's READY
+-- and START, load the truck, finish or beat the clock; no driving), a step done once goes quiet, the path (straight), the collection's state
 -- read. Run with tests/run_tests.py.
 local Config = require("./Config")
 local SandboxMap = require("./SandboxMap")
@@ -46,15 +46,17 @@ end
 -- ── The owner's table, row by row (9.7 runs: the lobby's words, no driving) ─
 do
 	local step = SandboxSteps.decide(state({}))
-	check("9.7 no run: walk to a portal (the nearest portal's pad)", step.id == "portal" and step.hint == "Walk to a portal: step onto a house's glowing pad" and step.target == "portal"
+	check("10.4 no run: step into PLAY (the PLAY circle)", step.id == "play" and step.hint == "Step into PLAY to start a run" and step.target == "play"
 		and not step.nav, show(step))
-	step = SandboxSteps.decide(state({ pad = true, padHost = true }))
-	check("9.7 on a portal's pad, the host: pick a difficulty (no 3D target: the panel)", step.id == "pick" and step.target == nil
-		and string.find(step.hint, "Pick a difficulty", 1, true) == 1, show(step))
-	step = SandboxSteps.decide(state({ pad = true }))
-	check("9.7 …on the pad, not the host: stay on it", step.id == "waitPad" and step.target == nil and string.find(step.hint, "Stay on the pad", 1, true) == 1, show(step))
-	step = SandboxSteps.decide(state({ pad = true, stock = 3 }))
-	check("9.7 …the pad wins over the stock", step.id == "waitPad", show(step))
+	step = SandboxSteps.decide(state({ lobby = true, lobbyHost = true }))
+	check("10.4 in a lobby, its host: READY, then START (no 3D target: the panel and its bar)", step.id == "lobbyHost" and step.target == nil
+		and step.hint == "Your lobby: press READY, then START", show(step))
+	step = SandboxSteps.decide(state({ lobby = true }))
+	check("10.4 …in a lobby, not the host: READY, the host starts it", step.id == "lobbyWait" and step.target == nil
+		and step.hint == "In a lobby: press READY, the host starts the run", show(step))
+	step = SandboxSteps.decide(state({ lobby = true, stock = 3 }))
+	check("10.4 …the lobby wins over the stock", step.id == "lobbyWait", show(step))
+	check("…no portal, no pad any more", SandboxSteps.Steps.portal == nil and SandboxSteps.Steps.pick == nil and SandboxSteps.Steps.waitPad == nil)
 	step = SandboxSteps.decide(state({ move = true }))
 	check("9.7 a run started, outside, nothing loaded: walk in through the front door (no E; no drive: the party lands by it)", step.id == "door"
 		and step.hint == "Walk in through the front door" and step.target == "door" and string.find(step.hint, "E at", 1, true) == nil and not step.nav, show(step))
@@ -77,12 +79,12 @@ do
 	step = SandboxSteps.decide(state({ stock = 3, freeStands = 2, shown = 1 }))
 	check("… some on show already and stands free: still put the rest on show", step.id == "show", show(step))
 	step = SandboxSteps.decide(state({ shown = 2 }))
-	check("pieces on show: they earn money, walk into another house for more (a portal)", step.id == "earn"
-		and step.hint == "Your pieces earn money while you play. Walk into another house for more!" and step.target == "portal" and step.info, show(step))
+	check("pieces on show: they earn money, step into PLAY for another run (the PLAY circle)", step.id == "earn"
+		and step.hint == "Your pieces earn money while you play. Step into PLAY for another run!" and step.target == "play" and step.info, show(step))
 	step = SandboxSteps.decide(state({ shown = 6, stock = 2, freeStands = 0 }))
 	check("… every stand full, more in the stock: they earn (nothing to put up)", step.id == "earn", show(step))
 	step = SandboxSteps.decide(state({ stock = 2, freeStands = 0 }))
-	check("stock but no free stand and nothing on show: walk to a portal", step.id == "portal", show(step))
+	check("stock but no free stand and nothing on show: step into PLAY", step.id == "play", show(step))
 	step = SandboxSteps.decide(state({ stock = 2, move = true }))
 	check("a run wins over the stock", step.id == "door", show(step))
 	step = SandboxSteps.decide(state({ planning = true, planningMine = true }))
@@ -107,17 +109,17 @@ end
 do
 	local done: { [string]: boolean } = {}
 	local last: SandboxSteps.Last = {}
-	local portal = SandboxSteps.Steps.portal
-	local hint, guide = SandboxSteps.visible(portal, done, false)
+	local play = SandboxSteps.Steps.play
+	local hint, guide = SandboxSteps.visible(play, done, false)
 	check("a new step: the hint and the 3D guide", hint and guide)
 	hint, guide = SandboxSteps.visible(SandboxSteps.Steps.inside, done, false)
 	check("in the house: the hint, no 3D guide", hint and not guide)
-	SandboxSteps.doneBy(state({ pad = true }), done, last)
-	check("9.7 on a pad: the portal step is done", done.portal == true and done.pick == nil and done.waitPad == nil)
-	hint, guide = SandboxSteps.visible(portal, done, false)
+	SandboxSteps.doneBy(state({ lobby = true }), done, last)
+	check("10.4 in a lobby: the PLAY step is done", done.play == true and done.lobbyHost == nil and done.lobbyWait == nil)
+	hint, guide = SandboxSteps.visible(play, done, false)
 	check("… its hint and guide quiet next time", not hint and not guide)
 	SandboxSteps.doneBy(state({ move = true }), done, last)
-	check("9.7 the run started: picking and waiting on the pad done too", done.pick == true and done.waitPad == true and done.door == nil)
+	check("10.4 the run started: the lobby's steps done too", done.lobbyHost == true and done.lobbyWait == true and done.door == nil)
 	SandboxSteps.doneBy(state({ move = true, inside = true }), done, last)
 	check("inside: the door is done", done.door == true and done.inside == nil)
 	SandboxSteps.doneBy(state({ move = true, carrying = true }), done, last)
@@ -141,7 +143,7 @@ do
 	local fresh: { [string]: boolean } = {}
 	local freshLast: SandboxSteps.Last = {}
 	SandboxSteps.doneBy(state({ planning = true }), fresh, freshLast)
-	check("the planning open: the way to a house was found (the portal step done)", fresh.portal == true and fresh.plan == nil)
+	check("the planning open: the way to a house was found (the PLAY step done)", fresh.play == true and fresh.plan == nil)
 	local empty: { [string]: boolean } = {}
 	local emptyLast: SandboxSteps.Last = {}
 	SandboxSteps.doneBy(state({ move = true }), empty, emptyLast)
@@ -176,7 +178,7 @@ do
 	check("… the truck's back", SandboxSteps.text(Steps.load, true) == "Load the truck: walk in or tap at its back", SandboxSteps.text(Steps.load, true))
 	check("… a computer keeps E (the door: its own words, no key)", SandboxSteps.text(Steps.door, false) == Steps.door.hint and SandboxSteps.text(Steps.load, false) == Steps.load.hint)
 	check("… words without a key unchanged (LAUNCH, FINISH keep their words)", SandboxSteps.text(Steps.plan, true) == Steps.plan.hint and SandboxSteps.text(Steps.finish, true) == Steps.finish.hint
-		and SandboxSteps.text(Steps.portal, true) == Steps.portal.hint)
+		and SandboxSteps.text(Steps.play, true) == Steps.play.hint)
 end
 
 -- ── At the house ────────────────────────────────────────────────────────────
@@ -205,10 +207,9 @@ do
 		return table.concat(parts, " ")
 	end
 	local plot = SandboxMap.Plots[1]
-	local portal = SandboxMap.Lobby.portals[1]
-	local px, pz = (portal.pad.x0 + portal.pad.x1) / 2, (portal.pad.z0 + portal.pad.z1) / 2
+	local px, pz = SandboxMap.Lobby.play.x, SandboxMap.Lobby.play.z
 	local n = SandboxSteps.route(plot.spawn.x, plot.spawn.z, px, pz, out, direct)
-	check("from your plot to a portal's pad: straight", n == 2 and out[1] == plot.spawn.x and out[2] == plot.spawn.z and out[3] == px and out[4] == pz, points(n))
+	check("from your plot to the PLAY circle: straight", n == 2 and out[1] == plot.spawn.x and out[2] == plot.spawn.z and out[3] == px and out[4] == pz, points(n))
 	local zone = SandboxMap.zone(SandboxMap.House.id) :: SandboxMap.Zone
 	local curb = SandboxMap.House.curb
 	n = SandboxSteps.route(zone.arrive.x, zone.arrive.z, curb.x, curb.z, out, direct)
@@ -348,7 +349,7 @@ do
 		and chosen(rich({ move = true, inside = true })).id == "inside" and chosen(rich({ move = true, carrying = true })).id == "load")
 	check("… the planning too", chosen(rich({ planning = true, planningMine = true })).id == "plan")
 	check("… a core step not done yet (putting the pieces on show)", chosen(rich(), nothing).id == "show")
-	check("… walking to a portal not done yet (nothing in the warehouse)", chosen(rich({ stock = 0, shown = 0 }), nothing).id == "portal")
+	check("… stepping into PLAY not done yet (nothing in the warehouse)", chosen(rich({ stock = 0, shown = 0 }), nothing).id == "play")
 	check("… but `earn`, which only says something, gives way", chosen(rich({ stock = 2, shown = 4, freeStands = 0 }), nothing).id == "grow"
 		and SandboxSteps.decide(rich({ stock = 2, shown = 4, freeStands = 0 })).id == "earn")
 	check("never while something covers the screen (a grip check, a result card, a window)", chosen(rich({ covered = true })).id == "show")
@@ -403,7 +404,7 @@ do
 
 	-- the ✕
 	local closed: { [string]: boolean } = { show = true }
-	check("the ✕ on a core step is not a dismissal (the guide goes off instead)", not SandboxSteps.dismiss(Steps.portal, closed) and closed.portal == nil)
+	check("the ✕ on a core step is not a dismissal (the guide goes off instead)", not SandboxSteps.dismiss(Steps.play, closed) and closed.play == nil)
 	check("the ✕ on a soft step: that step gone", SandboxSteps.dismiss(Steps.grow, closed) and closed.grow == true and chosen(rich(), closed).id == "hot")
 	check("… the hot one: gone for the session", SandboxSteps.dismiss(Steps.hot, closed) and closed.hot == true and closed.hotGone == true)
 	local closedLast: SandboxSteps.Last = { day = 20000, hot = 1 }
@@ -520,7 +521,7 @@ do
 	check("… not while you carry one, nor while you wait for him", chosen(dannyState({ helperQueue = 0, inside = true, carrying = true })).id == "inside"
 		and chosen(dannyState({ helperQueue = 0, inside = true, waiting = true })).id == "inside")
 	check("… not without Danny on the move, nor without a move", chosen(dannyState({ helper = false, helperQueue = 0, inside = true })).id == "inside"
-		and chosen(dannyState({ move = false, helperQueue = 0, inside = true }), { portal = true }).id ~= "give")
+		and chosen(dannyState({ move = false, helperQueue = 0, inside = true }), { play = true }).id ~= "give")
 	check("… never while something covers the screen (his card, the move's cards, a grip check) or something else talks",
 		chosen(dannyState({ helperQueue = 0, inside = true, covered = true })).id == "inside" and chosen(dannyState({ helperQueue = 0, inside = true, hush = true })).id == "inside")
 

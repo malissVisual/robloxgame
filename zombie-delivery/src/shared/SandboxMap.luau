@@ -2,8 +2,9 @@
 -- 8.0 SANDBOX (design/sandbox/KONTRAKT.md): the owner's small test world in place of the city. 9.7 runs (the owner:
 -- "shrink the map ... one little lobby, like Dungeon Quest: there you go into a dungeon, here you go into a house"):
 -- the LOBBY (design/lobby/plan.py, plan.json; its section below) is the whole visible world, a compact square with the
--- plaza, the spawn, the ZDC dispatch, the four player plots (each with a ZDC warehouse, its display stands), the
--- shops and six house portals; the six places to empty (Houses) each stand in a RUN ZONE of their own far off
+-- plaza, the spawn, the Deliveros dispatch, the four player plots (each with a warehouse, its display stands), the
+-- shops and (10.4) one PLAY circle where parties gather for a run; the six places to empty (Houses) each stand in a RUN
+-- ZONE of their own far off
 -- (design/countryside/plan.py, plan.json; its section below: Zones), fenced, out of sight of the lobby and of each
 -- other, their truck parked at the curb by the door (no driving any more: no lanes, no Depot Row, no Pražská). Plain
 -- data (numbers only: the pure tests run it outside Roblox); the builders read it.
@@ -15,11 +16,11 @@
 --   9.7 the lobby (design/lobby/plan.json; tools/lobby/sandboxmap.py writes Lobby between the BEGIN LOBBY and END
 --   LOBBY lines: change the plan, run it again):
 --   Lobby            bounds (the square: a hedge `hedge` in from it, invisible walls on it), far (studs to every run
---                    zone at least), plaza, spawn (a Spot; spawnApart: the players' spawns apart), dispatch (the ZDC
---                    dispatch kiosk), fountain, plots ({ id, x, wall, rect }: Plots below), portals ({ house, name, x, z,
---                    yaw, pad, foot, back }: a gate per place to empty, its glowing pad in front of it, its footprint,
---                    where its party comes back), shops (paint, leaders, auction: their spots and rects; paint's stand
---                    at its counter), lamps, trees
+--                    zone at least), plaza, spawn (a Spot; spawnApart: the players' spawns apart), dispatch (the
+--                    Deliveros dispatch kiosk), fountain, plots ({ id, x, wall, rect }: Plots below), 10.4 play ({ x, z,
+--                    r, back }: the PLAY circle's middle on the ground and its radius, config Runs.Play.Radius; back: a
+--                    Spot just off it facing it, where a party comes back from a run), shops (paint, leaders, auction:
+--                    their spots and rects; paint's stand at its counter), lamps, trees
 --   9.4 the countryside (design/countryside/plan.json; tools/countryside/sandboxmap.py writes Bounds, Roads and these
 --   between the BEGIN COUNTRYSIDE and END COUNTRYSIDE lines: change the plan, run it again):
 --   Bounds           the world's edge round the run zones and the lobby (the meadow under all of it; nothing you play
@@ -48,11 +49,11 @@
 --                      spawn       a spot in front of the warehouse (the admin's TO WAREHOUSE)
 --                      board       (8.0's Moving contracts board's spot: none is built since 9.7)
 --   Houses           the six places to empty (design/countryside/plan.json `spots`; tests/sandboxhouses_test.luau holds
---                    them to it), each a run's house (Config.Moving.Sandbox.Houses, by id; server/Runs.luau: a portal
---                    each in the lobby). In this order: the farmstead, the pond cabin, the lone house, the forest
---                    lodge, the old mill, the orchard cottage. Each:
+--                    them to it), each a run's house (Config.Moving.Sandbox.Houses, by id; 10.4: a party's lobby at the
+--                    PLAY circle picks one: server/Parties.luau). In this order: the farmstead, the pond cabin, the
+--                    lone house, the forest lodge, the old mill, the orchard cottage. Each:
 --                      id          the spot's (the farmstead's sandbox_house as ever)
---                      name        what the portal, the guide and its signs call it (made up, in English words)
+--                      name        what the PLAY panel, the guide and the signs call it (made up, in English words)
 --                      street      the road it stood on (its yard's name: the contract's address, the guide's words)
 --                      number      none (a spot of its own has no house number)
 --                      kind        its inside's plan's kind (shared/HouseLayout.luau; its contract's, Config.Moving
@@ -82,7 +83,7 @@
 --   SandboxMap.houseAt(x, z, margin)   the first house whose lot holds the point or lies within `margin` of it (nil: none)
 --   SandboxMap.zone(id)       9.7: the run zone of that house id (nil: none)
 --   SandboxMap.zoneAt(x, z, margin?)   9.7: the run zone whose rect (grown by `margin`) holds the point (nil: none)
---   SandboxMap.portal(id)     9.7: the lobby's portal of that house id (nil: none)
+--   SandboxMap.inPlay(x, z, margin?)   10.4: is the point in the PLAY circle (its radius grown by `margin`)?
 --   SandboxMap.inLobby(x, z, margin?)  9.7: is the point in the lobby's bounds (grown by `margin`)?
 --   SandboxMap.cframe(spot)   (Roblox only) a spot's CFrame
 
@@ -126,10 +127,10 @@ export type Lawn = { kind: string, x0: number, x1: number, z0: number, z1: numbe
 export type TreeLine = { kind: string, points: { { x: number, z: number } } }
 export type Wood = { id: string, x0: number, x1: number, z0: number, z1: number, clearings: { Rect } }
 export type Stream = { id: string, width: number, points: { { x: number, z: number } } }
--- 9.7: a run zone, the lobby's plot, portal and shops, the lobby
+-- 9.7: a run zone, the lobby's plot and shops, the lobby; 10.4 the PLAY circle
 export type Zone = { id: string, rect: Rect, arrive: Spot }
 export type LobbyPlot = { id: number, x: number, wall: number, rect: Rect }
-export type Portal = { house: string, name: string, x: number, z: number, yaw: number, pad: Rect, foot: Rect, back: Spot }
+export type Play = { x: number, z: number, r: number, back: Spot }
 export type Lobby = {
 	bounds: Rect,
 	hedge: number,
@@ -140,7 +141,7 @@ export type Lobby = {
 	dispatch: Spot,
 	fountain: { x: number, z: number, r: number },
 	plots: { LobbyPlot },
-	portals: { Portal },
+	play: Play,
 	shops: { paint: { spot: Spot, rect: Rect, stand: Spot }, leaders: { spot: Spot, rect: Rect }, auction: { spot: Spot, rect: Rect } },
 	lamps: { { x: number, z: number } },
 	trees: { { kind: string, x: number, z: number } },
@@ -151,43 +152,34 @@ SandboxMap.RoadTop = 0.4
 
 -- BEGIN LOBBY (tools/lobby/sandboxmap.py writes these lines from design/lobby/plan.json: do not edit them)
 SandboxMap.Lobby = {
-	bounds = { x0 = 1560, x1 = 2040, z0 = -200, z1 = 200 },
+	bounds = { x0 = 1572, x1 = 2028, z0 = -128, z1 = 98 },
 	hedge = 2,
 	far = 1000,
-	plaza = { x0 = 1635, x1 = 1965, z0 = -54, z1 = 150 },
-	spawn = { x = 1800, y = 3, z = 10, yaw = 180 },
+	plaza = { x0 = 1600, x1 = 2000, z0 = 6, z1 = 92 },
+	spawn = { x = 1800, y = 3, z = 80, yaw = 0 },
 	spawnApart = 6,
-	dispatch = { x = 1800, y = 0, z = -44, yaw = 180 },
-	fountain = { x = 1800, z = 70, r = 9 },
+	dispatch = { x = 1760, y = 0, z = 44, yaw = 270 },
+	fountain = { x = 1630, z = 48, r = 9 },
 	plots = {
-		{ id = 1, x = 1626, wall = -100, rect = { x0 = 1570, x1 = 1682, z0 = -190, z1 = -60 } },
-		{ id = 2, x = 1742, wall = -100, rect = { x0 = 1686, x1 = 1798, z0 = -190, z1 = -60 } },
-		{ id = 3, x = 1858, wall = -100, rect = { x0 = 1802, x1 = 1914, z0 = -190, z1 = -60 } },
-		{ id = 4, x = 1974, wall = -100, rect = { x0 = 1918, x1 = 2030, z0 = -190, z1 = -60 } },
+		{ id = 1, x = 1632, wall = -33, rect = { x0 = 1577, x1 = 1687, z0 = -123, z1 = 3 } },
+		{ id = 2, x = 1744, wall = -33, rect = { x0 = 1689, x1 = 1799, z0 = -123, z1 = 3 } },
+		{ id = 3, x = 1856, wall = -33, rect = { x0 = 1801, x1 = 1911, z0 = -123, z1 = 3 } },
+		{ id = 4, x = 1968, wall = -33, rect = { x0 = 1913, x1 = 2023, z0 = -123, z1 = 3 } },
 	},
-	portals = {
-		{ house = "pond_cabin", name = "The Pond Cabin", x = 1595, z = 0, yaw = 270, pad = { x0 = 1600, x1 = 1614, z0 = -7, z1 = 7 }, foot = { x0 = 1582, x1 = 1597, z0 = -10, z1 = 10 }, back = { x = 1618, y = 3, z = 0, yaw = 270 } },
-		{ house = "old_mill", name = "The Old Mill", x = 1595, z = 96, yaw = 270, pad = { x0 = 1600, x1 = 1614, z0 = 89, z1 = 103 }, foot = { x0 = 1582, x1 = 1597, z0 = 86, z1 = 106 }, back = { x = 1618, y = 3, z = 96, yaw = 270 } },
-		{ house = "sandbox_house", name = "The Old Farmstead", x = 1692, z = 176, yaw = 0, pad = { x0 = 1685, x1 = 1699, z0 = 157, z1 = 171 }, foot = { x0 = 1682, x1 = 1702, z0 = 174, z1 = 189 }, back = { x = 1692, y = 3, z = 153, yaw = 0 } },
-		{ house = "lone_house", name = "The Lone House", x = 1908, z = 176, yaw = 0, pad = { x0 = 1901, x1 = 1915, z0 = 157, z1 = 171 }, foot = { x0 = 1898, x1 = 1918, z0 = 174, z1 = 189 }, back = { x = 1908, y = 3, z = 153, yaw = 0 } },
-		{ house = "forest_lodge", name = "The Forest Lodge", x = 2005, z = 96, yaw = 90, pad = { x0 = 1986, x1 = 2000, z0 = 89, z1 = 103 }, foot = { x0 = 2003, x1 = 2018, z0 = 86, z1 = 106 }, back = { x = 1982, y = 3, z = 96, yaw = 90 } },
-		{ house = "orchard_cottage", name = "The Orchard Cottage", x = 2005, z = 0, yaw = 90, pad = { x0 = 1986, x1 = 2000, z0 = -7, z1 = 7 }, foot = { x0 = 2003, x1 = 2018, z0 = -10, z1 = 10 }, back = { x = 1982, y = 3, z = 0, yaw = 90 } },
-	},
+	play = { x = 1800, z = 44, r = 16, back = { x = 1800, y = 3, z = 68, yaw = 0 } },
 	shops = {
-		paint = { spot = { x = 2006, y = 0, z = -40, yaw = 90 }, rect = { x0 = 2006, x1 = 2018, z0 = -51, z1 = -29 }, stand = { x = 2002, y = 3, z = -40, yaw = 270 } },
-		leaders = { spot = { x = 1594, y = 0, z = -40, yaw = 270 }, rect = { x0 = 1591.5, x1 = 1596.5, z0 = -52, z1 = -28 } },
-		auction = { spot = { x = 1800, y = 0, z = 156, yaw = 0 }, rect = { x0 = 1774, x1 = 1826, z0 = 152, z1 = 190 } },
+		paint = { spot = { x = 1864, y = 0, z = 44, yaw = 90 }, rect = { x0 = 1864, x1 = 1876, z0 = 33, z1 = 55 }, stand = { x = 1860, y = 3, z = 44, yaw = 270 } },
+		leaders = { spot = { x = 1680, y = 0, z = 50, yaw = 270 }, rect = { x0 = 1677.5, x1 = 1682.5, z0 = 38, z1 = 62 } },
+		auction = { spot = { x = 1930, y = 0, z = 44, yaw = 90 }, rect = { x0 = 1926, x1 = 1964, z0 = 18, z1 = 70 } },
 	},
-	lamps = { { x = 1635, z = -54 }, { x = 1965, z = -54 }, { x = 1635, z = 150 }, { x = 1965, z = 150 }, { x = 1740, z = -54 }, { x = 1860, z = -54 }, { x = 1635, z = 48 }, { x = 1965, z = 48 } },
+	lamps = { { x = 1600, z = 6 }, { x = 2000, z = 6 }, { x = 1600, z = 92 }, { x = 2000, z = 92 }, { x = 1710, z = 6 }, { x = 1890, z = 6 }, { x = 1710, z = 92 }, { x = 1890, z = 92 } },
 	trees = {
-		{ kind = "linden", x = 1575, z = 180 },
-		{ kind = "oak", x = 2025, z = 180 },
-		{ kind = "birch", x = 1640, z = 186 },
-		{ kind = "birch", x = 1960, z = 186 },
-		{ kind = "linden", x = 1572, z = 140 },
-		{ kind = "oak", x = 2028, z = 140 },
-		{ kind = "birch", x = 1574, z = -30 },
-		{ kind = "birch", x = 2026, z = -30 },
+		{ kind = "linden", x = 1586, z = 20 },
+		{ kind = "oak", x = 2014, z = 20 },
+		{ kind = "birch", x = 1586, z = 52 },
+		{ kind = "birch", x = 2014, z = 52 },
+		{ kind = "oak", x = 1586, z = 84 },
+		{ kind = "linden", x = 2014, z = 84 },
 	},
 } :: Lobby
 -- END LOBBY
@@ -378,10 +370,6 @@ local zoneOf: { [string]: Zone } = {}
 for _, z in SandboxMap.Zones do
 	zoneOf[z.id] = z
 end
-local portalOf: { [string]: Portal } = {}
-for _, p in SandboxMap.Lobby.portals do
-	portalOf[p.house] = p
-end
 
 function SandboxMap.zone(id: any): Zone?
 	return if type(id) == "string" then zoneOf[id] else nil
@@ -398,8 +386,10 @@ function SandboxMap.zoneAt(x: number, z: number, margin: number?): Zone?
 	return nil
 end
 
-function SandboxMap.portal(id: any): Portal?
-	return if type(id) == "string" then portalOf[id] else nil
+function SandboxMap.inPlay(x: number, z: number, margin: number?): boolean
+	local p = SandboxMap.Lobby.play
+	local r = p.r + (margin or 0)
+	return (x - p.x) ^ 2 + (z - p.z) ^ 2 <= r * r
 end
 
 function SandboxMap.inLobby(x: number, z: number, margin: number?): boolean

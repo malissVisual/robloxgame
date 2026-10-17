@@ -1,30 +1,22 @@
 --!strict
 -- 9.7 RUNS (the owner: "like Dungeon Quest: from the lobby you go into a house, alone, with friends or with Danny. In
 -- the house you carry loot into the truck standing right at the house. When you leave, the loot is taken to your
--- warehouse in the lobby on its own"; Config.Runs, the rules shared/RunRules.luau, the client client/RunUi.luau). The
--- lobby's six portals (shared/SandboxMap.luau Lobby.portals, server/LobbyWorld.luau builds them) start the runs; a run
--- is a sandbox move of one house (server/Moving.luau: Moving.startRun, its hooks in the block "9.7 RUNS").
---   * The pads: every Config.Runs.Every s the server looks who stands on each portal's pad (on foot, alive, in no run,
---     not on a jump back). The first one on an empty pad is the host and starts its countdown (Countdown s); whoever
---     steps on joins the line, whoever steps off leaves it (the host's place goes to the next). The host picks the
---     difficulty (the Runs remote's "difficulty": only one open to them, RunRules.isOpen with their save's
---     runUnlocked; a new host keeps it when it is open to them, else the hardest open one under it). The pad's sign
---     says its state (WALK ONTO THE PAD, STARTING IN 7 · 2/4, IN USE) and its glow its colour (Config.Runs.Portal); the
---     players on it get the pad panel ({ kind = "pad", … }). When the countdown ends the first MaxParty on it go.
---   * A portal whose house is in a run already shows IN USE: nobody joins its pad (they hear so once).
---   * 10.x the map (read-only, for client/SandboxMapUi.luau's lobby): each portal model's attributes RunState ("free",
---     "wait": counting down, "use": in a run), RunEndsAt (the countdown's end), RunWho (who is on the pad, else the
---     run's party) and RunDifficulty, written in the same look as its sign, only when they change.
---   * The start: the host's van is parked at the house's curb (Moving.parkVan: server/SandboxBoot.luau's, repaired),
---     not drivable (its model's Config.Runs.Truck.Attribute: client/CarVisuals.luau shows no Drive / Ride along, its
---     seats Disabled), the party is the run's (Crew.members and Crew.ownerOf are wrapped: a run's party is its host's
---     crew, nobody else's crew counts in the sandbox), Moving.startRun starts the move (its contract's difficulty, the
---     house's clock × the difficulty's time; the inside's RunDifficulty attribute is Moving's), the map's house model
---     gets the attribute RunDifficulty too (traps, zombies and the loot's rarity read it: a later worker's), the truck
---     gets its prompts (the host's "Finish the run", the others' "Vote to finish") and everybody fades over to the
---     house's front yard (SandboxMap.Zones' arrive, Apart studs across), its door before them. The host's helper is
+-- warehouse in the lobby on its own"; Config.Runs, the rules shared/RunRules.luau, the client client/RunUi.luau). 10.4:
+-- the lobby's PLAY circle and its party lobbies start the runs (server/Parties.luau, shared/PartyRules.luau: Runs.start
+-- starts them; the six portals and their pads are gone); a run is a sandbox move of one house (server/Moving.luau:
+-- Moving.startRun, its hooks in the block "9.7 RUNS").
+--   * The start (Runs.begin: a party lobby's countdown over, server/Parties.luau; the admin's): the host's van is parked
+--     at the house's curb (Moving.parkVan: server/SandboxBoot.luau's, repaired), not drivable (its model's
+--     Config.Runs.Truck.Attribute: client/CarVisuals.luau shows no Drive / Ride along, its seats Disabled), the party
+--     is the run's (Crew.members and Crew.ownerOf are wrapped: a run's party is its host's crew, nobody else's crew
+--     counts in the sandbox), Moving.startRun starts the move (its contract's difficulty, the house's clock × the
+--     difficulty's time; the inside's RunDifficulty attribute is Moving's), the map's house model gets the attribute
+--     RunDifficulty too (traps, zombies and the loot's rarity read it), the truck gets its prompts (the host's "Finish
+--     the run", the others' "Vote to finish") and everybody fades over to the house's front yard (SandboxMap.Zones'
+--     arrive, Apart studs across), its door before them, from wherever they waited in the lobby. The host's helper is
 --     the move's (server/MoveHelper.luau: he waits by the truck at the house and goes with the run; 10.1 free, the
 --     host's pick of their crew: server/HelperCrew.luau, which also traps a helper in some runs' houses to rescue).
+--   * One run in a house at a time (Runs.inUse: the PLAY panel shows the house busy, a lobby cannot start there).
 --   * In the run: FINISH (the host: the truck's prompt, the move's panel) ends it; so does everybody else's vote
 --     (RunRules.voteDone over the party but the host); the clock ends it too (Moving's tick). LEAVE THE RUN (the Runs
 --     remote's "leave": the move's list) takes one player back alone (their loaded pieces still count at the end); the
@@ -32,21 +24,24 @@
 --   * The end (Moving.onRunEnd): what was in the truck went into the stock of whoever loaded it (Moving's SB.unloadAll);
 --     each player gets the results card ({ kind = "result", … }: the pieces, their rarity, who got them, the value,
 --     yours), a run done or late opens the next difficulty for those still in it (RunRules.unlock: the save's
---     runUnlocked, saved soon; { kind = "unlocked" }); EndHold s later everybody fades back to the lobby by the portal
---     they came from (its `back` spot: just off its pad, facing the plaza: never on it, that would start a run again),
---     the van goes, the house's RunDifficulty is cleared.
+--     runUnlocked, saved soon; { kind = "unlocked" }); EndHold s later everybody fades back to the lobby beside the
+--     PLAY circle (Lobby.play.back: just south of it, facing it, Apart studs across: never in it), the van goes, the
+--     house's RunDifficulty is cleared.
 --
---   Runs.start()                       the pads' loop, the remote, the wraps, the dispatch's and the truck's prompts
---   Runs.begin(house, party, difficulty, admin?)   a run now (the pad's end, the admin's): an error text or nil
+--   Runs.start()                       the remote, the wraps, the dispatch's and the truck's prompts; 10.4 the party
+--                                      lobbies (server/Parties.luau's start)
+--   Runs.begin(house, party, difficulty, admin?)   a run now (a lobby's start, the admin's): an error text or nil
 --   Runs.finish(player)                the host's FINISH (true when a run ended)
 --   Runs.vote(player) / Runs.leave(player)   a party member's vote to finish / leaving the run alone
 --   Runs.runOf(player)                 the run a player is in (host or party) or nil: { host, house, difficulty, party }
---   Runs.padOf(house)                  a portal's pad (RunRules.Pad) or nil
 --   Runs.inUse(house)                  a run in that house now?
+--   Runs.list()                        10.4: the runs now ({ house, difficulty, host, party }: the map's IN A RUN)
+--   Runs.free(player) -> root?         10.4: their body's root while they are free to stand in the PLAY circle and go
+--                                      (alive, on foot, in no run or move, not on a jump), else nil
+--   Runs.openOf(player) -> n           10.4: the difficulties open to them (their save's runUnlocked)
 --   Runs.admin(player, what, arg?, admin?)   the admin panel's SANDBOX tab (`player` its TARGET): "start" (a house: a run
 --                                      for `player` alone, at the difficulty `admin` picked, locks ignored) | "difficulty"
 --                                      (its id) | "end" (`player`'s run) → what to say
---   Runs.step()                        one look at the pads (the loop's; the tests')
 -- 10.x danger (server/RunDanger.luau: the locks and keys, the vault, the hazards, the zombies, the bat): started with the
 -- runs (Runs.start); the results card's `danger` ({ vault = true / false / nil: none, stopped = zombies killed }) is
 -- RunDanger.result's (the blocks marked "10.x danger").
@@ -81,15 +76,9 @@ type Run = {
 	ended: boolean,
 }
 local remote: RemoteEvent? = nil
-local pads: { [string]: RunRules.Pad } = {}
 local runs: { [string]: Run } = {} -- by house
 local runOf: { [Player]: Run } = {} -- every party member's
-local away: { [Player]: number } = {} -- on a jump (os.clock until): no pad, no join
-local padKey: { [Player]: string } = {} -- the last pad view sent ("" none)
-local signs: { [string]: { status: TextLabel?, pad: BasePart?, model: Instance? } } = {}
-local signText: { [string]: string } = {}
-local shownState: { [string]: string } = {} -- 10.x the map: the portal's attributes as last written (a key)
-local inUseSaid: { [Player]: string } = {}
+local away: { [Player]: number } = {} -- on a jump (os.clock until): not free (10.4: the PLAY circle ignores them)
 local adminPick: { [Player]: string } = {}
 local started = false
 
@@ -124,75 +113,6 @@ end
 
 local function moving(): any
 	return require(Server.Moving)
-end
-
-local function nameOf(house: string): string
-	local h = SandboxMap.house(house)
-	return if h then h.name else house
-end
-
--- ── The portals' signs and glow ────────────────────────────────────────────
-
-local function findSigns()
-	local world = workspace:FindFirstChild("Sandbox")
-	local lobby = world and world:FindFirstChild("Lobby")
-	local folder = lobby and lobby:FindFirstChild("Portals")
-	if not folder then
-		return
-	end
-	for _, model in folder:GetChildren() do
-		local house = model:GetAttribute("RunPortal")
-		if type(house) == "string" then
-			local sign = model:FindFirstChild("GateSign")
-			local gui = sign and sign:FindFirstChild("Words")
-			local status = gui and gui:FindFirstChild("Status")
-			local pad = model:FindFirstChild("RunPad")
-			signs[house] = {
-				status = if status and status:IsA("TextLabel") then status else nil,
-				pad = if pad and pad:IsA("BasePart") then pad else nil,
-				model = model,
-			}
-		end
-	end
-end
-
-local function paint(house: string, text: string, color: { number })
-	local key = `{text}|{color[1]}`
-	if signText[house] == key then
-		return
-	end
-	signText[house] = key
-	local found = signs[house]
-	if not found then
-		return
-	end
-	local c = Color3.fromRGB(color[1], color[2], color[3])
-	if found.status then
-		found.status.Text = text
-		found.status.TextColor3 = c
-	end
-	if found.pad then
-		found.pad.Color = c
-	end
-end
-
--- 10.x the map (client/SandboxMapUi.luau, read-only): the portal model's attributes RunState ("free" | "wait": a
--- countdown | "use": a run in its house), RunEndsAt (the countdown's end, the server's time), RunWho (who is on the pad,
--- or the run's party: display names, comma-joined) and RunDifficulty (the pad's pick, the run's): written only when
--- they change.
-local function publish(house: string, state: string, endsAt: number?, who: { string }, difficulty: string?)
-	local names = table.concat(who, ", ")
-	local key = `{state}|{endsAt or ""}|{names}|{difficulty or ""}`
-	local found = signs[house]
-	local model = found and found.model
-	if not model or shownState[house] == key then
-		return
-	end
-	shownState[house] = key
-	model:SetAttribute("RunState", state)
-	model:SetAttribute("RunEndsAt", endsAt)
-	model:SetAttribute("RunWho", if names ~= "" then names else nil)
-	model:SetAttribute("RunDifficulty", difficulty)
 end
 
 -- The map's house model of a place (its attribute SandboxHouse), nil when none.
@@ -231,7 +151,7 @@ local function jump(player: Player, frame: CFrame)
 		if player.Parent then
 			fades:FireClient(player, "fade", "in", R.Fade.In, { at = frame.Position, look = frame.LookVector, dark = 0.1, wait = 2, near = 8 })
 		end
-		away[player] = os.clock() + 1.5 -- (a moment on the pad they land on before it counts)
+		away[player] = os.clock() + 1.5 -- (a moment where they land before it counts)
 	end)
 end
 
@@ -247,52 +167,14 @@ local function spread(spot: SandboxMap.Spot, count: number): { CFrame }
 	return out
 end
 
-local function backTo(house: string, players: { Player })
-	local portal = SandboxMap.portal(house)
-	local spot = if portal then portal.back else L.spawn
-	for n, frame in spread(spot, #players) do
+-- 10.4: back beside the PLAY circle (Lobby.play.back: just south of it, facing it; never in it). `house` the run's.
+local function backTo(_house: string, players: { Player })
+	for n, frame in spread(L.play.back, #players) do
 		jump(players[n], frame)
 	end
 end
 
 -- ── The views ──────────────────────────────────────────────────────────────
-
-local function partyNames(list: { number }): { string }
-	local out: { string } = {}
-	for _, id in list do
-		local p = Players:GetPlayerByUserId(id)
-		table.insert(out, if p then p.DisplayName else "?")
-	end
-	return out
-end
-
-local function padView(house: string, pad: RunRules.Pad, player: Player): { [string]: any }
-	local host = if pad.host then Players:GetPlayerByUserId(pad.host) else nil
-	local open: { string } = {}
-	local count = if host then openOf(host) else R.Open
-	for _, def in RunRules.list() do
-		if RunRules.isOpen(count, def.id) then
-			table.insert(open, def.id)
-		end
-	end
-	local line = RunRules.party(pad, #pad.order)
-	return {
-		kind = "pad",
-		house = house,
-		name = nameOf(house),
-		endsAt = pad.endsAt,
-		left = RunRules.left(pad, workspace:GetServerTimeNow()),
-		host = pad.host,
-		hostName = if host then host.DisplayName else "",
-		party = partyNames(line),
-		going = math.min(#line, R.MaxParty),
-		max = R.MaxParty,
-		difficulty = pad.difficulty,
-		open = open,
-		mine = host == player,
-		place = table.find(pad.order, player.UserId) or 0,
-	}
-end
 
 local function runView(run: Run, player: Player): { [string]: any }
 	local votes = 0
@@ -430,10 +312,7 @@ function Runs.begin(house: string, party: { Player }, difficulty: string, admin:
 	end
 	truckPrompts(run, car)
 	for n, frame in spread(zone.arrive, #party) do
-		local p = party[n]
-		padKey[p] = ""
-		send(p, { kind = "pad" })
-		jump(p, frame)
+		jump(party[n], frame)
 	end
 	sendRun(run)
 	return nil
@@ -623,10 +502,9 @@ local function onEnd(host: Player, facts: { [string]: any })
 	end)
 end
 
--- ── The pads ───────────────────────────────────────────────────────────────
+-- ── Free to go (10.4: server/Parties.luau's PLAY circle and its runs) ───────
 
--- Is this player free to stand on a pad (in no run, alive, on foot, not on a jump)?
-local function free(player: Player): BasePart?
+function Runs.free(player: Player): BasePart?
 	if runOf[player] or (away[player] and os.clock() < away[player]) then
 		return nil
 	end
@@ -645,103 +523,8 @@ local function free(player: Player): BasePart?
 	return root
 end
 
-local function onPad(root: BasePart, pad: SandboxMap.Rect): boolean
-	local at = root.Position
-	return at.X >= pad.x0 and at.X <= pad.x1 and at.Z >= pad.z0 and at.Z <= pad.z1 and at.Y >= SandboxMap.GroundTop - 2 and at.Y <= SandboxMap.GroundTop + R.PadHeight
-end
-
-function Runs.step()
-	local now = workspace:GetServerTimeNow()
-	local standing: { [Player]: string } = {}
-	local roots: { [Player]: BasePart } = {}
-	for _, player in Players:GetPlayers() do
-		local root = free(player)
-		if root then
-			roots[player] = root
-		end
-	end
-	for _, portal in L.portals do
-		local house = portal.house
-		local here: { number } = {}
-		for player, root in roots do
-			if onPad(root, portal.pad) then
-				if runs[house] then
-					if inUseSaid[player] ~= house then
-						inUseSaid[player] = house
-						say(player, `⛔ {portal.name} is in use: try another house.`)
-					end
-				else
-					standing[player] = house
-					table.insert(here, player.UserId)
-				end
-			elseif inUseSaid[player] == house then
-				inUseSaid[player] = nil
-			end
-		end
-		table.sort(here) -- (newcomers in one look: a stable order)
-		local pad = pads[house] or RunRules.newPad()
-		pads[house] = pad
-		local run = runs[house]
-		if run then
-			RunRules.padStep(pad, {}, now, R.Countdown)
-			paint(house, "IN USE · A RUN IS ON", R.Portal.InUse)
-			local party: { string } = {}
-			for _, member in run.party do
-				table.insert(party, member.DisplayName)
-			end
-			publish(house, "use", nil, party, run.difficulty) -- (10.x the map)
-			continue
-		end
-		local hostBefore = pad.host
-		RunRules.padStep(pad, here, now, R.Countdown)
-		if pad.host and pad.host ~= hostBefore then
-			local host = Players:GetPlayerByUserId(pad.host)
-			pad.difficulty = RunRules.choose(if host then openOf(host) else R.Open, pad.difficulty)
-		end
-		if #pad.order == 0 then
-			paint(house, "WALK ONTO THE PAD", R.Portal.Free)
-			publish(house, "free", nil, {}, nil) -- (10.x the map)
-		else
-			paint(house, `STARTING IN {RunRules.left(pad, now)} · {math.min(#pad.order, R.MaxParty)}/{R.MaxParty}`, R.Portal.Waiting)
-			publish(house, "wait", pad.endsAt, partyNames(pad.order), pad.difficulty)
-		end
-		if RunRules.due(pad, now) then
-			local ids = RunRules.party(pad, R.MaxParty)
-			local difficulty = pad.difficulty
-			pads[house] = RunRules.newPad()
-			local party: { Player } = {}
-			for _, id in ids do
-				local p = Players:GetPlayerByUserId(id)
-				if p then
-					table.insert(party, p)
-				end
-			end
-			if #party > 0 then
-				local err = Runs.begin(house, party, difficulty)
-				if err then
-					for _, p in party do
-						say(p, `⛔ The run could not start: {err}`)
-					end
-				end
-			end
-		end
-	end
-	-- the pad panels: to whoever stands on a pad (a view when it changed), none to whoever stepped off
-	for _, player in Players:GetPlayers() do
-		local house = standing[player]
-		local pad = if house then pads[house] else nil
-		if house and pad and #pad.order > 0 and not runOf[player] then
-			local view = padView(house, pad, player)
-			local key = `{house}|{view.left}|{view.host}|{view.difficulty}|{table.concat(view.party, ",")}|{table.concat(view.open, ",")}`
-			if padKey[player] ~= key then
-				padKey[player] = key
-				send(player, view)
-			end
-		elseif padKey[player] ~= nil and padKey[player] ~= "" then
-			padKey[player] = ""
-			send(player, { kind = "pad" })
-		end
-	end
+function Runs.openOf(player: Player): number
+	return openOf(player)
 end
 
 -- ── The remote ─────────────────────────────────────────────────────────────
@@ -755,18 +538,6 @@ local function onRequest(player: Player, message: any)
 		local run = runOf[player]
 		if run then
 			send(player, runView(run, player))
-		end
-		padKey[player] = nil
-	elseif kind == "difficulty" then
-		for house, pad in pads do
-			if pad.host == player.UserId and not runs[house] then
-				if RunRules.isOpen(openOf(player), message.id) then
-					pad.difficulty = RunRules.clean(message.id)
-					padKey[player] = nil
-				else
-					say(player, "🔒 Finish a run at the difficulty before it to open that one.")
-				end
-			end
 		end
 	elseif kind == "vote" then
 		Runs.vote(player)
@@ -782,12 +553,21 @@ function Runs.runOf(player: Player): { host: Player, house: string, difficulty: 
 	return if run then { host = run.host, house = run.house, difficulty = run.difficulty, party = table.clone(run.party) } else nil
 end
 
-function Runs.padOf(house: string): RunRules.Pad?
-	return pads[house]
-end
-
 function Runs.inUse(house: string): boolean
 	return runs[house] ~= nil
+end
+
+function Runs.list(): { { house: string, difficulty: string, host: Player, party: { Player } } }
+	local out = {}
+	for house, run in runs do
+		if not run.ended then
+			table.insert(out, { house = house, difficulty = run.difficulty, host = run.host, party = table.clone(run.party) })
+		end
+	end
+	table.sort(out, function(a, b)
+		return a.house < b.house
+	end)
+	return out
 end
 
 function Runs.admin(player: Player, what: string, arg: string?, admin: Player?): string
@@ -848,7 +628,6 @@ function Runs.start()
 	end
 	started = true
 	remote = Net.get("Runs")
-	findSigns()
 	wrapCrew()
 	moving().onRunEnd(onEnd)
 	local ok, err = pcall(function() -- 10.x danger: every run's locks, vault, hazards and zombies
@@ -872,7 +651,7 @@ function Runs.start()
 				prompt.MaxActivationDistance = 12
 				prompt.RequiresLineOfSight = false
 				prompt.Triggered:Connect(function(player: Player)
-					say(player, `🏠 Walk onto a house's glowing pad: in {R.Countdown} s everybody on it goes in ({R.MaxParty} at most). The first on it picks the difficulty. Carry the loot into the truck at the door, FINISH at the truck (or beat the clock): it all comes home to your warehouse.`)
+					say(player, `▶ Step into the glowing PLAY circle: CREATE A LOBBY (a house, a difficulty, public or friends only) or JOIN one ({R.MaxParty} at most). Everybody READY, the host presses START. Carry the loot into the truck at the door, FINISH at the truck (or beat the clock): it all comes home to your warehouse.`)
 				end)
 				prompt.Parent = d
 			end
@@ -889,17 +668,15 @@ function Runs.start()
 			run.votes[player.UserId] = nil
 			sendRun(run)
 		end
-		away[player], padKey[player], inUseSaid[player], adminPick[player] = nil, nil, nil, nil
+		away[player], adminPick[player] = nil, nil
 	end)
-	task.spawn(function()
-		while true do
-			task.wait(R.Every)
-			local ok, err = pcall(Runs.step :: any)
-			if not ok then
-				warn(`[Runs] {err}`)
-			end
-		end
+	-- 10.4: the PLAY circle's party lobbies (they start the runs: Runs.begin)
+	local started, why = pcall(function()
+		require(Server.Parties).start(Runs)
 	end)
+	if not started then
+		warn(`[Runs] the party lobbies did not start: {why}`)
+	end
 end
 
 return Runs

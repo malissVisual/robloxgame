@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""9.7 the lobby (design/lobby/plan.py): design/lobby/plan.json as shared/SandboxMap.luau's LOBBY section, the data the
+"""9.7 the lobby (design/lobby/plan.py; 10.4 one PLAY circle): design/lobby/plan.json as shared/SandboxMap.luau's LOBBY section, the data the
 game builds. Nothing in the game reads plan.json: this writes it into the module once, as a Luau table, between the
 lines "-- BEGIN LOBBY" and "-- END LOBBY" of src/shared/SandboxMap.luau (the rest of the module is left as it is; its
 Plots are made from Lobby.plots). Deterministic: the same plan, the same lines.
@@ -17,9 +17,9 @@ What it writes (SandboxMap.Lobby):
   dispatch    the ZDC dispatch kiosk's foot (a Spot: its front's look)
   fountain    the fountain in the plaza (x, z, r)
   plots       the four plots: id, x (the warehouse's middle across), wall (its front wall's z: it looks south), rect
-  portals     the six house portals: house (a SandboxMap.Houses id), name, x, z, yaw (the gate's middle on the ground,
-              its front's look: toward the plaza), pad (the glowing pad's Rect in front of it), foot (the gate and its
-              facade's Rect), back (a Spot on its pad facing the plaza: where its party comes back)
+  play        10.4 the PLAY circle (one for every house: server/Parties.luau's party lobbies start the runs): x, z
+              (its middle on the ground), r (its radius: config Runs.Play.Radius), back (a Spot just south of it,
+              facing it: where a party comes back from a run, spread across; never in it)
   shops       paint (the PAINT shop's booth: spot, rect, stand: where you stand at its counter), leaders (the TOP
               MOVERS board: spot, rect), auction (the Auction House's front wall: spot, rect)
   lamps       the plaza's lamps ({ x, z })
@@ -72,11 +72,8 @@ def section(plan):
     for p in plan["plots"]:
         lines.append(f"\t\t{{ id = {num(p['id'])}, x = {num(p['x'])}, wall = {num(p['wall'])}, rect = {rect_text(p['rect'])} }},")
     lines.append("\t},")
-    lines.append("\tportals = {")
-    for p in plan["portals"]:
-        lines.append(f"\t\t{{ house = {q(p['house'])}, name = {q(p['name'])}, x = {num(p['x'])}, z = {num(p['z'])}, yaw = {num(p['yaw'])}, "
-                     f"pad = {rect_text(p['pad'])}, foot = {rect_text(p['foot'])}, back = {spot_text(p['back'])} }},")
-    lines.append("\t},")
+    p = plan["play"]
+    lines.append(f"\tplay = {{ x = {num(p['x'])}, z = {num(p['z'])}, r = {num(p['r'])}, back = {spot_text(p['back'])} }},")
     sh = plan["shops"]
     lines.append("\tshops = {")
     lines.append(f"\t\tpaint = {{ spot = {spot_text(sh['paint']['spot'])}, rect = {rect_text(sh['paint']['rect'])}, stand = {spot_text(sh['paint']['stand'])} }},")
