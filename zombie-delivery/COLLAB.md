@@ -4,6 +4,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## In progress
 <!-- who · task · files · since -->
+- Claude (lead + 3 agents: server, client, assets) · 10.0 only the sandbox: the old city is deleted (the owner: "ano, smaž to"; `design/city-removal/KONTRAKT.md`, `PLAN.md`) · everything outside the sandbox · 17. 10. 2026. Please do not start city work; sandbox work waits for this merge.
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
