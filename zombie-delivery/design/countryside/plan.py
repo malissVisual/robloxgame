@@ -1,29 +1,32 @@
 #!/usr/bin/env python3
 """The countryside instead of the village (the owner: "all the family houses are gone; instead six different spots: by
-the pond, on the farm, one house, somewhere else again; no towns, no villages"): the sandbox map as plain data and a
+the pond, on the farm, one house, somewhere else again; no towns, no villages"); 9.7 runs (the owner: "like Dungeon
+Quest: from the lobby you go into a house"): the six places to empty as run zones, the sandbox's map as plain data and a
 picture.
 
 Writes, next to this file:
-  plan.json   every road, spot, landmark, field, lawn, wood, stream and tree line, in SandboxMap's units and axes (studs;
+  plan.json   every yard, spot, zone, landmark, lawn, wood, stream and tree line, in SandboxMap's units and axes (studs;
               x east, z south: -z is north; a spot's yaw as SandboxMap's: 0 looks north, 90 west, 180 south, 270 east;
               a curb is the van's pivot as SandboxMap.House.curb: the Sprinter (21.8 long, 8 wide) its back 2 studs in
               from the edge of its yard nearest the door, its nose away from the door)
-  plan.png    the same seen from above, north up, the six spots labelled
+  plan.png    the same seen from above, north up, the six zones labelled
 
-Open countryside with six separate places to empty, each its own spot with its own surroundings, joined to the depot
-by country lanes (22 wide, narrower than Pražská's 28; each ends in a yard where the van turns round):
-  1 The Old Farmstead    the farm: Pražská's end, unmoved; a barn, round bales and a haystack, a fenced paddock, a muck
-                         heap and woodpile, an old tractor with its trailer, fields round it
-  2 The Pond Cabin       by the pond (Pond Lane): a fishing cabin on its east shore, a jetty, reeds, a rowing boat, a bench
-  3 The Lone House       one house alone (Hill Road): a family house by a country road among fields, its garden fenced,
-                         a couple of trees, no neighbours
-  4 The Forest Lodge     in a wood (Wood Lane): a forester's lodge in a clearing of the forest, a woodpile, a stump
-  5 The Old Mill         on a stream (Mill Lane): the millrace past its right-hand side (west, seen facing its door),
-                         a weir upstream, a footbridge downstream
-  6 The Orchard Cottage  in the orchard (Orchard Lane): rows of fruit trees, beehives, a fence round it
-The fixed things stay exactly where they are (shared/SandboxMap.luau): the four plots and Depot Row, Pražská, the
-turnaround and the farmstead, the Auction House's site, the TOP MOVERS board, the signpost; the D5 at the east edge with
-its cars; the railway along the south edge (a lone halt, under the D5). Nothing overlaps anything else: check() says.
+9.7 runs: there is no driving any more. The lobby (design/lobby/plan.py, at least FAR studs east of every zone) is the
+whole visible world; each of the six places to empty is a run zone of its own, out of sight of the lobby and of each
+other (MIN_APART studs between two zones at least, their tall screen hedges): a fenced yard and garden round its
+house, its surroundings its scenery, the truck parked at its curb (in its yard: the lanes' yards stay, the lanes are
+gone; the farmstead's yard where Pražská's end and its turnaround were). A run's party arrives at its `arrive` spot in
+the front yard, facing the door. Nothing else of the old map stays: no plots, no Depot Row or Pražská, no lanes, no
+fields, no D5, no railway (the lobby has the plots, the TOP MOVERS board and the Auction House's site).
+  1 The Old Farmstead    the farm: a barn, round bales and a haystack, a fenced paddock, a muck heap and woodpile, an
+                         old tractor with its trailer
+  2 The Pond Cabin       by the pond: a fishing cabin on its east shore, a jetty, reeds, a rowing boat, a bench
+  3 The Lone House       one house alone: a family house, its garden fenced, a couple of trees, no neighbours
+  4 The Forest Lodge     in a wood: a forester's lodge in a clearing of the forest, a woodpile, a stump
+  5 The Old Mill         on a stream: the millrace past its right-hand side (west, seen facing its door), a weir
+                         upstream, a footbridge downstream
+  6 The Orchard Cottage  in the orchard: rows of fruit trees, beehives, a fence round it
+Nothing overlaps anything else: check() says.
 
 tools/countryside/sandboxmap.py writes this plan into shared/SandboxMap.luau (its COUNTRYSIDE section); SandboxMap.Houses
 is written by hand from `spots` (tests/sandboxhouses_test.luau holds them together). Deterministic (no dice).
@@ -38,57 +41,40 @@ from PIL import Image, ImageDraw, ImageFont
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
-# ── The fixed world (shared/SandboxMap.luau, unchanged) ───────────────────────────────────────────────────────────
+# ── The world ──────────────────────────────────────────────────────────────────────────────────────────────────
 
-BOUNDS = {"x0": -1180, "x1": 420, "z0": -680, "z1": 760}
-PLOT_X = [-195, -65, 65, 195]
-PLOTS = [{"id": i + 1, "rect": {"x0": x - 60, "x1": x + 60, "z0": -230, "z1": -78},
-          "warehouse": {"x": x, "z": -160, "sx": 80, "sz": 60}} for i, x in enumerate(PLOT_X)]
-TURNAROUND = {"x": 0, "z": 470, "r": 34}
-SHOULDER = 4  # SandboxScenery.Run: the gravel shoulder round every road
-LANE = 22  # a country lane's width (Pražská and Depot Row are 28)
+# (9.7: the Bounds reach east round the lobby, design/lobby/plan.json: the meadow under both, the invisible walls on them)
+BOUNDS = {"x0": -1180, "x1": 2080, "z0": -680, "z1": 760}
+VIEW = {"x0": -1180, "x1": 420, "z0": -680, "z1": 760}  # (the picture: the zones' part of the map)
+SHOULDER = 4  # SandboxScenery.Run: the gravel shoulder round every yard
 VAN_LENGTH, VAN_WIDTH = 21.8, 8.0  # the Sprinter (SprinterLooks.Length, Config.Sprinter.Width)
 CURB_IN = 2 + 11  # a curb's pivot from its yard's edge: the van's back 2 in, its middle 11 on
 DOOR_IN = 1.2  # a door spot from its box's front edge (the look's front wall 1.5 in, the door 0.3 out of it)
 LOT_BACK = 6  # a lot reaches this far round its box (but its front: to its yard's edge, 10 out: the front garden)
+ARRIVE = 10  # a run's party arrives this far out of the front door, facing it (SandboxMap.Zones' arrive)
+MIN_APART = 200  # studs between two zones at least (their screens out of each other's sight)
+FAR = 1000  # studs from the lobby's bounds to every zone at least (design/lobby/plan.py's FAR)
 
 
 def rect(x0, x1, z0, z1):
     return {"x0": x0, "x1": x1, "z0": z0, "z1": z1}
 
 
-# Things that stand where they stand (not the plan's to move): the Auction House's site (shared/AuctionHouseLayout.luau
-# site(), built while Config.Auction.On), the TOP MOVERS board (SandboxLeadersRules.spot(): Pražská's east edge + 26,
-# Depot Row's south edge + 24, turned 45°; its footprint round it), the signpost at the crossroads.
-FIXED = [
-    {"id": "auction", "name": "Auction House", "rect": rect(132, 184, -26, 12)},
-    {"id": "leaders", "name": "TOP MOVERS board", "rect": rect(26, 54, -36, -8)},
-    {"id": "signpost", "name": "Signpost", "rect": rect(-34, -18, -42, -26)},
-]
+LOBBY_PLAN = os.path.join(os.path.dirname(HERE), "lobby", "plan.json")
+LOBBY = json.load(open(LOBBY_PLAN, encoding="utf-8"))["bounds"] if os.path.exists(LOBBY_PLAN) else rect(1560, 2040, -200, 200)
 
-# ── The roads ──────────────────────────────────────────────────────────────────────────────────────────────────────
+# ── The yards ──────────────────────────────────────────────────────────────────────────────────────────────────────
 
-# name, rect, yard (the spot's turning yard at the lane's end: part of its lane, its name the lane's), fixed (today's).
-# Pražská runs from Depot Row's north edge (z -74) as SandboxMap has it; a lane's rects only touch, never overlap.
+# name (the road its spot stood on: the spot's street, the words' "on Pond Lane"), rect: each spot's yard, where its
+# truck stands (asphalt, a gravel shoulder round it). The lanes that led to them are gone (9.7: no driving); the
+# farmstead's yard is where Pražská's end and its turnaround were.
 ROADS = [
-    ("Pražská", rect(-14, 14, -74, 470), False, True),
-    ("Depot Row", rect(-270, 270, -74, -46), False, True),
-    # west from Depot Row's end to the mill's yard (the forest's and the lone house's lanes turn off it)
-    ("Mill Lane", rect(-1012, -270, -71, -49), False, False),
-    ("Mill Lane", rect(-1066, -1012, -84, -36), True, False),
-    # north off Mill Lane into the forest, to the lodge's clearing
-    ("Wood Lane", rect(-951, -929, -404, -71), False, False),
-    ("Wood Lane", rect(-967, -913, -452, -404), True, False),
-    # north off Mill Lane between the fields, the lone house's pull-in on its west side at its end
-    ("Hill Road", rect(-531, -509, -440, -71), False, False),
-    ("Hill Road", rect(-583, -531, -460, -412), True, False),
-    # north from Depot Row's east end past the plots, the cottage's yard at the orchard's edge
-    ("Orchard Lane", rect(270, 292, -494, -46), False, False),
-    ("Orchard Lane", rect(222, 270, -494, -446), True, False),
-    # west off Pražská across the fields, then south to the pond
-    ("Pond Lane", rect(-896, -14, 320, 342), False, False),
-    ("Pond Lane", rect(-896, -874, 342, 446), False, False),
-    ("Pond Lane", rect(-922, -874, 446, 494), True, False),
+    ("Pražská", rect(-30, 30, 452, 504)),
+    ("Mill Lane", rect(-1066, -1012, -84, -36)),
+    ("Wood Lane", rect(-967, -913, -452, -404)),
+    ("Hill Road", rect(-583, -531, -460, -412)),
+    ("Orchard Lane", rect(222, 270, -494, -446)),
+    ("Pond Lane", rect(-922, -874, 446, 494)),
 ]
 
 # ── The six spots ──────────────────────────────────────────────────────────────────────────────────────────────────
@@ -109,7 +95,7 @@ FARMSTEAD = {"lot": rect(-60, 60, 504, 600), "door": {"x": 0, "z": 523, "yaw": 0
              "back": {"x": 0, "z": 557, "yaw": 180}}
 LOOK = {0: (0, -1), 90: (-1, 0), 180: (0, 1), 270: (1, 0)}  # the way a yaw looks (x, z)
 
-# ── The landmarks (each spot's surroundings, the D5, the railway) ───────────────────────────────────────────────────
+# ── The landmarks (each spot's surroundings; 9.7: the D5, the railway and its halt are gone) ───────────────────────────────────────────────────
 
 # id, name, kind, rect, yaw (its front's look), spot (whose surroundings; None: the map's)
 LANDMARKS = [
@@ -130,11 +116,6 @@ LANDMARKS = [
     ("footbridge", "The Footbridge", "footbridge", rect(-1090, -1066, 12, 20), 0, "old_mill"),
     # the orchard cottage
     ("apiary", "The Beehives", "apiary", rect(150, 186, -432, -414), 270, "orchard_cottage"),
-    # the map's: the D5 (its cars: client/VillageTraffic.luau), the railway under it and its lone halt
-    ("d5", "D5 Motorway", "motorway", rect(330, 390, -680, 760), 90, None),
-    ("railway", "Railway", "railway", rect(-1180, 330, 716, 728), 90, None),
-    ("railway_east", "Railway", "railway", rect(390, 420, 716, 728), 270, None),
-    ("halt", "Meadow Halt", "halt", rect(140, 220, 700, 716), 0, None),
 ]
 
 # The streams: the millrace from the forest past the mill into the pond (its water `width` wide on its middle line).
@@ -153,32 +134,8 @@ WOODS = [{"id": "forest", "rect": rect(-1160, -760, -672, -250), "clearings": [r
 # The orchard: fruit trees in rows (VillageLooks.orchard), the cottage on its east edge.
 ORCHARD = rect(30, 216, -650, -300)
 
-# Fields: rect, kind (VillageLooks' crops), each 10 off a road's asphalt, clear of everything else.
-FIELDS = [
-    # the north, round the lone house
-    (rect(-750, 20, -680, -520), "rapeseed"),
-    (rect(-750, -635, -510, -250), "wheat"),
-    (rect(-625, -541, -402, -250), "young"),
-    (rect(-499, 20, -510, -240), "wheat"),
-    (rect(-499, -280, -230, -81), "ploughed"),
-    # between the forest and Mill Lane
-    (rect(-1060, -961, -240, -94), "young"),
-    (rect(-919, -541, -240, -81), "rapeseed"),
-    # between Mill Lane and Pond Lane
-    (rect(-1002, -660, -39, 310), "wheat"),
-    (rect(-640, -300, -39, 310), "ploughed"),
-    (rect(-280, -36, -36, 310), "rapeseed"),
-    # the south: the pond's, the farm's
-    (rect(-1150, -884, 570, 706), "young"),
-    (rect(-864, -520, 352, 706), "ploughed"),
-    (rect(-500, -180, 352, 706), "wheat"),
-    (rect(-170, -48, 352, 450), "rapeseed"),
-    (rect(-170, -66, 600, 706), "young"),
-    # the east, between Pražská and the D5
-    (rect(24, 296, 28, 300), "young"),
-    (rect(48, 296, 310, 496), "rapeseed"),
-    (rect(160, 296, 506, 690), "wheat"),
-]
+# Fields: none any more (9.7: the fields lay between the lanes; a zone's view ends at its screen hedge).
+FIELDS = []
 
 # Lawns (ground tiles of their own, flush with the meadow): the forest's floor (the forest less its clearings).
 def forest_floor():
@@ -191,22 +148,31 @@ def forest_floor():
     return [{"kind": "forest", "rect": r} for r in out]
 
 
+# ── 9.7 The run zones ──────────────────────────────────────────────────────────────────────────────────────────
+
+# spot id → its zone: the fenced area round its house (its yard, its lot, its surroundings), a screen hedge on its edge
+# (CountryLooks' "screen": tall, solid) and invisible walls on it (server/SandboxWorld.luau): nobody wanders off.
+ZONES = {
+    "sandbox_house": rect(-190, 170, 440, 712),
+    "pond_cabin": rect(-1170, -860, 368, 580),
+    "lone_house": rect(-650, -515, -525, -395),
+    "forest_lodge": rect(-1015, -885, -512, -386),
+    "old_mill": rect(-1112, -995, -150, 46),
+    "orchard_cottage": rect(108, 292, -548, -384),
+}
+
+
+def screen_line(r):
+    return [(r["x0"], r["z0"]), (r["x1"], r["z0"]), (r["x1"], r["z1"]), (r["x0"], r["z1"]), (r["x0"], r["z0"])]
+
+
 # Tree lines: polyline, kind: "windbreak" (VillageLooks' mix), "alley" (fruit trees along a road), "hedge" (a low hedge,
-# CountryLooks), "fence" (a post-and-rail fence, CountryLooks).
+# CountryLooks), "fence" (a post-and-rail fence, CountryLooks), 9.7 "screen" (a zone's tall screen hedge, CountryLooks).
+# (9.7: the lanes' windbreaks, alleys and hedges are gone with the lanes.)
 TREE_LINES = [
-    ([(312, -20), (312, 700)], "windbreak"),  # along the D5
-    ([(-650, -27), (-650, 300)], "windbreak"),
-    ([(-290, -27), (-290, 300)], "windbreak"),
-    ([(-510, 362), (-510, 700)], "windbreak"),
-    ([(-480, -515), (10, -515)], "windbreak"),
-    ([(-497, -430), (-497, -92)], "alley"),  # along Hill Road
-    ([(-860, 306), (-40, 306)], "alley"),  # along Pond Lane
-    ([(-905, -79), (-560, -79)], "hedge"),  # along Mill Lane
-    ([(-860, 349), (-180, 349)], "hedge"),  # along Pond Lane's south side
-    ([(-170, 596), (-170, 700)], "hedge"),  # the farm's west field
     # the orchard's fence, its gate at the cottage
     ([(217, -495), (217, -650), (30, -650), (30, -300), (217, -300), (217, -445)], "fence"),
-]
+] + [(screen_line(ZONES[sid]), "screen") for sid in ZONES]
 
 
 # ── The derived data ───────────────────────────────────────────────────────────────────────────────────────────────
@@ -220,7 +186,7 @@ def grow(r, by):
 
 
 def yard_of(street):
-    return next(r for name, r, yard, _ in ROADS if name == street and yard)
+    return next(r for name, r in ROADS if name == street)
 
 
 def spots():
@@ -264,6 +230,18 @@ def spots():
     return out
 
 
+def zones(sp):
+    """9.7 the run zones: each spot's zone (its rect) and where its party arrives (ARRIVE out of the front door, facing
+    it)."""
+    out = []
+    for s in sp:
+        d = s["door"]
+        ox, oz = LOOK[d["yaw"]]
+        out.append({"id": s["id"], "rect": ZONES[s["id"]],
+                    "arrive": {"x": d["x"] + ox * ARRIVE, "y": 3, "z": d["z"] + oz * ARRIVE, "yaw": (d["yaw"] + 180) % 360}})
+    return out
+
+
 def stream_rects(stream, extra=0):
     """A stream's water as small squares along its middle line (for the overlap checks)."""
     out = []
@@ -278,15 +256,13 @@ def stream_rects(stream, extra=0):
     return out
 
 
-def check(sp):
+def check(sp, zs):
     """Everything the plan promises: returns the failures (empty: all fine)."""
     bad = []
-    roads = [(name, r) for name, r, _, _ in ROADS]
-    # every curb: the van on asphalt (its back, nose and corners), its back nearer the door
+    roads = list(ROADS)
+    # every curb: the van on its yard's asphalt (its back, nose and corners), its back nearer the door
     def on_road(x, z):
-        t = TURNAROUND
-        return any(r["x0"] - 1e-6 <= x <= r["x1"] + 1e-6 and r["z0"] - 1e-6 <= z <= r["z1"] + 1e-6 for _, r in roads) \
-            or math.hypot(x - t["x"], z - t["z"]) <= t["r"]
+        return any(r["x0"] - 1e-6 <= x <= r["x1"] + 1e-6 and r["z0"] - 1e-6 <= z <= r["z1"] + 1e-6 for _, r in roads)
     for s in sp:
         c, d = s["curb"], s["door"]
         lx, lz = LOOK[c["yaw"]]
@@ -295,56 +271,41 @@ def check(sp):
         px, pz = -lz * hw, lx * hw
         corners = [back, nose, (back[0] + px, back[1] + pz), (back[0] - px, back[1] - pz), (nose[0] + px, nose[1] + pz), (nose[0] - px, nose[1] - pz)]
         if not all(on_road(*p) for p in corners):
-            bad.append(f"{s['id']}: the van off the asphalt")
+            bad.append(f"{s['id']}: the van off its yard")
         if math.hypot(back[0] - d["x"], back[1] - d["z"]) >= math.hypot(nose[0] - d["x"], nose[1] - d["z"]):
             bad.append(f"{s['id']}: the van's nose to the door")
-    # the roads: none over another (they only touch)
+    # the yards: none over another
     for i, (na, a) in enumerate(roads):
         for nb, b in roads[i + 1:]:
-            if overlap(a, b, -1e-6) and {na, nb} != {"Pražská", "Depot Row"}:  # (Pražská from Depot Row's north edge)
-                bad.append(f"roads {na} and {nb} over each other")
-    # the areas that must never overlap: every road with its shoulder, the plots, the turnaround, the spots' boxes and
-    # lots, the landmarks, the fields, the streams, the fixed things
+            if overlap(a, b, SHOULDER * 2):
+                bad.append(f"yards {na} and {nb} too close")
+    # the areas that must never overlap: every yard with its shoulder, the spots' boxes and lots, the landmarks, the
+    # streams
     areas = [(f"road {n}", grow(r, SHOULDER)) for n, r in roads]
-    areas += [(f"plot {p['id']}", p["rect"]) for p in PLOTS]
-    t = TURNAROUND
-    areas.append(("turnaround", rect(t["x"] - t["r"] - SHOULDER, t["x"] + t["r"] + SHOULDER, t["z"] - t["r"] - SHOULDER, t["z"] + t["r"] + SHOULDER)))
     areas += [(f"spot {s['id']}", s["box"]) for s in sp]
     areas += [(f"lot {s['id']}", s["lot"]) for s in sp]
     areas += [(f"landmark {l[0]}", l[3]) for l in LANDMARKS]
-    areas += [(f"field {n}", f[0]) for n, f in enumerate(FIELDS)]
-    areas += [(f"fixed {f['id']}", f["rect"]) for f in FIXED]
     for st in STREAMS:
         areas += [(f"stream {st['id']}", r) for r in stream_rects(st)]
-    allowed = {
-        # a lot reaches its yard's edge (the yard's shoulder over its front), the farmstead's the turnaround's ring
-        ("road", "lot"), ("lot", "road"), ("turnaround", "lot"), ("lot", "turnaround"),
-        ("spot", "lot"), ("lot", "spot"),
-        # the roads meet each other, the turnaround is Pražská's end
-        ("road", "road"), ("road", "turnaround"), ("turnaround", "road"),
-        # a stream's squares overlap each other
-        ("stream", "stream"),
-    }
+    allowed = {("road", "lot"), ("lot", "road"), ("spot", "lot"), ("lot", "spot"), ("stream", "stream")}
     crossing = {("landmark weir", "stream millrace"), ("landmark footbridge", "stream millrace"), ("landmark pond", "stream millrace"),
                 ("spot old_mill", "stream millrace")}
     seen = set()
     for i, (na, a) in enumerate(areas):
         for nb, b in areas[i + 1:]:
             ka, kb = na.split(" ")[0], nb.split(" ")[0]
-            if (ka, kb) in allowed or (na, nb) in crossing or (nb, na) in crossing:
-                continue
-            if na == nb:
+            if (ka, kb) in allowed or (na, nb) in crossing or (nb, na) in crossing or na == nb:
                 continue
             if overlap(a, b, -1e-6):
                 key = (na, nb)
                 if key not in seen:
                     seen.add(key)
                     bad.append(f"{na} on {nb}")
-    # a spot's lot only on its own yard (the yard's shoulder), never another road
+    # a spot's lot only on its own yard (the yard's shoulder), never another
     for s in sp:
         for n, r in roads:
-            if overlap(s["lot"], r, -1e-6) and not (s["fixed"] and n == "Pražská"):
-                bad.append(f"lot {s['id']} on the asphalt of {n}")
+            if overlap(s["lot"], r, -1e-6) and n != s["street"]:
+                bad.append(f"lot {s['id']} on the yard of {n}")
     # the mill's millrace runs past its right-hand side (seen facing its front door from outside): its west wall
     mill = next(s for s in sp if s["id"] == "old_mill")
     ox, oz = LOOK[mill["yaw"]]
@@ -357,59 +318,38 @@ def check(sp):
     # (its water's edge 2 studs off the wall: its bed's bank, 1.5 wide, clear of the wall)
     if side is None or near > STREAMS[0]["width"] / 2 + 2.5:
         bad.append("the millrace is not past the mill's right-hand side")
-    # the fields 10 off every road's asphalt
-    for n, (f, _) in enumerate(FIELDS):
-        for name, r in roads:
-            if overlap(f, r, 10 - 1e-6):
-                bad.append(f"field {n} within 10 of {name}")
-    # inside the Bounds
-    for name, r in areas:
-        if r["x0"] < BOUNDS["x0"] - 1e-6 or r["x1"] > BOUNDS["x1"] + 1e-6 or r["z0"] < BOUNDS["z0"] - 1e-6 or r["z1"] > BOUNDS["z1"] + 1e-6:
-            if not name.startswith("stream"):
-                bad.append(f"{name} outside the Bounds")
+    # 9.7 the zones: one a spot; each holds its spot's box, lot, yard (and its shoulder), its van, its landmarks and its
+    # arrival spot, clear of its screen; none over another, MIN_APART apart, FAR from the lobby, all in the Bounds
+    def holds(outer, r, margin):
+        return r["x0"] >= outer["x0"] + margin and r["x1"] <= outer["x1"] - margin and r["z0"] >= outer["z0"] + margin and r["z1"] <= outer["z1"] - margin
+    for z in zs:
+        s = next(x for x in sp if x["id"] == z["id"])
+        r = z["rect"]
+        things = [("box", s["box"]), ("lot", s["lot"]), ("yard", grow(yard_of(s["street"]), SHOULDER))]
+        things += [(f"landmark {l[0]}", l[3]) for l in LANDMARKS if l[5] == s["id"]]
+        a = z["arrive"]
+        things.append(("arrive", rect(a["x"] - 4, a["x"] + 4, a["z"] - 4, a["z"] + 4)))
+        for name, t in things:
+            if not holds(r, t, 4):
+                bad.append(f"zone {z['id']}: its {name} not inside it")
+        if not holds(BOUNDS, r, 0):
+            bad.append(f"zone {z['id']} outside the Bounds")
+        dx = max(LOBBY["x0"] - r["x1"], r["x0"] - LOBBY["x1"], 0)
+        dz = max(LOBBY["z0"] - r["z1"], r["z0"] - LOBBY["z1"], 0)
+        if math.hypot(dx, dz) < FAR:
+            bad.append(f"zone {z['id']} within {FAR} of the lobby")
+    for i, a in enumerate(zs):
+        for b in zs[i + 1:]:
+            ra, rb = a["rect"], b["rect"]
+            dx = max(ra["x0"] - rb["x1"], rb["x0"] - ra["x1"], 0)
+            dz = max(ra["z0"] - rb["z1"], rb["z0"] - ra["z1"], 0)
+            if math.hypot(dx, dz) < MIN_APART:
+                bad.append(f"zones {a['id']} and {b['id']} only {math.hypot(dx, dz):.0f} apart")
+    # every landmark in its spot's zone (a landmark of the map's own: none any more)
+    for l in LANDMARKS:
+        if l[5] is None:
+            bad.append(f"landmark {l[0]} belongs to no zone")
     return bad
-
-
-def connected():
-    """Every lane reaches Depot Row (rects that touch along 20 studs or more)."""
-    roads = [(n, r) for n, r, _, _ in ROADS]
-    def joins(a, b):
-        x = min(a["x1"], b["x1"]) - max(a["x0"], b["x0"])
-        z = min(a["z1"], b["z1"]) - max(a["z0"], b["z0"])
-        return (x >= -1e-6 and z >= 20) or (z >= -1e-6 and x >= 20)
-    seen = {1}
-    grew = True
-    while grew:
-        grew = False
-        for i, (_, a) in enumerate(roads):
-            if i in seen:
-                continue
-            if any(joins(a, roads[j][1]) for j in seen):
-                seen.add(i)
-                grew = True
-    return [roads[i][0] for i in range(len(roads)) if i not in seen]
-
-
-def lengths(sp):
-    """The way from plot 1's spawn along the roads' middle lines to each spot's curb (studs, a Manhattan walk)."""
-    out = {}
-    for s in sp:
-        c = s["curb"]
-        sx, sz = -173, -112
-        if s["street"] == "Pražská":
-            d = abs(sx - 0) + abs(-60 - sz) + abs(c["z"] + 60)
-        elif s["street"] == "Orchard Lane":
-            d = abs(sx - 281) + abs(-60 - sz) + abs(c["z"] + 60) + abs(c["x"] - 281)
-        elif s["street"] == "Pond Lane":
-            d = abs(sx) + abs(-60 - sz) + (331 + 60) + abs(-885) + abs(c["z"] - 331) + abs(c["x"] + 885)
-        elif s["street"] == "Mill Lane":
-            d = abs(sx - c["x"]) + abs(-60 - sz) + abs(c["z"] + 60)
-        else:
-            lane = next(r for n, r, y, _ in ROADS if n == s["street"] and not y)
-            lx = (lane["x0"] + lane["x1"]) / 2
-            d = abs(sx - lx) + abs(-60 - sz) + abs(c["z"] + 60) + abs(c["x"] - lx)
-        out[s["id"]] = round(d)
-    return out
 
 
 # ── The picture ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -417,16 +357,15 @@ def lengths(sp):
 S = 1.2  # px per stud
 PANEL = 600  # the legend's width
 TOP = 130
-W = int((BOUNDS["x1"] - BOUNDS["x0"]) * S) + PANEL
-H = int((BOUNDS["z1"] - BOUNDS["z0"]) * S) + TOP + 20
+W = int((VIEW["x1"] - VIEW["x0"]) * S) + PANEL
+H = int((VIEW["z1"] - VIEW["z0"]) * S) + TOP + 20
 
 COL = {
-    "wheat": (196, 178, 92), "young": (110, 156, 66), "rapeseed": (226, 208, 62), "ploughed": (138, 104, 72),
-    "meadow": (112, 152, 72), "forest": (64, 98, 52), "asphalt": (52, 52, 56), "shoulder": (150, 142, 128),
-    "concrete": (200, 197, 190), "warehouse": (150, 160, 172), "big": (132, 54, 40), "spot": (176, 78, 56),
-    "water": (76, 140, 190), "tree": (40, 92, 40), "alley": (78, 132, 58), "hedge": (52, 96, 44), "fence": (140, 104, 70),
-    "label": (32, 32, 36), "accent": (240, 130, 40), "white": (250, 250, 250), "rail": (120, 112, 100),
-    "embank": (108, 134, 74), "text2": (205, 205, 210), "wood": (128, 92, 60), "hay": (214, 186, 110), "lot": (128, 168, 86),
+    "meadow": (112, 152, 72), "forest": (64, 98, 52), "asphalt": (52, 52, 56), "shoulder": (150, 142, 128), "big": (132, 54, 40),
+    "spot": (176, 78, 56), "water": (76, 140, 190), "tree": (40, 92, 40), "alley": (78, 132, 58), "hedge": (52, 96, 44),
+    "fence": (140, 104, 70), "label": (32, 32, 36), "accent": (240, 130, 40), "white": (250, 250, 250), "text2": (205, 205, 210),
+    "wood": (128, 92, 60), "hay": (214, 186, 110), "lot": (128, 168, 86), "screen": (34, 74, 34), "out": (84, 110, 66),
+    "zone": (120, 162, 80),
 }
 
 
@@ -439,7 +378,7 @@ def font(size, bold=False):
 
 
 def P(x, z):
-    return ((x - BOUNDS["x0"]) * S, (z - BOUNDS["z0"]) * S + TOP)
+    return ((x - VIEW["x0"]) * S, (z - VIEW["z0"]) * S + TOP)
 
 
 def R(r):
@@ -461,22 +400,6 @@ def tag(draw, x, y, text, sub=None, accent=False, number=None):
         draw.text((x + 10 + lead, y + 32), sub, font=fs, fill=COL["white"] if accent else COL["text2"])
 
 
-def road_name(img, name, r):
-    f = font(15, True)
-    along_x = (r["x1"] - r["x0"]) > (r["z1"] - r["z0"])
-    text = name.upper()
-    probe = ImageDraw.Draw(img)
-    tw = int(probe.textlength(text, font=f)) + 8
-    label = Image.new("RGBA", (tw, 20), (0, 0, 0, 0))
-    ImageDraw.Draw(label).text((4, 1), text, font=f, fill=(235, 235, 235, 255))
-    x0, y0, x1, y1 = R(r)
-    if along_x:
-        img.paste(label, (int((x0 + x1) / 2 - tw / 2), int((y0 + y1) / 2 - 10)), label)
-    else:
-        label = label.rotate(90, expand=True)
-        img.paste(label, (int((x0 + x1) / 2 - 10), int((y0 + y1) / 2 - tw / 2)), label)
-
-
 def trees_at(draw, x, z, r, colour):
     cx, cy = P(x, z)
     rr = r * S
@@ -484,23 +407,19 @@ def trees_at(draw, x, z, r, colour):
     draw.ellipse([cx - rr, cy - rr, cx + rr, cy + rr], fill=colour)
 
 
-def picture(sp, path):
+def near_zone(x, z, zs, margin):
+    return any(r["x0"] - margin <= x <= r["x1"] + margin and r["z0"] - margin <= z <= r["z1"] + margin for r in (q["rect"] for q in zs))
+
+
+def picture(sp, zs, path):
     img = Image.new("RGB", (W, H), (36, 38, 42))
     draw = ImageDraw.Draw(img)
-    draw.rectangle(R(BOUNDS), fill=COL["meadow"])
+    draw.rectangle(R(VIEW), fill=COL["out"])
+    for z in zs:
+        draw.rectangle(R(z["rect"]), fill=COL["zone"])
     for l in forest_floor():
         draw.rectangle(R(l["rect"]), fill=COL["forest"])
-    for r, kind in FIELDS:
-        box = R(r)
-        draw.rectangle(box, fill=COL[kind])
-        shade = tuple(max(0, c - 16) for c in COL[kind])
-        if r["x1"] - r["x0"] >= r["z1"] - r["z0"]:
-            for k in range(int(box[1]) + 6, int(box[3]) - 3, 11):
-                draw.line([box[0] + 3, k, box[2] - 3, k], fill=shade, width=2)
-        else:
-            for k in range(int(box[0]) + 6, int(box[2]) - 3, 11):
-                draw.line([k, box[1] + 3, k, box[3] - 3], fill=shade, width=2)
-    # the woods' trees (a sketch of the jittered grid) and the orchard's rows
+    # the woods' trees (a sketch of the jittered grid) and the orchard's rows: the ones the zones see
     for wood in WOODS:
         r = wood["rect"]
         n = 0
@@ -509,8 +428,6 @@ def picture(sp, path):
                 n += 1
                 jx, jz = (n * 37 % 11) - 5, (n * 53 % 11) - 5
                 if any(c["x0"] - 6 <= x <= c["x1"] + 6 and c["z0"] - 6 <= z <= c["z1"] + 6 for c in wood["clearings"]):
-                    continue
-                if any(r2["x0"] - 18 <= x <= r2["x1"] + 18 and r2["z0"] - 18 <= z <= r2["z1"] + 18 for nm, r2, _, _ in ROADS):
                     continue
                 if any(abs(x - px) < 16 and abs(z - pz) < 70 for st in STREAMS for px, pz in st["points"]):
                     continue
@@ -523,16 +440,6 @@ def picture(sp, path):
             if 140 <= x <= 196 and -440 <= z <= -406:
                 continue
             trees_at(draw, x, z, 8, COL["alley"])
-    # tree lines, hedges, fences
-    for points, kind in TREE_LINES:
-        for (ax, az), (bx, bz) in zip(points, points[1:]):
-            if kind in ("hedge", "fence"):
-                draw.line([P(ax, az), P(bx, bz)], fill=COL[kind], width=5 if kind == "hedge" else 3)
-                continue
-            step = 26 if kind == "alley" else 36
-            n = max(1, int(math.hypot(bx - ax, bz - az) / step))
-            for i in range(n + 1):
-                trees_at(draw, ax + (bx - ax) * i / n, az + (bz - az) * i / n, 6 if kind == "alley" else 9, COL["alley" if kind == "alley" else "tree"])
     # the streams
     for st in STREAMS:
         pts = [P(x, z) for x, z in st["points"]]
@@ -541,25 +448,7 @@ def picture(sp, path):
     # the landmarks
     for lid, name, kind, r, yaw, spot in LANDMARKS:
         box = R(r)
-        if kind == "motorway":
-            draw.rectangle([box[0], box[1], box[2], box[3]], fill=COL["embank"])
-            draw.rectangle([box[0] + 10, box[1], box[2] - 10, box[3]], fill=COL["asphalt"])
-            mid = (box[0] + box[2]) / 2
-            draw.line([mid, box[1], mid, box[3]], fill=(200, 200, 200), width=3)
-            for y in range(int(box[1]), int(box[3]), 40):
-                draw.line([box[0] + 20, y, box[0] + 20, y + 18], fill=(230, 230, 230), width=2)
-                draw.line([box[2] - 20, y, box[2] - 20, y + 18], fill=(230, 230, 230), width=2)
-            draw.line([box[0] + 3, box[1], box[0] + 3, box[3]], fill=(150, 150, 150), width=4)
-        elif kind == "railway":
-            draw.rectangle(box, fill=COL["rail"])
-            for x in range(int(box[0]), int(box[2]), 7):
-                draw.line([x, box[1] + 2, x, box[3] - 2], fill=(90, 70, 50), width=2)
-            draw.line([box[0], box[1] + 4, box[2], box[1] + 4], fill=(60, 60, 64), width=2)
-            draw.line([box[0], box[3] - 4, box[2], box[3] - 4], fill=(60, 60, 64), width=2)
-        elif kind == "halt":
-            draw.rectangle(box, fill=(176, 174, 168), outline=(90, 90, 96), width=2)
-            draw.rectangle([box[0] + 30, box[1] + 2, box[0] + 54, box[1] + 10], fill=(96, 70, 52))
-        elif kind == "fishpond":
+        if kind == "fishpond":
             # (its three rounds and its jetty as shared/CountryLooks.luau lays them: shares of its frame, its front east)
             cx, cz = (r["x0"] + r["x1"]) / 2, (r["z0"] + r["z1"]) / 2
             hw, hd = (r["z1"] - r["z0"]) / 2, (r["x1"] - r["x0"]) / 2  # (yaw 270: its width along z, its depth along x)
@@ -602,26 +491,20 @@ def picture(sp, path):
             draw.rectangle(box, fill=(150, 150, 146) if kind == "weir" else (150, 110, 70))
         else:
             draw.rectangle(box, fill=(150, 150, 150))
-    # the plots
-    for p in PLOTS:
-        draw.rectangle(R(p["rect"]), fill=COL["concrete"])
-        wh = p["warehouse"]
-        draw.rectangle(R(rect(wh["x"] - wh["sx"] / 2, wh["x"] + wh["sx"] / 2, wh["z"] - wh["sz"] / 2, wh["z"] + wh["sz"] / 2)),
-                       fill=COL["warehouse"], outline=(70, 76, 84), width=3)
-    # the roads: shoulders, then the asphalt and the turnaround
-    tx, ty = P(TURNAROUND["x"], TURNAROUND["z"])
-    tr = TURNAROUND["r"] * S
-    for _, r, _, _ in ROADS:
+    # the orchard's fence and the zones' screens
+    for points, kind in TREE_LINES:
+        if kind == "fence":
+            draw.line([P(x, z) for x, z in points], fill=COL["fence"], width=3)
+    for z in zs:
+        b = R(z["rect"])
+        draw.rectangle(b, outline=COL["screen"], width=6)
+    # the yards: shoulders, then the asphalt
+    for _, r in ROADS:
         x0, y0, x1, y1 = R(r)
         draw.rectangle([x0 - 4, y0 - 4, x1 + 4, y1 + 4], fill=COL["shoulder"])
-    draw.ellipse([tx - tr - 4, ty - tr - 4, tx + tr + 4, ty + tr + 4], fill=COL["shoulder"])
-    for _, r, _, _ in ROADS:
+    for _, r in ROADS:
         draw.rectangle(R(r), fill=COL["asphalt"])
-    draw.ellipse([tx - tr, ty - tr, tx + tr, ty + tr], fill=COL["asphalt"])
-    for f in FIXED:
-        if f["id"] == "auction":
-            draw.rectangle(R(f["rect"]), fill=(226, 214, 186), outline=(40, 40, 44), width=2)
-    # the spots: their lots, their boxes, the curb (the van's outline)
+    # the spots: their lots, their boxes, the curb (the van's outline), where the party arrives
     for i, s in enumerate(sp):
         draw.rectangle(R(s["lot"]), fill=COL["lot"])
     for i, s in enumerate(sp):
@@ -634,13 +517,9 @@ def picture(sp, path):
         draw.rectangle(R(rect(x0, x1, z0, z1)), outline=(250, 250, 250), width=2)
         nx, nz = P(c["x"] + lx * hl, c["z"] + lz * hl)
         draw.ellipse([nx - 3, nz - 3, nx + 3, nz + 3], fill=(250, 250, 250))
-    seen = set()
-    for name, r, yard, _ in ROADS:
-        if not yard and name not in seen and name not in ("Depot Row",):
-            seen.add(name)
-            road_name(img, name, r)
-    road_name(img, "Depot Row", ROADS[1][1])
-    draw = ImageDraw.Draw(img)
+    for z in zs:
+        ax, az = P(z["arrive"]["x"], z["arrive"]["z"])
+        draw.ellipse([ax - 4, az - 4, ax + 4, az + 4], fill=(120, 220, 255), outline=(20, 60, 90))
     # the spots' rings and numbers
     fn = font(20, True)
     for i, s in enumerate(sp):
@@ -653,59 +532,52 @@ def picture(sp, path):
     def at(x, z, dx=0, dy=0):
         px, py = P(x, z)
         return px + dx, py + dy
-    for p in PLOTS:
-        x, y = at(p["warehouse"]["x"], p["warehouse"]["z"], -44, -10)
-        draw.text((x, y), f"PLOT {p['id']}", font=font(16, True), fill=(30, 34, 40))
-    # the spots' labels
-    tag(draw, *at(-470, 450, 0, 0), "The Old Farmstead", "the farm: barn, bales, paddock, tractor", True, 1)
-    tag(draw, *at(-1150, 590, 0, 0), "The Pond Cabin", "by the pond: jetty, reeds, a boat", True, 2)
-    tag(draw, *at(-740, -400, 0, 0), "The Lone House", "one house alone by Hill Road", True, 3)
+    # the zones' labels
+    tag(draw, *at(-470, 470, 0, 0), "The Old Farmstead", "the farm: barn, bales, paddock, tractor", True, 1)
+    tag(draw, *at(-1150, 600, 0, 0), "The Pond Cabin", "by the pond: jetty, reeds, a boat", True, 2)
+    tag(draw, *at(-740, -380, 0, 0), "The Lone House", "one house alone, its garden", True, 3)
     tag(draw, *at(-1150, -650, 0, 0), "The Forest Lodge", "in a clearing of the forest", True, 4)
-    tag(draw, *at(-1040, 40, 30, 0), "The Old Mill", "on the millrace: weir, footbridge", True, 5)
+    tag(draw, *at(-980, 60, 10, 0), "The Old Mill", "on the millrace: weir, footbridge", True, 5)
     tag(draw, *at(-60, -640, 0, 0), "The Orchard Cottage", "fruit trees, beehives, a fence", True, 6)
-    tag(draw, *at(150, 640, 0, -10), "Meadow Halt", "the railway, under the D5")
-    tag(draw, *at(250, -140, -10, 0), "D5", "its cars")
-    tag(draw, *at(-500, -200, 0, 30), "Fields", "rapeseed, wheat, ploughed, young")
-    tag(draw, *at(186, -36, 4, 10), "Auction House")
+    tag(draw, *at(140, -100, 0, 0), "→ the lobby", f"{LOBBY['x0'] - 420:.0f}+ studs further east")
     # the title
     draw.rectangle([0, 0, W, TOP - 10], fill=(28, 30, 34))
-    draw.text((24, 16), "ZOMBIE DELIVERY · THE COUNTRYSIDE (SANDBOX MAP)", font=font(40, True), fill=COL["white"])
-    draw.text((24, 70), "Seen from above, north up. No village and no town: six places to empty, each on its own, "
-              "joined to the depot by country lanes. Plots, Depot Row, Pražská and the farmstead stay where they are.",
-              font=font(20), fill=COL["text2"])
+    draw.text((24, 16), "ZOMBIE DELIVERY · THE SIX RUN ZONES (SANDBOX, 9.7)", font=font(40, True), fill=COL["white"])
+    draw.text((24, 70), "Seen from above, north up. Each place to empty in its own zone behind a tall screen hedge, out of sight of the "
+              "others; the truck parked at its door. The lobby lies far to the east.", font=font(20), fill=COL["text2"])
     # the legend
     lx = W - PANEL + 24
     y = TOP + 10
-    draw.text((lx, y), "THE SIX PLACES TO EMPTY", font=font(24, True), fill=COL["white"])
+    draw.text((lx, y), "THE SIX RUN ZONES", font=font(24, True), fill=COL["white"])
     y += 42
-    lengths_ = lengths(sp)
     for i, s in enumerate(sp):
+        z = next(q for q in zs if q["id"] == s["id"])
+        r = z["rect"]
         draw.ellipse([lx, y + 2, lx + 26, y + 28], fill=COL["accent"])
         draw.text((lx + 13, y + 15), str(i + 1), font=font(16, True), fill=COL["white"], anchor="mm")
-        draw.text((lx + 38, y), f"{s['name']} · {s['street']}", font=font(19, True), fill=COL["white"])
-        draw.text((lx + 38, y + 26), f"{s['label']} · {s['look']} · about {lengths_[s['id']]} studs from plot 1", font=font(16), fill=COL["text2"])
+        draw.text((lx + 38, y), s["name"], font=font(19, True), fill=COL["white"])
+        draw.text((lx + 38, y + 26), f"{s['label']} · {s['look']} · zone {r['x1'] - r['x0']:.0f} × {r['z1'] - r['z0']:.0f}", font=font(16), fill=COL["text2"])
         y += 60
     y += 10
     draw.text((lx, y), "LEGEND", font=font(24, True), fill=COL["white"])
     y += 40
     rows = [
-        (COL["accent"], "the six places to empty (their box, the van's spot)"),
+        (COL["accent"], "the six places to empty (their box, the truck's spot)"),
+        (COL["zone"], "a run zone (fenced: a tall screen hedge, walls)"),
         (COL["lot"], "a place's lot (its garden)"),
-        (COL["asphalt"], "roads: lanes 22 wide, each ends in a yard"),
-        (COL["warehouse"], "the ZDC plots and warehouses (unchanged)"),
+        (COL["asphalt"], "its yard: the truck stands there, at its door"),
+        ((120, 220, 255), "where the party arrives, facing the door"),
         (COL["forest"], "the forest's floor and trees"),
         (COL["water"], "the pond and the millrace"),
-        (COL["rapeseed"], "rapeseed"), (COL["wheat"], "wheat"), (COL["ploughed"], "ploughed"), (COL["young"], "young crop"),
-        (COL["hedge"], "hedges, windbreaks, fruit alleys"),
         (COL["fence"], "fences (orchard, paddock, garden)"),
-        (COL["rail"], "the railway, a lone halt"),
+        (COL["out"], "outside every zone: the meadow (nobody goes there)"),
     ]
     for colour, text in rows:
         draw.rectangle([lx, y + 3, lx + 26, y + 23], fill=colour, outline=(20, 20, 20))
         draw.text((lx + 38, y + 2), text, font=font(18), fill=COL["white"])
         y += 31
     y += 12
-    draw.text((lx, y), f"map {BOUNDS['x1'] - BOUNDS['x0']} × {BOUNDS['z1'] - BOUNDS['z0']} studs, as before", font=font(17), fill=COL["text2"])
+    draw.text((lx, y), f"zones {MIN_APART}+ studs apart, {FAR}+ from the lobby", font=font(17), fill=COL["text2"])
     # the scale bar and north
     bx, by = W - PANEL + 24, H - 90
     draw.line([bx, by, bx + 100 * S, by], fill=COL["white"], width=4)
@@ -721,20 +593,16 @@ def picture(sp, path):
 
 def main():
     sp = spots()
-    bad = check(sp)
-    alone = connected()
-    if alone:
-        bad.append("roads not joined to Depot Row: " + ", ".join(alone))
+    zs = zones(sp)
+    bad = check(sp, zs)
     print("plan check: " + ("all fine" if not bad else "BAD\n  " + "\n  ".join(bad)))
     plan = {
-        "about": "The countryside instead of the village: the sandbox map (design/countryside/plan.py). Studs; x east, z south; "
-                 "yaw as SandboxMap (0 north, 90 west, 180 south, 270 east). Fixed entries are today's SandboxMap data.",
+        "about": "The countryside's six run zones (9.7): the sandbox map's places to empty (design/countryside/plan.py). Studs; x "
+                 "east, z south; yaw as SandboxMap (0 north, 90 west, 180 south, 270 east). The lobby: design/lobby/plan.json.",
         "bounds": BOUNDS,
-        "plots": PLOTS,
-        "turnaround": TURNAROUND,
-        "fixed": FIXED,
-        "roads": [{"name": n, "rect": r, "yard": y, "fixed": f} for n, r, y, f in ROADS],
+        "roads": [{"name": n, "rect": r, "yard": True} for n, r in ROADS],
         "spots": sp,
+        "zones": zs,
         "landmarks": [{"id": i, "name": n, "kind": k, "rect": r, "yaw": y, "spot": s} for i, n, k, r, y, s in LANDMARKS],
         "streams": [{"id": s["id"], "width": s["width"], "points": [{"x": x, "z": z} for x, z in s["points"]]} for s in STREAMS],
         "woods": WOODS,
@@ -745,8 +613,7 @@ def main():
     }
     with open(os.path.join(HERE, "plan.json"), "w", encoding="utf-8") as out:
         json.dump(plan, out, ensure_ascii=False, indent=1)
-    picture(sp, os.path.join(HERE, "plan.png"))
-    print("from plot 1 (studs along the roads): " + ", ".join(f"{k} {v}" for k, v in lengths(sp).items()))
+    picture(sp, zs, os.path.join(HERE, "plan.png"))
     if bad:
         raise SystemExit(1)
 

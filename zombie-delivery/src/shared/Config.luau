@@ -5712,6 +5712,7 @@ Config.Robust = {
 		Visitors = 2, -- 8.3: the Visitors remote's ACCEPT / DECLINE of a visitor's offer (server/VisitorOffers.luau)
 		PlayerTrade = 4, -- 8.7: the PlayerTrade remote's offer / answer / price / buy (server/PlayerTrade.luau)
 		TradeOffer = 0.2, -- 8.7: and a new offer to a player on top: one every 5 s at most (no offer spam)
+		Runs = 4, -- 9.7: the Runs remote's state / difficulty / vote / leave (a run's pad and the run: server/Runs.luau)
 	},
 }
 
@@ -6455,7 +6456,7 @@ Config.Moving = {
 			hordeAt = 3.5 * 60,
 			pay = 1.25,
 		},
-	} :: { { id: string, name: string, client: string, icon: string, home: string?, place: string?, seed: number, kind: string, blurb: string, time: number?, hordeAt: number?, pay: number? } },
+	} :: { { id: string, name: string, client: string, icon: string, home: string?, place: string?, seed: number, kind: string, blurb: string, time: number?, hordeAt: number?, pay: number?, difficulty: string? } },
 	Sites = {
 		farm = {
 			House = { At = { 45, -84 } :: { number }, Size = { 26, 10, 16 } :: { number } },
@@ -7482,10 +7483,86 @@ Config.Collection = {
 	IdleRemotes = { "Collection", "Moving", "Upgrades", "SandboxTasks", "Visitors", "VanPaint", "PlayerTrade" } :: { string }, -- (8.7: PlayerTrade)
 }
 
+-- 9.7 RUNS (the owner: "like Dungeon Quest: from the lobby you go into a house, alone, with friends or with Danny. In
+-- the house you carry loot into the truck standing right at the house. When you leave, the loot is taken to your
+-- warehouse in the lobby on its own"): the lobby's portals (shared/SandboxMap.luau Lobby.portals, design/lobby/plan.py),
+-- the runs (server/Runs.luau; their rules shared/RunRules.luau, tests/runrules_test.luau; client/RunUi.luau). A run is
+-- a sandbox move (server/Moving.luau) of one house by a party, its truck parked at the house's curb, no driving.
+--   Difficulties   in order: id (the run's contract.difficulty, the house's RunDifficulty attribute), name, time (× the
+--                  house's clock, Config.Moving.Sandbox.Houses' Time), color (the pad panel's and the results card's).
+--                  The difficulty does nothing else yet: traps and zombies (harder ones) and the loot's rarity read it
+--   Default        a run's difficulty when nobody picked one
+--   Open           the difficulties open from the start (Easy, Normal); each next one opens for a player who finished
+--                  a run at the one before it (any house: a run ended done or late, with something home)
+--   Flag           the save's mark: profile.runUnlocked (how many are open) is read only from a real save written with it
+--   Countdown      s from the first player on a portal's pad to the run (everybody on the pad then goes)
+--   MaxParty       the players a run takes at most (the first on the pad first)
+--   PadHeight      studs over the pad a body's root may be and still stand on it
+--   Every          s between two looks at the pads (the server's loop)
+--   Apart          studs between the party's arrival spots in the house's front yard (across the way they look)
+--   Fade           s: the screen's fade out before a jump (the run's start, its end, leaving), its fade in after
+--   EndHold        s from a run's end (its results card) to the fade back to the lobby (the house's own door trips of
+--                  whoever was inside, Config.Moving.Doors' FadeOut + Margin + Stream, are over by then)
+--   LeaveHold      s from LEAVE RUN to the fade back (the same door trip out of the house first)
+--   Truck          Attribute: the truck's model attribute while it stands at a run's house (client/CarVisuals.luau: no
+--                  Drive or Ride along prompt; its driver's seat is Disabled); Reach: its FINISH / VOTE prompts' reach;
+--                  At: their place on its chassis (x across, y up, z along: the driver's side behind the cab)
+--   Zone           a run zone's edge (SandboxMap.Zones): Screen (CountryLooks' "screen" hedge: Height, Width, its colour),
+--                  Wall (the invisible walls' height on it), View (studs: the forest's and the orchard's trees, the
+--                  stream's pieces kept within this of a zone, the rest of them never built)
+--   Portal         the lobby's gates (server/LobbyWorld.luau): Gate { width, height }, the pad's glow by its state (Free,
+--                  Waiting: a countdown, InUse: a run in that house), Styles: each house's colours for its gate and
+--                  facade (wall, trim, roof, accent: RGB), SignRange (its words' MaxDistance)
+--   Panel          the pad panel (client/RunUi.luau): Width (px at scale 1), TouchScale (its least scale on a phone)
+--   Result         the results card: Width, Rows (pieces listed at most; the rest summed up), TouchScale
+-- The Runs remote (Config.Robust.Limits.Runs): client → server { kind = "state" } | { kind = "difficulty", id } (the
+-- host on the pad) | { kind = "vote" } (to finish) | { kind = "leave" } (out of your run alone); server → client
+-- { kind = "pad", ... } | { kind = "pad" } (off a pad), { kind = "run", ... } | { kind = "run" } (not in a run),
+-- { kind = "result", ... } (the results card), { kind = "unlocked", id } (a difficulty opened).
+export type RunDifficulty = { id: string, name: string, time: number, color: { number } }
+Config.Runs = {
+	Difficulties = {
+		{ id = "easy", name = "Easy", time = 1.3, color = { 120, 214, 120 } },
+		{ id = "normal", name = "Normal", time = 1, color = { 120, 190, 255 } },
+		{ id = "hard", name = "Hard", time = 0.85, color = { 255, 196, 70 } },
+		{ id = "insane", name = "Insane", time = 0.72, color = { 255, 120, 60 } },
+		{ id = "nightmare", name = "Nightmare", time = 0.6, color = { 220, 70, 90 } },
+	} :: { RunDifficulty },
+	Default = "normal",
+	Open = 2,
+	Flag = "runUnlockedKept",
+	Countdown = 10,
+	MaxParty = 4,
+	PadHeight = 8,
+	Every = 0.2,
+	Apart = 3.5,
+	Fade = { Out = 0.45, In = 0.6 },
+	EndHold = 3.5,
+	LeaveHold = 3,
+	Truck = { Attribute = "RunParked", Reach = 9, At = { -4.6, 3.4, -1.5 } :: { number } },
+	Zone = { Screen = { Height = 14, Width = 4, Color = { 44, 82, 38 } :: { number } }, Wall = 80, View = 110 },
+	Portal = {
+		Gate = { 16, 15 } :: { number },
+		Free = { 90, 210, 255 } :: { number },
+		Waiting = { 255, 190, 70 } :: { number },
+		InUse = { 220, 64, 64 } :: { number },
+		SignRange = 180,
+		Styles = {
+			sandbox_house = { wall = { 226, 214, 186 }, trim = { 120, 58, 44 }, roof = { 150, 62, 44 }, accent = { 196, 160, 96 } },
+			pond_cabin = { wall = { 132, 94, 60 }, trim = { 60, 96, 120 }, roof = { 72, 76, 82 }, accent = { 176, 72, 52 } },
+			lone_house = { wall = { 236, 226, 200 }, trim = { 110, 80, 56 }, roof = { 172, 72, 52 }, accent = { 90, 130, 70 } },
+			forest_lodge = { wall = { 112, 76, 46 }, trim = { 60, 42, 28 }, roof = { 74, 92, 60 }, accent = { 226, 214, 186 } },
+			old_mill = { wall = { 150, 148, 142 }, trim = { 96, 70, 48 }, roof = { 92, 88, 86 }, accent = { 120, 90, 60 } },
+			orchard_cottage = { wall = { 244, 240, 230 }, trim = { 80, 112, 60 }, roof = { 198, 166, 98 }, accent = { 200, 60, 60 } },
+		} :: { [string]: { wall: { number }, trim: { number }, roof: { number }, accent: { number } } },
+	},
+	Panel = { Width = 380, TouchScale = 0.8 },
+	Result = { Width = 420, Rows = 8, TouchScale = 0.8 },
+}
+
 -- 8.0 SANDBOX, the guide (client/SandboxGuide.luau, its steps shared/SandboxSteps.luau): a thin hint line at the top in
--- the middle and a 3D guide (a soft glowing path on the ground along the roads, a floating chevron over the target with
--- its distance) to what to do next. Each step goes quiet once done (per session); the arrow to the house and home
--- stays while you drive. Hold G (or press the hint's ✕) to hide it; hold G again (a touch screen: tap the 💡 chip) to bring
+-- the middle and a 3D guide (a soft glowing path on the ground, 9.7 a straight one: the lobby has no roads; a floating
+-- chevron over the target with its distance) to what to do next. Each step goes quiet once done (per session). Hold G (or press the hint's ✕) to hide it; hold G again (a touch screen: tap the 💡 chip) to bring
 -- it back.
 --   Every         s between two looks: the step, the path, the distance (nothing is done frame by frame)
 --   Fade          s the hint line takes to fade in or out
@@ -7829,7 +7906,8 @@ Config.CollectionBook = {
 --   rare      … of them RareRank or rarer (Config.Collection's tiers: 3 is rare)
 --   clean     a move finished with pieces home and nothing broken (everybody in its crew)
 --   moves     a move finished with pieces home (everybody in its crew)
---   trips     the trips home of one move (`best`: the most in one move counts, not a sum)
+--   trips     the truckloads home (9.7 runs: a run's truck going home at its end is one; a sum: was the most trips of
+--             one move, which a run never has more than one of)
 --   shown     pieces on show at once (`best`)
 --   sell      $ your pieces sold for
 --   income    $ your display stands paid
@@ -7879,7 +7957,7 @@ Config.SandboxTasks = {
 		{ id = "home", group = "home", event = "home", icon = "📦", text = "Bring {n} pieces home", target = { 8, 14 }, money = 120 },
 		{ id = "rare", group = "home", event = "rare", icon = "💎", text = "Bring home {n} rare or better pieces", one = "Bring home a rare or better piece", target = { 1, 2 }, money = 150 },
 		{ id = "clean", group = "move", event = "clean", icon = "✨", text = "Finish {n} moves with nothing broken", one = "Finish a move with nothing broken", target = { 1, 1 }, money = 200 },
-		{ id = "trips", group = "move", event = "trips", best = true, icon = "🚐", text = "Make {n} trips home in one move", target = { 2, 3 }, money = 150 },
+		{ id = "trips", group = "move", event = "trips", icon = "🚐", text = "Bring {n} truckloads home", target = { 2, 3 }, money = 150 }, -- (9.7: a run's truck home at its end is one)
 		{ id = "shown", event = "shown", best = true, icon = "🏛️", text = "Have {n} pieces on show at once", target = { 6, 10 }, money = 120 },
 		{ id = "sell", group = "money", event = "sell", icon = "💰", text = "Sell pieces worth ${n}", target = { 150, 400 }, step = 50, money = 120 },
 		{ id = "income", group = "money", event = "income", icon = "📈", text = "Earn ${n} from your stands", target = { 300, 800 }, step = 50, money = 150 },
@@ -7910,9 +7988,8 @@ Config.SandboxTasks = {
 --   Legendary    the collection tier (Config.Collection.Tiers) the board's LEGENDARY column counts
 --   Stats        the player list's columns, in their order (the first sorts the list): the money (an IntValue), $ a
 --                minute (a NumberValue, to a tenth), the collection's worth (an IntValue)
---   Board        the signboard: Corner studs east of Pražská's east edge and south of Depot Row's south edge (the
---                crossroads' south-east corner, off the shoulders, the lamps and the trees), its face Yaw (degrees,
---                SandboxMap's: 45 looks north-west, to the crossroads); the painted panel Width × Height studs, Lift
+--   Board        the signboard: 9.7 in the lobby (SandboxMap.Lobby.shops.leaders: its spot and its face's yaw; Corner
+--                and Yaw were its place by the old crossroads, unused now); the painted panel Width × Height studs, Lift
 --                over the ground, Thick; the gable roof Over past the panel each side, Run deep each way from the
 --                ridge, Rise high; PixelsPerStud and Range (studs) of its SurfaceGuis (one on each face)
 --   AllTime      the best collection worth each player ever had, kept in the OrderedDataStore Store (key: the user
@@ -8363,8 +8440,8 @@ Config.SandboxLight = {
 --   Grand       the Grand Auction (later; hooks only): On, its daily start (Hour, UTC), Lots of the house's own (Items:
 --               the exclusive legendaries' ids, none yet), Reserve × their worth
 --   House       the building (shared/AuctionHouseLayout.luau): Spot, the middle of its front wall on the ground, looking
---               out (yaw as SandboxMap's spots; the one place to move it when the Jinočany village is built:
---               design/jinocany/plan.json keeps x 40 – 120 here for the Corner Drugstore); Width × Depth, Wall (the walls'
+--               out (yaw as SandboxMap's spots; 9.7: the lobby's south edge, SandboxMap.Lobby.shops.auction's spot from
+--               design/lobby/plan.py: tests/lobby_test.luau holds them together); Width × Depth, Wall (the walls'
 --               height over the floor), Roof (the ridge's rise), Door ({ width, height }), Budget (its parts at most),
 --               Range (studs its signs are drawn from), Lamp (its hanging lamps' light)
 --   Window      the window (client/AuctionUi.luau): Width × Height at most (unscaled px), Tile a consign tile's
@@ -8402,7 +8479,7 @@ Config.Auction = {
 	Salt = 8808,
 	Grand = { On = false, Hour = 19, Lots = 3, Reserve = 1.5, Items = {} :: { string } },
 	House = {
-		Spot = { x = 158, y = 0, z = -22, yaw = 0 } :: AuctionSpot,
+		Spot = { x = 1800, y = 0, z = 156, yaw = 0 } :: AuctionSpot, -- (9.7: the lobby's, SandboxMap.Lobby.shops.auction)
 		Width = 48,
 		Depth = 32,
 		Wall = 16,

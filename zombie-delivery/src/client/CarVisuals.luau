@@ -389,8 +389,9 @@ local function step(dt: number)
 
 		-- Prompts: 3.7, one at every door.
 		if prompts then
+			-- (9.7 runs: a truck parked at a run's house is never driven nor ridden: Config.Runs.Truck.Attribute)
 			local enterable = car:GetAttribute("Chauffeured") ~= true and not handsFull and not boarding and seatedIn == nil
-				and (car:GetAttribute("Health") or 0) > 0
+				and (car:GetAttribute("Health") or 0) > 0 and car:GetAttribute("RunParked") ~= true
 			for _, entry in state.doorPrompts do
 				local want = if entry.driver
 					then enterable and mine and driverFree(car)

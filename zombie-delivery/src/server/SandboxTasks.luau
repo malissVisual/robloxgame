@@ -17,7 +17,7 @@
 --   hotsell     8.3: Collection.onPaid "sale": the pieces of today's hot kinds in it (Config.Market)
 --   hotincome   8.3: Collection.onPaid "income": the dollars of it the hot pieces on show earned
 --   upgrade     Upgrades.onChanged: the levels bought since the last look (your levels in all went up)
---   trips       Moving.onStored: the move's trips home so far (the owner's; the best counts)
+--   trips       Moving.onStored: a truckload home (the owner's; 9.7: one a run's end; a sum)
 --   moves       Moving.onResult: a move done (or late) with pieces home, for everybody in its crew
 --   clean       … and nothing of it broken (MovingRules' result.broken)
 --   danny       every DannyEvery s while a danny task is open: Danny (server/MoveHelper.luau find) holds the other end of
@@ -302,10 +302,10 @@ local function onUpgrades(player: Player)
 	end
 end
 
--- A trip home (Moving.onStored, the move's owner): its trips so far.
+-- A trip home (Moving.onStored, the move's owner; 9.7: a run's truck at its end): one truckload more.
 local function onTrip(owner: Player, move: MovingRules.Move, _spots: { number })
 	if type(move) == "table" and type(move.trips) == "number" then
-		SandboxTasks.note(owner, "trips", move.trips)
+		SandboxTasks.note(owner, "trips", 1)
 	end
 end
 

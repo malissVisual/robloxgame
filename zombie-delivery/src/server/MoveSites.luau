@@ -184,6 +184,15 @@ function MoveSites.plotBoard(parent: Instance, plot: SandboxMap.Plot): (Model, B
 	return model, board
 end
 
+-- 9.7 RUNS: the kiosk's art at any spot (the lobby's ZDC dispatch: SandboxMap.Lobby.dispatch), named `name`
+-- (Persistent like the plots' were); returns it and its corkboard ("Board").
+function MoveSites.kiosk(parent: Instance, spot: SandboxMap.Spot, name: string): (Model, BasePart)
+	local model = MoveSites.build(parent, { x = spot.x, y = spot.y, z = spot.z, yaw = spot.yaw }, Looks.board(true), name, Enum.ModelStreamingMode.Persistent)
+	local board = named(model, "Board")
+	model.PrimaryPart = board
+	return model, board
+end
+
 function MoveSites.dropOff(parent: Instance): Model
 	local model = MoveSites.build(parent, Looks.checkpointPlace(), Looks.checkpoint(), "MovingDropOff", Enum.ModelStreamingMode.Persistent)
 	model.PrimaryPart = named(model, "CheckpointSign")

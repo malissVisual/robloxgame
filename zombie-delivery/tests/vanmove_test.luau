@@ -241,10 +241,11 @@ check("six places: every place's contract, of its kind (its Client and Blurb wit
 	return n == #SandboxMap.Houses
 end)())
 check("the sandbox's van is the Sprinter, its bed set", Config.Sandbox.Van == "sprinter" and T.Beds[Config.Sandbox.Van] ~= nil)
-check("the house's front door looks out to the road, the van's curb between them (its back to the door)", (function()
+check("the house's front door looks out to its yard (9.7: Pražská's, no turnaround), the van's curb in it (its back to the door)", (function()
 	local h = SandboxMap.House
-	local road = SandboxMap.Turnaround
-	return h.door.yaw == 0 and h.curb.yaw == 0 and h.curb.z < h.door.z and math.abs(h.curb.z - road.z) <= road.r and h.door.z - h.curb.z > SP.Length / 2
+	local road = SandboxMap.Roads[1]
+	return h.door.yaw == 0 and h.curb.yaw == 0 and h.curb.z < h.door.z and road.name == h.street and h.curb.z >= road.z0 and h.curb.z <= road.z1
+		and h.door.z - h.curb.z > SP.Length / 2
 end)())
 
 check("Walt's lines fit their bubbles", (function()

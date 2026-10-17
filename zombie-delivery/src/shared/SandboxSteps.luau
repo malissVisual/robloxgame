@@ -4,10 +4,12 @@
 --
 -- The state (client/SandboxGuide.luau fills one table again every Config.SandboxGuide.Every seconds):
 --   plot          your plot (the player attribute Plot, server/SandboxPlots.luau; nil: none yet)
---   move          a move runs (the Moving remote's "state" is a table, client/MovingHud.luau)
+--   move          a move runs (the Moving remote's "state" is a table, client/MovingHud.luau; 9.7: a run)
+--   pad           9.7: you stand on a portal's pad (client/RunUi.luau's pad view); padHost: you are its host (you pick
+--                 the difficulty)
 --   inside        you are in the house (the state's `inside`, server/HouseInterior.luau)
 --   carrying      you carry a piece (one of the state's items is `mine` and "carried")
---   vanLoad       the pieces in the van now (the state's counts.out)
+--   vanLoad       the pieces in the truck now (the state's counts.out)
 --   delivered     the pieces unloaded at home on this move (the state's counts.delivered: a trip or more done)
 --   atHouse       you stand (or drive) at the house (SandboxSteps.atHouse: the move's)
 --   house         the move's place (the Moving state's `contract`: a SandboxMap.Houses id; nil: the farmstead)
@@ -22,7 +24,7 @@
 --   hot           the name of a hot piece (today's market) in your stock; hotCount how many; hotSold a hot kind sold
 --                 today (the market's demand); day the market's day (the Collection remote's state: its market)
 --   painted       something of the PAINT shop is yours (the VanPaint remote's state: owned)
---   vanHome       your van stands at your plot's van spot (its 🎨 Paint van prompt is on)
+--   vanHome       9.7: you are in the lobby (no run, no planning): the PAINT shop's booth is there
 --   window        the sandbox window open now (its client module's name: "UpgradeUi", "WarehouseUi", "VanPaintUi", …)
 --   covered       something covers the screen (client/SandboxHintsUi.luau isCovered: a grip check, the move's cards,
 --                 a sandbox window, Danny's card, the start screen)
@@ -38,24 +40,22 @@
 --   players       the players on the server, you too (the client's Players list)
 --   signs         your pieces on show with a FOR SALE sign (the Collection remote's "state": its views' `sale`)
 --
--- The steps (SandboxSteps.decide, the first that fits; the owner's table):
---   in the house                        inside    "Carry the furniture out to your van (E to pick up)"   (no target)
---   carrying, outside                   load      "Load it into the van: walk in or E at the back"        the van's back
---   the van has things, the move is on  home      "Drive home to your warehouse to unload (or keep loading)" unload
---   a move, at the house, outside       door      "Walk in through the front door"                        its door
---   a move, not at the house            drive     "Drive to The Pond Cabin on Pond Lane"                  its curb
---     (after a trip home)               back      "Drive back to The Pond Cabin on Pond Lane for more, or FINISH"
---   (the move's place and its road, SandboxSteps.words with the state's `house`; the step's own hint the
---   farmstead's, "Drive to The Old Farmstead on Pražská")
+-- The steps (SandboxSteps.decide, the first that fits; the owner's table; 9.7 runs: the lobby's words, no driving):
+--   in the house                        inside    "Carry the loot out to the truck (E to pick up)"        (no target)
+--   carrying, outside                   load      "Load the truck: walk in or E at its back"              the truck's back
+--   the truck has things, the run is on finish    "Finish or beat the clock: FINISH at the truck …"       the truck's back
+--   a run, outside, nothing loaded      door      "Walk in through the front door"                        its door
 --   no move, the planning open          plan      "Press LAUNCH to start the move" / the crew waits       (no target)
+--   on a portal's pad, the host         pick      "Pick a difficulty: the run starts when the clock runs out" (no target)
+--   on a portal's pad                   waitPad   "Stay on the pad: the run starts in a moment"           (no target)
 --   no move, pieces in the stock        show      "Put your pieces on show: E at an empty stand"          a free stand
---   no move, pieces on show             earn      "Your pieces earn money while you play. …"              the board
---   no move                             contract  "Take a contract at the board"                          the board
+--   no move, pieces on show             earn      "Your pieces earn money while you play. …"              a portal
+--   no move                             portal    "Walk to a portal: step onto a house's glowing pad"     the nearest portal
 --
 -- Done once, a step stays quiet for the session (SandboxSteps.doneBy: what the player did, seen this session: a count
 -- that went up, not one a save brought along; `earn` only says something, so the client counts it done after
 -- Config.SandboxGuide.InfoSeconds on the screen). A quiet step shows no hint and no 3D guide, except the drive steps
--- (nav: drive, back, home): their arrow stays while you drive.
+-- (nav: 9.7 none any more: nobody drives): their arrow stays while you drive.
 --   SandboxSteps.decide(state, done?) -> Step          the step now (8.4: with `done`, Danny's step first in a move)
 --   SandboxSteps.doneBy(state, done, last)             marks in `done` (id → true) the steps this state shows done;
 --                                                      `last` keeps the counts of the look before (vanLoad, delivered,
@@ -64,12 +64,10 @@
 --   SandboxSteps.text(step, touch) -> string           the hint's words ("E" is "tap" on a touch screen)
 --   SandboxSteps.atHouse(x, z, margin, house?) -> boolean   in the house's lot or within `margin` studs of it (
 --                                                      `house` a SandboxMap.Houses id, the move's; nil: the farmstead)
---   SandboxSteps.route(fx, fz, tx, tz, out, direct) -> n   the path on the ground, along the roads: n points written
---                                                      into `out` as x1, z1, x2, z2 … (no table made: the guide calls
---                                                      it five times a second); straight when within `direct` studs.
---                                                      along every road of SandboxMap.Roads (the shortest
---                                                      way along their middle lines, from the road nearest the start to
---                                                      the one nearest the target), MaxPoints points at most
+--   SandboxSteps.route(fx, fz, tx, tz, out, direct) -> n   the path on the ground: n points written into `out` as x1,
+--                                                      z1, x2, z2 … (no table made: the guide calls it five times a
+--                                                      second); 9.7 runs: always straight (the lobby and the run zones
+--                                                      are small, no road to follow: `direct` is kept for its callers)
 --   SandboxSteps.collection(msg, total?) -> Summary    the Collection remote's "state": stock, shown, free, taken (8.3:
 --                                                      the hot pieces in the stock, the first one's name, the market's
 --                                                      day, a hot kind sold today; 8.9: the pieces on show with a FOR
@@ -78,8 +76,8 @@
 --   SandboxSteps.nearestShown(x, z, spots, taken) -> index?  8.9: the nearest stand with a piece on show (taken[i])
 --
 -- 8.3, the soft steps: what 8.3 added, each said at its moment and never nagging (SandboxSteps.choose). The core loop
--- always wins: a move (in the house, carrying, the van loaded, the drive home, back), the planning, and a core step not
--- done yet (take a contract, put your pieces on show); only `earn` (it only says something) gives way. Nothing soft while
+-- always wins: a run (in the house, carrying, the truck loaded), the planning, a portal's pad, and a core step not
+-- done yet (walk to a portal, put your pieces on show); only `earn` (it only says something) gives way. Nothing soft while
 -- something covers the screen (a grip check, the move's result card, a sandbox window, the start screen: `covered`) or
 -- while something else talks (a first-time hint, shared/SandboxHints.luau busy; a soft step just ended: `hush`). The
 -- first that fits, in this order (SandboxSteps.Soft):
@@ -90,9 +88,10 @@
 --   upgrade  another upgrade the money buys now (the cheapest; the window's order breaks a tie; never a locked one:
 --            UpgradeRules.locked, More stands below the Big Warehouse)
 --            "💡 New upgrade in reach: Showroom lights at the UPGRADES desk ($1,500)"     the desk
---   paint    nothing bought at the PAINT shop yet, the van parked at home (its 🎨 prompt on), and a warehouse past the
---            Garage (UpgradeRules.warehouseLevel) or Config.SandboxGuide.PaintMoney ($2,000) in your pocket
---            "🎨 Make your van your own: E at its side opens the PAINT SHOP"              the van's 🎨 prompt
+--   paint    nothing bought at the PAINT shop yet, you in the lobby (9.7: its booth there; no van parked any more), and
+--            a warehouse past the Garage (UpgradeRules.warehouseLevel) or Config.SandboxGuide.PaintMoney ($2,000) in
+--            your pocket
+--            "🎨 Make your truck your own at the PAINT SHOP"                              the booth's counter
 --   sell     8.9 (8.7 trading between players, while Config.PlayerTrade.On): Config.SandboxGuide.SellPlayers players on
 --            the server or more (you too), SellShown pieces of yours on show or more, none with a FOR SALE sign yet
 --            "🏷 Sell to players: set a price on a piece on show"                        your nearest piece on show
@@ -146,6 +145,8 @@ local SandboxSteps = {}
 export type State = {
 	plot: number?,
 	move: boolean,
+	pad: boolean?, -- 9.7: on a portal's pad (padHost: its host)
+	padHost: boolean?,
 	inside: boolean,
 	carrying: boolean,
 	vanLoad: number,
@@ -184,10 +185,10 @@ export type State = {
 	house: string?,
 }
 
--- target: what the 3D guide points at (client/SandboxGuide.luau finds it): "board" | "curb" | "door" | "van" |
--- "unload" | "stand" | 8.3: "desk" (the UPGRADES desk) | "hot" (a free stand, else the 📦 STOCK chip) | "paint" (the
--- van's 🎨 prompt) | 8.4: "danny" (Danny's body) | 8.9: "sale" (your nearest piece on show: its Set price prompt) | nil
--- (the hint only). nav: the arrow stays while you drive, done or not.
+-- target: what the 3D guide points at (client/SandboxGuide.luau finds it): 9.7 "portal" (the nearest portal's pad) |
+-- "door" | "van" (the truck's back) | "stand" | 8.3: "desk" (the UPGRADES desk) | "hot" (a free stand, else the 📦 STOCK
+-- chip) | "paint" (9.7: the PAINT shop's booth) | 8.4: "danny" (Danny's body) | 8.9: "sale" (your nearest piece on
+-- show: its Set price prompt) | nil (the hint only). nav: the arrow stays while you drive, done or not.
 -- info: it only says something (done after a while on the screen). soft: 8.3, a soft step (SandboxSteps.choose; its ✕
 -- dismisses it; 8.4: Danny's steps too). pad: 8.4, the SandboxPad action whose gamepad button follows its words in
 -- brackets (SandboxSteps.onDevice; nil: none).
@@ -215,7 +216,7 @@ export type Last = { vanLoad: number?, delivered: number?, shown: number?, level
 -- A display stand's place in the world (client/SandboxGuide.luau reads them from shared/WarehouseLayout.luau).
 export type Place = { x: number, y: number, z: number }
 
-local HOUSE = `{SandboxMap.House.name} on {SandboxMap.House.street}` -- (the farmstead and its street: the steps' own words)
+local HOUSE = SandboxMap.House.name -- (the farmstead: the steps' own words)
 local DANNY = Config.MoveHelper.Name -- 8.4
 
 local function step(id: string, hint: string, target: string?, nav: boolean, info: boolean, soft: boolean?, pad: string?): Step
@@ -223,22 +224,23 @@ local function step(id: string, hint: string, target: string?, nav: boolean, inf
 end
 
 SandboxSteps.Steps = {
-	contract = step("contract", "Take a contract at the board", "board", false, false),
+	-- 9.7 runs: the lobby's (no contract board, no driving: drive, back and home are gone)
+	portal = step("portal", "Walk to a portal: step onto a house's glowing pad", "portal", false, false),
+	pick = step("pick", "Pick a difficulty: the run starts when the clock runs out", nil, false, false),
+	waitPad = step("waitPad", "Stay on the pad: the run starts in a moment", nil, false, false),
 	plan = step("plan", "Press LAUNCH to start the move", nil, false, false),
 	planCrew = step("planCrew", "Get ready: the move's owner presses LAUNCH", nil, false, false),
-	drive = step("drive", `Drive to {HOUSE}`, "curb", true, false),
-	back = step("back", `Drive back to {HOUSE} for more, or FINISH`, "curb", true, false),
 	door = step("door", "Walk in through the front door", "door", false, false), -- (8.1 walk-in doors: no E)
-	inside = step("inside", "Carry the furniture out to your van (E to pick up)", nil, false, false),
-	load = step("load", "Load it into the van: walk in or E at the back", "van", false, false),
-	home = step("home", "Drive home to your warehouse to unload (or keep loading)", "unload", true, false),
+	inside = step("inside", "Carry the loot out to the truck (E to pick up)", nil, false, false),
+	load = step("load", "Load the truck: walk in or E at its back", "van", false, false),
+	finish = step("finish", "Finish or beat the clock: load more, or FINISH at the truck", "van", false, false),
 	show = step("show", "Put your pieces on show: E at an empty stand", "stand", false, false),
-	earn = step("earn", "Your pieces earn money while you play. Take another contract for more!", "board", false, true),
+	earn = step("earn", "Your pieces earn money while you play. Walk into another house for more!", "portal", false, true),
 	-- 8.3, the soft steps (their words with the price or the piece: SandboxSteps.words)
 	grow = step("grow", "Your warehouse is full: grow it at the UPGRADES desk", "desk", false, false, true),
 	hot = step("hot", "🔥 Your piece is hot today: sell it or show it", "hot", false, false, true),
 	upgrade = step("upgrade", "New upgrade in reach at the UPGRADES desk", "desk", false, false, true),
-	paint = step("paint", "🎨 Make your van your own: E at its side opens the PAINT SHOP", "paint", false, false, true),
+	paint = step("paint", "🎨 Make your truck your own at the PAINT SHOP", "paint", false, false, true),
 	-- 8.4, Danny for hire (soft: said once; their words the same on every device, a gamepad's button added: onDevice)
 	lift = step("lift", `Heavy piece: press Lift and wait for {DANNY}`, nil, false, false, true),
 	-- (8.5 orders mode: its words say the clipboard's key, SandboxSteps.words without it out)
@@ -273,15 +275,15 @@ function SandboxSteps.decide(s: State, done: { [string]: boolean }?): Step
 			return S.load
 		end
 		if s.vanLoad > 0 then
-			return S.home
+			return S.finish -- (9.7 runs: no drive home: FINISH, or the clock)
 		end
-		if s.atHouse then
-			return S.door
-		end
-		return if s.delivered > 0 then S.back else S.drive
+		return S.door
 	end
 	if s.planning then
 		return if s.planningMine then S.plan else S.planCrew -- (8.4: no Danny yet: he comes with the move)
+	end
+	if s.pad == true then -- 9.7 runs: on a portal's pad
+		return if s.padHost == true then S.pick else S.waitPad
 	end
 	local free = s.freeStands
 	if s.stock > 0 and (free == nil or free > 0) then
@@ -290,7 +292,7 @@ function SandboxSteps.decide(s: State, done: { [string]: boolean }?): Step
 	if s.shown > 0 then
 		return S.earn
 	end
-	return S.contract
+	return S.portal
 end
 
 -- Did the count go up since the look before (nil before: not known yet, nothing to say)?
@@ -302,18 +304,14 @@ end
 -- when they go up (a piece loaded, a trip unloaded, a piece put on show), so what a save or a crew brought along before
 -- you looked does not.
 function SandboxSteps.doneBy(s: State, done: { [string]: boolean }, last: Last)
-	if s.move or s.planning then
-		done.contract = true
+	if s.move or s.planning or s.pad == true then
+		done.portal = true -- (9.7 runs: on a pad, or in the run)
 	end
 	if s.move then
 		done.plan = true
 		done.planCrew = true
-		if s.atHouse then
-			done.drive = true
-			if s.delivered > 0 then
-				done.back = true
-			end
-		end
+		done.pick = true
+		done.waitPad = true
 		if s.inside then
 			done.door = true
 		elseif s.carrying then
@@ -324,8 +322,8 @@ function SandboxSteps.doneBy(s: State, done: { [string]: boolean }, last: Last)
 	if s.move and rose(last.vanLoad, s.vanLoad) then
 		done.load = true
 	end
-	if s.move and rose(last.delivered, s.delivered) then
-		done.home = true
+	if not s.move and (last.vanLoad or 0) > 0 then
+		done.finish = true -- (9.7 runs: the run ended with something in the truck: it went home)
 	end
 	if rose(last.shown, s.shown) then
 		done.show = true
@@ -499,7 +497,7 @@ function SandboxSteps.upgradeFor(s: State): (string?, number?)
 end
 
 local function paintFits(s: State): boolean
-	if s.painted ~= false or s.vanHome ~= true then
+	if s.painted ~= false or s.vanHome ~= true or s.move then -- (9.7: vanHome: in the lobby, the booth there)
 		return false
 	end
 	local levels, money = s.levels, s.money
@@ -565,16 +563,14 @@ function SandboxSteps.detail(step: Step, s: State): (string?, number?)
 		return s.hot, nil
 	elseif step.id == "give" and s.clipboard == true then
 		return "clipboard", nil -- (8.5: its words change once the clipboard is out)
-	elseif step.id == "drive" or step.id == "back" then
-		return s.house, nil -- (the move's place)
 	end
 	return nil, nil
 end
 
--- "The Pond Cabin on Pond Lane", the place's name on its road (nil or an unknown id: the farmstead's).
+-- "The Pond Cabin", the place's name (nil or an unknown id: the farmstead's; 9.7: no road to drive along).
 function SandboxSteps.houseWords(id: string?): string
 	local h = SandboxMap.house(id)
-	return if h then `{h.name} on {h.street}` else HOUSE
+	return if h then h.name else HOUSE
 end
 
 function SandboxSteps.words(step: Step, s: State): string
@@ -593,10 +589,6 @@ function SandboxSteps.words(step: Step, s: State): string
 		return `🔥 Your {s.hot} is hot today: sell it or show it`
 	elseif step.id == "give" and s.clipboard == true then
 		return `Pick a piece to give it to {DANNY}` -- (8.5: the clipboard out, orders mode)
-	elseif step.id == "drive" and s.house ~= nil then -- (the move's place and its road)
-		return `Drive to {SandboxSteps.houseWords(s.house)}`
-	elseif step.id == "back" and s.house ~= nil then
-		return `Drive back to {SandboxSteps.houseWords(s.house)} for more, or FINISH`
 	end
 	return step.hint
 end
@@ -606,7 +598,7 @@ function SandboxSteps.atHouse(x: number, z: number, margin: number, house: strin
 	return x >= lot.x0 - margin and x <= lot.x1 + margin and z >= lot.z0 - margin and z <= lot.z1 + margin
 end
 
--- ── The path along the roads ───────────────────────────────────────────────
+-- ── The path along the roads (9.7: none: SandboxMap.Roads are the run zones' yards, nothing to follow) ──────────
 -- Along the roads' middle lines (SandboxMap.Roads: Depot Row, the plots' road; Pražská down to the farmstead;
 -- 9.4: the country lanes and their yards too, each one east-west when it is longer along X). The path goes out from the start
 -- to the middle line of the road nearest it, along the roads the shortest way to the middle line of the road nearest
@@ -616,7 +608,7 @@ end
 
 SandboxSteps.MaxPoints = 8 -- (client/SandboxGuide.luau: a path of seven beams)
 local MIN_STEP = 3 -- studs: a point this close to the last one is left out
-local ROADS = SandboxMap.Roads
+local ROADS: { SandboxMap.Road } = {} -- (9.7 runs: no road to follow: a straight path in the lobby and the zones)
 -- each road's middle line: along X (at z = mid, from lo to hi) or along Z (at x = mid)
 local ALONG_X: { boolean } = {}
 local MID: { number } = {}
@@ -707,7 +699,7 @@ end
 function SandboxSteps.route(fx: number, fz: number, tx: number, tz: number, out: { number }, direct: number): number
 	local n = push(out, 0, fx, fz)
 	local dx, dz = tx - fx, tz - fz
-	if dx * dx + dz * dz > direct * direct then
+	if #ROADS > 0 and dx * dx + dz * dz > direct * direct then
 		local from, ex, ez = nearestRoad(fx, fz)
 		local to, qx, qz = nearestRoad(tx, tz)
 		n = push(out, n, ex, ez)

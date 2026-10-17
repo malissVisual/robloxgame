@@ -218,7 +218,7 @@ check("a trip home: trips 1/3 (the owner's)", slot(A, 2).progress == 1)
 R.trip(A, { trips = 2 }, { 3 })
 mark = #E.sent
 R.trip(A, { trips = 3 }, { 4 })
-check("three trips in one move: done", slot(A, 2).progress == 3 and #kinds(E.received(A, "SandboxTasks", mark), "done") == 1)
+check("three truckloads home: done (9.7: one a trip, one a run's end)", slot(A, 2).progress == 3 and #kinds(E.received(A, "SandboxTasks", mark), "done") == 1)
 R.trip(B, { trips = 1 }, { 1 })
 check("… a crew mate's own trips are theirs (B has no trips task: nothing)", slot(B, 1).progress == 0)
 local function move(states: { string }): any

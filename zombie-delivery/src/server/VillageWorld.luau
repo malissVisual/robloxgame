@@ -242,11 +242,15 @@ function VillageWorld.build(world: Instance): Built
 		part(chunkOf(village, chunks, p.chunk), p)
 	end
 
-	-- far away: outside the Bounds, on every client
+	-- far away: outside the Bounds, on every client (9.7: none while there are run zones: VillageScenery.far)
+	local farPieces = VillageScenery.far()
+	if #farPieces == 0 then
+		return built
+	end
 	local far = Instance.new("Model")
 	far.Name = "Far"
 	far.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
-	for _, p in VillageScenery.far() do
+	for _, p in farPieces do
 		local made = part(far, p, true)
 		made.CanQuery = false
 		made.CanCollide = p.ground == true

@@ -1396,21 +1396,36 @@ Sandbox.run.broke = function(player: Player)
 	say(player, "ADMIN: your money is $0.")
 end
 
--- Moves (the sandbox house: Moving's admin) ----------------------------------------------------------------------------
+-- Runs (9.7: server/Runs.luau's admin; the moves' clock and horde: Moving's admin) ------------------------------------
 
--- A new seed refills the house (KONTRAKT: "Each move gets a new seed, so the house is refilled"; 8.3 economy: once a
--- move brought something home, a move called off with nothing home keeps it): a running one ends cleanly
--- (Moving.admin "end", called off), then Moving.admin "refill" forgets the seed your card holds and opens the card on a
--- new one: the next START fills the house anew.
-Sandbox.run.refill = function(player: Player)
-	local ended = if Sandbox.onMove(player) then string.gsub(Sandbox.moving(player, "end"), "^ADMIN: ", "") .. " " else "No move was running. "
-	Sandbox.moving(player, "refill")
-	say(player, `ADMIN: REFILL HOUSE: {ended}The next START MOVE fills the house anew (a new seed).`)
+-- ("run_<house>"): a run on that house for the TARGET alone, at the difficulty the admin picked ("rundiff_<id>"; locks
+-- ignored); "runend": the TARGET's run ends (what is in the truck goes home).
+function Sandbox.runs(player: Player, admin: Player, what: string, arg: string?)
+	local ok, said = pcall(function(): any
+		return require(Server.Runs).admin(player, what, arg, admin)
+	end)
+	say(admin, if ok and type(said) == "string" then said else `ADMIN: the runs are not ready ({said}).`)
 end
 
-Sandbox.run.start = function(player: Player)
-	say(player, Sandbox.moving(player, "start"))
+function Sandbox.registerRuns()
+	for _, action in Sandbox.Rules.Actions do
+		local house = Sandbox.Rules.runHouse(action.id)
+		local difficulty = Sandbox.Rules.runDifficulty(action.id)
+		if house then
+			Sandbox.run[action.id] = function(player: Player, admin: Player)
+				Sandbox.runs(player, admin, "start", house)
+			end
+		elseif difficulty then
+			Sandbox.run[action.id] = function(player: Player, admin: Player)
+				Sandbox.runs(player, admin, "difficulty", difficulty)
+			end
+		end
+	end
+	Sandbox.run.runend = function(player: Player, admin: Player)
+		Sandbox.runs(player, admin, "end", nil)
+	end
 end
+Sandbox.registerRuns()
 
 Sandbox.run.clock = function(player: Player)
 	say(player, Sandbox.moving(player, "time"))
@@ -1590,22 +1605,9 @@ end
 
 -- Travel and the van (shared/SandboxMap.luau's spots) -----------------------------------------------------------------
 
--- Your sandbox van to your plot's vanSpot, its nose to the street and its back doors to the roller door: the live one
--- moved with its load (and whoever is in it), else a new one built there.
-Sandbox.run.van = function(player: Player)
-	local plot = Sandbox.plot(player)
-	if not plot then
-		say(player, Sandbox.NoPlot)
-		return
-	end
-	local vanId = Sandbox.vanId()
-	local car = Vehicles.get(player)
-	if car and car.id == vanId and not car.wrecked and car.model.Parent and Sandbox.park(car, plot.vanSpot) then
-		say(player, "ADMIN: your van is at your warehouse, its back to the roller door.")
-		return
-	end
-	local made = Vehicles.spawnAt(player, vanId, Sandbox.frame(plot.vanSpot), false)
-	say(player, if made then `ADMIN: your {carName(vanId)} is at your warehouse, its back to the roller door.` else "ADMIN: no van (the save is still loading).")
+-- 9.7: the lobby's plaza (no van in the lobby: BRING VAN is gone).
+Sandbox.run.lobby = function(player: Player)
+	say(player, if Sandbox.walkTo(player, Sandbox.Map.Lobby.spawn, 0.5, 0, false) then "ADMIN: the lobby's plaza." else "ADMIN: you have no body right now.")
 end
 
 -- To the house's front door (facing it: Enter house); driving your van: the van to its curb, its back to the door.

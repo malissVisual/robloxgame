@@ -235,7 +235,7 @@ local CARRY_ATTRIBUTES = { "Carrying", "CarryCount", "CarryHands", "CarryAt", "C
 -- The art (another branch builds it): shared/FurnitureLooks.luau (Items, build), shared/HouseLayout.luau (plan),
 -- server/HouseInterior.luau (build, slot, destroy).
 export type Art = { looks: any, layout: any, interior: any }
-type Contract = { id: string, name: string, client: string, icon: string, home: string?, place: string?, seed: number, kind: string, blurb: string, time: number?, hordeAt: number?, pay: number? }
+type Contract = { id: string, name: string, client: string, icon: string, home: string?, place: string?, seed: number, kind: string, blurb: string, time: number?, hordeAt: number?, pay: number?, difficulty: string? } -- (9.7 runs: difficulty)
 
 -- 7.x farm move: a way in from outside (a house has one, the front door; a farm the farmhouse's and the barn doors),
 -- in the plan's exits' order.
@@ -330,6 +330,9 @@ type Session = {
 	ways: { Way }, -- 7.x farm move: the ways out (ways[1] the front door: `exit`)
 	lostAt: number?, -- 7.x van moves: the van was lost then (server time; nil: it is out or never was)
 	backWarned: number?, -- 8.0 SANDBOX: os.clock of the last "Back the van up" (SB.backUp)
+	loaders: { [number]: number }?, -- 9.7 runs: spot → the user id of whoever loaded it into the truck last (Danny's: his hirer's)
+	homeTo: { [number]: number }?, -- 9.7 runs: spot → the user id whose stock it went into (SB.store)
+	rarity: { [number]: string }?, -- 9.7 runs: spot → its model's Rarity attribute as it went home (the loot's own, when it has one)
 }
 
 local art: Art? = nil
@@ -727,7 +730,7 @@ end
 -- `extra`); a grip check's holds only its own. The moments: startMove's end, a door trip in (travel), Load (onLoad,
 -- Danny's helperLoad), a trip (deliverTrip), the end (finish) and a grip check's outcome (Grip.result).
 -- (stored / result: the daily tasks' hooks with the move itself, Moving.onStored / onResult below)
-SB.listeners = { start = {}, enter = {}, load = {}, trip = {}, finish = {}, grip = {}, stored = {}, result = {} } :: { [string]: { any } }
+SB.listeners = { start = {}, enter = {}, load = {}, trip = {}, finish = {}, grip = {}, stored = {}, result = {}, run = {} } :: { [string]: { any } }
 
 -- A move started (LAUNCH, the admin's start): fn(owner, facts).
 function Moving.onStart(fn: (Player?, { [string]: any }) -> ())
@@ -951,8 +954,8 @@ function SB.atDrop(s: Session, truck: Vehicles.Car): boolean
 		return flat(truck.chassis.Position, dropOffAt()) <= T.DropRadius
 	end
 	local plot = SB.plotOf(s.owner)
-	if not plot then
-		return false
+	if not plot or s.contract.difficulty then
+		return false -- (9.7 runs: nothing is unloaded at a plot: it all goes home at the run's end)
 	end
 	local middle = truck.chassis.Position
 	local door = Vehicles.cargoDoor(truck)
@@ -972,7 +975,8 @@ function SB.backUp(s: Session, truck: Vehicles.Car, clock: number)
 	local plot = SB.plotOf(s.owner)
 	local at = truck.chassis.Position
 	local inside = SandboxMap.plotAt(at.X, at.Z)
-	if not plot or not inside or inside.id ~= plot.id or Rules.counts(s.move).out == 0 or clock - (s.backWarned or -math.huge) < SB.BackEvery then
+	if not plot or not inside or inside.id ~= plot.id or Rules.counts(s.move).out == 0 or clock - (s.backWarned or -math.huge) < SB.BackEvery
+		or s.contract.difficulty then
 		return
 	end
 	s.backWarned = clock
@@ -1006,17 +1010,6 @@ local function buildBoard(parent: Instance)
 	local _, board = require(script.Parent.MoveSites).board(parent)
 	boardPrompt(board)
 	boardPart = board
-end
-
--- 8.0 SANDBOX: a Moving contracts kiosk on every plot (server/MoveSites.luau plotBoard at SandboxMap plot.board, by the
--- warehouse's roller door); any of them opens the card and LAUNCHes (the van is the player's own: it waits at their plot).
-function SB.buildBoards(parent: Instance)
-	local sites = require(script.Parent.MoveSites)
-	for _, plot in SandboxMap.Plots do
-		local _, board = sites.plotBoard(parent, plot)
-		boardPrompt(board)
-		table.insert(SB.boards, board)
-	end
 end
 
 -- Is `root` within `reach` studs (flat) of a Moving contracts board: the depot's (8.0 SANDBOX: any plot's)?
@@ -1257,7 +1250,7 @@ function SB.newContract(h: SandboxMap.House): Contract
 	}
 end
 
--- Is a point on the test world's asphalt (SandboxMap.Roads and the turnaround, 2 studs of slack)? (The Guard's
+-- Is a point on the test world's asphalt (SandboxMap.Roads: 9.7 the run zones' yards, 2 studs of slack)? (The Guard's
 -- barricades stay off it, as off the city's roads.)
 function SB.onRoad(at: Vector3): boolean
 	for _, road in SandboxMap.Roads do
@@ -1265,8 +1258,7 @@ function SB.onRoad(at: Vector3): boolean
 			return true
 		end
 	end
-	local turn = SandboxMap.Turnaround
-	return flat(at, Vector3.new(turn.x, at.Y, turn.z)) <= turn.r + 2
+	return false
 end
 
 -- ── The carry ──────────────────────────────────────────────────────────────
@@ -1900,7 +1892,8 @@ local function onLoad(s: Session, player: Player)
 		then `{labelOf(thing)} hitched behind the van · {c.out} in the van · drive it to {SB.wall()}`
 		else `{if moved then "Van repacked: " else ""}{labelOf(thing)} loaded · {c.out} in the van · van {fill}% full · {c.delivered}/{c.total} {if SB.on then "home" else "delivered"}`)
 	s.dirty = true
-	SB.tell("load", s, player, { item = thing.item }) -- 8.2: the listeners (Moving.onLoad)
+	SB.loaded(s, spot, player) -- 9.7 runs: whose stock it goes into
+	SB.tell("load", s, player, { item = thing.item, spot = spot }) -- 8.2: the listeners (Moving.onLoad)
 end
 
 local function onUnload(s: Session, player: Player)
@@ -2223,7 +2216,9 @@ function Moving.helperLoad(s: Session, npc: Model): (boolean, string?)
 	local c = Rules.counts(s.move)
 	say(s.owner, `{npc.Name} loaded {labelOf(thing)} · {c.out}/{c.total} out · truck {math.floor(Rules.fill(s.move.packing) * 100 + 0.5)}% full`)
 	s.dirty = true
-	SB.tell("load", s, nil, { item = thing.item }) -- 8.2: the listeners (Moving.onLoad: Danny's, no player)
+	local hired = MoveHelper.find(s.owner) -- (9.7 runs: his loads go into his hirer's stock)
+	SB.loaded(s, spot, if hired then hired.hirer else nil)
+	SB.tell("load", s, nil, { item = thing.item, spot = spot }) -- 8.2: the listeners (Moving.onLoad: Danny's, no player)
 	return true, nil
 end
 
@@ -3691,7 +3686,15 @@ local function viewFor(s: Session, player: Player): { [string]: any }
 		graceEndsAt = if s.late then s.move.endsAt + T.LateGrace else nil, -- 7.0 review: late: the Wall by then
 		trips = s.move.trips or 0, -- 7.x van moves: the trips delivered at the Wall (the HUD's TRIP n: the next one)
 		vanAgainAt = if s.lostAt then s.lostAt + T.VanAgain else nil, -- 7.x van moves: the van lost: CAR again then
+		run = if s.contract.difficulty then SB.runView(s, player) else nil, -- 9.7 runs: the run's difficulty, its host
 	}
+end
+
+-- 9.7 runs: what the move's HUD shows of a run (client/MovingHud.luau: no trips, no drive; the host's FINISH, the
+-- others' VOTE FINISH and LEAVE THE RUN).
+function SB.runView(s: Session, player: Player): { [string]: any }
+	local def = require(Shared.RunRules).def(s.contract.difficulty)
+	return { difficulty = s.contract.difficulty, name = if def then def.name else "", host = s.owner.DisplayName, mine = player == s.owner }
 end
 
 local function send(s: Session)
@@ -3843,6 +3846,9 @@ local function finish(s: Session, event: string, why: string?)
 	if s.ended then
 		return
 	end
+	if SB.on and s.contract.difficulty then
+		event = SB.unloadAll(s, event) -- 9.7 runs: what is in the truck goes home now, to whoever loaded it
+	end
 	local phase = Rules.advance(s.move.phase, event)
 	if not phase then
 		return
@@ -3941,6 +3947,10 @@ end
 -- came home over every trip (home: its pieces, their value at their condition; delivered: the same pieces, also when
 -- it was called off: they are in the warehouse already), the trips and the rating; the analytics' MoveDone.
 function SB.result(s: Session, phase: string, why: string?, result: Rules.Result)
+	if s.contract.difficulty then
+		SB.runResult(s, phase, why, result) -- 9.7 runs: server/Runs.luau's results card (Moving.onRunEnd)
+		return
+	end
 	local c = Rules.counts(s.move)
 	local pieces, value = 0, 0
 	for _, spot in s.move.order do
@@ -4182,10 +4192,10 @@ function Moving.openCard(player: Player, contractId: string?, admin: boolean)
 end
 
 -- `roles` (7.0 planning): the lobby's, by user id (nil: the admin's start, everybody gets a free role).
-local function startMove(owner: Player, contractId: any, admin: boolean, roles: { [number]: string }?): string?
+local function startMove(owner: Player, contractId: any, admin: boolean, roles: { [number]: string }?, given: Contract?): string?
 	local contract = contractById(contractId)
 	if SB.on and contract then
-		contract = (SB.contractFor(owner)) -- 8.0 SANDBOX: the house with the seed of the owner's card (or a new one)
+		contract = given or (SB.contractFor(owner)) -- 8.0 SANDBOX: the house with the seed of the owner's card (or a new one); 9.7: a run's own
 	end
 	local site = contract and sites[contract.id]
 	if not contract or not site then
@@ -4226,6 +4236,9 @@ local function startMove(owner: Player, contractId: any, admin: boolean, roles: 
 	end
 	if not (interior :: Model).Parent then
 		(interior :: Model).Parent = folder or workspace -- (server/HouseInterior.luau builds it unparented)
+	end
+	if contract.difficulty then -- 9.7 runs: the run's difficulty on its inside (traps, zombies and the loot read it)
+		(interior :: Model):SetAttribute("RunDifficulty", contract.difficulty)
 	end
 	-- 7.x van moves: the owner's own van (out already, else right next to them, they in the driver's seat); a job's or a
 	-- rental's lent car is not theirs: their own comes instead. 7.2 review: never a bike (no back: nothing could be
@@ -4321,7 +4334,9 @@ local function startMove(owner: Player, contractId: any, admin: boolean, roles: 
 	end
 	WalkIn.ways(s) -- 8.1 walk-in doors: the ways' zones and their doormats inside
 	truckPrompts(s)
-	if SB.on then -- 8.0 SANDBOX (8.3 economy: its seed stays the owner's until a trip brings something home, SB.store)
+	if SB.on and contract.difficulty then -- 9.7 runs: no driving, the truck at the door
+		tellAll(s, SB.runStartText(s))
+	elseif SB.on then -- 8.0 SANDBOX (8.3 economy: its seed stays the owner's until a trip brings something home, SB.store)
 		tellAll(s, `🚐 Move started: {contract.name}, {site.home.address}. Drive your van there (follow the arrow), carry the things out, load them and bring them home to your warehouse: as many trips as it takes, then FINISH.`)
 	else
 		tellAll(s, `🚐 Move started: {contract.name}, {site.home.address}. Drive your van there (GPS), carry the things out, load them and bring them to the Wall at the depot: as many trips as it takes, then FINISH. {Rules.counts(s.move).stars} ★ things are a must!`)
@@ -4544,9 +4559,13 @@ function SB.store(s: Session, spots: { number }): number
 				variant = planned.variant
 			end
 		end
-		local ok, uid = pcall(Collection.add, s.owner, { item = thing.item, variant = variant, condition = thing.condition, name = thing.name })
+		local to = SB.stockFor(s, spot) -- (9.7 runs: whoever loaded it; else, and in a plain move, the owner)
+		local ok, uid = pcall(Collection.add, to, { item = thing.item, variant = variant, condition = thing.condition, name = thing.name })
 		if ok and uid ~= nil then
 			took += 1
+			local home = s.homeTo or {}
+			home[spot] = to.UserId
+			s.homeTo = home
 		else
 			if not ok then
 				warn(`[Moving] Collection.add of {thing.item}: {uid}`)
@@ -4582,6 +4601,10 @@ local function finishMove(player: Player)
 	if not s or s.ended then
 		return
 	end
+	if SB.on and s.contract.difficulty then
+		finish(s, "deliver", "Finished: what was in the truck went home") -- 9.7 runs: the host's FINISH (SB.unloadAll)
+		return
+	end
 	local c = Rules.counts(s.move)
 	if c.delivered == 0 then
 		say(player, `Nothing delivered yet: bring a load to {SB.wall()} first (or GIVE UP in the move's list, O).`)
@@ -4590,6 +4613,174 @@ local function finishMove(player: Player)
 	local done = if SB.on then "Finished: what came home is in your warehouse" else "Finished: everything at the Wall is paid" -- (8.0 SANDBOX)
 	-- (7.2 review: late only when something reached the Wall late: FINISH in the grace after 0:00 brings nothing late)
 	finish(s, if c.late > 0 then "timeout" else "deliver", if c.out > 0 then "Finished: what was still in the van stayed behind" else done)
+end
+
+-- ── 9.7 RUNS (server/Runs.luau: the lobby's portals; Config.Runs, shared/RunRules.luau) ───────────────────────────
+-- A run is a sandbox move whose contract has a difficulty: one house, its party the host's (Runs wraps Crew.members and
+-- Crew.ownerOf), its truck the host's van parked at the house's curb (Runs parks it there before Moving.startRun: no
+-- driving). Nothing is unloaded at a plot: at the run's end (the host's FINISH, the party's vote, the clock, GIVE UP,
+-- the host gone) everything in the truck goes home at once (SB.unloadAll), each piece into the stock of whoever loaded
+-- it last (SB.loaded: Danny's loads his hirer's; one who left the game: the host's), and Runs shows the results card
+-- (Moving.onRunEnd) and takes the party back to the lobby.
+--   Moving.startRun(host, house, difficulty)   the run's move: its contract (the house's, the host's card's seed for it
+--                             while unspent, else a new one; its clock RunRules.time; contract.difficulty) started
+--                             as the admin's start (no card, no planning) → an error text or nil
+--   Moving.endRun(host, why)  the host's run ends now (FINISH, the vote, the host leaving it): true when one ended
+--   Moving.onRunEnd(fn)       fn(host, facts) at a run's end: { contract, house, difficulty, phase, why, crew (the
+--                             players still on it), pieces ({ spot, item, name, icon, value (× its condition), to (the
+--                             user id whose stock it went into), rarity? (its model's Rarity attribute) }) }
+
+function Moving.onRunEnd(fn: (Player, { [string]: any }) -> ())
+	table.insert(SB.listeners.run, fn)
+end
+
+-- Who loaded the piece at `spot` (a player; nil: nobody known, the host's then).
+function SB.loaded(s: Session, spot: number?, who: Player?)
+	if not spot then
+		return
+	end
+	local list = s.loaders or {}
+	list[spot] = if who then who.UserId else nil
+	s.loaders = list
+end
+
+-- The player whose stock the piece at `spot` goes into: a run's loader while still in the game (RunRules.stockOwner),
+-- else the move's owner.
+function SB.stockFor(s: Session, spot: number): Player
+	if not s.contract.difficulty then
+		return s.owner
+	end
+	local loaders = s.loaders or {}
+	local id = require(Shared.RunRules).stockOwner(loaders[spot], s.owner.UserId, function(userId: number): boolean
+		return playerById(userId) ~= nil
+	end)
+	return playerById(id) or s.owner
+end
+
+-- A run's end: everything in the truck goes home now (its pieces into their loaders' stocks, the models gone), as a
+-- trip; returns the event the end takes (FINISH or the vote with nothing ever home: called off).
+function SB.unloadAll(s: Session, event: string): string
+	for _, spot in s.move.order do -- (a thing whose model went never counts: lost)
+		local thing = s.move.things[spot]
+		local item = s.items[spot]
+		if thing.state == "truck" and (not item or not item.model.Parent) then
+			thing.state, thing.condition = "lost", 0
+		end
+	end
+	local rarity = s.rarity or {}
+	for _, spot in s.move.order do
+		local item = s.items[spot]
+		local mark = if s.move.things[spot].state == "truck" and item then item.model:GetAttribute("Rarity") else nil
+		if type(mark) == "string" then
+			rarity[spot] = mark
+		end
+	end
+	s.rarity = rarity
+	local spots = Rules.deliver(s.move, now())
+	if #spots > 0 then
+		local stored = SB.store(s, spots)
+		for _, spot in spots do
+			local item = s.items[spot]
+			if item then
+				for _, hook in item.hooks do
+					hook:Disconnect()
+				end
+				table.clear(item.hooks)
+				unweld(item)
+				item.model:Destroy()
+			end
+		end
+		s.dirty = true
+		SB.tell("trip", s, s.owner, { pieces = #spots, stored = stored }) -- 8.2: the listeners (Moving.onTrip)
+		if stored < #spots then
+			tellAll(s, `⚠ {#spots - stored} of the truck's pieces could not be stored: a warehouse is full`)
+		end
+	end
+	local c = Rules.counts(s.move)
+	if c.delivered == 0 and event == "deliver" then
+		return "cancel" -- (FINISH with nothing home: called off)
+	elseif c.delivered == 0 and event == "timeout" then
+		return "lose"
+	elseif c.delivered > 0 and event == "cancel" then
+		return "deliver" -- (GIVE UP, the admin's end, the host gone: what was in the truck came home all the same)
+	end
+	return event
+end
+
+-- The run's first words to its party.
+function SB.runStartText(s: Session): string
+	local def = require(Shared.RunRules).def(s.contract.difficulty)
+	local clock = require(Shared.RunRules).clock(s.contract.time or T.Time)
+	return `🏠 {s.contract.name} · {if def then string.upper(def.name) else "RUN"} · {clock} on the clock. Carry the loot out and load it into the truck at the door; FINISH at the truck (or beat the clock): what is in the truck goes to your warehouse.`
+end
+
+-- A run's end (SB.result's): the party's move HUD closes, the listeners (server/Runs.luau: the results card), the
+-- analytics' MoveDone and the daily tasks' and the badges' result listeners as a move's.
+function SB.runResult(s: Session, phase: string, why: string?, result: Rules.Result)
+	local crew = everyone(s)
+	for _, member in crew do
+		remote:FireClient(member, "state", nil)
+	end
+	local pieces: { { [string]: any } } = {}
+	local home = s.homeTo or {}
+	for _, spot in s.move.order do
+		local thing = s.move.things[spot]
+		if thing.state == "delivered" and home[spot] then
+			table.insert(pieces, { spot = spot, item = thing.item, name = thing.name, icon = thing.icon, value = thing.value * thing.condition,
+				condition = thing.condition, to = home[spot], rarity = (s.rarity or {})[spot] })
+		end
+	end
+	local facts = { contract = s.contract.id, house = s.contract.id, name = s.contract.name, difficulty = s.contract.difficulty, phase = phase,
+		why = why or SB.how[phase] or phase, crew = crew, pieces = pieces, stars = result.stars, total = Rules.counts(s.move).total }
+	for _, fn in SB.listeners.run do
+		local ok, err = pcall(fn, s.owner, facts)
+		if not ok then
+			warn(`[Moving] a run's end listener failed: {err}`)
+		end
+	end
+	if phase == "done" or phase == "late" then
+		PlayerData.track("event", s.owner, "MoveDone", result.stars, s.contract.id, if #crew > 1 then "crew" else "solo")
+	end
+	for _, fn in SB.listeners.result do task.spawn(fn, s.owner, s.move, result, crew) end -- 8.2: Moving.onResult
+end
+
+function Moving.startRun(host: Player, house: string, difficulty: string): string?
+	local base = SB.contracts[house]
+	if not SB.on or not base then
+		return "No such house."
+	end
+	local RunRules = require(Shared.RunRules)
+	local card, kept = SB.cardOf(host)
+	local seed = kept
+	if card ~= house or seed == nil then -- (8.3 economy: the host's seed for this house stays until a run brings something home)
+		local fresh = math.random(1, T.Sandbox.Seeds)
+		while fresh == SB.last do
+			fresh = math.random(1, T.Sandbox.Seeds)
+		end
+		SB.last, seed = fresh, fresh
+		SB.keep(host, house, fresh)
+	end
+	local own = T.Sandbox.Houses[house]
+	local made = table.clone(base)
+	made.seed = seed :: number
+	made.difficulty = RunRules.clean(difficulty)
+	made.time = RunRules.time(if own then own.Time else (base.time or T.Time), made.difficulty)
+	made.hordeAt = if T.Sandbox.Horde then T.Sandbox.HordeAt else 0
+	MoveLobby.close(host, nil)
+	local failed = startMove(host, house, true, nil, made)
+	if failed and seed ~= kept then
+		SB.keep(host, card, kept) -- (no run: the card as it was)
+	end
+	return failed
+end
+
+function Moving.endRun(host: Player, why: string?): boolean
+	local s = sessions[host]
+	if not s or s.ended or not s.contract.difficulty then
+		return false
+	end
+	finish(s, "deliver", why or "Finished: what was in the truck went home")
+	return true
 end
 
 -- The van lost mid-move (wrecked, gone, not the owner's car any more): what was in it is lost (condition 0, its models
@@ -4648,7 +4839,10 @@ local function tick(s: Session)
 	local t = now()
 	local clock = os.clock()
 	local due = Rules.due(s.move, t)
-	if due == "timeout" then
+	if due == "timeout" and SB.on and s.contract.difficulty then
+		finish(s, "timeout", "Time's up: what was in the truck went home") -- 9.7 runs: the clock ends the run (no drive home)
+		return
+	elseif due == "timeout" then
 		-- 7.0 review: late: the load still pays LateShare if the truck reaches the Wall within LateGrace s, else it is lost
 		-- (7.x van moves: what is in the van then; an empty van ends the move at once, the trips before paid in full)
 		if t >= s.move.endsAt + T.LateGrace or (not s.late and Rules.counts(s.move).out == 0) then
@@ -5418,15 +5612,14 @@ function Moving.start()
 	made.Parent = workspace
 	folder = made
 	if SB.on then
-		-- 8.0 SANDBOX: the houses (no Marge, no Walt; six houses: six, a contract and a site each), a board on every plot,
-		-- no Wall, no dressing, no soldier
+		-- 8.0 SANDBOX: the houses (no Marge, no Walt; six houses: six, a contract and a site each), no Wall, no dressing,
+		-- no soldier; 9.7 runs: no board on the plots (the lobby's portals start the runs: server/Runs.luau)
 		for _, h in SandboxMap.Houses do
 			local house = SB.newContract(h)
 			SB.contracts[house.id] = house
 			table.insert(SB.all, house)
 			sites[house.id] = SB.site(house, made)
 		end
-		SB.buildBoards(made)
 		MoveGreeters.start(nil, false)
 	else
 		for _, contract in T.Contracts do
@@ -5467,7 +5660,15 @@ function Moving.start()
 	Net.get("PutDown").OnServerEvent:Connect(onPutDown)
 	Players.PlayerRemoving:Connect(function(player: Player)
 		local own = sessions[player]
-		if own then
+		if own and SB.on and own.contract.difficulty and not own.ended then
+			-- 9.7 runs: the host left: the run ends, what is in the truck goes home (each piece to whoever loaded it)
+			for _, member in everyone(own) do
+				if member ~= player then
+					say(member, `The run ended: {player.DisplayName} (the host) left. What was in the truck went home.`)
+				end
+			end
+			finish(own, "deliver", `{player.DisplayName} left the game: what was in the truck went home`)
+		elseif own then
 			-- 7.2 review: after a trip, what reached the Wall pays the crew there (not called off for nothing)
 			local c = Rules.counts(own.move)
 			for _, member in everyone(own) do

@@ -330,7 +330,7 @@ bookRemote.OnClientEvent:Fire({ kind = "state", book = { chair = { n = 1, best =
 check("… (the book emptied by the admin and a piece again: no second hint)", not SandboxHints.waiting(queue, "book"))
 -- a task done with its reward waiting: what covers the screen
 M.focus = nil
-tasksRemote.OnClientEvent:Fire({ kind = "done", title = "Make 3 trips home in one move", money = 380 })
+tasksRemote.OnClientEvent:Fire({ kind = "done", title = "Bring 3 truckloads home", money = 380 })
 tasksRemote.OnClientEvent:Fire(tasksView({ { "home", 12, 12, true }, { "trips", 3, 3 }, { "sell", 250, 120 } }))
 check("a task done, its reward waiting: its hint waits", SandboxHints.waiting(queue, "tasks"))
 local toastsTasks = #M.toasts

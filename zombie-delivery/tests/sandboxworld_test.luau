@@ -17,6 +17,10 @@
 -- five other places to empty in their looks (SandboxWorld.villageHouse), each walked in as the farmstead is (its
 -- FrontDoor on its door, two leaves, the walls less a dark hall), nothing in its door's way or its walk to its curb
 -- (9.5: its eaves 8 up at least; the cabin's veranda deck walked up as a doorstep, its roof overhead no obstacle).
+-- 9.7 runs (design/lobby/plan.py, design/countryside/plan.py): no Pražská, Depot Row, lanes, turnaround, markings,
+-- street lamps or signpost; the asphalt is the run zones' yards (a shoulder round each); every run zone walled and
+-- screened on its edge (its ZoneWalls, its ScreenHedge); no far view; the trucks find room at every house's curb; the
+-- lobby itself: tests/lobby_test.luau.
 -- Run with tests/run_tests.py.
 local Mock = require("./WorldMock")
 local G = Mock.globals
@@ -47,9 +51,7 @@ end
 type Rect = { x0: number, x1: number, z0: number, z1: number }
 local B = SandboxMap.Bounds
 local TOP, GROUND = SandboxMap.RoadTop, SandboxMap.GroundTop
-local TURN = SandboxMap.Turnaround
 local HOUSE = SandboxMap.House
-local MAIN, DEPOT = SandboxMap.Roads[1], SandboxMap.Roads[2]
 local RUN = SandboxScenery.Run
 local EPS = 1e-3
 
@@ -66,7 +68,7 @@ local function onAsphalt(x: number, z: number): boolean
 			return true
 		end
 	end
-	return SandboxScenery.circleOut(x, z) <= 0
+	return false
 end
 
 -- ── The numbers ────────────────────────────────────────────────────────────
@@ -131,44 +133,23 @@ do
 			worst, at = margin, string.format("%.1f, %.1f (%.1f out)", x, z, out)
 		end
 	end
-	-- (every road but Pražská the same way, the lanes and their yards too; a point past the world's edge is none)
-	local function inside(x: number, z: number): boolean
-		return x > B.x0 and x < B.x1 and z > B.z0 and z < B.z1
-	end
 	for _, out in { 0.3, 1.5, 3 } do
-		-- (8.9: every street's slab, each side and corner; Pražská's sides down to the turnaround; nothing past the
-		-- Bounds, where a road would meet the invisible wall)
+		-- (9.7: every yard's slab, each side and corner)
 		for _, r in SLABS do
-			local south = if r.name == MAIN.name then TURN.z - TURN.r else r.z1
 			for x = r.x0, r.x1, 5 do
 				edgePoint(x, r.z0 - out, out, TOP)
-				if r.name ~= MAIN.name then
-					edgePoint(x, r.z1 + out, out, TOP)
-				end
+				edgePoint(x, r.z1 + out, out, TOP)
 			end
-			for z = r.z0, south, 4 do
-				if r.x0 - out > B.x0 then
-					edgePoint(r.x0 - out, z, out, TOP)
-				end
+			for z = r.z0, r.z1, 4 do
+				edgePoint(r.x0 - out, z, out, TOP)
 				edgePoint(r.x1 + out, z, out, TOP)
 			end
-			if r.name ~= MAIN.name then
-				for _, c in { { r.x0, r.z0, -1, -1 }, { r.x0, r.z1, -1, 1 }, { r.x1, r.z0, 1, -1 }, { r.x1, r.z1, 1, 1 } } do
-					for _, a in { 0.2, 0.5, 0.8 } do
-						local dx, dz = math.cos(a * math.pi / 2), math.sin(a * math.pi / 2)
-						if c[1] + c[3] * dx * out > B.x0 then
-							edgePoint(c[1] + c[3] * dx * out, c[2] + c[4] * dz * out, out, TOP)
-						end
-					end
+			for _, c in { { r.x0, r.z0, -1, -1 }, { r.x0, r.z1, -1, 1 }, { r.x1, r.z0, 1, -1 }, { r.x1, r.z1, 1, 1 } } do
+				for _, a in { 0.2, 0.5, 0.8 } do
+					local dx, dz = math.cos(a * math.pi / 2), math.sin(a * math.pi / 2)
+					edgePoint(c[1] + c[3] * dx * out, c[2] + c[4] * dz * out, out, TOP)
 				end
 			end
-		end
-		-- (the ring's wedges stand on chords just inside the asphalt's edge: mid-piece the slope starts its sag lower)
-		local top = SandboxScenery.TurnaroundTop
-		local sag = (top - GROUND) * TURN.r * (1 - math.cos(math.pi / SandboxScenery.RingPieces)) / RUN
-		for deg = 0, 359, 3 do
-			local a = math.rad(deg)
-			edgePoint(TURN.x + math.cos(a) * (TURN.r + out), TURN.z + math.sin(a) * (TURN.r + out), out, top, sag)
 		end
 	end
 	check("a shoulder slopes from the asphalt down to the meadow along every edge (no step)", worst >= -0.01, string.format("%d points, worst %.3f at %s", samples, worst, at))
@@ -195,22 +176,12 @@ do
 			end
 		end
 	end
-	check(`8.9: {#trees} trees of the tree lines, the orchard and 9.4 the forest, every one where the rules let it stand`, #trees >= 250 and why == nil, why or #trees)
+	check(`8.9: {#trees} trees of the orchard and 9.4 the forest (9.7: the ones a run zone sees), every one where the rules let it stand`, #trees >= 60 and why == nil, why or #trees)
 	local again = VillageScenery.trees()
 	check("the same trees every time", again == trees and #again == #trees)
 
-	-- far away: the far view outside the Bounds (8.9: no hill, no peak)
-	local near: string? = nil
-	for _, p in VillageScenery.far() do
-		local x0, x1, y0, y1, z0, z1 = require("./VillageLooks").box(p)
-		if y1 > GROUND + EPS and x0 < B.x1 and x1 > B.x0 and z0 < B.z1 and z1 > B.z0 then
-			near = `{p.name} at {math.floor(x0)}, {math.floor(z0)}`
-		end
-		if p.name == "Peak" or p.name == "Hill" or p.material == "Snow" then
-			near = `an alpine {p.name}`
-		end
-	end
-	check("8.9: the far view stands outside the Bounds (its fields under them), no hill, no peak", near == nil, near)
+	-- far away: 9.7 none (every run zone ends at its screen hedge, the lobby at its own)
+	check("9.7: no far view (VillageScenery.far: nothing)", #VillageScenery.far() == 0)
 end
 
 -- ── The built world ────────────────────────────────────────────────────────
@@ -314,9 +285,9 @@ do
 			out = `{b.name} at {math.floor(b.x0)} … {math.floor(b.x1)}, {math.floor(b.z0)} … {math.floor(b.z1)}`
 		end
 	end
-	check("everything but the far view is inside SandboxMap.Bounds", out == nil, out)
-	check("8.9: the far view (its fields, tree lines, pylons, roofs) all outside the Bounds", farIn == nil and #named("FarField") > 0 and #named("FarTrees") > 0 and #named("Peak") == 0 and #named("Hill") == 0, farIn)
-	check("the far view is one Persistent model", far ~= nil and far:IsA("Model") and far.ModelStreamingMode == Enum.ModelStreamingMode.Persistent)
+	check("everything is inside SandboxMap.Bounds", out == nil and farIn == nil, out or farIn)
+	check("9.7: no far view (no Far model, no far field, no peak, no hill), no D5, no railway", far == nil and #named("FarField") == 0 and #named("Peak") == 0 and #named("Hill") == 0
+		and world:FindFirstChild("Motorway") == nil and world:FindFirstChild("Railway") == nil)
 	local walls = named("InvisibleWall")
 	local sides = { x0 = false, x1 = false, z0 = false, z1 = false }
 	local real = true
@@ -329,6 +300,34 @@ do
 		real = real and p.Transparency >= 1 and p.CanCollide and w.y0 <= GROUND and w.y1 >= 100
 	end
 	check("invisible walls stand on all four sides of the Bounds", #walls == 4 and real and sides.x0 and sides.x1 and sides.z0 and sides.z1)
+	-- 9.7 runs: every run zone walled on its edge (four ZoneWalls, unseen, solid, Config.Runs.Zone.Wall high) and
+	-- screened (CountryLooks' ScreenHedge on each side: solid, Config.Runs.Zone.Screen.Height high)
+	local zoneWalls, zoneOk, why = named("ZoneWall"), true, nil :: string?
+	local hedges = named("ScreenHedge")
+	for _, zone in SandboxMap.Zones do
+		local q = zone.rect
+		local mine, screened = 0, 0
+		for _, w in zoneWalls do
+			if w.part:GetAttribute("RunZone") == zone.id then
+				mine += 1
+				local onEdge = math.abs(w.x1 - q.x0) < 0.01 or math.abs(w.x0 - q.x1) < 0.01 or math.abs(w.z1 - q.z0) < 0.01 or math.abs(w.z0 - q.z1) < 0.01
+				zoneOk = zoneOk and onEdge and w.part.Transparency >= 1 and w.part.CanCollide and w.y0 <= GROUND + EPS and w.y1 >= Config.Runs.Zone.Wall - EPS
+			end
+		end
+		for _, hb in hedges do
+			local cx, cz = (hb.x0 + hb.x1) / 2, (hb.z0 + hb.z1) / 2
+			local onEdge = (math.abs(cx - q.x0) < 0.01 or math.abs(cx - q.x1) < 0.01) and cz > q.z0 and cz < q.z1
+				or (math.abs(cz - q.z0) < 0.01 or math.abs(cz - q.z1) < 0.01) and cx > q.x0 and cx < q.x1
+			if onEdge then
+				screened += 1
+				zoneOk = zoneOk and hb.part.CanCollide and hb.y1 >= Config.Runs.Zone.Screen.Height - EPS
+			end
+		end
+		if mine ~= 4 or screened ~= 4 then
+			zoneOk, why = false, `{zone.id}: {mine} walls, {screened} screen hedges`
+		end
+	end
+	check("9.7: every run zone walled (4 ZoneWalls, unseen, solid, high) and screened (4 tall solid ScreenHedges) on its edge", zoneOk and #zoneWalls == 4 * #SandboxMap.Zones, why)
 end
 
 -- the asphalt covers SandboxMap.Roads and the turnaround, its top at RoadTop
@@ -337,7 +336,6 @@ do
 	for _, b in named("Road") do
 		table.insert(asphalt, b)
 	end
-	local disc = named("Turnaround")[1]
 	local function covered(x: number, z: number, list: { Box }, top: number, tolerance: number): boolean
 		for _, b in list do
 			if x >= b.x0 - EPS and x <= b.x1 + EPS and z >= b.z0 - EPS and z <= b.z1 + EPS and math.abs(b.y1 - top) <= tolerance then
@@ -356,7 +354,7 @@ do
 			end
 		end
 	end
-	check(`the asphalt covers every road of SandboxMap.Roads at RoadTop ({#asphalt} slabs: 9.4 the lanes and their yards too)`, missed == nil and #asphalt == #SLABS and #SLABS == #SandboxMap.Roads, missed)
+	check(`the asphalt covers every road of SandboxMap.Roads at RoadTop ({#asphalt} slabs: 9.7 the run zones' yards)`, missed == nil and #asphalt == #SLABS and #SLABS == #SandboxMap.Roads and #SLABS == #SandboxMap.Houses, missed)
 	local labelled = true
 	for _, road in SandboxMap.Roads do
 		local found = false
@@ -366,46 +364,33 @@ do
 		labelled = labelled and found
 	end
 	check("…each slab says its road (the attribute Road: Mill Lane, Pond Lane …)", labelled)
-	local ok = disc ~= nil and disc.part.Shape == Enum.PartType.Cylinder and math.abs((disc.x1 - disc.x0) / 2 - TURN.r) < EPS
-	if disc then
-		for deg = 0, 359, 10 do
-			for _, r in { 0, TURN.r * 0.5, TURN.r - 0.5 } do
-				local x, z = TURN.x + math.cos(math.rad(deg)) * r, TURN.z + math.sin(math.rad(deg)) * r
-				if not covered(x, z, { disc }, TOP, 0.03) then
-					ok = false
-				end
-			end
-		end
-	end
-	check("the turnaround is an asphalt disc on the Turnaround (its top within a hair of RoadTop)", ok)
+	check("9.7: no turnaround", #named("Turnaround") == 0)
 	check("a shoulder part for every piece of SandboxScenery.ramps", #named("Shoulder") == #SandboxScenery.ramps())
-	check("the markings: centre lines, edge lines, the give-way line", #namedIn("CentreLine", roadsFolder) > 20 and #namedIn("EdgeLine", roadsFolder) > 10 and #namedIn("GiveWay", roadsFolder) == 1)
-	local raised: string? = nil
-	for _, name in { "CentreLine", "EdgeLine", "GiveWay" } do
-		for _, b in namedIn(name, roadsFolder) do
-			if b.part.CanCollide or b.y1 > TOP + 0.06 or not onAsphalt((b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2) then
-				raised = `{name} at {math.floor(b.x0)}, {math.floor(b.z0)}`
-			end
-		end
-	end
-	check("the markings lie flat on the asphalt and never collide", raised == nil, raised)
+	check("9.7: no markings (the yards have none)", #namedIn("CentreLine", roadsFolder) == 0 and #namedIn("EdgeLine", roadsFolder) == 0 and #namedIn("GiveWay", roadsFolder) == 0)
 end
 
 -- nothing that collides stands on the roads, the turnaround, the plots (their pads are the floor), the path from the
 -- curb to the door or in the door's way; the floors themselves never rise over the asphalt's top
 do
-	local FLOOR = { Road = true, Turnaround = true, Shoulder = true, Pad = true, Meadow = true, Lawn = true, Field = true, VillageLawn = true }
+	local FLOOR = { Road = true, Shoulder = true, Pad = true, Meadow = true, Lawn = true, Field = true, VillageLawn = true, Plaza = true }
 	local areas: { { name: string, rect: Rect, circle: boolean?, top: number? } } = {}
 	for _, road in SandboxMap.Roads do
 		table.insert(areas, { name = road.name, rect = road :: any })
 	end
-	table.insert(areas, { name = "the turnaround", rect = { x0 = TURN.x - TURN.r, x1 = TURN.x + TURN.r, z0 = TURN.z - TURN.r, z1 = TURN.z + TURN.r }, circle = true })
 	for _, plot in SandboxMap.Plots do
 		table.insert(areas, { name = `plot {plot.id}`, rect = plot.rect })
 	end
 	table.insert(areas, { name = "the path from the curb to the door", rect = { x0 = SandboxScenery.Path.x0, x1 = SandboxScenery.Path.x1, z0 = SandboxScenery.Path.z0, z1 = HOUSE.door.z - 0.01 } })
 	local d = HOUSE.door
 	table.insert(areas, { name = "the front door's way", rect = { x0 = d.x - 2.5, x1 = d.x + 2.5, z0 = d.z - 5, z1 = d.z - 0.01 } })
+	-- 9.7 runs: every portal's pad (a party stands there) and every zone's arrival spot (somebody lands there)
+	for _, portal in SandboxMap.Lobby.portals do
+		table.insert(areas, { name = `{portal.name}'s pad`, rect = portal.pad })
+	end
+	for _, zone in SandboxMap.Zones do
+		local a = zone.arrive
+		table.insert(areas, { name = `{zone.id}'s arrival`, rect = { x0 = a.x - 6, x1 = a.x + 6, z0 = a.z - 6, z1 = a.z + 6 }, top = 8 })
+	end
 	-- (every other place to empty's door's way, 5 out of it, and its walk to its curb, under its eaves: up to 8
 	-- high, a mover and whatever goes through a door 7.2 high)
 	for index, h in SandboxMap.Houses do
@@ -441,19 +426,11 @@ do
 				continue
 			end
 			if b.x0 < r.x1 - EPS and b.x1 > r.x0 + EPS and b.z0 < r.z1 - EPS and b.z1 > r.z0 + EPS then
-				local hit = true
-				if a.circle then
-					local cx = math.clamp(TURN.x, b.x0, b.x1)
-					local cz = math.clamp(TURN.z, b.z0, b.z1)
-					hit = (cx - TURN.x) ^ 2 + (cz - TURN.z) ^ 2 < (TURN.r - EPS) ^ 2
-				end
-				if hit then
-					blocked = `{b.name} on {a.name}`
-				end
+				blocked = `{b.name} on {a.name}`
 			end
 		end
 	end
-	check("nothing that collides on the roads (9.4: no road closed either), the turnaround, the plots, the path to the door or the door's way", blocked == nil and barrier == nil, blocked)
+	check("nothing that collides on the yards, the plots, the path to the door, the doors' ways, 9.7 the portals' pads or the zones' arrival spots", blocked == nil and barrier == nil, blocked)
 	check("no floor (asphalt, shoulder, pad, meadow, lawn, field) rises over RoadTop", floorHigh == nil, floorHigh)
 	local pads = named("Pad")
 	local padOk = #pads == #SandboxMap.Plots
@@ -478,7 +455,6 @@ do
 	for _, road in SandboxMap.Roads do
 		table.insert(keep, { name = road.name, rect = grow(road :: any, RUN) })
 	end
-	table.insert(keep, { name = "the turnaround", rect = grow({ x0 = TURN.x - TURN.r, x1 = TURN.x + TURN.r, z0 = TURN.z - TURN.r, z1 = TURN.z + TURN.r }, RUN), circle = true })
 	for _, plot in SandboxMap.Plots do
 		table.insert(keep, { name = `plot {plot.id}`, rect = plot.rect })
 	end
@@ -493,15 +469,7 @@ do
 			for _, k in keep do
 				local r = k.rect
 				if b.x0 < r.x1 and b.x1 > r.x0 and b.z0 < r.z1 and b.z1 > r.z0 then
-					local inside = true
-					if k.circle then
-						local cx = math.clamp(TURN.x, b.x0, b.x1)
-						local cz = math.clamp(TURN.z, b.z0, b.z1)
-						inside = (cx - TURN.x) ^ 2 + (cz - TURN.z) ^ 2 < (TURN.r + RUN) ^ 2
-					end
-					if inside then
-						hit = `a tree's {name} on {k.name} at {math.floor(b.x0)}, {math.floor(b.z0)}`
-					end
+					hit = `a tree's {name} on {k.name} at {math.floor(b.x0)}, {math.floor(b.z0)}`
 				end
 			end
 		end
@@ -512,7 +480,12 @@ do
 			own += if p.name == "Trunk" then 1 else 0
 		end
 	end
-	check(`the trees ({#trunks}) keep off the roads, the turnaround, the plots, the house's lot, the path and the vans' ways`, hit == nil and #trunks == #VillageScenery.trees() + own and #named("Crown") == #trunks and #named("Needles") == 0, hit)
+	local lobbyTrees = 0 -- (9.7: the lobby's own, server/LobbyWorld.luau's)
+	for _, b in trunks do
+		lobbyTrees += if SandboxMap.inLobby(b.x0, b.z0) then 1 else 0
+	end
+	check(`the trees ({#trunks}) keep off the yards, the plots, the house's lot, the path and the trucks' spots`, hit == nil and #trunks == #VillageScenery.trees() + own + lobbyTrees
+		and lobbyTrees == #SandboxMap.Lobby.trees and #named("Crown") == #trunks and #named("Needles") == 0, hit or `{#trunks} trunks, {lobbyTrees} in the lobby`)
 	local solid = true
 	for _, b in trunks do
 		solid = solid and b.part.CanCollide
@@ -986,33 +959,26 @@ do
 		and SandboxWorld.villageHouse(G.Instance.new("Folder"), nowhere) == nil)
 end
 
--- the words: the signpost's boards, the gate's and the mailbox's
+-- the words: the mailbox's (9.7: no signpost; the portals' signs: tests/lobby_test.luau)
 do
-	local texts: { [string]: number } = {}
 	local mailbox: string? = nil
+	local signpost = 0
 	for _, d in world:GetDescendants() do
 		if d.ClassName == "TextLabel" then
-			texts[d.Text] = (texts[d.Text] or 0) + 1
 			if d.Parent and d.Parent.Parent and d.Parent.Parent.Name == "MailboxName" then
 				mailbox = d.Text
 			end
+			if string.find(d.Text, "WAREHOUSES", 1, true) then
+				signpost += 1
+			end
 		end
 	end
-	check("the signpost: ← WAREHOUSES, THE OLD FARMSTEAD → (and the other ways round)", texts["← WAREHOUSES"] == 2 and texts["WAREHOUSES →"] == 2 and texts["THE OLD FARMSTEAD →"] == 1 and texts["← THE OLD FARMSTEAD"] == 1)
-	check("the mailbox says THE OLD FARMSTEAD", mailbox == "THE OLD FARMSTEAD", mailbox)
-end
-
--- the street lamps along Pražská, off its shoulders
-do
-	local poles = named("LampPole")
-	local ok = #poles >= 4
-	for _, b in poles do
-		local x = (b.x0 + b.x1) / 2
-		local z = (b.z0 + b.z1) / 2
-		local off = math.min(math.abs(x - MAIN.x0), math.abs(x - MAIN.x1))
-		ok = ok and off > RUN and off < RUN + 4 and z > DEPOT.z1 and z < TURN.z - TURN.r and not onAsphalt(x, z)
+	local lamps = 0 -- (street lamps out of the lobby: the dispatch kiosk's lamp is in it)
+	for _, b in named("LampArm") do
+		lamps += if SandboxMap.inLobby(b.x0, b.z0) then 0 else 1
 	end
-	check(`street lamps along Pražská ({#poles})`, ok)
+	check("the mailbox says THE OLD FARMSTEAD; 9.7 no signpost, no street lamps (the lobby's lamps are on its plaza)", mailbox == "THE OLD FARMSTEAD" and signpost == 0
+		and #named("SignBoard") == 0 and lamps == 0, `{mailbox}, {signpost} signposts, {lamps} street lamps`)
 end
 
 -- shadows only from the bigger parts
@@ -1039,8 +1005,8 @@ end
 -- ball is a cube some 480 studs wide whose top stands over the meadow, so without the pass every van's spot was
 -- "taken" and the van went down anyway, onto a player too. Here the built world and every plot's warehouse
 -- (WarehouseLayout.pieces, its solid ones) stand in for the workspace, the wheels' rays find the ground (a ball's
--- cap, a disc, else a part's box), and the Sprinter (SprinterLooks: its hull, its wheels) at every plot's vanSpot and
--- at the house's curb has its four wheels on one plane and its room free on the first try; a player standing there
+-- cap, a disc, else a part's box), and the Sprinter (SprinterLooks: its hull, its wheels) at every house's curb (9.7:
+-- where a run parks it) has its four wheels on one plane and its room free on the first try; a player standing there
 -- takes it.
 do
 	local Cfg = Config.SpawnSpot
@@ -1158,10 +1124,9 @@ do
 		return true, string.format("its wheels at %.2f", ground)
 	end
 	local spots: { { name: string, spot: SandboxMap.Spot } } = {}
-	for _, plot in SandboxMap.Plots do
-		table.insert(spots, { name = `plot {plot.id}'s vanSpot`, spot = plot.vanSpot })
+	for _, h in SandboxMap.Houses do -- (9.7 runs: a run parks its truck at its house's curb; none at the plots)
+		table.insert(spots, { name = `{h.name}'s curb`, spot = h.curb })
 	end
-	table.insert(spots, { name = "the house's curb", spot = HOUSE.curb })
 	local grounded = 0
 	for _, at in spots do
 		local spot = at.spot
@@ -1173,7 +1138,7 @@ do
 			grounded += 1
 		end
 		-- a player standing there (their body's box: 2 wide, 1 deep, 5 tall on the ground)
-		local feet = if spot == HOUSE.curb then SandboxScenery.TurnaroundTop else GROUND
+		local feet = TOP
 		local body: Solid = { name = "a player", x0 = spot.x - 1, x1 = spot.x + 1, y0 = feet, y1 = feet + 5, z0 = spot.z - 0.5, z1 = spot.z + 0.5, passed = false }
 		local taken, whyTaken = firstTry(spot, { body }, true)
 		check(`… a player standing at {at.name} takes it`, not taken and whyTaken == "a player in the way", whyTaken)

@@ -8,18 +8,16 @@
 --     reaches down to the line) and is itself a top block ("SandboxGuide"), so the quick chat's
 --     lines and the banners go under it. Its words wrap rather than grow wide; on a touch screen it is at least
 --     TouchScale big and its ✕ a finger's size.
---   * The 3D guide: a soft glowing path on the ground (Beams between Attachments in the Terrain: no parts) along the
---     roads (SandboxSteps.route: out to the nearest road, along the roads the shortest way, in), a floating orange
---     chevron over the target and its distance tag ("THE OLD FARMSTEAD · 420 m"). Inside the house only the hint (no
---     target there). The drive steps name the move's place (the Moving state's `contract`, a SandboxMap.Houses
---     id: "Drive to The Pond Cabin on Pond Lane"), the chevron over its curb ("THE POND CABIN") and its door.
+--   * The 3D guide: a soft glowing path on the ground (Beams between Attachments in the Terrain: no parts; 9.7 a
+--     straight one: the lobby and a run's front yard have no roads to follow), a floating orange chevron over the
+--     target and its distance tag ("THE OLD FARMSTEAD · 42 m": 9.7 the nearest portal's pad, named for its house).
+--     Inside the house only the hint (no target there). 9.7 runs: nobody drives (the run's truck stands at the curb).
 --   * The steps come from shared/SandboxSteps.luau (pure, tested) on a state read from what the client sees: the player
 --     attribute Plot (server/SandboxPlots.luau); the Moving remote's "state" (as client/MovingHud.luau reads it: a move
 --     runs, `inside` the house, the van's load counts.out, counts.delivered, your piece in your hands: an item `mine` and
 --     "carried"); the MoveLobby remote's "lobby" (the planning: LAUNCH); the Collection remote's "state" (the stock, the
 --     pieces on show and their stands); where you stand and whether you sit in a vehicle.
---   * Each step goes quiet once done (per session: SandboxSteps.doneBy); the arrow to the house and home stays while you
---     drive. Hold G (not while you carry: G puts a piece down) or the ✕ hides the guide ("Guide off" for a moment); hold G
+--   * Each step goes quiet once done (per session: SandboxSteps.doneBy). Hold G (not while you carry: G puts a piece down) or the ✕ hides the guide ("Guide off" for a moment); hold G
 --     again, or on a touch screen the 💡 chip left in its place, brings it back. SandboxGuide.setEnabled for a settings row.
 --   * 8.3 keys (shared/SandboxPad.luau, client/PadGlyph.luau): the line's words are the device's used now, a gamepad
 --     used last first: a prompt's E is the gamepad's X ("X at the back"; a touch screen's "tap at the back"), "Guide off ·
@@ -106,11 +104,9 @@ local LINE_H = G.TextSize + 4 -- one line of words
 local CLOSE_W = 28 -- the ✕'s column (at scale 1; a finger's size on a touch screen)
 local MIN_ROOM = 220 -- px at scale 1: narrower than this beside the sides' HUD, the line goes under it
 local LABELS: { [string]: string } = {
-	board = "CONTRACTS",
-	curb = string.upper(SandboxMap.House.name), -- (the move's place's, HOUSE_LABELS)
+	portal = "PORTAL", -- 9.7 runs (a portal's own name: its house's)
 	door = "FRONT DOOR",
-	van = "YOUR VAN",
-	unload = "UNLOAD HERE",
+	van = "THE TRUCK",
 	stand = "EMPTY STAND",
 	warehouse = "WAREHOUSE",
 	desk = "UPGRADES DESK", -- 8.3
@@ -440,21 +436,6 @@ local function vanBack(): Vector3?
 	return (chassis.CFrame * CFrame.new(0, 0, chassis.Size.Z / 2 + 2)).Position
 end
 
--- 8.3: your van stands at your plot's van spot (Config.VanPaint.Prompt.Home: its 🎨 Paint van prompt is on there).
-local function vanHome(): boolean
-	local plotId = state.plot
-	local plot = if plotId then SandboxMap.Plots[plotId] else nil
-	local model = if plot then van() else nil
-	local chassis = model and model.PrimaryPart
-	local at = chassis and chassis.Position
-	if not plot or not at then
-		return false
-	end
-	local spot, reach = plot.vanSpot, Config.VanPaint.Prompt.Home
-	local dx, dz = at.X - spot.x, at.Z - spot.z
-	return dx * dx + dz * dz <= reach * reach
-end
-
 -- 8.4: Danny's body on your move (the model in workspace.Npcs whose MoveHelper is your player attribute MoveHelperId,
 -- as client/MoveHelperCard.luau finds it): looked up at most once a second, kept while it stays.
 local function dannyRoot(): BasePart?
@@ -549,25 +530,25 @@ local function targetOf(kind: string?, px: number, pz: number): (Vector3?, strin
 	local plotId = state.plot
 	local plot = if plotId then SandboxMap.Plots[plotId] else nil
 	local house = SandboxMap.house(state.house) or SandboxMap.House -- (the move's place)
-	if kind == "board" then
-		if plot then
-			return Vector3.new(plot.board.x, plot.board.y + 4, plot.board.z), LABELS.board
+	if kind == "portal" then -- 9.7 runs: the nearest portal's pad (its house's name on the chevron)
+		local best: SandboxMap.Portal? = nil
+		local bestD = math.huge
+		for _, portal in SandboxMap.Lobby.portals do
+			local mx, mz = (portal.pad.x0 + portal.pad.x1) / 2, (portal.pad.z0 + portal.pad.z1) / 2
+			local d = (mx - px) ^ 2 + (mz - pz) ^ 2
+			if d < bestD then
+				best, bestD = portal, d
+			end
 		end
-	elseif kind == "curb" then
-		return Vector3.new(house.curb.x, house.curb.y, house.curb.z), HOUSE_LABELS[house.id] or LABELS.curb
+		if best then
+			return Vector3.new((best.pad.x0 + best.pad.x1) / 2, SandboxMap.GroundTop + 1, (best.pad.z0 + best.pad.z1) / 2), HOUSE_LABELS[best.house] or LABELS.portal
+		end
 	elseif kind == "door" then
 		return Vector3.new(house.door.x, house.door.y + 3, house.door.z), LABELS.door
 	elseif kind == "van" then
 		local back = vanBack()
 		if back then
 			return back, LABELS.van
-		end
-	elseif kind == "unload" then
-		local drop = move and move.dropOff
-		if plot and mine then
-			return Vector3.new(plot.unload.x, SandboxMap.RoadTop, plot.unload.z), LABELS.unload
-		elseif type(drop) == "table" and type(drop.x) == "number" and type(drop.z) == "number" then
-			return Vector3.new(drop.x, SandboxMap.RoadTop, drop.z), LABELS.unload
 		end
 	elseif kind == "stand" or kind == "hot" then
 		if plotId and plot then
@@ -586,16 +567,9 @@ local function targetOf(kind: string?, px: number, pz: number): (Vector3?, strin
 			end
 			return Vector3.new(plot.door.x, plot.door.y + 4, plot.door.z), LABELS.warehouse
 		end
-	elseif kind == "paint" then -- 8.3: the van's 🎨 Paint van prompt (server/VanPaint.luau's PaintPoint)
-		local model = van()
-		local chassis = model and model.PrimaryPart
-		if chassis then
-			local point = chassis:FindFirstChild("PaintPoint")
-			if point and point:IsA("Attachment") then
-				return point.WorldPosition, LABELS.paint
-			end
-			return chassis.Position, LABELS.paint
-		end
+	elseif kind == "paint" then -- 9.7: the lobby's PAINT shop booth (its counter: SandboxMap.Lobby.shops.paint)
+		local stand = SandboxMap.Lobby.shops.paint.stand
+		return Vector3.new(stand.x, SandboxMap.GroundTop + 3, stand.z), LABELS.paint
 	elseif kind == "danny" then -- 8.4: Danny, for hire on your move
 		local root = dannyRoot()
 		if root then
@@ -1113,7 +1087,14 @@ local function look()
 	state.covered = asks and ask(SandboxGuide.covered, "isCovered") == true
 	local window = if state.covered then ask(SandboxGuide.windowOpen, "window") else nil -- (a window open covers it)
 	state.window = if type(window) == "string" then window else nil
-	state.vanHome = calm and state.painted == false and vanHome()
+	state.vanHome = calm and state.painted == false -- (9.7: in the lobby, the PAINT shop's booth there)
+	-- 9.7 runs: on a portal's pad (client/RunUi.luau's pad view: you its host or not)
+	local pad: any = nil
+	pcall(function()
+		pad = (require(script.Parent.RunUi) :: any).pad()
+	end)
+	state.pad = type(pad) == "table" and not state.move
+	state.padHost = state.pad == true and pad.mine == true
 	state.hush = asks and (os.clock() < softAfter or ask(nil, "busy") == true) -- (a first-time hint talks)
 	SandboxSteps.doneBy(state, done, last)
 	local step = SandboxSteps.choose(state, done)
@@ -1166,7 +1147,7 @@ local function look()
 			-- Danny's "Pick a piece …")
 			ui.stepText = SandboxSteps.onDevice(step, words, device)
 		end
-		setHint(hint, ui.stepText, true)
+		setHint(hint and not state.pad, ui.stepText, true) -- (9.7: on a pad its panel says it: client/RunUi.luau's, where the line is)
 	end
 	if (ui.shown or ui.chip.Visible) and (os.clock() - (ui.laidAt or 0) > 1 or under(ui.root.AbsolutePosition, Ui.screenScale()) ~= ui.under) then
 		layout() -- (what is above moved: at once; the sides' HUD may have moved: a second's look is enough)
