@@ -2,7 +2,7 @@
 -- 10.4 the ride (the owner: "there is no driving the car any more, so every time you go to a place, an animation of
 -- you driving there"): when a run takes you to its house, and when it takes you back to the lobby, the Deliveros van
 -- drives across the screen over the jump's fade (server/Runs.luau sends { kind = "ride", to, back, difficulty?, party?,
--- seconds } on the Runs remote just before it; Config.Runs.Ride). A short flat scene in the intro's look
+-- seconds, round? (10.5: how many ride to the round) } on the Runs remote just before it; Config.Runs.Ride). A short flat scene in the intro's look
 -- (src/first/Loading.client.luau): the sky of the run's difficulty (a fresh morning for Easy … a night with the moon
 -- and the van's lamps for Nightmare; a warm evening on the way back), hills, trees and fence posts going by at their
 -- own speeds, the road's dashes, the van bouncing along with its wheels turning; at the top where you are going ("ON
@@ -308,6 +308,10 @@ function RideUi.show(message: any)
 			end
 		end
 		table.insert(bits, "with " .. table.concat(names, ", ") .. (if #party > 3 then ` +{#party - 3}` else ""))
+	end
+	local movers = tonumber(message.round) -- 10.5 rounds: everybody in the game rides there (how many)
+	if movers then
+		table.insert(bits, if movers > 1 then `ROUND · {movers} MOVERS` else "ROUND")
 	end
 	local line = make("TextLabel", {
 		Size = UDim2.fromScale(1, 0.2), Position = UDim2.fromScale(0, 0.72), BackgroundTransparency = 1, Text = table.concat(bits, "   ·   "), Font = Enum.Font.GothamBold,

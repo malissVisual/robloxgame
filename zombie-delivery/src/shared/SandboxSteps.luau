@@ -51,6 +51,9 @@
 --   no move, pieces in the stock        show      "Put your pieces on show: E at an empty stand"          a free stand
 --   no move, pieces on show             earn      "Your pieces earn money while you play. …"              a portal
 --   no move                             portal    "Walk to a portal: step onto a house's glowing pad"     the nearest portal
+-- 10.5 rounds (the state's `round`: Config.Rounds.On): in the house roundIn "Carry the loot out to YOUR van …", carrying
+-- outside roundLoad "Load it into YOUR van: E at its back" (your own van's back), in the lobby roundWait "Wait here: the
+-- next round starts by itself" in place of portal (and earn without a portal to point at); no FINISH step.
 --
 -- Done once, a step stays quiet for the session (SandboxSteps.doneBy: what the player did, seen this session: a count
 -- that went up, not one a save brought along; `earn` only says something, so the client counts it done after
@@ -144,6 +147,7 @@ export type State = {
 	plot: number?,
 	move: boolean,
 	pad: boolean?, -- 9.7: on a portal's pad (padHost: its host)
+	round: boolean?, -- 10.5: the rounds are on (Config.Rounds.On): their own words, no portal
 	padHost: boolean?,
 	inside: boolean,
 	carrying: boolean,
@@ -234,6 +238,11 @@ SandboxSteps.Steps = {
 	finish = step("finish", "Finish or beat the clock: load more, or FINISH at the truck", "van", false, false),
 	show = step("show", "Put your pieces on show: E at an empty stand", "stand", false, false),
 	earn = step("earn", "Your pieces earn money while you play. Walk into another house for more!", "portal", false, true),
+	-- 10.5 rounds (the state's `round`)
+	roundIn = step("roundIn", "Carry the loot out to YOUR van (E to pick up): the best first", nil, false, false),
+	roundLoad = step("roundLoad", "Load it into YOUR van: E at its back", "van", false, false),
+	roundWait = step("roundWait", "Wait here: the next round starts by itself", nil, false, false),
+	roundEarn = step("roundEarn", "Your pieces earn money while you play. The next round brings more!", nil, false, true),
 	-- 8.3, the soft steps (their words with the price or the piece: SandboxSteps.words)
 	grow = step("grow", "Your warehouse is full: grow it at the UPGRADES desk", "desk", false, false, true),
 	hot = step("hot", "🔥 Your piece is hot today: sell it or show it", "hot", false, false, true),
@@ -267,6 +276,9 @@ function SandboxSteps.decide(s: State, done: { [string]: boolean }?): Step
 		if danny then
 			return danny
 		end
+		if s.round then -- 10.5 rounds: your own van, no FINISH
+			return if s.inside then S.roundIn elseif s.carrying then S.roundLoad else S.door
+		end
 		if s.inside then
 			return S.inside
 		end
@@ -289,9 +301,9 @@ function SandboxSteps.decide(s: State, done: { [string]: boolean }?): Step
 		return S.show
 	end
 	if s.shown > 0 then
-		return S.earn
+		return if s.round then S.roundEarn else S.earn
 	end
-	return S.portal
+	return if s.round then S.roundWait else S.portal
 end
 
 -- Did the count go up since the look before (nil before: not known yet, nothing to say)?
@@ -305,6 +317,7 @@ end
 function SandboxSteps.doneBy(s: State, done: { [string]: boolean }, last: Last)
 	if s.move or s.planning or s.pad == true then
 		done.portal = true -- (9.7 runs: on a pad, or in the run)
+		done.roundWait = if s.move then true else done.roundWait -- (10.5 rounds: been in one: the banner says the rest)
 	end
 	if s.move then
 		done.plan = true

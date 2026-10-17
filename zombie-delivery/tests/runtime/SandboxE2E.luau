@@ -37,6 +37,7 @@
 -- task.delay + E.fire). E.sent keeps every FireClient: E.messages / E.lastNotice / E.heard read it.
 local Mock = require("./ItemMock")
 local Config = require("./Config")
+Config.Rounds.On = false -- (10.5: the portals' runs here, as before the rounds; tests/rounds_runtime_test.luau turns them on)
 local SandboxMapReal = require("./SandboxMap")
 local SprinterLooks = require("./SprinterLooks")
 local Economy = require("./Economy")

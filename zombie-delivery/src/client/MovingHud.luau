@@ -51,7 +51,9 @@
 -- card): no trips and no driving: the panel's line is "IN THE TRUCK n/total · ★ · the difficulty", its next step says to
 -- load the truck and FINISH at it (or beat the clock); the host's FINISH is always there, the others' is VOTE FINISH
 -- (the Runs remote's "vote"), the list's footer LEAVE THE RUN for them (the Runs remote's "leave", asked twice); a
--- run's own results card is RunUi's (the Moving remote's "result" carries none for a run).
+-- run's own results card is RunUi's (the Moving remote's "result" carries none for a run). 10.5 rounds (its `run.round`):
+-- the line is "YOURS n · $ · the place · the difficulty" (what you loaded into your own van), the next step says to load
+-- it into YOUR van, no FINISH and no vote, the list's footer LEAVE THE ROUND for everybody.
 -- 8.3 keys (the sandbox; shared/SandboxPad.luau, client/PadGlyph.luau): the panel's words name the keys of the device
 -- used now, a gamepad used last first: what to do next ("Pick up the things (E)", "(X)" with a gamepad, no key on a
 -- touch screen: the prompt is tapped) and the list's hint ("LIST [O]", "TAP: LIST" on a touch screen, none with a
@@ -400,7 +402,14 @@ local function nextStep(s: any): string
 	local out, total = tonumber(counts.out) or 0, tonumber(counts.total) or 0
 	local carried = tonumber(counts.carried) or 0
 	local delivered = tonumber(counts.delivered) or 0
-	if type(s.run) == "table" then -- 9.7 runs: the truck at the door, no driving
+	if type(s.run) == "table" and s.run.round == true then -- 10.5 rounds: your own van, no FINISH
+		if s.inside == true then
+			return if carried > 0 then "Carry it out to YOUR van: walk out through a door" else `{keyed("Pick up the loot")} · the best first`
+		elseif carried > 0 then
+			return keyed("Load it into YOUR van (its back)")
+		end
+		return "Grab more before the clock runs out: the most value wins"
+	elseif type(s.run) == "table" then -- 9.7 runs: the truck at the door, no driving
 		if s.inside == true then
 			return if carried > 0 then "Carry it out: walk out through a door" else `{keyed("Pick up the loot")} · ★ first`
 		elseif carried > 0 then
@@ -476,7 +485,9 @@ refreshPanel = function()
 	local delivered = tonumber(counts.delivered) or 0
 	-- 7.x van moves: the trip under way and what reached the Wall over every trip (9.7 runs: what is in the truck)
 	local run = if type(s.run) == "table" then s.run else nil
-	refs.check.Text = if run
+	refs.check.Text = if run and run.round == true -- (10.5 rounds: what you loaded into your own van)
+		then `YOURS {tonumber(run.count) or 0} · {Ui.money(tonumber(run.value) or 0)} · {string.upper(tostring(s.name or ""))} · {string.upper(tostring(run.name or ""))}`
+		elseif run
 		then `IN THE TRUCK {counts.out or 0}/{counts.total or 0} · ★ {counts.stars or 0} · {string.upper(tostring(run.name or ""))}{if broken > 0 then ` · 💥 {broken}` else ""}`
 		else `TRIP {(tonumber(s.trips) or 0) + 1} · delivered {delivered}/{counts.total or 0} · ★ {counts.starsDelivered or 0}/{counts.stars or 0}{if broken > 0 then ` · 💥 {broken}` else ""}{if s.horde ~= true and hordeIn > 0 then ` · 🧟 {clock(hordeIn)}` else ""}`
 	local fill = math.clamp(tonumber(s.fill) or 0, 0, 1)
@@ -491,7 +502,7 @@ refreshPanel = function()
 	end
 	local finish = refs.finish -- 7.x van moves: the owner's FINISH once something reached the Wall (asked twice)
 	if finish then
-		local can = (s.mine == true and delivered > 0) or run ~= nil -- (9.7 runs: the host's FINISH, the others' vote)
+		local can = (s.mine == true and delivered > 0) or (run ~= nil and run.round ~= true) -- (9.7 runs: the host's FINISH, the others' vote; 10.5 rounds: none)
 		local sure = os.clock() - finishAt <= GIVE_UP_SURE
 		finish.Visible = can
 		finish.Text = if sure then (if run and run.mine ~= true then "TAP TO VOTE" else "TAP TO FINISH") elseif run and run.mine ~= true then "✓ VOTE FINISH" else "✓ FINISH"
@@ -836,7 +847,7 @@ local function drawList()
 			else Ui.make("Frame", { Name = "Footer", Size = UDim2.new(1, -24, 0, 40), Position = UDim2.new(0, 12, 1, -46), BackgroundTransparency = 1 }, frame)
 		CardKit.bigButton(foot, {
 			name = "LeaveRun",
-			text = "LEAVE THE RUN",
+			text = if s.run.round == true then "LEAVE THE ROUND" else "LEAVE THE RUN", -- (10.5 rounds)
 			kind = "shut",
 			height = if sheet then finger else 40,
 			textSize = 14,

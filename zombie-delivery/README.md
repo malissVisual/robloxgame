@@ -4,7 +4,8 @@
 > test world instead of the city (`shared/SandboxMap.luau`, `server/SandboxWorld.luau`). **Since 10.0 a small lobby
 > like Dungeon Quest** (`design/lobby/`, `server/LobbyWorld.luau`: the plaza, the four warehouses, the shops and six
 > portals) from which a party goes into a house to empty at a chosen difficulty (`server/Runs.luau`, see the 10.0 note
-> below; its pieces wear their rarity's outline and stars); the houses stand in their own fenced run zones of the
+> below; its pieces wear their rarity's outline and stars; **since 10.5 one round for the whole server at a time instead,
+> everybody loading into their own van: the 10.5 note**); the houses stand in their own fenced run zones of the
 > 9.0 countryside: since 9.0 **open countryside**
 > (`design/countryside/`; 8.9: the village of Jinočany, 8.0 – 8.8: an alpine meadow with one road) with **six places to
 > empty**, each on its own country lane (`SandboxMap.Houses`, a contract each in `Config.Moving.Sandbox.Houses`; every
@@ -370,6 +371,26 @@
 > with the van moving along it. The engine pulls away and slows as it arrives (sfx6's van sounds); your controls are
 > off while it plays. **The start's sounds** (`art/audio/sfx6.ogg`, `art/audio/NAHRAT-SFX6.md`): the intro's van and
 > jingle, the start screen's and the character creator's; sfx5.ogg's asset id is in.
+>
+> **10.5** (the owner: "zombies I don't want in the game at all"; "16 people on one server … a round starts at one place,
+> everybody runs there, everyone has their own car, what you carry off to it quickly is yours … not teams"): **rounds
+> instead of the portals' runs** (`Config.Rounds`; `server/Runs.luau`'s block "10.5 ROUNDS", `shared/RoundRules.luau`,
+> `client/RoundUi.luau`; `Config.Rounds.On = false` brings the portals' pads back). After PLAY you wait in the lobby: a
+> banner counts down to the next round (`Wait`, 45 s), names its place and difficulty (never the same place twice in a
+> row; its portal says NEXT ROUND HERE). Then everybody in the game rides there together (10.4's ride: "ROUND · n
+> MOVERS"), each player's **own van** parked at the house's curb, side by side and in rows behind it (`Config.Rounds.Park`,
+> spots with a tree or a fence in the way last), locked, its back open, its owner's name over it (yours says YOUR VAN, seen
+> through walls). Grab the loot, carry it out and **Load** it at YOUR van (E, only you see its prompt): it is yours at
+> once, straight into your warehouse's stock (`Moving.claim`, `MovingRules.claim`), everybody hears who took what (the
+> feed) and sees **the table** (the top five by value and your place). The move's panel has the clock (`Seconds`, 5:00)
+> and what you loaded; nobody FINISHes or votes (the clock ends it), LEAVE THE ROUND takes you back alone, the host
+> leaving the game hands the round over (`Moving.handOver`), never ends it; no helper comes, CAR is refused. At 0:00 the
+> results card ranks everybody who came ("🥇 YOU: 1ST OF 6", every row's pieces and value), the ride back to the plaza,
+> the vans go and the next countdown starts; whoever pressed PLAY during a round goes in the next one. The admin's
+> `Runs.admin(…, "round")` starts the countdown's round now. **No zombies any more**: none at any difficulty, no bat, no
+> boss (`Config.Runs.Danger`; their code stays, `tests/danger_*` turn them on for themselves); the locks, the vault and
+> the floor's hazards stay. Next (planned): taking a piece out of somebody's hands (a short tug of war, the carrier
+> favoured, safe by your own van) and a private warehouse each behind one door in the lobby, for 16 players.
 
 The active Roblox game in this repository (Merge Blades is preserved in `../archive/merge-blades`). **You run a delivery company** in a world
 gone wrong: take a job, carry the cargo to your vehicle with your own hands (or lead the horses on a rope), drive it
