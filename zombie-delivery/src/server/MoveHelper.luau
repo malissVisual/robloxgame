@@ -109,10 +109,10 @@
 --     (what he does), MoveHelperId (his id: the card finds his body by it), 10.1 MoveHelperName and MoveHelperKind.
 --   * He stays out of fights: a zombie within FleeRange, he runs (never while holding the other end of your piece, nor
 --     from the van's seat). The zombies go after him like after a player on foot (Zombies.extraTargets); a bite knocks
---     what he holds (Moving.helperHurt); at 0 health he drops it (knocked; his own piece back on his list) and lies down;
---     he is back at the van Respawn s later.
---   * He talks a little: a speech bubble (Npcs.say) on the way's events, never the same line within TalkRepeat s (8.0
---     SANDBOX: MoveHelperBrain.line's sandbox words: no Wall, no depot).
+--     what he holds (Moving.helperHurt); at 0 health he drops it (knocked; his own piece back on his list) and lies down
+--     (10.1: down in the run, the revive prompt on him: server/HelperCrew.luau).
+--   * He talks a little: a speech bubble (Npcs.say) on the way's events, never the same line within TalkRepeat s
+--     (MoveHelperBrain.line's sandbox words: no Wall, no depot).
 -- 8.6 (the owner: "Somewhere I'd like to see an indicator of what Danny is doing right now, and to be able to tell him,
 -- for example, put it down on the ground, or get out of the car"):
 --   * What he does over his head: setDoing makes the status line's words and the bubble's from the same action
@@ -237,8 +237,8 @@
 -- 10.1 THE CREW (the owner: "Danny will be the base, so I'd cancel having to buy him … you'll be able to get different
 -- employees who can do something different"; Config.Crew, shared/CrewRules.luau, server/HelperCrew.luau):
 --   * No hire any more: the helper is free and the move's from its start (h.hirer is the move's owner, the 8.3 code's
---     "hired" paths are every move's; no price, no "Hire Danny" sign, no HIRE request). In the sandbox he comes with
---     every crew (a run's party); the city's moves keep Solo / Duo (once with a move he stays, as a hired one did).
+--     "hired" paths are every move's; no price, no "Hire Danny" sign, no HIRE request). He comes with every party (a
+--     run's: MoveHelperBrain.wanted's `every`).
 --   * Which helper: the move's owner's pick of their crew (Crew.kindFor: Danny by default, a run's host's pick: Bruno,
 --     Zip, Gus or Lucy; nobody ready: no helper). h.kind and h.name are his; his look, name tag, health and the words of
 --     his own are his kind's (Crew.look, Crew.health, Crew.line), his walk × his kind's (Crew.pace in go), what he may
@@ -247,7 +247,7 @@
 --     Moving.helperTake's CrewSolo). Gus walks with his boss and fights (Crew.guard, before his brain's step).
 --   * Down in a run (Crew.downed in his down step): no comeback at the van: he lies there with the revive prompt on him
 --     for Config.Crew.Down.Seconds (a party player's E held: up with half his health), else he is out of the run (faded
---     away) and in hospital. The city's moves: as before.
+--     away) and in hospital.
 --   Every hook is one line here (marked "10.1"); the crew's own code is server/HelperCrew.luau's.
 
 local Players = game:GetService("Players")
@@ -495,7 +495,7 @@ type Helper = {
 }
 
 local ID_BASE = -2000000000 -- (no player's id is this low; Studio's test players are -1, -2 …)
-local FALL = 3 -- s he lies there before his body goes
+local FALL = 3 -- s a body that went (removed by something else) counts as fallen that long ago
 local INSIDE = 400 -- studs from a move's interior origin that count as inside it
 -- Npcs.walkTo's options: he walks on into the next order (8.3: no jump; 9.3 his legs by his real speed: Npcs' `legs`).
 -- (Roblox: Humanoid:MoveTo walks him straight at the point and stops there by itself; with the Jumping state off a
@@ -870,7 +870,7 @@ end
 local URGENT: { [string]: boolean } = { help = true, three = true, door = true, open = true, mine = true, queued = true, ride = true, revived = true }
 local function say(h: Helper, key: string, clock: number, force: boolean?): boolean
 	local body = h.body
-	local text = Crew.line(h, key) or Brain.line(key, Config.Sandbox.On) -- (8.0 SANDBOX: no Wall, no depot in his words; 10.1 his kind's own)
+	local text = Crew.line(h, key) or Brain.line(key, true) -- (the sandbox's words: no Wall, no depot; 10.1 his kind's own)
 	if not body or not text then
 		return false
 	end
@@ -2105,7 +2105,8 @@ local function removeBody(h: Helper)
 	end
 	clearPath(h)
 end
-
+-- Down: what he holds falls, he lies on his back (10.1: down in the run, the revive prompt on him:
+-- server/HelperCrew.luau).
 -- Down: what he holds falls, he lies on his back; his body goes FALL s later, he is back Respawn s later.
 local function fall(h: Helper, body: Body, clock: number)
 	Walking.crossOff(h, body) -- 9.3 (in sight where he falls)
@@ -2128,7 +2129,7 @@ local function fall(h: Helper, body: Body, clock: number)
 	local y = floorAt(h, root.Position - Vector3.new(0, 2, 0))
 	local at = Vector3.new(root.Position.X, y + 0.6, root.Position.Z)
 	Walking.pivot(h, body, CFrame.new(at) * CFrame.Angles(-math.pi / 2, 0, 0), "down")
-	tell(h, Crew.fallText(h) or `🧑‍🔧 {h.name} is down! Back at the van in {cfg.Respawn} s.`) -- (10.1 a run's: revive or out)
+	tell(h, Crew.fallText(h) or `🧑‍🔧 {h.name} is down!`) -- (10.1 a run's: revive or out)
 end
 
 -- 7.x farm move: the ways a piece may leave by (Moving's helperExits; nil: every way, one way only, or no piece).
@@ -3690,28 +3691,10 @@ local function stepHelper(h: Helper, dt: number, clock: number)
 		h.stayOut = false -- 8.6 GET OUT held while the owner stayed at the wheel: they left it (8.6 review: down too)
 	end
 	if h.dead then
-		local kept = Crew.downed(h, body, clock) -- 10.1 a run's: down (the revive prompt on him) or out; nil: as ever
-		if kept then
-			endCall(h, "down", clock)
-			setDoing(h, if kept == "out" then "out" else "revive", nil)
-			return
-		end
-		if body and clock - h.downAt >= FALL then
-			removeBody(h)
-		end
-		if clock - h.downAt >= cfg.Respawn then
-			if h.body then
-				removeBody(h)
-			end
-			if spawnBody(h, homeSpot(h)) then
-				say(h, "back", clock, true)
-				h.thinkAt, h.waited, h.dropping, h.fleeing = 0, 0, false, false
-			else
-				h.downAt = clock - cfg.Respawn + 2 -- (no body yet: tried again in a moment)
-			end
-		end
+		-- 10.1 down in the run (every move is one): the revive prompt on him, else out (no comeback at the van)
+		local kept = Crew.downed(h, body, clock)
 		endCall(h, "down", clock) -- 8.3 (no call waits for him while he is down)
-		setDoing(h, "down", nil)
+		setDoing(h, if kept == "out" then "out" elseif kept then "revive" else "down", nil)
 		return
 	end
 	if not body or not body.model.Parent or not body.humanoid.Parent then
@@ -3841,7 +3824,7 @@ local function dismiss(h: Helper, why: string?)
 		h.port.helperDrop(s, body.model, "put")
 	end
 	if why == "crew" then
-		tell(h, if Config.Sandbox.On then `🧑‍🔧 {h.name} heads home: your crew has it now.` else `🧑‍🔧 {h.name} heads back to the depot: your crew has it now.`)
+		tell(h, `🧑‍🔧 {h.name} heads home: your crew has it now.`)
 	end
 	local clock = os.clock()
 	endCall(h, if s.ended then nil else "gone", clock) -- 8.3
@@ -4483,7 +4466,7 @@ local function syncOne(s: any, port: Port)
 			count += 1
 		end
 	end
-	local want = Brain.wanted(count, Config.Sandbox.On or h ~= nil) -- (10.1 the sandbox: every crew; the city: Solo / Duo, then he stays as a hired one did)
+	local want = Brain.wanted(count, true) -- (10.1: with every party)
 	local kind = if want and not h then Crew.kindFor(s) else nil -- 10.1 the owner's pick of their crew (nil: nobody ready)
 	if kind and not h then
 		h = create(s, port, kind)

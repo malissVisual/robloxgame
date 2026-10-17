@@ -1,4 +1,4 @@
--- 8.0 SANDBOX, moves (design/sandbox/KONTRAKT.md): the real server/Moving.luau (MoveLobby, MoveGreeters, MoveHelper,
+-- 8.0 SANDBOX, moves (design/sandbox/KONTRAKT.md): the real server/Moving.luau (MoveLobby, MoveHelper,
 -- MoveSites with it) on tests/runtime/MovingRuntime.luau's fakes with Config.Sandbox.On (tests/run_tests.py builds
 -- them; the fake art's plan records its seeds and gives each piece a colour variant).
 --   * Moving.start in the sandbox: 9.7 no kiosk on the plots (the lobby's portals start the runs: server/Runs.luau), no
@@ -44,9 +44,7 @@ local E = require("./MovingRuntime")
 local Config = require("./Config")
 Config.Sandbox.On = true -- (before Moving.start: it reads the mode there)
 local Moving = require("./MovingServer")
-local Greeters = require("./MoveGreetersServer")
 local MoveHelper = require("./MoveHelperServer")
-local Lobby = require("./MoveLobbyServer")
 local SandboxMap = require("./SandboxMap")
 local SprinterLooks = require("./SprinterLooks")
 local Brain = require("./MoveHelperBrain")
@@ -90,7 +88,7 @@ local function lobbyRequest(player: any, ...: any)
 	E.Net.get("MoveLobby").OnServerEvent:Fire(player, ...)
 end
 local function heard(player: any, text: string, since: number?): boolean
-	for index = since or 1, #E.messages do
+	for index = math.max(since or 1, 1), #E.messages do
 		local m = E.messages[index]
 		if m.player == player and m.remote == "Notice" and string.find(tostring(m.kind), text, 1, true) ~= nil then
 			return true
@@ -251,7 +249,6 @@ local function howOf(entry: any): string
 	return Plan.moveHow(f.phase, f.why, f.left, f.home + f.lost >= f.total)
 end
 Moving.start()
-Greeters.step()
 
 -- The world ----------------------------------------------------------------------------------------------------------------
 
@@ -261,7 +258,6 @@ check("the sandbox: 9.7 no kiosk on the plots (the lobby's portals start the run
 	and moves:FindFirstChild("MovingDropOff") == nil and moves:FindFirstChild("MoveDressing") == nil)
 check("one contract a place: The Old Farmstead's among them (no Marge, no Walt)", moves:FindFirstChild("Move_sandbox_house") ~= nil and moves:FindFirstChild("Move_marge") == nil
 	and moves:FindFirstChild("Move_walt") == nil)
-check("no soldier at a Wall", Greeters.soldier() == nil)
 E.request(cid, "start", House.id)
 check("9.7: a START asked (no board anywhere): no planning, no move", E.last(cid, "MoveLobby", "lobby") == nil and E.built == 0)
 

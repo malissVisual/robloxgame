@@ -1,70 +1,57 @@
 --!strict
--- Crews (Config.Crew): invite another player into your job; members help, ride along or follow, and share the pay.
+-- Crews (Config.Crew): invite other players into your crew; on a run they are its party (server/Runs.luau wraps
+-- Crew.members and Crew.ownerOf: a run's party is its host's crew).
 --
--- One player leads a crew (the owner: the one whose job it is), up to Config.Crew.MaxMembers others join it by
--- invitation. The owner may invite with or without a job running. Since 3.0 a crew outlives the jobs: friends play
--- mission after mission (shared/Missions.luau) together. It stays until a member leaves (LEAVE), the owner takes a
--- member out (KICK) or breaks it up (LEAVE / DISBAND), or somebody leaves the game. A member who takes a job of their
--- own leaves the crew on their own. (Crew.disband is still there, but Jobs no longer calls it when a job ends.)
+-- One player leads a crew (the owner), up to Config.Crew.MaxMembers others join it by invitation. A crew outlives the
+-- runs: friends play run after run together. It stays until a member leaves (LEAVE), the owner takes a member out
+-- (KICK) or breaks it up (LEAVE / DISBAND), or somebody leaves the game. Crew.hasJob is a hook (server/Moving.luau's:
+-- the host of a run is busy): a busy player can't be invited, can't join, and a member who becomes busy on their own
+-- leaves the crew.
 --
--- The crew board (3.0): a player without a crew can say "looking for a crew" for one mission or for anything ("any").
--- Everybody gets the list (the crew panel shows it with INVITE); a player is off it when they join a crew (or get a
--- member), take it back, leave the game, or after LFG_TIMEOUT.
+-- The crew board (3.0): a player without a crew can say "looking for a crew" ("any"). Everybody gets the list (the
+-- crew panel shows it with INVITE); a player is off it when they join a crew (or get a member), take it back, leave
+-- the game, or after LFG_TIMEOUT.
 --
--- Everything is checked here on the server; the client (client/CrewPanel.luau) only asks. Jobs (server/Jobs.luau)
--- counts `Crew.members(owner)` as crew exactly like the riders in the owner's car: they may handle the cargo, their
--- kills count, they get XP and their share of the pay (Economy.crewSplit).
+-- Everything is checked here on the server; the client (client/CrewPanel.luau) only asks.
 --
 -- Remotes (shared/Net.luau):
 --   CrewInvite   client → server (userId)                  invite that player into my crew
---                server → client (fromUserId, jobName?)    an invitation came (the panel shows it, a toast says so)
+--                server → client (fromUserId)              an invitation came (the panel shows it, a toast says so)
 --   CrewAnswer   client → server (fromUserId, accepted)    answer an invitation
 --                client → server ("leave")                 leave the crew (the owner: break it up)
 --                client → server ("kick", userId)          the owner removes a member
 --                client → server ("cancel", userId)        the owner takes an invitation back
 --   CrewState    client → server ()                        send me my crew state (after loading; the board too)
---                server → client (state | nil)             my crew, the invitations and the owner's job (see stateFor)
---   CrewBoard    client → server (mission id | "any" | nil)  I am looking for a crew (for that mission), or not
+--                server → client (state | nil)             my crew and the invitations (see stateFor)
+--   CrewBoard    client → server ("any" | nil)             I am looking for a crew, or not
 --                server → client ({ entry })               who is looking (see boardList), to everybody on a change
--- The state goes to everybody involved on every change and every ~2 s while the owner has a job (so the members'
--- GPS follows the owner's next stop).
+-- The state goes to everybody involved on every change.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
-local Economy = require(Shared.Economy)
 local Levels = require(Shared.Levels)
 local Net = require(Shared.Net)
-local Missions = require(Shared.Missions)
 local PlayerData = require(script.Parent.PlayerData)
 
 local Crew = {}
 
--- Set by Main: does this player have a job running (server/Jobs.luau Jobs.active)?
+-- Wrapped by server/Moving.luau: is this player busy (the host of a run)?
 Crew.hasJob = function(_player: Player): boolean
 	return false
-end
-
--- Set by Main: what the members should see of the owner's job (server/Jobs.luau Jobs.crewStatus): a table with
--- name, step, position (Vector3), stars, endsAt, mission (3.0: { id, name, campaign, number, twists, coop,
--- defendLeft }) — or nil when the owner has no job.
-Crew.statusOf = function(_owner: Player): { [string]: any }?
-	return nil
 end
 
 type Invite = {
 	from: Player, -- the owner (or a player without a crew yet)
 	to: Player,
 	expiresAt: number, -- workspace:GetServerTimeNow(), so the clients count down to the same moment
-	job: string?, -- the owner's job when it was sent
 }
 
 local ACTION_GAP = 0.3 -- seconds between two requests of one player (a spam guard)
 local DECLINED_WAIT = 20 -- after a "no", the same invitation waits this long before it can come again
-local TICK = 0.5 -- the loop: invitations expire, members on their own job leave
-local STATUS_EVERY = 2 -- while the owner has a job, the crew gets the job status this often
+local TICK = 0.5 -- the loop: invitations expire, busy members leave
 local LFG_TIMEOUT = 15 * 60 -- seconds on the crew board before a player is taken off it
 
 local crews: { [Player]: { Player } } = {} -- owner → members in the order they joined (no entry = no members)
@@ -73,11 +60,10 @@ local invites: { Invite } = {} -- pending invitations (a few at most: a plain li
 local declined: { [Player]: { [Player]: number } } = {} -- invited → inviter → os.clock() of the "no"
 local lastAction: { [Player]: number } = {}
 local lastRefresh: { [Player]: number } = {}
-local hadJob: { [Player]: boolean } = {} -- owners: was a job running at the last tick (a change sends the state)
 local dirty: { [Player]: boolean } = {} -- needs a fresh state
 local sent: { [Player]: boolean } = {} -- the client holds a (non-nil) state
--- The crew board: who is looking for a crew, for which mission ("any" = anything), since when (server time), and
--- whether they were on a job of their own at the last tick (a change is broadcast).
+-- The crew board: who is looking for a crew ("any"), since when (server time), and whether they were busy at the
+-- last tick (a change is broadcast).
 type Looking = { mission: string, since: number, busy: boolean }
 local looking: { [Player]: Looking } = {}
 local boardDirty = false
@@ -175,70 +161,14 @@ local function tellCrew(owner: Player, text: string, skip: Player?)
 	end
 end
 
--- The mission part of the owner's job status (3.0, Jobs.crewStatus `mission`): the same checked copy, its twists a
--- plain list of strings. Nil when it is not a mission.
-local function missionCopy(value: any): { [string]: any }?
-	if type(value) ~= "table" or type(value.id) ~= "string" then
-		return nil
-	end
-	local copy: { [string]: any } = {}
-	for _, key in { "id", "name", "campaign" } do
-		if type(value[key]) == "string" then
-			copy[key] = value[key]
-		end
-	end
-	for _, key in { "number", "defendLeft", "gatePulled" } do -- 3.2: gatePulled, the DUO switches' lever count
-		if type(value[key]) == "number" then
-			copy[key] = value[key]
-		end
-	end
-	copy.coop = value.coop == true
-	copy.duo = value.duo == true -- 3.2
-	local twists = {}
-	if type(value.twists) == "table" then
-		for _, twist in value.twists do
-			if type(twist) == "string" then
-				table.insert(twists, twist)
-			end
-		end
-	end
-	copy.twists = twists
-	return copy
-end
-
--- What a member sees of the owner's job: a plain copy of the simple values of Crew.statusOf (strings, numbers,
--- booleans, Vector3), so a broken hook or an odd value never breaks the state.
-local function statusFor(owner: Player): { [string]: any }?
-	local ok, status = pcall(Crew.statusOf, owner)
-	if not ok then
-		warn(`[Crew] statusOf failed: {status}`)
-		return nil
-	end
-	if type(status) ~= "table" then
-		return nil
-	end
-	local copy: { [string]: any } = {}
-	for key, value in status :: { [any]: any } do
-		local kind = typeof(value)
-		if type(key) == "string" and (kind == "string" or kind == "number" or kind == "boolean" or kind == "Vector3") then
-			copy[key] = value
-		end
-	end
-	local mission = missionCopy((status :: { [any]: any }).mission)
-	if mission then
-		copy.mission = mission
-	end
-	return copy
-end
-
 local function entry(player: Player): { [string]: any }
 	local level = PlayerData.level(player)
 	return { userId = player.UserId, name = nameOf(player), level = level, rank = Levels.rank(level) }
 end
 
 -- The crew board for the clients, the newest first:
---   { userId, name, level, rank, mission ("any" or a mission id), missionName?, campaign?, number?, coop,
---     since (workspace:GetServerTimeNow() when they went on it), busy (on a job of their own right now) }
+--   { userId, name, level, rank, mission ("any"), coop (false), since (workspace:GetServerTimeNow() when they went
+--     on it), busy (the host of a run right now) }
 local function boardList(): { { [string]: any } }
 	local list = {}
 	for who, info in looking do
@@ -246,12 +176,8 @@ local function boardList(): { { [string]: any } }
 			continue
 		end
 		local item = entry(who)
-		local def = if info.mission ~= "any" then Missions.find(info.mission) else nil
 		item.mission = info.mission
-		item.missionName = if def then def.name else nil
-		item.campaign = if def then def.campaign else nil
-		item.number = if def then def.number else nil
-		item.coop = def ~= nil and def.coop == true
+		item.coop = false
 		item.since = info.since
 		item.busy = info.busy
 		table.insert(list, item)
@@ -262,7 +188,7 @@ local function boardList(): { { [string]: any } }
 	return list
 end
 
--- Puts a player on the crew board (mission id or "any") or takes them off (nil). True when it changed; the board
+-- Puts a player on the crew board ("any") or takes them off (nil). True when it changed; the board
 -- goes out with the next flush.
 local function setLooking(player: Player, mission: string?): boolean
 	local current = looking[player]
@@ -286,13 +212,8 @@ end
 --   role       "owner" | "member" | nil (no crew yet)
 --   owner      { userId, name, level, rank } (the crew's leader; also set for an owner without members yet)
 --   members    { { userId, name, level, rank } }
---   split      { owner, member, members, riders } % of the job's pay for the owner and for each member with
---              `members` paid besides the owner (at least 1: the preview before anybody joined; riders = those of them
---              who only rode along, Jobs' crewCount; Economy.crewSplit, nobody loses money, the shares come on top),
---              ownerPay / memberPay in $ of the base pay when the job's status tells it (`pay`, before the bonuses)
---   status     the owner's job (Crew.statusOf: name, step, position, stars, endsAt, mission …) or nil
 --   lfg        the crew board (boardList; the CrewBoard remote sends the same to everybody on every change)
---   invites    incoming: { { userId, name, job?, expiresAt } }
+--   invites    incoming: { { userId, name, expiresAt } }
 --   pending    outgoing: { { userId, name, expiresAt } }
 --   maxMembers, inviteTimeout
 local function stateFor(player: Player): { [string]: any }?
@@ -300,7 +221,7 @@ local function stateFor(player: Player): { [string]: any }?
 	local pending = {}
 	for _, invite in invites do
 		if invite.to == player then
-			table.insert(incoming, { userId = invite.from.UserId, name = nameOf(invite.from), job = invite.job, expiresAt = invite.expiresAt })
+			table.insert(incoming, { userId = invite.from.UserId, name = nameOf(invite.from), expiresAt = invite.expiresAt })
 		elseif invite.from == player then
 			table.insert(pending, { userId = invite.to.UserId, name = nameOf(invite.to), expiresAt = invite.expiresAt })
 		end
@@ -309,28 +230,15 @@ local function stateFor(player: Player): { [string]: any }?
 	if not owner and #incoming == 0 and #pending == 0 then
 		return nil
 	end
-	-- An owner without members yet (invitations out) still sees their job and the split they would get.
-	local lead = owner or player
+	local lead = owner or player -- (an owner without members yet: invitations out)
 	local members = {}
 	for _, member in membersOf(lead) do
 		table.insert(members, entry(member))
-	end
-	local status = statusFor(lead)
-	-- Jobs pays everybody who rode in the owner's car too (status.crewCount), not only the invited members.
-	local count = math.max(#members, if status and type(status.crewCount) == "number" then status.crewCount else 0, 1)
-	local ownerShare, memberShare = Economy.crewSplit(100, count)
-	local split: { [string]: any } = { owner = ownerShare, member = memberShare, members = count, riders = math.max(count - #members, 0) }
-	if status and type(status.pay) == "number" then
-		local ownerPay, memberPay = Economy.crewSplit(status.pay, count)
-		split.ownerPay = ownerPay
-		split.memberPay = memberPay
 	end
 	return {
 		role = if owner == nil then nil elseif owner == player then "owner" else "member",
 		owner = entry(lead),
 		members = members,
-		split = split,
-		status = status,
 		lfg = boardList(),
 		invites = incoming,
 		pending = pending,
@@ -390,11 +298,8 @@ local function join(owner: Player, member: Player)
 	dropInvites(function(invite: Invite): boolean
 		return invite.to == member or invite.from == member or invite.to == owner
 	end)
-	local status = statusFor(owner)
 	tellCrew(owner, `{nameOf(member)} joined the crew.`, member)
-	say(member, if status and type(status.name) == "string"
-		then `You joined {nameOf(owner)}'s crew: {status.name}. Follow the GPS route to their stop.`
-		else `You joined {nameOf(owner)}'s crew. You help with their next job and share the pay.`)
+	say(member, `You joined {nameOf(owner)}'s crew: you are in their party on their next run.`)
 	markCrew(owner)
 end
 
@@ -465,7 +370,7 @@ local function invite(from: Player, userId: any)
 		return
 	end
 	if hasJob(target) then
-		say(from, `{nameOf(target)} is on a job of their own.`)
+		say(from, `{nameOf(target)} is on a run of their own.`)
 		return
 	end
 	if findInvite(from, target) then
@@ -486,16 +391,13 @@ local function invite(from: Player, userId: any)
 		say(from, `{nameOf(target)} just said no. Try again in a moment.`)
 		return
 	end
-	local status = statusFor(from)
-	local jobName = if status and type(status.name) == "string" then status.name else nil
 	table.insert(invites, {
 		from = from,
 		to = target,
 		expiresAt = workspace:GetServerTimeNow() + Config.Crew.InviteTimeout,
-		job = jobName,
 	})
-	inviteRemote:FireClient(target, from.UserId, jobName)
-	say(target, `{nameOf(from)} invites you into their crew{if jobName then `: {jobName}` else ""}. Open CREW (K) to answer.`)
+	inviteRemote:FireClient(target, from.UserId, nil)
+	say(target, `{nameOf(from)} invites you into their crew. Open CREW (K) to answer.`)
 	say(from, `Invitation sent to {nameOf(target)}.`)
 	mark(from)
 	mark(target)
@@ -528,7 +430,7 @@ local function respond(player: Player, fromId: number, accepted: boolean)
 		flush()
 		return
 	end
-	-- Your own crew or your own job: the invitation waits (until it runs out) while you sort that out.
+	-- Your own crew or your own run: the invitation waits (until it runs out) while you sort that out.
 	local mine = leaderOf(player)
 	if mine == player then
 		say(player, "You lead a crew of your own: break it up first (LEAVE).")
@@ -537,7 +439,7 @@ local function respond(player: Player, fromId: number, accepted: boolean)
 		say(player, `You are in {nameOf(mine)}'s crew: leave it first.`)
 		return
 	elseif hasJob(player) then
-		say(player, "Finish or cancel your own job first.")
+		say(player, "Finish your own run first.")
 		return
 	end
 	table.remove(invites, index)
@@ -580,7 +482,7 @@ local function kick(owner: Player, userId: any)
 	flush()
 end
 
--- The crew board: "any", a mission id, or nil / false (off it). Only for a player without a crew.
+-- The crew board: "any", or nil / false (off it). Only for a player without a crew.
 local function lookFor(player: Player, mission: any)
 	if not allowed(player, lastBoard) then
 		return
@@ -592,27 +494,20 @@ local function lookFor(player: Player, mission: any)
 		flush()
 		return
 	end
-	if type(mission) ~= "string" then
-		return
-	end
-	local def = if mission ~= "any" then Missions.find(mission) else nil
-	if mission ~= "any" and not def then
+	if mission ~= "any" then
 		return
 	end
 	local myLeader = leaders[player]
 	if myLeader then
-		say(player, `You are in {nameOf(myLeader)}'s crew already: your leader picks the mission.`)
+		say(player, `You are in {nameOf(myLeader)}'s crew already: your leader picks the run.`)
 		return
 	end
 	if crews[player] then
 		say(player, "You lead a crew already: invite more players from the CREW panel (K).")
 		return
 	end
-	local changed = setLooking(player, mission)
-	if changed then
-		say(player, if def
-			then `You are on the crew board for "{def.name}". Wait for an invitation, or invite someone yourself.`
-			else "You are on the crew board. Wait for an invitation, or invite someone yourself.")
+	if setLooking(player, mission) then
+		say(player, "You are on the crew board. Wait for an invitation, or invite someone yourself.")
 	end
 	flush()
 end
@@ -648,8 +543,6 @@ end
 
 -- ── The loop ───────────────────────────────────────────────────────────────
 
-local sinceStatus = 0
-
 local function step()
 	-- Invitations nobody answered.
 	local now = workspace:GetServerTimeNow()
@@ -662,7 +555,7 @@ local function step()
 			mark(pending.to)
 		end
 	end
-	-- The crew board: gone players, the ones on it too long, and who is on a job of their own now.
+	-- The crew board: gone players, the ones on it too long, and who is busy now.
 	for who, info in looking do
 		if not who.Parent then
 			looking[who] = nil
@@ -670,7 +563,7 @@ local function step()
 		elseif now - info.since >= LFG_TIMEOUT then
 			looking[who] = nil
 			boardDirty = true
-			say(who, "You are off the crew board (it has been a while). FIND CREW in MISSIONS (U) or the CREW panel puts you back.")
+			say(who, "You are off the crew board (it has been a while). The CREW panel puts you back.")
 		else
 			local busy = hasJob(who)
 			if busy ~= info.busy then
@@ -679,35 +572,12 @@ local function step()
 			end
 		end
 	end
-	-- A member who took a job of their own works on that one now.
+	-- A member who started a run of their own is on that one now.
 	for member, owner in leaders do
 		if hasJob(member) then
 			removeMember(member)
-			say(member, `You took a job of your own and left {nameOf(owner)}'s crew.`)
-			tellCrew(owner, `{nameOf(member)} took a job of their own and left the crew.`)
-		end
-	end
-	-- The owner's job started or ended: the crew sees it at once; while it runs, every STATUS_EVERY seconds.
-	sinceStatus += TICK
-	local periodic = sinceStatus >= STATUS_EVERY
-	if periodic then
-		sinceStatus = 0
-	end
-	for owner in crews do
-		local running = hasJob(owner)
-		if running ~= (hadJob[owner] == true) or (running and periodic) then
-			markCrew(owner)
-		end
-		if running then
-			hadJob[owner] = true
-		else
-			hadJob[owner] = nil
-		end
-	end
-	-- An owner without members but with invitations out: their job shows in the invitations they sent.
-	for owner in hadJob do
-		if not crews[owner] then
-			hadJob[owner] = nil
+			say(member, `You started a run of your own and left {nameOf(owner)}'s crew.`)
+			tellCrew(owner, `{nameOf(member)} started a run of their own and left the crew.`)
 		end
 	end
 	flush()
@@ -715,7 +585,7 @@ end
 
 -- ── API ────────────────────────────────────────────────────────────────────
 
--- The players who joined `owner`'s job by invitation (not the owner). A copy: safe to keep while the crew changes.
+-- The players who joined `owner`'s crew by invitation (not the owner). A copy: safe to keep while the crew changes.
 function Crew.members(owner: Player): { Player }
 	local list = {}
 	for _, member in membersOf(owner) do
@@ -726,27 +596,26 @@ function Crew.members(owner: Player): { Player }
 	return list
 end
 
--- Whose job does this player work on (nil = nobody's / their own)?
+-- Whose crew is this player in (nil = nobody's / their own)?
 function Crew.ownerOf(player: Player): Player?
 	return leaders[player]
 end
 
--- Breaks the crew of `owner` up (since 3.0 nothing calls it when a job ends: crews persist; it stays for tools and
--- tests). Safe for a player without a crew.
+-- Breaks the crew of `owner` up (nothing calls it when a run ends: crews persist; it stays for tools). Safe for a
+-- player without a crew.
 function Crew.disband(owner: Player)
 	if crews[owner] then
 		breakUp(owner, `{nameOf(owner)}'s crew broke up.`)
 	else
-		-- No members: the invitations that came with the job are void too.
+		-- No members: the invitations out are void too.
 		dropInvites(function(invite: Invite): boolean
 			return invite.from == owner
 		end)
 	end
-	hadJob[owner] = nil
 	flush()
 end
 
--- Puts a player on the crew board (a mission id or "any") or takes them off (nil), like the CrewBoard remote but
+-- Puts a player on the crew board ("any") or takes them off (nil), like the CrewBoard remote but
 -- without the checks and the notices (server tools). Ignored for a player in a crew.
 function Crew.setLooking(player: Player, mission: string?)
 	if mission ~= nil and (leaders[player] or crews[player]) then
@@ -756,7 +625,7 @@ function Crew.setLooking(player: Player, mission: string?)
 	flush()
 end
 
--- What the player is looking for on the crew board ("any" or a mission id), or nil.
+-- What the player is looking for on the crew board ("any"), or nil.
 function Crew.lookingFor(player: Player): string?
 	local info = looking[player]
 	return if info then info.mission else nil
@@ -798,7 +667,6 @@ function Crew.start()
 			looking[player] = nil
 			boardDirty = true
 		end
-		hadJob[player] = nil
 		dirty[player] = nil
 		sent[player] = nil
 		flush()

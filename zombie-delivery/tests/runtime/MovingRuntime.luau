@@ -48,7 +48,6 @@ local Runtime: any = {
 	zombies = {}, -- every zombie spawned
 	marched = 0,
 	tags = {},
-	holstered = 0,
 	floor = 0, -- the floor's height the rays find (the interiors' own: Runtime.interiorFloor near them)
 	-- 7.0 planning
 	seated = {}, -- player → the car they drive (Vehicles.seatedIn)
@@ -559,31 +558,22 @@ Runtime.PlayerData = stub("PlayerData", {
 	track = function(name: string, ...: any)
 		table.insert(Runtime.tracked, { name = name, args = { ... } })
 	end,
-	-- 7.x farm move: a player's profile (its story flags: Runtime.story[player], its car) and a flag kept in it
-	-- (7.2 review: a test's own Runtime.profiles[player] when it set one: its car, bike and lastCar kept)
+	-- a player's profile: a test's own Runtime.profiles[player] when it set one (its card's house and seed kept), else
+	-- a fresh one with the van
 	get = function(player: any): any
-		Runtime.story[player] = Runtime.story[player] or {}
 		local own = Runtime.profiles[player]
 		if own then
-			own.story = Runtime.story[player]
 			own.money = moneyOf(player)
 			return own
 		end
-		return { story = Runtime.story[player], car = Runtime.carId, money = moneyOf(player) }
+		return { car = Runtime.carId, money = moneyOf(player) }
 	end,
 	-- 8.4: was the player's save read? A test's own Runtime.profiles[player] stands for one (its sandboxHouseSeed the
 	-- save's, kept there as Moving sets it); without one: a fresh profile, never saved (Moving's own memory counts)
 	loaded = function(player: any): boolean
 		return Runtime.profiles[player] ~= nil
 	end,
-	notify = noop, -- (7.2 review: the profile's car changed)
-	markStory = function(player: any, key: string): boolean
-		Runtime.story[player] = Runtime.story[player] or {}
-		local new = Runtime.story[player][key] ~= true
-		Runtime.story[player][key] = true
-		table.insert(Runtime.marked, { player = player, key = key })
-		return new
-	end,
+	notify = noop,
 })
 
 -- The truck: a chassis at `at`, its back door attachment 9 studs behind it, a BackPrompt. (7.2 review: a bike,
@@ -656,8 +646,6 @@ Runtime.makeCar = makeCar -- (8.0 SANDBOX: the test's own Moving.parkVan parks o
 Runtime.truckAt = Mock.Vector3.new(0, 2, 0) -- where placeNear puts the truck (the test sets it)
 -- a move goes with its owner's own van (10.5: the Sprinter, Config.Sandbox.Van, its walk-in bay Config.Moving.Beds.sprinter)
 Runtime.carId = Config.Sandbox.Van
-Runtime.story = {} -- 7.x farm move: player → their story flags (PlayerData.get(player).story)
-Runtime.marked = {} -- { { player, key } } every PlayerData.markStory
 Runtime.profiles = {} -- 7.2 review: player → a profile of the test's own (PlayerData.get returns it)
 
 Runtime.Vehicles = stub("Vehicles", {
@@ -865,7 +853,7 @@ Runtime.Zombies = stub("Zombies", {
 })
 
 -- 7.0, the depot's helper's body (server/Npcs.luau): a model with a root and a humanoid where it is put; what he says.
--- 7.0 greeters (server/MoveGreeters.luau): who said what (and seen from how far), the gestures, the glances.
+-- Who said what (and seen from how far), the gestures, the glances.
 Runtime.said = {} -- { text } every Npcs.say
 Runtime.saidBy = {} -- { { npc, text, range } } every Npcs.say
 Runtime.acts = {} -- { { npc, kind } } every Npcs.act
@@ -971,15 +959,6 @@ function Runtime.saidSince(text: string, from: number?): boolean
 	return false
 end
 
-Runtime.Jobs = stub("Jobs", {
-	active = function(player: any): boolean
-		return Runtime.jobOf == player
-	end,
-	returnLent = function()
-		return true
-	end,
-})
-Runtime.BanditCars = stub("BanditCars", { onCarDamaged = noop })
 -- 8.0 SANDBOX: the plots (server/SandboxPlots.luau) and the collection (server/Collection.luau)
 Runtime.plots = {} -- player → their SandboxMap plot
 Runtime.collected = {} -- { { player, entry, uid } } every Collection.add
@@ -1008,12 +987,6 @@ Runtime.Collection = stub("Collection", {
 		return uid
 	end,
 })
-Runtime.Hand = stub("Hand", {
-	holster = function()
-		Runtime.holstered += 1
-	end,
-})
-
 local services: { [string]: any } = {
 	Players = Players,
 	ReplicatedStorage = { WaitForChild = function()

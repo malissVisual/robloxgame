@@ -141,8 +141,6 @@ with tempfile.TemporaryDirectory() as tmp:
             'local Instance, Vector3, Color3, CFrame, Enum = M.Instance, M.Vector3, M.Color3, M.CFrame, M.Enum\n'
             'local RaycastParams, OverlapParams, UDim2, UDim, typeof = M.RaycastParams, M.OverlapParams, M.UDim2, M.UDim, M.typeof\n'
             'local warn = function(...) print("WARN", ...) end\n')
-    # 7.0 greeters: the real server/MoveGreeters.luau as MoveGreetersServer.luau the same way (the client on the porch, the
-    # soldier at the Wall, Marge at the kiosk; Moving requires it; tests/movegreeters_runtime_test.luau drives it).
     # 8.1 carrying in two: the real server/PairHold.luau as PairHoldServer.luau the same way (Danny's hold and a crew
     # mate's at a piece's far end; MoveHelper and Moving require it).
     # 9.x loot: the real server/Loot.luau as LootServer.luau the same way (Moving tags every piece with it: its rarity,
@@ -151,8 +149,8 @@ with tempfile.TemporaryDirectory() as tmp:
     # zombies; Moving's run start listener; tests/danger_runtime_test.luau). 10.1 the crew: the real server/HelperCrew.luau
     # as HelperCrewServer.luau the same way (MoveHelper requires it: each kind's hooks, down in a run, the rescue;
     # tests/crew_runtime_test.luau).
-    built_as = {"MoveHelper": "MoveHelperServer", "MoveLobby": "MoveLobbyServer", "MoveGreeters": "MoveGreetersServer", "PairHold": "PairHoldServer", "Loot": "LootServer", "RunDanger": "RunDangerServer", "HelperCrew": "HelperCrewServer"}
-    for module, built in (("Moving", "MovingServer"), ("MoveHelper", "MoveHelperServer"), ("MoveLobby", "MoveLobbyServer"), ("MoveGreeters", "MoveGreetersServer"), ("PairHold", "PairHoldServer"), ("Loot", "LootServer"), ("RunDanger", "RunDangerServer"), ("HelperCrew", "HelperCrewServer")):
+    built_as = {"MoveHelper": "MoveHelperServer", "MoveLobby": "MoveLobbyServer", "PairHold": "PairHoldServer", "Loot": "LootServer", "RunDanger": "RunDangerServer", "HelperCrew": "HelperCrewServer"}
+    for module, built in (("Moving", "MovingServer"), ("MoveHelper", "MoveHelperServer"), ("MoveLobby", "MoveLobbyServer"), ("PairHold", "PairHoldServer"), ("Loot", "LootServer"), ("RunDanger", "RunDangerServer"), ("HelperCrew", "HelperCrewServer")):
         source = open(os.path.join(os.path.dirname(SHARED), "server", module + ".luau"), encoding="utf-8").read()
         source = re.sub(r"require\(Shared\.(\w+)\)", lambda m: "E.Net" if m[1] == "Net" else f'require("./{m[1]}")', source)
         source = source.replace("require(script.Parent.MoveSites)", 'require("./MoveSitesServer")')  # 7.0: the real one (below)

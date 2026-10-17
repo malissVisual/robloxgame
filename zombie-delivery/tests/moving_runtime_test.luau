@@ -580,7 +580,7 @@ T.Sandbox.Roam = 0
 
 -- The truck lost; the clock; the admin's other commands --------------------------------------------------------------------
 
-check("no move: the admin says so", string.find(Moving.admin(ann, "horde"), "not running", 1, true) ~= nil)
+check("no run: the admin says so", string.find(Moving.admin(ann, "horde"), "not on a run", 1, true) ~= nil)
 -- a thing carried out of the house into `owner`'s run's van (its back opened; Ann's without one)
 local function loadOne(player: any, spot: number, owner: any?)
 	local van = E.cars[owner or ann]

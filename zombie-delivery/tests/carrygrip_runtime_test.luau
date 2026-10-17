@@ -177,7 +177,6 @@ putDown(ann)
 
 -- The lift check: feeling for the grip ------------------------------------------------------------------------------
 
-local holsters = E.holstered
 local since = #E.messages
 pick(ann, 1) -- the lamp: one hand, fragile, weight 1
 local lift = lastGrip(ann, "open")
@@ -185,7 +184,6 @@ check("the fragile lamp's Pick up: a lift check, not a carry", lift ~= nil and l
 	and thingOf(1).state ~= "carried", lift and lift.what)
 check("…its numbers: an easy zone (a third of the sweep or so), a slow needle, 3 s", lift.zone >= 0.27 and lift.zone <= 0.4 and lift.speed <= 0.76 and lift.window >= G.Lift.Window
 	and lift.zone0 >= G.Zone.Start - 1e-9 and lift.name == "Lamp" and lift.icon == "💡", `{lift.zone} {lift.speed} {lift.window}`)
-check("…the gun away (both hands on it)", E.holstered > holsters)
 pick(ann, 1)
 check("E again during the check: no second check", countGrip(ann, "open", since) == 1)
 local lamp0 = thingOf(1).condition

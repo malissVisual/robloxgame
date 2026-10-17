@@ -1,6 +1,6 @@
 -- 8.9 six houses, 9.4 the countryside (the blocks marked "six houses" in server/Moving.luau), 9.7 runs: the six places to
 -- empty of shared/SandboxMap.luau (Houses: The Old Farmstead and the countryside's five spots) with the real
--- server/Moving.luau (MoveLobby, MoveGreeters, MoveHelper and MoveSites with it) on tests/runtime/MovingRuntime.luau's
+-- server/Moving.luau (MoveLobby, MoveHelper and MoveSites with it) on tests/runtime/MovingRuntime.luau's
 -- fakes, Config.Sandbox.On (tests/run_tests.py builds them; the fake art's plans record their seeds and kinds):
 --   * a site per house (Move_<id>): a doormat at its front door, its "Enter house" on that house's own map door (the
 --     SandboxDoor part in the model whose SandboxHouse is its id: server/SandboxWorld.luau's stand-ins; the farmstead's

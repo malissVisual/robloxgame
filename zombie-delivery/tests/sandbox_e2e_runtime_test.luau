@@ -1,7 +1,7 @@
 -- 8.2 e2e: the whole SANDBOX loop with the REAL modules together, for two players at once (and three more at the end).
 -- tests/run_tests.py stages the real server modules SandboxE2E lists in E.real (SandboxBoot, SandboxWorld, HouseMesh,
 -- PlayerData, SandboxPlots, Collection, CollectionBook, Warehouse with WarehouseMesh, Upgrades, SandboxTasks, SandboxLeaders,
--- Analytics, SandboxAnalytics, Moving with MoveLobby, MoveHelper, MoveGreeters, PairHold and MoveSites, HouseInterior,
+-- Analytics, SandboxAnalytics, Moving with MoveLobby, MoveHelper, PairHold and MoveSites, HouseInterior,
 -- FurnitureMesh; 9.7 LobbyWorld and Runs) and
 -- shared/Net.luau on tests/runtime/SandboxE2E.luau's Roblox stand-in: only Roblox (its services, AnalyticsService
 -- recorded) and the physics-heavy modules (Vehicles, Zombies, Npcs, Crew, Hand) are mocked; see its header. The clock is
