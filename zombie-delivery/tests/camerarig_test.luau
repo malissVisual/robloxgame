@@ -103,6 +103,7 @@ local function world(sandbox: boolean, touch: boolean?): World
 		InputEnded = E.signal(),
 		InputChanged = E.signal(),
 		WindowFocusReleased = E.signal(),
+		PointerAction = E.signal(), -- 9.0.1 a trackpad's swipe and pinch
 		focused = nil,
 	}
 	function uis.GetFocusedTextBox(self: any): any
@@ -357,6 +358,46 @@ do
 	frame(w)
 	check("… nor does the city's MOUSE button (client/Hud.luau hides it here): still free", free(w))
 	w.rig.toggleFreeMouse()
+
+	-- 9.0.1 (the owner: "on the Mac you can't turn with the touchpad at all"): a trackpad's two-finger swipe turns the
+	-- camera (PointerAction's pan), a pinch zooms; , / . and the arrows on foot turn it; never under a list or a window
+	do
+		frame(w, 30)
+		local was = yawOf(w)
+		w.uis.PointerAction:Fire(0, Vector2.new(10, 0), 0, false)
+		frame(w)
+		check("9.0.1 a trackpad's two-finger swipe turns the free camera (Config.CameraTurn.Pan a unit), the mouse free", free(w)
+			and math.abs(turned(was, yawOf(w)) - 10 * Config.CameraTurn.Pan) < 1e-3, `{turned(was, yawOf(w))}`)
+		was = yawOf(w)
+		w.uis.PointerAction:Fire(0, Vector2.new(10, 0), 0, true)
+		frame(w)
+		check("… not when a list under the cursor takes it (processed)", turned(was, yawOf(w)) < 1e-6)
+		frame(w, 30)
+		local away = distance(w)
+		w.uis.PointerAction:Fire(0, Vector2.new(0, 0), 0.5, false)
+		frame(w, 30)
+		check("… a pinch zooms the camera in", distance(w) < away - 0.5, `{away} → {distance(w)}`)
+		w.uis.PointerAction:Fire(0, Vector2.new(0, 0), -0.5, false)
+		frame(w, 30)
+		was = yawOf(w)
+		press(w, "Keyboard", "Period")
+		frame(w, 30)
+		release(w, "Keyboard", "Period")
+		local turnedBy = turned(was, yawOf(w))
+		check("… . held turns it at Config.CameraTurn.Keys (half a second: about 60°)", math.abs(turnedBy - Config.CameraTurn.Keys * 30 * w.dt) < 0.05, `{turnedBy}`)
+		was = yawOf(w)
+		press(w, "Keyboard", "Left")
+		frame(w, 30)
+		release(w, "Keyboard", "Left")
+		check("… the arrow Left on foot turns it too", turned(was, yawOf(w)) > 0.5)
+		w.uis.focused = {}
+		was = yawOf(w)
+		press(w, "Keyboard", "Comma")
+		frame(w, 30)
+		release(w, "Keyboard", "Comma")
+		w.uis.focused = nil
+		check("… but never while typing in a text box", turned(was, yawOf(w)) < 1e-6)
+	end
 
 	-- the wheel zooms, but not under a window or over a list
 	frame(w, 30)

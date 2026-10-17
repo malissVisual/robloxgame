@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "9.0"
+Config.Version = "9.0.1"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -8803,6 +8803,20 @@ Config.DrivePedals = {
 	Rolling = 1.5,
 	Check = 0.1,
 	Place = 0.5,
+}
+
+-- 9.0.1 (the owner: "on the Mac you can't turn with the touchpad at all"): client/CameraRig.luau's free camera turned
+-- by a trackpad and the keys, as Roblox's own camera does.
+--   Pan       radians a unit of a two-finger swipe (UserInputService.PointerAction's pan) turns it (the mouse's
+--             0.0032 a pixel; Roblox's own camera turns 14 × more a pan unit than a mouse pixel)
+--   PanPitch  × Pan up and down (Roblox's 0.77)
+--   Pinch     × a pinch's scale on the zoom (0.5 … 2; a wheel's notch is 0.1)
+--   Keys      radians a second , / . (and the arrows on foot) turn it (Roblox's 120°)
+Config.CameraTurn = {
+	Pan = 0.045,
+	PanPitch = 0.77,
+	Pinch = 1,
+	Keys = math.rad(120),
 }
 
 return Config

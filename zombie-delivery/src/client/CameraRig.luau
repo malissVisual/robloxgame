@@ -40,6 +40,11 @@
 -- left click is the world's (Danny, a piece, the grip check), never a shot. Armed: the locked mouse and the crosshair
 -- as in the city. Alt and the MOUSE [ALT] button do nothing there (client/Hud.luau hides it). The city (aimOnly false)
 -- is unchanged; a touch screen and a gamepad alone keep the Roblox camera as before.
+-- 9.0.1 (the owner: "on the Mac you can't turn with the touchpad at all"): the free camera turned only with the right
+-- mouse held, which a trackpad hardly gives. Now, as Roblox's own camera does, a two-finger swipe on a trackpad turns it
+-- (UserInputService.PointerAction's pan, Config.CameraTurn.Pan) and a pinch zooms (its pinch); the arrow keys Left /
+-- Right on foot (in a car they steer: client/Drive.luau) and , / . anywhere turn it at Config.CameraTurn.Keys. A window
+-- that needs the mouse keeps its own scroll, and typing in a text box turns nothing.
 
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
@@ -119,6 +124,14 @@ local RAISE_TIME = 0.25
 local armPitch = 0 -- how far up (+) or down the gun arm points: from the shoulder to what is under the crosshair
 local smoothFocus: Vector3? = nil -- the camera's focus follows smoothly (no shaking with every bump of the car)
 local SENSITIVITY = 0.0032
+-- 9.0.1 the keys that turn the camera, held (1) or not (0): , / . anywhere, the arrows on foot
+local turnKeys = { left = 0, right = 0, arrowLeft = 0, arrowRight = 0 }
+local TURN_KEYS: { [Enum.KeyCode]: string } = {
+	[Enum.KeyCode.Comma] = "left",
+	[Enum.KeyCode.Period] = "right",
+	[Enum.KeyCode.Left] = "arrowLeft",
+	[Enum.KeyCode.Right] = "arrowRight",
+}
 -- 3.10: 0 = the walk's view, 1 = the car's; the car it eases toward or away from.
 local CAR_BLEND = 0.45
 local carBlend = 0
@@ -531,6 +544,14 @@ local function update(dt: number)
 
 	-- Driving and not touching the mouse for a moment: the camera swings back behind the car. (6.14.1: on two wheels
 	-- sooner, quicker, the same at any frame rate and a little into the turn: Feel.TwoWheels)
+	-- 9.0.1 the keys that turn it (the arrows only on foot: in a car they steer)
+	do
+		local spin = (turnKeys.right - turnKeys.left) + (if car == nil then turnKeys.arrowRight - turnKeys.arrowLeft else 0)
+		if spin ~= 0 then
+			yaw -= math.clamp(spin, -1, 1) * Config.CameraTurn.Keys * dt
+			lastMouse = now
+		end
+	end
 	local twoWheels = car ~= nil and car:GetAttribute("Bike") == true
 	if car and driving and car.PrimaryPart and now - lastMouse > (if twoWheels then Feel.TwoWheels.FollowAfter else 1.2) and not carAim then
 		local chassis = car.PrimaryPart
@@ -784,7 +805,28 @@ function CameraRig.start()
 			zoom = math.clamp(zoom - input.Position.Z * 0.1, 0.5, 2)
 		end
 	end)
+	-- 9.0.1 a trackpad (the Mac's): a two-finger swipe turns the camera, a pinch zooms (Roblox's own camera's way; its
+	-- wheel is the MouseWheel's above). A window under the cursor keeps its scroll.
+	UserInputService.PointerAction:Connect(function(_wheel: number, pan: Vector2, pinch: number, processed: boolean)
+		if not enabled or processed or CameraRig.mouseNeeded() then
+			return
+		end
+		local turn = Config.CameraTurn
+		if pan.X ~= 0 or pan.Y ~= 0 then
+			yaw -= pan.X * turn.Pan
+			pitch = math.clamp(pitch - pan.Y * turn.Pan * turn.PanPitch, -1.2, 0.9)
+			lastMouse = os.clock()
+		end
+		if pinch ~= 0 then
+			zoom = math.clamp(zoom - pinch * turn.Pinch, 0.5, 2)
+		end
+	end)
 	UserInputService.InputBegan:Connect(function(input, processed)
+		local turnKey = TURN_KEYS[input.KeyCode]
+		if turnKey and UserInputService:GetFocusedTextBox() == nil then
+			turnKeys[turnKey] = 1 -- 9.0.1 (never while typing; the camera's own key bindings may mark them processed)
+			return
+		end
 		if input.KeyCode == Enum.KeyCode.LeftAlt or input.KeyCode == Enum.KeyCode.RightAlt then
 			altHeld = true
 		elseif input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.RightShift then
@@ -815,6 +857,11 @@ function CameraRig.start()
 		end
 	end)
 	UserInputService.InputEnded:Connect(function(input)
+		local turnKey = TURN_KEYS[input.KeyCode]
+		if turnKey then
+			turnKeys[turnKey] = 0
+			return
+		end
 		if input.KeyCode == Enum.KeyCode.LeftAlt or input.KeyCode == Enum.KeyCode.RightAlt then
 			altHeld = false
 		elseif input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.RightShift then
@@ -828,6 +875,9 @@ function CameraRig.start()
 	end)
 	-- Leaving the window (Alt+Tab, a screenshot) can swallow the key-up events: nothing stays held.
 	UserInputService.WindowFocusReleased:Connect(function()
+		for key in turnKeys do
+			turnKeys[key] = 0
+		end
 		altHeld = false
 		shiftHeld = false
 		padSprint = false
