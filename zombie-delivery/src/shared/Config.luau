@@ -5712,6 +5712,7 @@ Config.Robust = {
 		Visitors = 2, -- 8.3: the Visitors remote's ACCEPT / DECLINE of a visitor's offer (server/VisitorOffers.luau)
 		PlayerTrade = 4, -- 8.7: the PlayerTrade remote's offer / answer / price / buy (server/PlayerTrade.luau)
 		TradeOffer = 0.2, -- 8.7: and a new offer to a player on top: one every 5 s at most (no offer spam)
+		Slots = 4, -- 9.6: the Slots remote's list / play / new (the start screen's save slots: server/SaveSlots.luau)
 	},
 }
 
@@ -8759,6 +8760,123 @@ Config.Saving = {
 	CloseWait = 25,
 	WarnBytes = 1_000_000,
 	MaxBytes = 4_000_000,
+}
+
+-- 9.6, the start (the owner: "každý hráč … si dělá charaktera … má svůj save, … má nahraný level 15, pak může jít od
+-- znova"): every player has Count save slots, each its own game (money, warehouse, collection, upgrades, its courier).
+-- The start screen lists them (client/Menu.luau): CONTINUE a save, NEW GAME in an empty slot, START OVER a used one (a
+-- fresh game in it), LOOK (the courier changed, the save kept). server/SaveSlots.luau answers the Slots remote; the save
+-- loads only once a slot is picked (server/PlayerData.luau: PlayerData.chooseSlot); the pure rules (the slots' keys,
+-- their summaries) are shared/SaveSlotRules.luau. Slot 1 is the save of before 9.6 (its key unchanged: "Player_<id>");
+-- slot n is "Player_<id>_slot<n>". The summaries read each slot once (GetAsync) when the start screen asks.
+--   On        the start screen picks a slot (off, or a server without server/SaveSlots.luau: slot 1 at once, as before)
+--   Count     the slots a player has
+--   Read      s at least between two reads of one player's slots (the list; a flood reads nothing)
+--   NameMin / NameMax   a courier's name, its characters (filtered by Roblox's TextService before it is kept)
+Config.SaveSlots = {
+	On = true,
+	Count = 3,
+	Read = 4,
+	NameMin = 2,
+	NameMax = 16,
+}
+
+-- 9.6, the courier you make (the start screen's character creator, client/CharacterCreator.luau): your own Roblox avatar
+-- (base "own", the look of 6.9: server/CourierAvatar.luau) or a courier made here (base "custom"): Roblox's classic
+-- blocky R15 in these colours (its HumanoidDescription: the head and the arms the skin, the torso the top's colour, the
+-- legs the trousers'; no clothes, no accessories, the classic face) and parts welded on (shared/CharacterLooks.luau's
+-- geometry, shared/StyleBuild.luau's builder): the hair, a hat (StyleLooks' hats), the top's sleeves or a jacket
+-- (StyleLooks' jackets), the belt and something on the face. Kept in the slot's save (profile.character), checked on
+-- load (CharacterLooks.clean). Every list: { id, name, rgb? (RGB), trim? (a cloth's second colour) }; Default the
+-- creator's start (a new slot), every id one of its list's.
+export type LookOption = { id: string, name: string, rgb: { number }?, trim: { number }? }
+Config.Characters = {
+	Default = { base = "custom", skin = "warm", hair = "short", hairColor = "brown", hat = "cap", hatColor = "orange", top = "tee", topColor = "orange", pants = "denim", extra = "none" },
+	Bases = {
+		{ id = "custom", name = "Make a courier" },
+		{ id = "own", name = "My Roblox avatar" },
+	} :: { LookOption },
+	Skins = {
+		{ id = "porcelain", name = "Porcelain", rgb = { 255, 226, 200 } },
+		{ id = "light", name = "Light", rgb = { 241, 200, 167 } },
+		{ id = "warm", name = "Warm", rgb = { 218, 166, 119 } },
+		{ id = "tan", name = "Tan", rgb = { 196, 140, 96 } },
+		{ id = "olive", name = "Olive", rgb = { 172, 126, 82 } },
+		{ id = "brown", name = "Brown", rgb = { 138, 92, 58 } },
+		{ id = "deep", name = "Deep", rgb = { 100, 66, 42 } },
+		{ id = "ebony", name = "Ebony", rgb = { 68, 45, 30 } },
+		{ id = "green", name = "Zombie", rgb = { 128, 168, 104 } },
+	} :: { LookOption },
+	HairColors = {
+		{ id = "black", name = "Black", rgb = { 30, 28, 28 } },
+		{ id = "dark", name = "Dark brown", rgb = { 60, 42, 32 } },
+		{ id = "brown", name = "Brown", rgb = { 104, 70, 44 } },
+		{ id = "auburn", name = "Auburn", rgb = { 140, 62, 34 } },
+		{ id = "ginger", name = "Ginger", rgb = { 206, 112, 48 } },
+		{ id = "blond", name = "Blond", rgb = { 228, 188, 106 } },
+		{ id = "platinum", name = "Platinum", rgb = { 238, 230, 208 } },
+		{ id = "grey", name = "Grey", rgb = { 150, 150, 152 } },
+		{ id = "blue", name = "Blue", rgb = { 60, 112, 214 } },
+		{ id = "pink", name = "Pink", rgb = { 236, 112, 172 } },
+	} :: { LookOption },
+	Colors = { -- the cloth of the hats and the tops (trim: the cuffs, the snap, the band)
+		{ id = "orange", name = "Deliveros orange", rgb = { 245, 124, 30 }, trim = { 40, 40, 44 } },
+		{ id = "red", name = "Red", rgb = { 196, 40, 38 }, trim = { 28, 31, 34 } },
+		{ id = "gold", name = "Gold", rgb = { 240, 190, 50 }, trim = { 60, 60, 64 } },
+		{ id = "green", name = "Green", rgb = { 60, 150, 80 }, trim = { 236, 236, 232 } },
+		{ id = "teal", name = "Teal", rgb = { 32, 150, 150 }, trim = { 236, 236, 232 } },
+		{ id = "blue", name = "Blue", rgb = { 40, 98, 196 }, trim = { 236, 236, 232 } },
+		{ id = "navy", name = "Navy", rgb = { 34, 46, 86 }, trim = { 245, 124, 30 } },
+		{ id = "purple", name = "Purple", rgb = { 110, 60, 170 }, trim = { 240, 190, 50 } },
+		{ id = "pink", name = "Pink", rgb = { 236, 112, 172 }, trim = { 255, 255, 255 } },
+		{ id = "white", name = "White", rgb = { 236, 236, 232 }, trim = { 196, 40, 38 } },
+		{ id = "grey", name = "Grey", rgb = { 118, 122, 128 }, trim = { 196, 40, 38 } },
+		{ id = "black", name = "Black", rgb = { 34, 36, 40 }, trim = { 245, 124, 30 } },
+	} :: { LookOption },
+	Pants = {
+		{ id = "denim", name = "Denim", rgb = { 52, 82, 140 } },
+		{ id = "dark", name = "Charcoal", rgb = { 44, 48, 56 } },
+		{ id = "black", name = "Black", rgb = { 30, 31, 34 } },
+		{ id = "khaki", name = "Khaki", rgb = { 176, 152, 108 } },
+		{ id = "olive", name = "Olive", rgb = { 88, 98, 62 } },
+		{ id = "grey", name = "Grey", rgb = { 120, 122, 126 } },
+		{ id = "brown", name = "Brown", rgb = { 96, 66, 44 } },
+		{ id = "orange", name = "Work orange", rgb = { 230, 116, 34 } },
+	} :: { LookOption },
+	Hair = {
+		{ id = "none", name = "Bald" },
+		{ id = "short", name = "Short" },
+		{ id = "buzz", name = "Buzz cut" },
+		{ id = "spiky", name = "Spiky" },
+		{ id = "long", name = "Long" },
+		{ id = "ponytail", name = "Ponytail" },
+		{ id = "bun", name = "Bun" },
+		{ id = "afro", name = "Afro" },
+	} :: { LookOption },
+	Hats = { -- (shared/StyleLooks.luau's hats)
+		{ id = "none", name = "No hat" },
+		{ id = "cap", name = "Backwards cap" },
+		{ id = "beanie", name = "Beanie" },
+		{ id = "hardhat", name = "Hard hat" },
+		{ id = "cowboy", name = "Cowboy hat" },
+		{ id = "helmet", name = "Bike helmet" },
+	} :: { LookOption },
+	Tops = { -- tee and long: sleeves of their own; the others StyleLooks' jackets
+		{ id = "tee", name = "T-shirt" },
+		{ id = "long", name = "Long sleeves" },
+		{ id = "hoodie", name = "Hoodie" },
+		{ id = "track", name = "Track jacket" },
+		{ id = "bomber", name = "Bomber jacket" },
+		{ id = "puffer", name = "Puffer jacket" },
+		{ id = "leather", name = "Leather jacket" },
+	} :: { LookOption },
+	Extras = {
+		{ id = "none", name = "Nothing" },
+		{ id = "glasses", name = "Glasses" },
+		{ id = "sunglasses", name = "Sunglasses" },
+		{ id = "moustache", name = "Moustache" },
+		{ id = "beard", name = "Beard" },
+	} :: { LookOption },
 }
 
 -- 9.1, the drive pedals (the owner: "Add a drive pedal to the game … just visible pedals on PC, and on mobile as driving

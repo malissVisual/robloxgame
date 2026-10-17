@@ -11,7 +11,8 @@
 -- What starts, in this order:
 --   * the folders the game puts things in (Cars, Zombies, Effects: World's build made them) and the map
 --     (server/SandboxWorld.luau: the ground, the roads, the house's outside, the scenery, the lighting);
---   * PlayerData (its own saves, Config.Sandbox.Store), Analytics, Vehicles, CarRighting, Zombies (Zombies.ambient
+--   * 9.6's SaveSlots (the save slots: a join's save loads once the start screen picked one), PlayerData (its own saves,
+--     Config.Sandbox.Store), Analytics, Vehicles, CarRighting, Zombies (Zombies.ambient
 --     off: no camps, no roamers round the players; only what a move spawns), Npcs (Danny, the greeters), Admin, Crew
 --     (the moves' lobby, the crew panel), Transport, KitWear, Horn, 8.5's Clipboard (Danny's clipboard: orders mode);
 --   * the plots (server/SandboxPlots.luau), FurnitureMesh (the Blender furniture, before any piece is shown), 8.9.1's
@@ -304,6 +305,15 @@ local function remotes(queueState: (Player) -> ())
 			return
 		end
 		playing[player] = true
+		local slots = Server:FindFirstChild("SaveSlots") -- 9.6: a PLAY with no slot picked (an old client): the slot saved last
+		if slots and slots:IsA("ModuleScript") then
+			local picked, why = pcall(function()
+				(require(slots :: ModuleScript) :: any).fallback(player)
+			end)
+			if not picked then
+				warn(`[Sandbox] PLAY for {player.Name}: no save slot: {why}`)
+			end
+		end
 		PlayerData.track("onPlay", player) -- 6.13: the onboarding funnel's PressedPlay
 		local ok, err = pcall(function()
 			vanAtHome(player)
@@ -383,6 +393,7 @@ local function world()
 end
 
 local function services()
+	optional("SaveSlots", "start") -- 9.6: the save slots (before PlayerData: a join's load waits for the start screen's pick)
 	safely("PlayerData", PlayerData.start)
 	-- 6.13: Roblox's analytics (its hooks first: before any pay; a module that fails to load only means none)
 	safely("Analytics", function()
