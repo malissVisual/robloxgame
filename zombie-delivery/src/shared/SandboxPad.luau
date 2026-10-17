@@ -35,6 +35,8 @@
 -- computer Config.MoveHelper.Clipboard.Key (Q: free in the sandbox, where E, F, C, J, K, B, G, P, O, T, Z, H and Tab are
 -- taken and R is the city's clerks'), with a gamepad R1 (Danny's: with it out, R1 by a piece gives it to him, his
 -- "dannygive"), on a touch screen its 📋 button; "stow" puts it away (Q again, a gamepad's B: back).
+-- 10.x the map: "map" opens and closes the big map (M, the gamepad's L2 on foot, a touch screen's 🗺 MAP chip; the chip
+-- beside 📋 TASKS: client/SandboxMapUi.luau).
 --   SandboxPad.Actions                     the actions (id → { key, pad, tap?, hold? }): key the keyboard's ("E"),
 --                                           pad the gamepad's buttons (Enum.KeyCode names, never the D-pad: the chips'),
 --                                           tap a touch screen's button for it ("GRIP", "💡"; nil: the thing itself, a
@@ -79,6 +81,10 @@ SandboxPad.Actions = {
 	horn = { key = "H", pad = {} }, -- (no button: the keyboard's H only)
 	list = { key = "O", pad = {} }, -- the move's list (a phone taps the move's panel)
 	chat = { key = "T", pad = {}, hold = true }, -- the quick chat
+	-- 10.x the map (client/SandboxMapUi.luau, Config.SandboxMapUi): M; with a gamepad L2 on foot (in a seat L2 is the
+	-- brake: not then; no seat is driven in the sandbox since 9.7, and the city's clerks, L2's other user, never stand
+	-- there); a touch screen's 🗺 MAP chip
+	map = { key = Config.SandboxMapUi.Key, pad = { Config.SandboxMapUi.Button }, tap = "🗺 MAP" },
 } :: { [string]: Action }
 
 local BUTTONS: { [string]: string } = {

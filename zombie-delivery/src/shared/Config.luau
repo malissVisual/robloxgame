@@ -8090,6 +8090,111 @@ Config.SandboxLeaders = {
 	AllTime = { On = true, Store = "Sandbox_TopCollection", Every = 120, Studio = false },
 }
 
+-- 10.x THE MAP (the owner: "I need you to add a way to look at the map"): the sandbox's big map and its minimap
+-- (client/SandboxMapUi.luau, client/SandboxMiniMap.luau, drawn by client/SandboxMapDraw.luau from what
+-- client/SandboxMapData.luau reads of the world; the pure rules shared/SandboxMapRules.luau, tests/sandboxmaprules_test.luau).
+-- In the lobby a plan of it from SandboxMap.Lobby (the plaza, the hedge, the plots and your warehouse, the shops and
+-- desks, the six portals with their live state, the players, you); in a run the house's floor plan (its interior's
+-- MapPlan: server/HouseInterior.luau) over a strip of its front yard with the truck, who is where, the loot under fog
+-- and the danger markers (the CollectionService tags Danger: none there, none drawn).
+--   Key / Button   M opens and closes it; the gamepad's Button (on foot: L2 is the brake only in a seat; the D-pad is
+--                  the HUD's three chips', Select Roblox's): SandboxPad.chip("map"); a touch screen's 🗺 MAP chip
+--   Every          s between two looks at the markers while the big map is open (its plan is drawn once an open)
+--   Window         the window: Width × Height px at its scale (a computer: the HUD's, at least LeastScale; a touch
+--                  screen: TouchScale), Margin (TouchMargin) px to the screen's edge, Header px, a side column Side
+--                  (TouchSide) px when the map keeps most of the window, Pad px
+--   Text           px at scale 1: Title, Label, Small; never under Least (a phone's too)
+--   Inside / Below / Above   studs: a point is in a run's house within its box + Inside, from Below under its floor
+--                  to Above over its ceiling
+--   Yard           the strip of the front yard under the plan: Depth studs past the truck's far end (Truck studs long),
+--                  Half studs each side of the door at least (the plan's width when wider)
+--   Fog            a piece shows once you saw it: within See studs of your eyes (Eye studs over your root), no wall in
+--                  between (a ray against the house's shell), looked at every Every s, Most pieces a look at most (the
+--                  nearest first); it stays until carried out (in the truck, home or lost)
+--   Pulse          the uncarried pieces of From's tier and up pulse (Seconds a beat)
+--   Zombies        studs: the zombies within this of you show (a run's), the others not
+--   Names          most names on a portal's line before "+n" (the side column's HOUSES); MapNames on the map, where a
+--                  portal's line keeps LineEm × its text size px (its words cut at their end past it) on a lobby drawn
+--                  at LongScale px a stud or more; a smaller one's (a phone's) says only its state (FREE, STARTING IN 7,
+--                  IN USE · HARD): its labels would cover each other, the side column says who
+--   Mini           the minimap in a run (its plan, you, your party, the loot you saw near you): Size px at the HUD's
+--                  scale (a computer: the bottom right corner), TouchSize px on a touch screen (its top right), shrunk by
+--                  Step to Least to keep clear of the HUD (else none); Scale px a stud (TouchScale on a touch screen);
+--                  Margin px to the edges (Top px under Roblox's top bar on a touch screen); Every s a look; hidden with
+--                  the HUD, under a window and during a grip check
+--   Danger         the tags another worker's runs put on the house's dangers (none: nothing drawn): their icon; RunLock
+--                  (a locked doorway: its attribute Open), RunKey, RunVault (Open), RunHazard (its Kind: Hazards), RunRescue
+--   Colors         { r, g, b } of the drawing
+Config.SandboxMapUi = {
+	Key = "M",
+	Button = "ButtonL2",
+	Every = 0.2,
+	Window = { Width = 1180, Height = 760, Margin = 24, TouchMargin = 8, Header = 44, Side = 260, TouchSide = 200, Pad = 10, TouchScale = 0.9, LeastScale = 0.8 },
+	Text = { Title = 18, Label = 13, Small = 12, Least = 11 },
+	Inside = 4,
+	Below = 6,
+	Above = 8,
+	Yard = { Depth = 6, Truck = 22, Half = 20 },
+	Fog = { See = 40, Eye = 1.5, Every = 0.25, Most = 16 },
+	Pulse = { From = "epic", Seconds = 0.7 },
+	Zombies = 60,
+	Names = 3,
+	MapNames = 2,
+	LineEm = 17,
+	LongScale = 1.2,
+	Mini = { Size = 190, TouchSize = 140, Least = 96, Step = 8, Scale = 2.4, TouchScale = 2, Margin = 16, Top = 8, Every = 0.15 },
+	Danger = {
+		RunLock = { icon = "🔒", open = "🔓", name = "LOCKED DOOR" },
+		RunKey = { icon = "🔑", name = "KEY" },
+		RunVault = { icon = "🏦", open = "💰", name = "VAULT" },
+		RunHazard = { icon = "⚠", name = "HAZARD" },
+		RunRescue = { icon = "🆘", name = "TRAPPED HELPER" },
+	} :: { [string]: { icon: string, open: string?, name: string } },
+	Hazards = { fire = "🔥", gas = "☣", electric = "⚡", spark = "⚡", water = "💧", flood = "💧", hole = "🕳", spikes = "⚠", trap = "⚠", zombie = "🧟" } :: { [string]: string },
+	Colors = {
+		Back = { 16, 19, 23 },
+		Meadow = { 74, 112, 62 },
+		Hedge = { 38, 70, 34 },
+		Plaza = { 178, 170, 156 },
+		Water = { 76, 140, 190 },
+		Tree = { 54, 96, 48 },
+		Lamp = { 240, 232, 200 },
+		Plot = { 122, 124, 122 },
+		Warehouse = { 86, 92, 100 },
+		Yours = { 255, 206, 92 },
+		Desk = { 228, 170, 82 },
+		Paint = { 214, 72, 120 },
+		Leaders = { 226, 196, 92 },
+		Dispatch = { 215, 74, 70 },
+		Auction = { 150, 112, 200 },
+		Wall = { 40, 44, 52 },
+		Floor = { 198, 186, 164 },
+		Fixture = { 112, 104, 94 },
+		Door = { 226, 216, 196 },
+		Exit = { 126, 196, 120 },
+		Glass = { 150, 190, 220 },
+		Grass = { 84, 120, 70 },
+		Road = { 86, 90, 96 },
+		Truck = { 242, 242, 240 },
+		You = { 255, 255, 255 },
+		Party = { 255, 210, 90 },
+		Player = { 140, 200, 255 },
+		Helper = { 240, 132, 44 },
+		Zombie = { 215, 74, 70 },
+	} :: { [string]: { number } },
+	Rooms = {
+		hall = { 196, 186, 166 },
+		living = { 204, 180, 140 },
+		kitchen = { 206, 196, 166 },
+		bedroom = { 184, 176, 200 },
+		kids = { 176, 200, 182 },
+		bath = { 168, 200, 210 },
+		garage = { 156, 156, 152 },
+		store = { 186, 168, 136 },
+		workroom = { 176, 168, 156 },
+	} :: { [string]: { number } },
+}
+
 -- 8.3 SANDBOX, the market (the owner: selling should be a decision, not a reflex). shared/Market.luau has the rules
 -- (tests/market_test.luau), server/Collection.luau prices every sale and the stands' income with it, the STOCK list and
 -- the picker show it (client/WarehouseUi.luau: the 🔥 / ❄ tags, the header's line, prices with the market in them).
