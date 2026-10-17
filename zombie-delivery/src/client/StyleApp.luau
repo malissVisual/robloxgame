@@ -481,7 +481,7 @@ function StyleApp.render(list: Instance, look: OrdersUi.Kit, host: Host, wide: b
 	bind()
 	look.meta(list, `Buy them from {Style.soldBy(tab)}; wear them from here, anywhere. `
 		.. (if tab == "courier" then "Looks only: no item changes a number of the game; your own look stays under them."
-			else "Looks only, on every vehicle of yours they fit; a lent company vehicle and a ZDC RIDE scooter keep theirs."), order)
+			else "Looks only, on every vehicle of yours they fit; a lent company vehicle and a Deliveros RIDE scooter keep theirs."), order)
 	-- the hero: the look you try, the live preview filling it
 	local height = CardKit.Layout.heroHeight(host.room() - 40)
 	local _, left, right = CardKit.columns(list, { name = "StyleCards", order = order + 1, side = wide == true, hero = true, heroHeight = height })

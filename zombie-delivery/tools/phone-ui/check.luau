@@ -106,7 +106,7 @@ tap("FULL BOARD")
 check("FULL BOARD opens the real board, the popup and its blur go",boards==1 and not Phone.isOpen() and popup()==nil and blur()==nil)
 Phone.open()
 check("home stands upright, no popup",upright() and popup()==nil and not Phone.appOpen())
-local payload={stopLabel="Harbor warehouse",customer="Earl",cargo="Parcels",total=2,pay=180,endsAt=376,timeLimit=400,position=M.Vector3.new(150,0,100),mode="foot",stopCount=2,stopIndex=2,orders={{id=1,state="open",focused=true,pay=180,endsAt=376,stops={{label="ZDC DEPOT",kind="pickup",done=true},{label="HARBOR WAREHOUSE",kind="drop",current=true}}},{id=2,state="open",title="Medicine",pay=80,stops={{label="Clinic",current=true}}}}}
+local payload={stopLabel="Harbor warehouse",customer="Earl",cargo="Parcels",total=2,pay=180,endsAt=376,timeLimit=400,position=M.Vector3.new(150,0,100),mode="foot",stopCount=2,stopIndex=2,orders={{id=1,state="open",focused=true,pay=180,endsAt=376,stops={{label="DELIVEROS DEPOT",kind="pickup",done=true},{label="HARBOR WAREHOUSE",kind="drop",current=true}}},{id=2,state="open",title="Medicine",pay=80,stops={{label="Clinic",current=true}}}}}
 M.remotes.Job.OnClientEvent:Fire(payload)
 check("home reflects incoming order",text("HARBOR WAREHOUSE")~=nil and text("$180")~=nil)
 -- 6.18: during a run the hero is YOUR RUN: the next stop, its pay big in green, the orders and the distance, the clock.
@@ -558,13 +558,13 @@ Phone.open("garage");deep(named("Item_car"),"Call").Activated:Fire()
 check("CALL CAR calls the car",lastSent("Equip").args[1]=="drive")
 -- 5.6: ZDC RIDE, the nearest rental dock and the GPS to it.
 Phone.open("garage")
-local rideLine=all(M.gui,function(object) return type(object.Text)=="string" and string.find(object.Text,"ZDC RIDE · nearest dock",1,true)~=nil end)[1]
-check("garage names the nearest ZDC RIDE dock",rideLine~=nil and #M.warnings==0)
+local rideLine=all(M.gui,function(object) return type(object.Text)=="string" and string.find(object.Text,"Deliveros RIDE · nearest dock",1,true)~=nil end)[1]
+check("garage names the nearest Deliveros RIDE dock",rideLine~=nil and #M.warnings==0)
 local waypoints=0
 local setWaypoint=M.MapView.setWaypoint
 M.MapView.setWaypoint=function() waypoints+=1 end
 deep(named("Item_ride"),"Gps").Activated:Fire()
-check("ZDC RIDE's GPS sets the waypoint",waypoints==1)
+check("Deliveros RIDE's GPS sets the waypoint",waypoints==1)
 named("Item_ride").Activated:Fire()
 check("a row's tap opens its details, ‹ BACK returns",named("ItemHero")~=nil and named("Back")~=nil)
 named("Back").Activated:Fire()
@@ -574,7 +574,7 @@ M.MapView.setWaypoint=setWaypoint
 local sounds=0
 Phone.onSound=function() sounds+=1 end
 Phone.open("settings")
-check("settings lists every key and the version",text("Weapon wheel")~=nil and text("Sprint")~=nil and text(`ZDC courier terminal · Zombie Delivery {Config.Version}`)~=nil)
+check("settings lists every key and the version",text("Weapon wheel")~=nil and text("Sprint")~=nil and text(`Deliveros courier terminal · {Config.Version}`)~=nil)
 named("CycleSound").Activated:Fire()
 check("settings' sound goes through Phone.onSound",sounds==1)
 -- 6.15: ENEMY OUTLINES off and on (client/EnemyOutline.luau through Phone.onOutline; no button without it).
@@ -699,7 +699,7 @@ named("Tab_shops").Activated:Fire()
 check("SHOPS lists the five shops",named("Shops")~=nil and named("Tab_shops"):FindFirstChild("Underline")~=nil
 	and named("Shop_bags")~=nil and named("Shop_supplies")~=nil and named("Shop_guns")~=nil and named("Shop_dealer")~=nil and named("Shop_mechanic")~=nil
 	and named("Shop_bikes")==nil and named("Shop_guns").LayoutOrder<named("Shop_dealer").LayoutOrder and named("Shop_dealer").LayoutOrder<named("Shop_mechanic").LayoutOrder)
-check("6.6: ZDC Bags first, the bags there; no backpack anywhere",named("Shop_bags").LayoutOrder<named("Shop_supplies").LayoutOrder and text("ZDC Bags")~=nil and text("Bags (sprint with your deliveries)")~=nil
+check("6.6: Deliveros Bags first, the bags there; no backpack anywhere",named("Shop_bags").LayoutOrder<named("Shop_supplies").LayoutOrder and text("Deliveros Bags")~=nil and text("Bags (sprint with your deliveries)")~=nil
 	and all(M.gui,function(object) return type(object.Text)=="string" and string.find(string.lower(object.Text),"backpack",1,true)~=nil end)[1]==nil)
 check("each shop says what it sells",text("Last Stop Supplies")~=nil and text("Items and vests, next to the bags")~=nil and text("Lead & Co.")~=nil and text("Range · guns, gun upgrades, a baseball bat")~=nil
 	and text("Dead End Motors")~=nil and text("Cars, vans, trucks · bikes, the E-Scooter, bike gear")~=nil and text("Wrench Garage")~=nil and text("Stages, car upgrades, gear, paint, car guns, repairs")~=nil) -- (6.7: what each really sells; 6.12.7: the bikes at Dead End Motors)
@@ -952,7 +952,7 @@ do
 		and named("StyleCards")~=nil and named("StyleCards"):FindFirstChild("Left")~=nil and M.focus==deep(named("Hero"),"HeroMain"))
 	check("its sections: hats, jackets, the vest's and the bag's colours",text("Hats · your own")~=nil and text("Jackets · your own")~=nil and text("Courier Vest colour · your own")~=nil and text("Bag colour · your own")~=nil)
 	check("the live preview shows the courier with the first item",#M.previews>0 and M.previews[#M.previews].tab=="courier" and M.previews[#M.previews].id=="cap_red" and named("Preview")~=nil)
-	check("a card an item: its colours, name, price",named("Style_cap_red")~=nil and text("BACKWARDS CAP · ZDC RED")~=nil and inCard("cap_red","Colour1")~=nil and inCard("cap_red","Colour2")~=nil and text("$250")~=nil) -- (6.19: $120 × Prices.Style, rounded to $50)
+	check("a card an item: its colours, name, price",named("Style_cap_red")~=nil and text("BACKWARDS CAP · DELIVEROS RED")~=nil and inCard("cap_red","Colour1")~=nil and inCard("cap_red","Colour2")~=nil and text("$250")~=nil) -- (6.19: $120 × Prices.Style, rounded to $50)
 	check("a reward is flagged",inCard("cap_gold","Main")~=nil and inCard("cap_gold","Main").Text=="🏆 REWARD")
 	check("a level's lock shows",text("🔒 LV 4")~=nil)
 	check("the hero's full words: BUY · $250 for the first look",deep(named("Hero"),"HeroMain").Text=="BUY · $250")
@@ -971,7 +971,7 @@ do
 	-- the state brings the purchase back: "cash", OWNED → WEAR, WEARING → TAKE OFF
 	Phone.setState({phone=true,money=380,kit={},cars={},style={owned={cap_red=true},worn={hat="cap_red"}}})
 	check("the purchase plays cash once",M.played[#M.played]=="cash" and #M.played==1)
-	check("WEARING and TAKE OFF",hasText("WEARING") and inCard("cap_red","Main").Text=="OFF" and text("Hats · Backwards Cap · ZDC Red")~=nil)
+	check("WEARING and TAKE OFF",hasText("WEARING") and inCard("cap_red","Main").Text=="OFF" and text("Hats · Backwards Cap · Deliveros Red")~=nil)
 	inCard("cap_red","Main").Activated:Fire()
 	check("TAKE OFF asks the server with the slot",styleSent().args[1]=="unwear" and styleSent().args[2]=="hat")
 	Phone.setState({phone=true,money=380,kit={},cars={},style={owned={cap_red=true},worn={}}})
@@ -1076,7 +1076,7 @@ do
 	check("… the mission card: its name, the readiness chip",text("PAPER TRAIL")~=nil and text("✖ 2 OF 3 READY")~=nil)
 	check("… the rows: the level (required, missing), the van and its room (done), a medkit (would help)",named("Check_level")~=nil and named("Check_vehicle")~=nil and named("Check_cargo")~=nil and named("Check_medkit")~=nil
 		and named("Check_level"):FindFirstChild("Mark").Text=="✖" and named("Check_vehicle"):FindFirstChild("Mark").Text=="✔" and named("Check_medkit"):FindFirstChild("Mark").Text=="☆")
-	check("… the van's row: done, nothing to buy, no action (7.x: the ZDC Van is yours)",named("Check_vehicle"):FindFirstChild("Action")==nil and text("Your ZDC Van holds 4")~=nil)
+	check("… the van's row: done, nothing to buy, no action (7.x: the Deliveros Van is yours)",named("Check_vehicle"):FindFirstChild("Action")==nil and text("Your Deliveros Van holds 4")~=nil)
 	check("… the level's row: the XP and about how much work (CareerUi.toGo)",Levels.xpFor(2)+100<1000 and text(`{Levels.xpFor(2)+100} / 2,093 XP · about 8 runs`)~=nil and named("Check_level"):FindFirstChild("Action").Text=="JOBS  ›")
 	check("… no savings goal (a medkit is none)",named("SavingsGoal")==nil)
 	check("… not ready: WORK · EARN AND LEVEL UP and OPEN MISSIONS, no START",named("Jobs")~=nil and named("OpenMissions")~=nil and named("Start")==nil)

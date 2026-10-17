@@ -687,7 +687,7 @@ do
 	tall.clock = { id = "clock", name = "Grandfather Clock", icon = "🕰", size = { X = 2, Y = 7.2, Z = 1.4 }, class = "pair", weight = 7, value = 900, fragile = true, room = "living" }
 	local clockSpots: { Rules.Spot } = { { id = 1, item = "box", room = "attic", star = true }, { id = 2, item = "clock", room = "living", star = true }, { id = 3, item = "lamp", room = "living", star = false } }
 	local inVan = Rules.newMove(clockSpots, tall, vanBed, 0, 600)
-	check("…(the 7.2 clock never fits the ZDC Van's bay, not even lying down)", not Rules.canLoad(inVan, 2))
+	check("…(the 7.2 clock never fits the Deliveros Van's bay, not even lying down)", not Rules.canLoad(inVan, 2))
 	loadAll(inVan, { 1 })
 	check("…a ★ thing no van can take is not asked for: the box home whole is the chapter", Rules.starsHome(inVan) and inVan.things[2].state ~= "delivered")
 end
@@ -722,7 +722,7 @@ local dx, dz = Map.Depot.x + T.DropOff[1], Map.Depot.z + T.DropOff[2]
 check("the drop-off (the Wall) is in the safe zone", Map.isSafe(dx, dz))
 check("the board is in the safe zone", Map.isSafe(Map.Depot.x + T.Board[1], Map.Depot.z + T.Board[2]))
 check("the drop-off reaches the road in front of the depot", T.DropRadius >= 15 and T.DropOff[2] + T.DropRadius > Map.BlockSize / 2 + 4)
-check("7.x van moves: a move goes with the owner's ZDC Van, its bed set", T.Van == "zdcvan" and T.Beds[T.Van] ~= nil and T.Beds[T.Van].Cell > 0 and T.VanAgain > 0)
+check("7.x van moves: a move goes with the owner's Deliveros Van, its bed set", T.Van == "zdcvan" and T.Beds[T.Van] ~= nil and T.Beds[T.Van].Cell > 0 and T.VanAgain > 0)
 check("the numbers", T.Fade > 0 and T.Fade < 1 and T.Slots >= 2 and T.Tether >= 4 and T.Grace > 0 and Config.Robust.Limits.Moving > 0)
 local van = nil
 for _, def in Config.Cars do -- (7.x: the ZDC Van is the one car a player owns, Config.Cars)

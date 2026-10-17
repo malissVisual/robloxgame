@@ -194,7 +194,7 @@ local function shelter(parent: Instance, stop: BusLines.Stop)
 	local mapBoard = deco(part(model, "MapBoard", Vector3.new(3.4, 4.6, 0.12), at(mapAlong, mapDepth, PAD_TOP + 3.85), Color3.fromRGB(18, 20, 24), Enum.Material.SmoothPlastic))
 	local plain = surface(mapBoard, Enum.NormalId.Back, 40)
 	plain.Name = "MapBoardGui"
-	text(plain, "ZDC TRANSIT · EXPRESS", UDim2.new(1, -12, 0.08, 0), UDim2.fromOffset(6, 6), Color3.fromRGB(230, 230, 222))
+	text(plain, "DELIVEROS TRANSIT · EXPRESS", UDim2.new(1, -12, 0.08, 0), UDim2.fromOffset(6, 6), Color3.fromRGB(230, 230, 222))
 	text(plain, "BUS MAP", UDim2.new(1, -24, 0.12, 0), UDim2.new(0, 12, 0.44, 0), Color3.fromRGB(255, 196, 70))
 	-- On the road: the yellow kerb line where the bus stands, and BUS.
 	local stand = BusLines.DoorAhead -- (the bus's middle is this far behind the door)

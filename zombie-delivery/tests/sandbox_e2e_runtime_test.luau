@@ -753,7 +753,7 @@ end
 local annVan = H.play(ann)
 local bobVan = H.play(bob)
 do
-	check("2. PLAY: Ann's ZDC Sprinter at her vanSpot, nose to the street, its back doors in the unload circle", annVan ~= nil and annVan.id == Config.Sandbox.Van
+	check("2. PLAY: Ann's Deliveros Sprinter at her vanSpot, nose to the street, its back doors in the unload circle", annVan ~= nil and annVan.id == Config.Sandbox.Van
 		and H.flat(annVan.chassis.Position, V3(plots[1].vanSpot.x, 0, plots[1].vanSpot.z)) < 0.5 and annVan.chassis.CFrame.LookVector.Z > 0.99
 		and H.inCircle(H.doorOf(annVan).WorldPosition, plots[1]), annVan and annVan.chassis.Position)
 	check("…she is not in it, still at the spawn; told where it is", E.humanoidOf(ann).SeatPart == nil
@@ -1287,7 +1287,7 @@ do
 	check("NEG. 8.3: More stands in her garage: refused with the lock's reason (\"Needs the Big Warehouse\"), nothing taken, nothing changed", said == "Needs the Big Warehouse"
 		and H.profileOf(ann).money - poor == H.paid(ann, "CollectionIncome", poorAt) and Upgrades.levels(ann).stands == nil and Collection.stands(ann) == WarehouseLayout.count(1), said)
 	said = H.buy(ann, "warehouse", 1)
-	check("NEG. the ZDC Warehouse (the Workshop) without the money: refused, nothing taken, nothing changed", poor < WP[1] and string.find(said, `costs {WarehouseLayout.money(WP[1])}`, 1, true) ~= nil
+	check("NEG. the Deliveros Warehouse (the Workshop) without the money: refused, nothing taken, nothing changed", poor < WP[1] and string.find(said, `costs {WarehouseLayout.money(WP[1])}`, 1, true) ~= nil
 		and H.profileOf(ann).money - poor == H.paid(ann, "CollectionIncome", poorAt) and Upgrades.levels(ann).warehouse == nil and Warehouse.level(1) == 1, said)
 	PlayerData.addMoney(ann, 250000, "Admin") -- (the admin panel's money button: PlayerData.addMoney; 8.3 economy: every level below)
 	local rich = H.profileOf(ann).money
@@ -1638,7 +1638,7 @@ do
 		and Collection.stands(ann2) == 26 and Warehouse.isOpen(1, 26) and not Warehouse.isOpen(1, 27) and ann2:GetAttribute(Config.SandboxUpgrades.WarehouseAttribute) == 5, said)
 	check("8.3: …every piece still on its stand (the one on stand 13 too: a big stand there now), standing at the level's spots", kept and shown)
 	local top = H.buy(ann2, "warehouse", 5)
-	check("8.3: …the ZDC Warehouse at its top: refused, says so", top == "ZDC Warehouse is at its top level." and Warehouse.level(1) == 5, top)
+	check("8.3: …the Deliveros Warehouse at its top: refused, says so", top == "Deliveros Warehouse is at its top level." and Warehouse.level(1) == 5, top)
 end
 
 -- ── 14. Bob cannot use Ann's stands or desk; her kiosk opens his own move ─

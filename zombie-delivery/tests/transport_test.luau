@@ -129,7 +129,7 @@ check("about 8 foot jobs to level 2", jobs >= 6 and jobs <= 10, jobs)
 check("a new store (everybody starts again)", Config.DataStoreName == "ZombieDelivery_v2")
 check("a new player starts with $40", Config.StartMoney == 40)
 local van = Config.Cars[1]
-check("7.x: the first car is the ZDC Van, everybody's from level 1 (free; 7.2 review: never paid back)", van.id == Config.CompanyVan.Car and van.level == 1 and van.price == 0
+check("7.x: the first car is the Deliveros Van, everybody's from level 1 (free; 7.2 review: never paid back)", van.id == Config.CompanyVan.Car and van.level == 1 and van.price == 0
 	and (van :: any).refund == nil)
 check("the car tiers: ★ 4, ★★ 5, ★★★ 6, ★★★★ 9", Config.Jobs.Tiers[1].level == 4 and Config.Jobs.Tiers[2].level == 5 and Config.Jobs.Tiers[3].level == 6 and Config.Jobs.Tiers[4].level == 9)
 check("the licences: ★★★ 6 + 5 jobs, ★★★★ 9 + 10 jobs", Config.Jobs.Licences[1].level == 6 and Config.Jobs.Licences[1].jobs == 5
@@ -141,9 +141,9 @@ for _, def in Config.JobTypes do
 	end
 end
 check("a job that lends a company vehicle needs level 4+", lent)
-check("level 2 tells of the bikes (6.12.7: Dead End Motors' BIKES counter), level 4 of the car jobs in your ZDC Van (7.x: Earl's Old Van before)", string.find(Config.Levels.Rewards[2].text or "", "bike", 1, true) ~= nil
+check("level 2 tells of the bikes (6.12.7: Dead End Motors' BIKES counter), level 4 of the car jobs in your Deliveros Van (7.x: Earl's Old Van before)", string.find(Config.Levels.Rewards[2].text or "", "bike", 1, true) ~= nil
 	and string.find(Config.Levels.Rewards[2].text or "", Config.BikeShop.Shop, 1, true) ~= nil and string.find(Config.Levels.Rewards[2].text or "", "Spoke", 1, true) == nil
-	and string.find(Config.Levels.Rewards[4].text or "", "ZDC Van", 1, true) ~= nil and string.find(Config.Levels.Rewards[4].text or "", "Old Van", 1, true) == nil)
+	and string.find(Config.Levels.Rewards[4].text or "", "Deliveros Van", 1, true) ~= nil and string.find(Config.Levels.Rewards[4].text or "", "Old Van", 1, true) == nil)
 check("the light looks include the mail, documents, medicine, pizza, parcels and bread", Config.Cargo.LightLooks.mail and Config.Cargo.LightLooks.documents
 	and Config.Cargo.LightLooks.medicine and Config.Cargo.LightLooks.pizza and Config.Cargo.LightLooks.parcel and Config.Cargo.LightLooks.bread)
 

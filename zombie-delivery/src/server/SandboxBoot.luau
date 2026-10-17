@@ -479,7 +479,7 @@ function SandboxBoot.start(queueState: (Player) -> ())
 		onPlayer(player)
 	end
 	remotes(queueState)
-	print(`[Server] Zombie Delivery {Config.Version} SANDBOX is running`)
+	print(`[Server] Deliveros {Config.Version} SANDBOX is running`)
 	-- 8.5.1: Studio kept old scripts after a sync? (this side's stamp against the shared Config's version)
 	local stamp = script.Parent:FindFirstChild("BuildStamp")
 	local ok, built = false, nil

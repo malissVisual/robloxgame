@@ -372,7 +372,7 @@ check("8.3: every piece of every level has its colour and material (a lamp's lig
 check("its pieces stand on the plot, none under the ground", onPlotOk and groundOk, table.concat(detail, "; "))
 check("nothing solid on the way in under the door's top (the floor apart)", solidPathOk, table.concat(detail, "; "))
 check(`the hall's lamps: the level's (Garage … Logistics Center: {table.concat(lampsSeen, ", ")} PointLights, at most 12)`, lampsOk, lampCount)
-check("the signs (ZDC, the owner's, STOCK, RECEIVING, UNLOAD HERE, 8.1's UPGRADES desk and sign) and every stand's podium, top and plate", signsOk and standPartsOk)
+check("the signs (Deliveros, the owner's, STOCK, RECEIVING, UNLOAD HERE, 8.1's UPGRADES desk and sign) and every stand's podium, top and plate", signsOk and standPartsOk)
 check("8.1: an upgrade stand's spot (its outline, \"STAND n\") painted under its podium: covered once it is built; none for the start's", spotsOk, table.concat(detail, "; "))
 check("8.1: the UPGRADES desk at the back wall's middle, facing the hall, its top at counter height, off the zone and the way in; its body solid", deskOk)
 check(`8.1: … no stand on it and an aisle (the level's walk) free in front of it to stand at`, deskRoomOk, table.concat(detail, "; "))
@@ -502,7 +502,7 @@ end
 check("8.3: the two-person collectibles (the alphorn, the T. rex skull, the safe) stand on every level's big stands, the Garage's too", pairsFit)
 
 -- the texts
-check("the owner's sign: <Name>'s Warehouse", WarehouseLayout.ownerLines("Pavel", 2)[1].text == "Pavel's Warehouse" and WarehouseLayout.ownerLines("Pavel", 2)[2].text == "ZDC STORAGE · PLOT 2")
+check("the owner's sign: <Name>'s Warehouse", WarehouseLayout.ownerLines("Pavel", 2)[1].text == "Pavel's Warehouse" and WarehouseLayout.ownerLines("Pavel", 2)[2].text == "DELIVEROS STORAGE · PLOT 2")
 check("…FOR RENT without an owner", WarehouseLayout.ownerLines(nil, 3)[1].text == "FOR RENT")
 local board = WarehouseLayout.stockLines(5, 12.4, 3, 12)
 check("the STOCK board: 📦 N pieces in stock · $X/min", board[1].text == "STOCK" and board[2].text == "📦 5 pieces in stock · $12/min" and board[3].text == "3 of 12 stands on show", board[2].text)

@@ -21,6 +21,7 @@ from mathutils import Vector, Matrix
 
 # ───────────────────────────────────────────────────────────── NASTAVENÍ
 EXPORT = False   # True = uloží ZDCWarehouseArt.fbx pro hru do složky "roblox" vedle .blend souboru
+BRAND = "DELIVEROS"   # nápis na skladu (8.9: hra je Deliveros, ne ZDC)
 GAP = 18         # mezera mezi budovami v řadě (studs)
 
 # Úrovně: šířka W (napříč), hloubka D (dozadu), výška zdí H, vrata (šířka, výška), střecha, plášť, kolik stojanů
@@ -166,7 +167,8 @@ def prism(name, pts, depth_axis, d0, d1, finish):
     return o
 
 
-def text(name, body, size, at, finish, depth=0.25, face="front"):
+def text(name, body, size, at, finish, depth=0.25, face="front", fit=None):
+    """Extruded letters; fit(scale) → the widest they may be at that scale (studs): a longer word is made smaller."""
     cu = bpy.data.curves.new(name, "FONT")
     cu.body = body
     cu.size = size
@@ -177,6 +179,14 @@ def text(name, body, size, at, finish, depth=0.25, face="front"):
     COL.objects.link(o)
     turn = {"front": euler(rx=math.pi / 2), "left": euler(rx=math.pi / 2) @ euler(ry=-math.pi / 2)}[face]
     o.matrix_world = Matrix.Translation(ORIGIN + Vector(at)) @ turn
+    if fit:
+        bpy.context.view_layer.update()
+        xs = [c[0] for c in o.bound_box]
+        k = 1.0
+        for _ in range(4):  # (smaller letters reach less high up a gable: a little more room)
+            k = min(1.0, fit(k) / max(1e-6, (max(xs) - min(xs))))
+        if k < 1.0:
+            o.matrix_world = o.matrix_world @ Matrix.Scale(k, 4)
     return o
 
 
@@ -475,10 +485,10 @@ def extras(lv):
     W, D, H, lid = lv["W"], lv["D"], lv["H"], lv["id"]
     dw, dh = lv["door"]
     hw = W / 2
-    # the ZDC sign: a plate on the garage, big letters in the gable / over the door from level 2
+    # the company's sign (8.9: DELIVEROS): a plate on the garage, big letters in the gable from level 2
     if lid == 1:
         span("Cedule", -3.0, 3.0, -0.25, 0, dh + 0.6, dh + 1.6, "orange")
-        text("Nápis ZDC", "ZDC", 0.9, (0, -0.3, dh + 1.1), "white", depth=0.1)
+        text("Nápis ZDC", BRAND, 0.9, (0, -0.3, dh + 1.1), "white", depth=0.1, fit=lambda k: 5.4)
         # a side door, a window, a bin
         span("Dveře", hw - 0.02, hw + 0.12, 5.0, 8.4, 0.15, 7.2, "door")
         span("Dveře rám", hw - 0.02, hw + 0.08, 4.8, 8.6, 0.15, 7.4, "trim")
@@ -489,7 +499,11 @@ def extras(lv):
     top = H + (lv["rise"] * 0.55 if lv["roof"] == "gable" else 0)
     size = {2: 3.2, 3: 4.2, 4: 6.0, 5: 7.0}[lid]
     zl = (H + lv["rise"] * 0.42) if lv["roof"] == "gable" else (H + lv["rise"] * 0.42)
-    text("Nápis ZDC", "ZDC", size, (0, -0.35, zl), "orange", depth=0.4)
+    if lv["roof"] == "gable":  # (as wide as the gable is at the letters' top, a stud's margin each side)
+        room = lambda k: 2 * hw * (1 - max(0.0, zl + size * k * 0.36 - H) / lv["rise"]) - 2.0
+    else:
+        room = lambda k: W * 0.62
+    text("Nápis ZDC", BRAND, size, (0, -0.35, zl), "orange", depth=0.4, fit=room)
     if lid >= 3:
         text("Nápis podtitul", "STORAGE" if lid < 5 else "LOGISTICS", size * 0.28, (0, -0.35, zl - size * 0.62), "white", depth=0.2)
     # a personnel door on the front, right of the roller door, with its canopy

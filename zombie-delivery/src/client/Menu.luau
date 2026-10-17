@@ -8,9 +8,10 @@
 -- 5.8 (the courier phone's look, design/phone-ui/): the card carries the ZDC mark (the red square, the wordmark, a
 -- thin rule, COURIER TERMINAL), PLAY is the phone's red primary action, the company line and the controls are slim
 -- hairline rows (no corners), and the controls card has the ZDC heading.
--- 8.0 SANDBOX (Config.Sandbox.On, design/sandbox/KONTRAKT.md): a simple screen instead (showSandbox): the ZDC mark,
--- the title ZDC MOVES · SANDBOX, PLAY (ENTER) and the version; the camera drifts slowly over the sandbox
--- (shared/SandboxMap.luau: the farmstead, Pražská, your plot), never over the old city. PLAY does what the city's does.
+-- 8.0 SANDBOX (Config.Sandbox.On, design/sandbox/KONTRAKT.md): a simple screen instead (showSandbox): the mark
+-- (8.9: DELIVEROS) over its slogan MOVE · FIND · GROW, PLAY (ENTER) and the version; the camera drifts slowly over the
+-- sandbox (shared/SandboxMap.luau: the farmstead, Pražská, your plot), never over the old city. PLAY does what the
+-- city's does.
 -- 8.3 (design/warehouse-levels/KONTRAKT.md): the two shots of your warehouse look at the building of its level
 -- (WarehouseLayout.site: 1 the Garage … 5 the Logistics Center).
 
@@ -142,7 +143,7 @@ function Menu.setState(state: any)
 	end
 end
 
--- 8.0 SANDBOX: the sandbox's start screen. The city's charcoal card, smaller: the ZDC mark, ZDC MOVES · SANDBOX, PLAY
+-- 8.0 SANDBOX: the sandbox's start screen. The city's charcoal card, smaller: the mark (8.9: DELIVEROS), its slogan, PLAY
 -- (ENTER, a gamepad's A) and the version; PLAY fades out the same way and runs onPlay (the server's Play).
 local function showSandbox(onPlay: () -> ())
 	gui = Ui.make("ScreenGui", {
@@ -180,7 +181,7 @@ local function showSandbox(onPlay: () -> ())
 			part.ZIndex = 6
 		end
 	end
-	local title = Ui.label(face, "ZDC MOVES · SANDBOX", UDim2.fromOffset(W - 48, 56), {
+	local title = Ui.label(face, "MOVE · FIND · GROW", UDim2.fromOffset(W - 48, 56), { -- (8.9: the mark above says DELIVEROS)
 		Name = "Title", Position = UDim2.fromOffset(24, 62), TextSize = 42, TextScaled = true, Font = Theme.DisplayFont, ZIndex = 6,
 	})
 	Ui.make("UITextSizeConstraint", { MaxTextSize = 42 }, title)

@@ -191,7 +191,7 @@ end)()
 -- The cab: the nose, the bonnet, the windscreen, the roof cap and what you see through the glass.
 local function cab(out: { Piece })
 	edges(out, "FrontBumper", "trim", -HW - 0.05, HW + 0.05, 1.05, 2.05, FRONT, FRONT + 0.7)
-	label(out, "FrontPlate", { 1.9, 0.45, 0.05 }, { 0, 1.55, FRONT - 0.03 }, nil, "ZDC 02", "trim", "GothamBold", true)
+	label(out, "FrontPlate", { 1.9, 0.45, 0.05 }, { 0, 1.55, FRONT - 0.03 }, nil, "DLV 02", "trim", "GothamBold", true)
 	edges(out, "Nose", "paint", -HW + 0.1, HW - 0.1, 2.05, 4.6, FRONT + 0.2, FRONT + 0.7)
 	edges(out, "Grille", "trim", -1.8, 1.8, 2.55, 3.95, FRONT + 0.13, FRONT + 0.21)
 	edges(out, "GrilleBar", "chrome", -1.7, 1.7, 3.19, 3.31, FRONT + 0.08, FRONT + 0.14)
@@ -255,8 +255,8 @@ local function box(out: { Piece })
 			edges(out, "Stripe", "stripe", OUT - 0.02, OUT + 0.02, STRIPE_Y - STRIPE_H / 2, STRIPE_Y + STRIPE_H / 2, SB, BAY1)
 		end
 		local logoZ = if side < 0 then 4.0 else 6.2
-		label(out, "Logo", { 6.0, 2.4, 0.02 }, { side * (HW + 0.03), 7.6, logoZ }, side, "ZDC", "stripe", "GothamBlack")
-		label(out, "CompanyName", { 6.6, 1.1, 0.02 }, { side * (HW + 0.03), 5.6, logoZ }, side, "ZOMBIE DELIVERY CO.\nWE DELIVER. THEY DON'T.", "trim", "GothamBold")
+		label(out, "Logo", { 6.0, 2.4, 0.02 }, { side * (HW + 0.03), 7.6, logoZ }, side, "DELIVEROS", "stripe", "GothamBlack")
+		label(out, "CompanyName", { 6.6, 1.1, 0.02 }, { side * (HW + 0.03), 5.6, logoZ }, side, "MOVING & STORAGE\nMOVE · FIND · GROW", "trim", "GothamBold")
 	end
 	-- the sliding door's track over the side behind it
 	edges(out, "SlideTrack", "trim", HW, HW + 0.08, STOP + 0.15, STOP + 0.29, SB, SB + S.Slider.Back)
@@ -270,7 +270,7 @@ local function box(out: { Piece })
 		add(out, "Stripe", { WALL, STRIPE_H, 0.04 }, { x, STRIPE_Y, BACK + 0.02 }, "stripe")
 	end
 	edges(out, "RearBumper", "trim", -HW, HW, 1.4, FLOOR - 0.02, BAY1 - 0.6, BAY1)
-	label(out, "RearPlate", { 1.9, 0.45, 0.05 }, { 0, 1.85, BACK + 0.03 }, 0, "ZDC 02", "trim", "GothamBold", true)
+	label(out, "RearPlate", { 1.9, 0.45, 0.05 }, { 0, 1.85, BACK + 0.03 }, 0, "DLV 02", "trim", "GothamBold", true)
 	edges(out, SprinterLooks.StepFolded, "step", -S.Step.Width / 2, S.Step.Width / 2, 1.17, 1.37, BAY1 - 0.55, BAY1 - 0.05)
 	edges(out, "BrakeLight", "tail", -0.7, 0.7, CEIL + 0.12, CEIL + 0.28, BACK, BACK + 0.05)
 end
@@ -348,9 +348,9 @@ function SprinterLooks.leaves(): { Leaf }
 		add(pieces, "LeafLining", { width - 0.2, y1 - y0 - 0.3, 0.04 }, { cx, cy, BACK - 0.22 }, "lining")
 		if side > 0 then
 			add(pieces, "LeafHandle", { 0.2, 0.9, 0.06 }, { side * 0.35, 5.5, BACK + 0.03 }, "trim")
-			label(pieces, "LeafName", { width - 0.4, 0.9, 0.02 }, { cx, 6.6, BACK + 0.03 }, 0, "ZOMBIE\nDELIVERY CO.", "trim", "GothamBold")
+			label(pieces, "LeafName", { width - 0.4, 0.9, 0.02 }, { cx, 6.6, BACK + 0.03 }, 0, "MOVE · FIND · GROW", "trim", "GothamBold")
 		else
-			label(pieces, "LeafLogo", { width - 0.4, 1.2, 0.02 }, { cx, 6.6, BACK + 0.03 }, 0, "ZDC", "stripe", "GothamBlack")
+			label(pieces, "LeafLogo", { width - 0.4, 1.2, 0.02 }, { cx, 6.6, BACK + 0.03 }, 0, "DELIVEROS", "stripe", "GothamBlack")
 		end
 		table.insert(list, {
 			size = { width, y1 - y0, 0.2 },

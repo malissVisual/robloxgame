@@ -355,11 +355,11 @@ local function carGun(player: Player, arg: any)
 	end
 	local carId = profile.car
 	if not carId then
-		say(player, "ADMIN: your ZDC Van is not ready yet (the save is loading).")
+		say(player, "ADMIN: your Deliveros Van is not ready yet (the save is loading).")
 		return
 	end
 	if not Economy.canMount(carId) then
-		say(player, "ADMIN: this vehicle can't carry a gun (the ZDC Van can; a bike can't).")
+		say(player, "ADMIN: this vehicle can't carry a gun (the Deliveros Van can; a bike can't).")
 		return
 	end
 	if arg == "none" then
@@ -398,7 +398,7 @@ local function car(player: Player, arg: any)
 	-- 7.x, one car: only a vehicle a player may have (the ZDC Van, a bike), never a body of Config.AmbientCars
 	local def = if type(arg) == "string" and Economy.isPlayerCar(arg) then Economy.findCar(arg) else nil
 	if not def then
-		say(player, "ADMIN: unknown car (the ZDC Van and the bikes).")
+		say(player, "ADMIN: unknown car (the Deliveros Van and the bikes).")
 		return
 	end
 	local err = Vehicles.spawn(player, true, def.id)
@@ -996,7 +996,7 @@ function Give.upgrade(player: Player, arg: any)
 	if def.car then
 		local carId = profile.car
 		if not carId then
-			say(player, "ADMIN: your ZDC Van is not ready yet (the save is loading).")
+			say(player, "ADMIN: your Deliveros Van is not ready yet (the save is loading).")
 			return
 		end
 		if not Economy.upgradeFits(carId, def.id) then

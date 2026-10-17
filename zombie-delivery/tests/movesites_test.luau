@@ -86,7 +86,7 @@ check("8.0.1: …its corkboard says \"Bring it home to your warehouse.\" (9.4: t
 	and string.find(plotAll, "THE OLD FARMSTEAD", 1, true) == nil and string.find(plotAll, "Bring it home to your warehouse.", 1, true) ~= nil, plotAll)
 check("8.0.1: …no Marge, no Walt, no Wall, no evacuation", string.find(plotAll, "MARGE", 1, true) == nil and string.find(plotAll, "WALT", 1, true) == nil
 	and string.find(plotAll, "Wall", 1, true) == nil and string.find(string.upper(plotAll), "EVACUAT", 1, true) == nil, plotAll)
-check("8.0.1: the depot's kiosk unchanged (Marge's photo, Go to the Wall, ZDC MOVING & EVACUATION)", cityText.PhotoMarge ~= nil
+check("8.0.1: the depot's kiosk unchanged (Marge's photo, Go to the Wall, Deliveros MOVING & EVACUATION)", cityText.PhotoMarge ~= nil
 	and string.find(cityText.FlyerEvac, "Go to the Wall", 1, true) ~= nil and string.find(cityText.Header, "EVACUATION", 1, true) ~= nil)
 
 -- Sound pieces --------------------------------------------------------------------------------------------------------
@@ -335,10 +335,10 @@ for _, contract in Config.Moving.Contracts do
 	local sign = false
 	for _, p in set.pieces do
 		if p.name == "YardSign" and p.words then
-			sign = p.words[1].lines[1].text == "ZDC MOVING" and p.words[1].lines[2].text == string.upper(contract.name)
+			sign = p.words[1].lines[1].text == "DELIVEROS MOVING" and p.words[1].lines[2].text == string.upper(contract.name)
 		end
 	end
-	check(`{contract.id}: the yard sign says ZDC MOVING · {string.upper(contract.name)}`, sign)
+	check(`{contract.id}: the yard sign says Deliveros MOVING · {string.upper(contract.name)}`, sign)
 end
 
 -- The banner ------------------------------------------------------------------------------------------------------------
@@ -465,10 +465,10 @@ do
 		local sign = false
 		for _, p in set.pieces do
 			if p.name == "YardSign" and p.words then
-				sign = p.words[1].lines[1].text == "ZDC MOVING" and p.words[1].lines[2].text == string.upper(contract.name)
+				sign = p.words[1].lines[1].text == "DELIVEROS MOVING" and p.words[1].lines[2].text == string.upper(contract.name)
 			end
 		end
-		check(`the farm: the yard sign says ZDC MOVING · {string.upper(contract.name)}`, sign)
+		check(`the farm: the yard sign says Deliveros MOVING · {string.upper(contract.name)}`, sign)
 		-- Map step 2 moves the Old Farm and turns it 90° (Map.Relocations): the site follows its place
 		local raw = Map.Places
 		local moved = {}

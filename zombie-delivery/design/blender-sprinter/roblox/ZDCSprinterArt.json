@@ -165,15 +165,15 @@
   "BackDoorL_stripe": {
    "center": [
     -1.775,
-    5.452,
+    5.273,
     10.989
    ],
    "size": [
     3.35,
-    2.204,
+    1.8461,
     0.018
    ],
-   "triangles": 60
+   "triangles": 129
   },
   "BackDoorR_chrome": {
    "center": [
@@ -255,16 +255,16 @@
   },
   "BackDoorR_trim": {
    "center": [
-    1.7086,
-    5.7105,
+    1.8062,
+    5.5369,
     10.839
    ],
    "size": [
-    2.7172,
-    1.4209,
+    2.9124,
+    1.0738,
     0.318
    ],
-   "triangles": 195
+   "triangles": 177
   },
   "Body_amber": {
    "center": [
@@ -386,15 +386,15 @@
   "Body_plate": {
    "center": [
     0.0,
-    2.3167,
+    2.3361,
     0.0
    ],
    "size": [
     1.6,
-    1.5333,
+    1.5721,
     21.99
    ],
-   "triangles": 60
+   "triangles": 38
   },
   "Body_ply": {
    "center": [
@@ -464,15 +464,15 @@
   "Body_stripe": {
    "center": [
     0.0,
-    5.8128,
+    5.4513,
     0.015
    ],
    "size": [
     7.824,
-    6.1055,
+    5.3826,
     21.57
    ],
-   "triangles": 260
+   "triangles": 398
   },
   "Body_trim": {
    "center": [
@@ -485,7 +485,7 @@
     8.8,
     22.0
    ],
-   "triangles": 5137
+   "triangles": 5113
   },
   "Body_under": {
    "center": [
@@ -799,6 +799,6 @@
    -5.75
   ]
  },
- "triangles": 14523,
+ "triangles": 14666,
  "wheelTriangles": 1560
 }

@@ -42,7 +42,7 @@ local VAN: Rules.Bed = { width = V.Width, length = V.Length, height = V.Height, 
 
 -- The van's bay ---------------------------------------------------------------------------------------------------------------
 
-check("the ZDC Van's bay: 6.2 wide, 6.4 long, 4.3 tall (its cargo box less its walls), smaller than the old truck's", V.Width == 6.2 and V.Length == 6.4 and V.Height == 4.3
+check("the Deliveros Van's bay: 6.2 wide, 6.4 long, 4.3 tall (its cargo box less its walls), smaller than the old truck's", V.Width == 6.2 and V.Length == 6.4 and V.Height == 4.3
 	and V.Width * V.Length * V.Height < T.Beds.movingtruck.Width * T.Beds.movingtruck.Length * T.Beds.movingtruck.Height)
 
 -- The hitch ---------------------------------------------------------------------------------------------------------------------
@@ -155,10 +155,10 @@ local FurnitureLooks = require("./FurnitureLooks")
 local SandboxMap = require("./SandboxMap")
 local SP = T.Beds.sprinter
 local SPRINTER: Rules.Bed = { width = SP.Width, length = SP.Length, height = SP.Height, cell = SP.Cell }
-check("the Sprinter's bay: 6.6 wide, 7.6 tall, 14 long, walk-in, its back from the van's doors; far bigger than the ZDC Van's", SP ~= nil and SP.Width == 6.6
+check("the Sprinter's bay: 6.6 wide, 7.6 tall, 14 long, walk-in, its back from the van's doors; far bigger than the Deliveros Van's", SP ~= nil and SP.Width == 6.6
 	and SP.Height == 7.6 and SP.Length == 13.7 and SP.WalkIn == true and type(SP.Back) == "number" and SP.Cell >= 0.4 and SP.Cell <= 0.5
 	and SP.Width * SP.Length * SP.Height > 2.5 * V.Width * V.Length * V.Height)
-check("…the ZDC Van's bay is no walk-in one (the city's game as it was)", V.WalkIn ~= true and V.Back == nil)
+check("…the Deliveros Van's bay is no walk-in one (the city's game as it was)", V.WalkIn ~= true and V.Back == nil)
 do
 	local lying, missing = {}, {}
 	local farm: { [string]: boolean } = {}
@@ -207,7 +207,7 @@ do -- a whole house (shared/HouseLayout.luau plan) loaded piece after piece: the
 	end
 	local sprinter, van = loaded(7, SPRINTER), loaded(7, VAN)
 	-- (8.0 merge: a house holds 2 – 4 small collectibles now, which both bays take: the ratio is a little lower)
-	check("a whole house loaded in one go: the Sprinter takes far more than the ZDC Van", sprinter >= 1.3 * van and sprinter >= 12, `{sprinter} vs {van}`)
+	check("a whole house loaded in one go: the Sprinter takes far more than the Deliveros Van", sprinter >= 1.3 * van and sprinter >= 12, `{sprinter} vs {van}`)
 end
 check("a new seed is a new house (the sandbox refills it every move)", (function()
 	local a, b = HouseLayout.plan(101, "house"), HouseLayout.plan(202, "house")

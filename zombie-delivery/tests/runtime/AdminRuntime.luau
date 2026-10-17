@@ -353,7 +353,7 @@ Runtime.paints = {} -- { { player, what } }
 Runtime.VanPaint = {
 	admin = function(player: any, what: string): string
 		table.insert(Runtime.paints, { player = player, what = what })
-		return if what == "all" then "ADMIN: every paint and livery of the PAINT shop is yours (16 items): wear them at your van." else "ADMIN: the paints reset: nothing bought, your van in ZDC cream with the ZDC classic stripe."
+		return if what == "all" then "ADMIN: every paint and livery of the PAINT shop is yours (16 items): wear them at your van." else "ADMIN: the paints reset: nothing bought, your van in Deliveros cream with the Deliveros classic stripe."
 	end,
 }
 

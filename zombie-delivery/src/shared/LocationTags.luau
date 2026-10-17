@@ -82,7 +82,7 @@ local ESTATE_SUB: { [string]: string } = {
 }
 -- The name as on the building's sign, where the map's list says it otherwise.
 local NAMES: { [string]: string } = {
-	depot = "Zombie Delivery Co.",
+	depot = "Deliveros",
 }
 
 -- The second line for a landmark (nil when there is nothing sure to say).

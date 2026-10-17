@@ -355,7 +355,7 @@ function TutorialSteps.tourDialog(step: string, info: { [string]: any }?): Dialo
 	local last = step == TutorialSteps.Tour[#TutorialSteps.Tour]
 	local page: string? = nil
 	if step == "dock" then
-		page = `See the red ZDC RIDE dock{if type(data.dock) == "string" then ` on {data.dock}` else ""}, right by the depot? Free e-scooters: rent one, ride to your run, leave it at any dock. It's on your GPS.`
+		page = `See the red Deliveros RIDE dock{if type(data.dock) == "string" then ` on {data.dock}` else ""}, right by the depot? Free e-scooters: rent one, ride to your run, leave it at any dock. It's on your GPS.`
 	elseif step == "bus" then
 		page = `The buses are free too. Your nearest stop is {text(data.stop, "a short walk away")}: board at the door, ring the bell (E) and hop off where you need. GPS is on it.`
 	elseif step == "board" then

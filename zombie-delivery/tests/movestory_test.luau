@@ -237,7 +237,7 @@ if greeter then
 	for _, key in { "star", "horde", "leave" } do
 		checkText(`the porch's {key} line fits its bubble`, (greeter :: any)[key], L.Bubble)
 	end
-	check("her first word is for ZDC, the last one for Grandpa's clock (the door is open)", string.find(greeter.hello[1], "ZDC", 1, true) ~= nil
+	check("her first word is for Deliveros, the last one for Grandpa's clock (the door is open)", string.find(greeter.hello[1], "Deliveros", 1, true) ~= nil
 		and string.find(table.concat(greeter.hello, " "), "door's open", 1, true) ~= nil and string.find(greeter.hello[#greeter.hello], "clock", 1, true) ~= nil)
 end
 for _, chapter in chapters do

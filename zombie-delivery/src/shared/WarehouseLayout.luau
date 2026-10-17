@@ -486,7 +486,7 @@ end
 function WarehouseLayout.ownerLines(name: string?, id: number): { Line }
 	return {
 		if name then line(`{name}'s Warehouse`, WHITE, 0.58, "Black") else line("FOR RENT", ORANGE, 0.58, "Black"),
-		line(`ZDC STORAGE · PLOT {id}`, if name then ORANGE else GREY, 0.26, "Bold"),
+		line(`DELIVEROS STORAGE · PLOT {id}`, if name then ORANGE else GREY, 0.26, "Bold"),
 	}
 end
 
@@ -509,7 +509,7 @@ end
 -- 8.1: the UPGRADES desk's monitor.
 function WarehouseLayout.terminalLines(): { Line }
 	return {
-		line("ZDC UPGRADES", ORANGE, 0.36, "Black"),
+		line("DELIVEROS UPGRADES", ORANGE, 0.36, "Black"),
 		line("Warehouse · Stands · Lights · Van", WHITE, 0.2, "Bold"),
 		line("WALK UP TO OPEN", GREY, 0.18, "Medium"), -- (8.3 keys: no key, a phone and a gamepad read it too)
 	}
@@ -734,7 +734,7 @@ function WarehouseLayout.pieces(plot: SandboxMap.Plot): { Piece }
 		local zw = math.min(20, 2 * hx * (1 - (zh + 0.5) / ridge) * 0.95)
 		local zdc = look(add("ZdcSign", "sign", { zw, zh, 0.4 }, { 0, h + 0.5 + zh / 2, hz + 0.3 }, TRIM, "SmoothPlastic"))
 		zdc.yaw = 180
-		zdc.words = { { face = "Front", lit = true, lines = { line("ZDC", ORANGE, 0.6, "Black"), line("ZOMBIE DELIVERY CO.", WHITE, 0.24, "Bold") } } }
+		zdc.words = { { face = "Front", lit = true, lines = { line("DELIVEROS", ORANGE, 0.6, "Black"), line("MOVING & STORAGE", WHITE, 0.24, "Bold") } } }
 	end
 	-- (8.3: its bottom 0.4 over the opening, under a low header a lower one, in front of the Blender door's frame, its
 	-- letters and its lamps: 0.6 out, at most 1.4 wider than the door each side; a Garage's covers its ZDC plate)

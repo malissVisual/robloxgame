@@ -930,7 +930,7 @@ local function showContract(card: any)
 	if not body then
 		return
 	end
-	line(body, "ZDC MOVING · CONTRACT", 1, { Font = Theme.HeadingFont, TextSize = 12, TextColor3 = ORANGE })
+	line(body, "DELIVEROS MOVING · CONTRACT", 1, { Font = Theme.HeadingFont, TextSize = 12, TextColor3 = ORANGE })
 	-- 7.x farm move: the board's contracts (open ones ask for their card, a locked one says why)
 	local list = if type(card.contracts) == "table" then card.contracts else {}
 	local open: { [string]: boolean }? = nil

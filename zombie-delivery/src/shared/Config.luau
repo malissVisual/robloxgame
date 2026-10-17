@@ -288,7 +288,7 @@ Config.Arms = {
 	MaxArmour = 0.8,
 	-- 6.0.1: Marge's text about the plastic bag (server/Tutorial.luau bagCheck); 6.7: the vest's tips
 	-- 6.12.2: Last Stop Supplies is the GEAR counter of the gear stall by the spawn, ZDC Bags the counter next to it
-	BagTip = "Customers tip a courier they can see: the ZDC Courier Vest ({price}) adds 5% to every delivery. Last Stop Supplies sells it at the gear stall by the spawn. It's on your GPS. Bags are at the counter next to it.",
+	BagTip = "Customers tip a courier they can see: the Deliveros Courier Vest ({price}) adds 5% to every delivery. Last Stop Supplies sells it at the gear stall by the spawn. It's on your GPS. Bags are at the counter next to it.",
 }
 
 -- 3.7: the first-day tutorial (server/Tutorial.luau, client/TutorialUi.luau): the dispatcher at the depot greets a new
@@ -456,7 +456,7 @@ Config.Cars = {
 		trolley = true,
 		level = 1,
 		mount = true,
-		name = "ZDC Van",
+		name = "Deliveros Van",
 		price = 0,
 		style = "zdcvan",
 		maxSpeed = 66,
@@ -469,9 +469,9 @@ Config.Cars = {
 		ramPower = 1.35,
 		color = { 217, 204, 176 },
 		role = "The company van: every courier drives one",
-		description = "Zombie Delivery Co.'s own van, yours from day one: a bull bar in front, a roof rack with a spare wheel, a hollow cargo bay with two back doors. Room for 4 pieces (+2 light ones with the Roof Rack). 1 passenger.",
+		description = "Deliveros's own van, yours from day one: a bull bar in front, a roof rack with a spare wheel, a hollow cargo bay with two back doors. Room for 4 pieces (+2 light ones with the Roof Rack). 1 passenger.",
 		stages = {
-			{ name = "ZDC Van", price = 0, capacity = 4, adds = "" },
+			{ name = "Deliveros Van", price = 0, capacity = 4, adds = "" },
 		},
 	},
 	-- 5.1, the bikes (CarDef.bike): sold at the bike counter from level 2 (6.12.7: Dead End Motors' BIKES counter), after
@@ -590,7 +590,7 @@ Config.Cars = {
 		id = "sprinter",
 		sandboxOnly = true,
 		level = 1,
-		name = "ZDC Sprinter",
+		name = "Deliveros Sprinter",
 		price = 0,
 		style = "sprinter",
 		maxSpeed = 58,
@@ -603,7 +603,7 @@ Config.Cars = {
 		ramPower = 1.5,
 		color = { 232, 226, 210 },
 		role = "The sandbox's walk-in van",
-		description = "Zombie Delivery Co.'s high-roof van: walk into its cargo bay through the back doors or the sliding side door. 1 passenger.",
+		description = "Deliveros's high-roof van: walk into its cargo bay through the back doors or the sliding side door. 1 passenger.",
 	},
 } :: { CarDef }
 
@@ -1470,7 +1470,7 @@ Config.Kit = {
 	-- just the look (no armour), worn until a Kevlar or heavy vest covers it (shared/KitFit.luau). Saves from before
 	-- 6.0.1 get it once on load (server/PlayerData.luau), so nobody who played loses it. 6.7: customers tip a courier
 	-- they can see: +5% of every order's pay (tips; it counts under an armoured vest too: kit is always worn).
-	{ id = "hivis", name = "Courier Vest", level = 1, price = 20, icon = "🦺", tips = 0.05, description = "The ZDC reflective vest: customers see a courier and tip +5% on every delivery (it still counts under a Kevlar or heavy vest)." },
+	{ id = "hivis", name = "Courier Vest", level = 1, price = 20, icon = "🦺", tips = 0.05, description = "The Deliveros reflective vest: customers see a courier and tip +5% on every delivery (it still counts under a Kevlar or heavy vest)." },
 	-- 6.4, the bigger bags (6.6: sold at ZDC Bags; USE there or in the I window's BAGS tab picks the one you hold)
 	{ id = "tote", name = "Canvas Tote", level = 2, price = 120, icon = "👜", extra = 3, carry = "shoulder", stays = true, description = "Sprint with your deliveries: 3 light pieces ride in this canvas tote over your shoulder. Swings onto your back when you draw your gun." },
 	{ id = "thermal", name = "Thermal Delivery Bag", level = 3, price = 300, icon = "🔥", extra = 4, carry = "hand", bagWarm = 0.35, description = "Sprint with your deliveries: 4 light pieces ride in it. Insulated: food in it stays hot (cools ×0.35)." },
@@ -1518,14 +1518,14 @@ Config.GearStall = {
 	Height = 10,
 	Counter = 6.5,
 	Radius = 14,
-	Board = "LAST STOP SUPPLIES · ZDC BAGS  GEAR & BAGS FOR COURIERS",
+	Board = "LAST STOP SUPPLIES · DELIVEROS BAGS  GEAR & BAGS FOR COURIERS",
 }
 
 -- 6.6, ZDC Bags (Map.Shops.bags): the bags (Config.Kit pieces with `extra`). 6.12.2: the BAGS counter of the gear stall
 -- (Config.GearStall; the 6.6 kiosk east of the spawn is gone). X / Z: the counter's front (the customers' side), studs
 -- from the depot's middle; Radius: the stall's. (Last Stop Supplies, the GEAR counter: Map.Shops.supplies.)
 Config.BagShop = {
-	Name = "ZDC Bags",
+	Name = "Deliveros Bags",
 	X = Config.GearStall.X + Config.GearStall.Depth / 2,
 	Z = Config.GearStall.Z - Config.GearStall.Counter,
 	Radius = Config.GearStall.Radius,
@@ -1548,7 +1548,7 @@ Config.BagShop = {
 	Refund = {} :: { [string]: number },
 	Flag = "perGameBags",
 	Refunded = "Bags are now bought for each game: {money} refunded for your bags.",
-	NoBag = "No bag this game: buy one at ZDC Bags (by the spawn).",
+	NoBag = "No bag this game: buy one at Deliveros Bags (by the spawn).",
 	BuyHint = "BUY A BAG",
 	Pill = "BUY",
 	ForGame = "FOR THIS GAME",
@@ -1566,9 +1566,9 @@ Config.VanQuest = {
 	Sign = "· SOLD",
 	Tag = "SOLD · Earl's own, not for sale",
 	Lines = {
-		"Sold my last van years ago, kid. Your company hands every courier a ZDC Van now.",
+		"Sold my last van years ago, kid. Your company hands every courier a Deliveros Van now.",
 		"She ain't for sale. Thirty years on the road: she's earned her rest.",
-		"Treat that ZDC Van right, kid. They don't build 'em like my old girl any more.",
+		"Treat that Deliveros Van right, kid. They don't build 'em like my old girl any more.",
 	} :: { string },
 }
 
@@ -1598,11 +1598,11 @@ Config.VanQuest = {
 Config.CompanyVan = {
 	Car = "zdcvan",
 	Flag = "vanOnly",
-	Refunded = "The company runs on one car now: your ZDC Van. {money} paid back for your other cars, and the van took over their best upgrades.",
-	Kept = "The company runs on one car now: your ZDC Van. It took over the best upgrades of your other cars.",
+	Refunded = "The company runs on one car now: your Deliveros Van. {money} paid back for your other cars, and the van took over their best upgrades.",
+	Kept = "The company runs on one car now: your Deliveros Van. It took over the best upgrades of your other cars.",
 	Bonus = "{employer} pays you a {money} bonus for your work!",
-	Hello = "One more thing: the company's ZDC Van is yours. Press CAR and it comes to you. The ★ car jobs open at level {level}.",
-	MissionsNeed = "Missions need your ZDC Van: press CAR and it comes to you.",
+	Hello = "One more thing: the company's Deliveros Van is yours. Press CAR and it comes to you. The ★ car jobs open at level {level}.",
+	MissionsNeed = "Missions need your Deliveros Van: press CAR and it comes to you.",
 }
 
 -- 5.1, the bikes (Config.Cars with bike = true) and the bike gear (Config.Gear bikeOnly), sold at Spoke & Chain Cycles
@@ -1903,7 +1903,7 @@ Config.Cosmetics = {
 	} :: { [string]: CosmeticCounter },
 	Items = {
 		-- Hats (StyleLooks.hat: fitted to the head; the player's own hat and hair accessories hide under it)
-		{ id = "cap_red", name = "Backwards Cap · ZDC Red", slot = "hat", look = "cap", price = 120, color = { 196, 40, 38 }, trim = { 28, 31, 34 }, description = "The dispatcher's favourite, worn the courier way." },
+		{ id = "cap_red", name = "Backwards Cap · Deliveros Red", slot = "hat", look = "cap", price = 120, color = { 196, 40, 38 }, trim = { 28, 31, 34 }, description = "The dispatcher's favourite, worn the courier way." },
 		{ id = "cap_black", name = "Backwards Cap · Black", slot = "hat", look = "cap", price = 120, color = { 32, 34, 38 }, trim = { 196, 40, 38 }, description = "A black cap with a red snap, peak to the back." },
 		{ id = "beanie_orange", name = "Beanie · Safety Orange", slot = "hat", look = "beanie", price = 150, color = { 245, 120, 30 }, trim = { 214, 92, 22 }, description = "A knitted beanie with a pom-pom. Seen from three blocks away." },
 		{ id = "beanie_grey", name = "Beanie · Heather Grey", slot = "hat", look = "beanie", price = 150, color = { 150, 152, 156 }, trim = { 196, 40, 38 }, description = "A grey beanie with a red cuff." },
@@ -1914,7 +1914,7 @@ Config.Cosmetics = {
 		{ id = "helmet_chrome", name = "Chrome Helmet", slot = "hat", look = "helmet", price = 0, reward = "pass", color = { 205, 210, 216 }, trim = { 30, 30, 34 }, material = "Foil", description = "Not for sale: a reward of a later pass." },
 		-- Jackets (StyleLooks.jacket: thin shells over the torso and the arms, under the vest and the bag)
 		{ id = "hoodie_grey", name = "Hoodie · Grey", slot = "jacket", look = "hoodie", price = 350, color = { 118, 122, 128 }, trim = { 196, 40, 38 }, description = "A grey hoodie: a hood, a kangaroo pocket, red cuffs." },
-		{ id = "hoodie_red", name = "Hoodie · ZDC Red", slot = "jacket", look = "hoodie", price = 350, color = { 176, 36, 34 }, trim = { 30, 32, 36 }, description = "The company's red hoodie with black cuffs." },
+		{ id = "hoodie_red", name = "Hoodie · Deliveros Red", slot = "jacket", look = "hoodie", price = 350, color = { 176, 36, 34 }, trim = { 30, 32, 36 }, description = "The company's red hoodie with black cuffs." },
 		{ id = "track_blue", name = "Track Jacket", slot = "jacket", look = "track", price = 500, color = { 36, 74, 160 }, trim = { 236, 236, 232 }, description = "Blue, with two white stripes down each sleeve." },
 		{ id = "bomber_olive", name = "Bomber Jacket", slot = "jacket", look = "bomber", price = 650, level = 3, color = { 88, 98, 62 }, trim = { 214, 110, 40 }, description = "An olive bomber with ribbed orange cuffs and a sleeve pocket." },
 		{ id = "puffer_yellow", name = "Puffer Jacket", slot = "jacket", look = "puffer", price = 800, level = 4, color = { 238, 190, 40 }, trim = { 60, 60, 64 }, material = "SmoothPlastic", description = "A quilted puffer for the cold night shifts." },
@@ -1939,7 +1939,7 @@ Config.Cosmetics = {
 		{ id = "wrap_teal", name = "Satin Teal", slot = "wrap", look = "wrap", price = 900, color = { 32, 150, 150 }, description = "A satin teal wrap." },
 		{ id = "wrap_orange", name = "Sunset Orange", slot = "wrap", look = "wrap", price = 900, color = { 240, 110, 40 }, description = "A sunset orange wrap." },
 		{ id = "wrap_ice", name = "Ice Blue", slot = "wrap", look = "wrap", price = 900, color = { 150, 200, 236 }, description = "A pale ice-blue wrap." },
-		{ id = "wrap_red", name = "ZDC Courier Red", slot = "wrap", look = "wrap", price = 1000, color = { 190, 36, 34 }, description = "The company's red, on every car of yours." },
+		{ id = "wrap_red", name = "Deliveros Courier Red", slot = "wrap", look = "wrap", price = 1000, color = { 190, 36, 34 }, description = "The company's red, on every car of yours." },
 		{ id = "wrap_green", name = "Racing Green", slot = "wrap", look = "wrap", price = 1100, color = { 22, 92, 56 }, description = "A deep racing green." },
 		{ id = "wrap_matte", name = "Matte Black", slot = "wrap", look = "wrap", price = 1200, color = { 30, 31, 34 }, material = "Plastic", description = "A flat, matte black." },
 		{ id = "wrap_purple", name = "Candy Purple", slot = "wrap", look = "wrap", price = 1500, level = 6, color = { 130, 40, 170 }, material = "Metal", description = "A metallic candy purple." },
@@ -1953,7 +1953,7 @@ Config.Cosmetics = {
 		{ id = "bike_white", name = "Pearl White Frame", slot = "bikepaint", look = "bikepaint", price = 250, color = { 236, 236, 230 }, description = "Every bike's frame and the E-Scooter in pearl white." },
 		{ id = "bike_gold", name = "Gold Frame", slot = "bikepaint", look = "bikepaint", price = 0, reward = "event", color = { 222, 176, 48 }, material = "Metal", description = "Not for sale: a reward of a later event." },
 		-- Decals for the cars, vans and trucks (StyleLooks.decals)
-		{ id = "logo", name = "ZDC Logo", slot = "decal", look = "logo", price = 500, color = { 236, 236, 232 }, trim = { 196, 40, 38 }, description = "The company's roundel on both sides." },
+		{ id = "logo", name = "Deliveros Logo", slot = "decal", look = "logo", price = 500, color = { 236, 236, 232 }, trim = { 196, 40, 38 }, description = "The company's roundel on both sides." },
 		{ id = "stripes_white", name = "Racing Stripes · White", slot = "decal", look = "stripes", price = 900, color = { 236, 236, 232 }, description = "Two white stripes over the hood and the roof." },
 		{ id = "stripes_black", name = "Racing Stripes · Black", slot = "decal", look = "stripes", price = 900, color = { 26, 27, 30 }, description = "Two black stripes over the hood and the roof." },
 		{ id = "checker", name = "Checker Band", slot = "decal", look = "checker", price = 1200, level = 5, color = { 236, 236, 232 }, trim = { 24, 24, 26 }, description = "A black and white checker band down both sides." },
@@ -2883,7 +2883,7 @@ Config.Levels = {
 	Rewards = {
 		[2] = { money = 500, items = { medkit = 2 }, text = "Your first bike: the BIKES counter at Dead End Motors" }, -- (6.12.7: Spoke & Chain before)
 		[3] = { money = 750, items = { medkit = 2 }, kit = "tote" }, -- (6.6: the Canvas Tote, no backpack any more)
-		[4] = { money = 1000, items = { medkit = 2 }, kit = "thermal", text = "The ★ car jobs, in your ZDC Van" }, -- (6.12.2: the shoes before; 7.x: Earl's Old Van before)
+		[4] = { money = 1000, items = { medkit = 2 }, kit = "thermal", text = "The ★ car jobs, in your Deliveros Van" }, -- (6.12.2: the shoes before; 7.x: Earl's Old Van before)
 		[5] = { money = 1500, items = { repair = 2 }, paint = "hivis" },
 		[6] = { money = 2000, items = { molotov = 4 } },
 		[7] = { money = 2500, items = { mine = 2 } },
@@ -3979,7 +3979,7 @@ Config.Jobs = {
 		StrayDistance = { 60, 110 } :: { number },
 		-- A car job (the board's ★ … ★★★★, a special in your own car) while you have no vehicle: locked with these words.
 		-- (7.x: every courier has the ZDC Van, so only a save still loading sees them.)
-		NeedsVehicle = "Needs your ZDC Van: press CAR and it comes to you.",
+		NeedsVehicle = "Needs your Deliveros Van: press CAR and it comes to you.",
 		NeedsVehicleButton = "🚐 CALL YOUR VAN",
 		TutorialDrop = 220,
 		TutorialCargo = { cargo = "Letters", kind = "crate", look = "mail", piece = "letter bundle", plural = "letter bundles" },
@@ -4021,7 +4021,7 @@ Config.Jobs = {
 		NeedsBikeButton = "🚲 NEEDS A BIKE",
 		RideBike = "Bike jobs are ridden: MY BIKE on your phone brings your bike (your car stays where it is).",
 		RideBikeButton = "🚲 RIDE YOUR BIKE",
-		NeedsCar = "You're on your bike: car jobs need your ZDC Van. CALL CAR on your phone.",
+		NeedsCar = "You're on your bike: car jobs need your Deliveros Van. CALL CAR on your phone.",
 		NeedsCarButton = "🚐 CALL YOUR VAN",
 	},
 	-- Every job is a list of stops. At a pick-up you park in the circle, get out, carry the pieces from the giver to
@@ -5152,11 +5152,11 @@ Config.Courier = {
 	Step = 3.5,
 	Switch = 0.5,
 	-- 6.4: Marge texts once when a level opens a bag you don't own (server/Tutorial.luau; {name}, {room}, {price}).
-	BagUnlock = "Sprint with more of your deliveries: ZDC Bags at the depot has the {name} for you now, {room} pieces in it, {price} for this game. It's on your GPS.", -- (6.23: bags for each game)
+	BagUnlock = "Sprint with more of your deliveries: Deliveros Bags at the depot has the {name} for you now, {room} pieces in it, {price} for this game. It's on your GPS.", -- (6.23: bags for each game)
 	-- 6.6: Marge's text, once, to a save that owned a backpack (Config.RetiredKit): {money} is the refund
 	PackRefund = "Backpacks are gone: bags do it all now. You got {money} back.",
 	-- 6.7: Marge's text, once, to a save that owned the Thermal Jacket (Config.RetiredKit, its noJacket flag)
-	JacketRefund = "The Thermal Jacket is gone: the Thermal Delivery Bag at ZDC Bags keeps food far hotter. You got {money} back.",
+	JacketRefund = "The Thermal Jacket is gone: the Thermal Delivery Bag at Deliveros Bags keeps food far hotter. You got {money} back.",
 	-- 6.12.2: … and to a save that owned the Running Shoes (Config.RetiredKit, its noShoes flag)
 	ShoeRefund = "The Running Shoes are gone from the shops: you got {money} back. Need more legs? An Energy Drink at the gear stall by the spawn.",
 	-- 6.4.1, what is in the bag shows (shared/BagFill.luau; server/KitWear.luau on you, server/Cargo.luau on the ground):
@@ -5336,7 +5336,7 @@ Config.JobTypes = {
 	{
 		id = "schoolrun",
 		name = "School Run",
-		description = "Pick the kids up at three homes and bring them to Sunny Hill School in your ZDC Van.",
+		description = "Pick the kids up at three homes and bring them to Sunny Hill School in your Deliveros Van.",
 		employer = "school",
 		level = 4, -- 5.0: a company vehicle (or your own car) needs level 4 (7.x: the car jobs' level)
 		pickups = 3,
@@ -5360,7 +5360,7 @@ Config.JobTypes = {
 	{
 		id = "armysupply",
 		name = "Army Supply",
-		description = "Load ammo at the Harbor Docks and drive it in your ZDC Van through the tunnel to the base.",
+		description = "Load ammo at the Harbor Docks and drive it in your Deliveros Van through the tunnel to the base.",
 		level = 7, -- (3.2: the armored truck it earned could carry a car gun; 7.x: the army's bonus)
 		employer = "army",
 		pickups = 1,
@@ -5384,7 +5384,7 @@ Config.JobTypes = {
 	{
 		id = "icecream",
 		name = "Ice Cream Route",
-		description = "Load up at Frosty's and sell ice cream from your ZDC Van at 4 stops. Hold still while the kids buy.",
+		description = "Load up at Frosty's and sell ice cream from your Deliveros Van at 4 stops. Hold still while the kids buy.",
 		employer = "icecream",
 		pickups = 1,
 		pickupAt = "frosty",
@@ -5408,7 +5408,7 @@ Config.JobTypes = {
 	{
 		id = "moving",
 		name = "Moving Day",
-		description = "Load a family's furniture into your ZDC Van at their house and unload it at their new home.",
+		description = "Load a family's furniture into your Deliveros Van at their house and unload it at their new home.",
 		employer = "movers",
 		level = 4, -- 5.0: a company vehicle (or your own car) needs level 4 (7.x: the car jobs' level)
 		pickups = 1,
@@ -5432,7 +5432,7 @@ Config.JobTypes = {
 	{
 		id = "farmrun",
 		name = "Farm Run",
-		description = "Load fresh food into your ZDC Van at the Old Farm and bring it to two markets in the city.",
+		description = "Load fresh food into your Deliveros Van at the Old Farm and bring it to two markets in the city.",
 		employer = "farm",
 		level = 9, -- 5.0: the Muscle Car's level then (4.x: 8)
 		pickups = 1,
@@ -5480,7 +5480,7 @@ Config.JobTypes = {
 	{
 		id = "horses", -- (the id stays: 7.x turned the Horse Transport into Feed and Tack, horses do not fit a van)
 		name = "Feed and Tack",
-		description = "Walt's mares went to the Riverside Riding School. Load their feed sacks and saddles at Silver Spur Ranch into your ZDC Van and bring them over.",
+		description = "Walt's mares went to the Riverside Riding School. Load their feed sacks and saddles at Silver Spur Ranch into your Deliveros Van and bring them over.",
 		employer = "ranch",
 		level = 5,
 		pickups = 1,
@@ -5504,7 +5504,7 @@ Config.JobTypes = {
 	{
 		id = "fuelrun",
 		name = "Fuel Run",
-		description = "Load fuel barrels into your ZDC Van at the Harbor Fuel Depot and refill the Gas Station on the North Highway.",
+		description = "Load fuel barrels into your Deliveros Van at the Harbor Fuel Depot and refill the Gas Station on the North Highway.",
 		employer = "gas",
 		level = 4,
 		pickups = 1,
@@ -5528,7 +5528,7 @@ Config.JobTypes = {
 	{
 		id = "cashrun",
 		name = "Cash Transport",
-		description = "Load sacks of cash at the First Zombie Bank into your ZDC Van and bring them to the Military Base vault. Every bandit in town wants this cargo.",
+		description = "Load sacks of cash at the First Zombie Bank into your Deliveros Van and bring them to the Military Base vault. Every bandit in town wants this cargo.",
 		employer = nil,
 		board = true,
 		level = 5,
@@ -5554,7 +5554,7 @@ Config.JobTypes = {
 	{
 		id = "ambulance",
 		name = "Ambulance Run",
-		description = "A patient is waiting at their home. Pick them up in your ZDC Van and rush them to the City Clinic before it is too late.",
+		description = "A patient is waiting at their home. Pick them up in your Deliveros Van and rush them to the City Clinic before it is too late.",
 		employer = "clinic",
 		level = 4, -- 5.0: a company vehicle (or your own car) needs level 4 (7.x: the car jobs' level)
 		pickups = 1,
@@ -7136,7 +7136,7 @@ Config.MoveHelper = {
 	Solo = true,
 	Duo = false,
 	Name = "Danny",
-	Title = "ZDC Moving",
+	Title = "Deliveros Moving",
 	Health = 100,
 	Respawn = 15,
 	Speed = 0.7,
@@ -7748,7 +7748,7 @@ export type SandboxUpgradeDef = { name: string, icon: string, max: number, step:
 Config.SandboxUpgrades = {
 	Order = { "warehouse", "stands", "lights", "engine", "danny" } :: { string },
 	List = {
-		warehouse = { name = "ZDC Warehouse", icon = "🏭", max = 4, step = 1, prices = { 1000, 7500, 30000, 100000 } },
+		warehouse = { name = "Deliveros Warehouse", icon = "🏭", max = 4, step = 1, prices = { 1000, 7500, 30000, 100000 } },
 		stands = { name = "More stands", icon = "🏛️", max = 4, step = 2, prices = { 4000, 8000, 15000, 25000 } },
 		lights = { name = "Showroom lights", icon = "💡", max = 5, step = 0.1, prices = { 1500, 4000, 12000, 30000, 75000 } },
 		engine = { name = "Van engine", icon = "🚐", max = 3, step = 0.05, prices = { 1500, 5000, 15000 } },
@@ -8159,7 +8159,7 @@ export type VanPaintDef = {
 }
 Config.VanPaint = {
 	Paints = {
-		{ id = "cream", name = "ZDC cream", color = { 232, 226, 210 }, price = 0 },
+		{ id = "cream", name = "Deliveros cream", color = { 232, 226, 210 }, price = 0 },
 		{ id = "white", name = "Arctic white", color = { 241, 243, 245 }, price = 300 },
 		{ id = "silver", name = "Silver grey", color = { 170, 175, 181 }, price = 400 },
 		{ id = "graphite", name = "Graphite", color = { 66, 70, 76 }, price = 500 },
@@ -8174,7 +8174,7 @@ Config.VanPaint = {
 		{ id = "chrome", name = "Mirror chrome", color = { 206, 212, 218 }, material = "Foil", price = 50000, premium = true },
 	} :: { VanPaintDef },
 	Liveries = {
-		{ id = "zdc", name = "ZDC classic", stripe = { 179, 38, 30 }, price = 0 },
+		{ id = "zdc", name = "Deliveros classic", stripe = { 179, 38, 30 }, price = 0 },
 		{ id = "alpine", name = "Alpine", stripe = { 34, 110, 70 }, roof = "snow", price = 1200 },
 		{ id = "racing", name = "Racing stripes", stripe = "contrast", roof = "racing", price = 1500 },
 		{ id = "goldline", name = "Gold line", stripe = { 212, 170, 60 }, material = "Metal", roof = "pinstripe", price = 3000 },

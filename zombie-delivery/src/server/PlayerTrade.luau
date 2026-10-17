@@ -582,7 +582,7 @@ function PlayerTrade.setPrice(owner: Player, uid: any, price: any): (boolean, st
 	end
 	local ok, why = Collection.setSale(owner, entry.uid, price)
 	if ok then
-		say(owner, `🏷 FOR SALE: your {entry.name} at {Market.money(price)} (you get {Market.money(Rules.net(price))} after the ZDC fee).`)
+		say(owner, `🏷 FOR SALE: your {entry.name} at {Market.money(price)} (you get {Market.money(Rules.net(price))} after the Deliveros fee).`)
 	end
 	return ok, why
 end

@@ -25,7 +25,7 @@
 --   Ui.bar(parent, size, color) -> (back, fill)   a thin square bar on a dark track.
 --
 -- 5.8, the courier phone's marks (design/phone-ui/) for every window:
---   Ui.brand(parent, size?, props?) -> Frame   the ZDC mark: the red square and the "ZDC" wordmark.
+--   Ui.brand(parent, size?, props?) -> Frame   the company's mark: the red square and the "DELIVEROS" wordmark (8.9: was ZDC).
 --   Ui.glyph(slot, id, size?)   draws the phone's white line glyph `id` (PhoneContract: "board", "missions", "garage",
 --       "estate", "bank", "crew", "top", "career", "settings", "shop", "bag", "orders", "map", "messages"; "" clears).
 --   Ui.glyphFor(icon?) -> string   the glyph id for a window's emoji icon ("" when none fits).
@@ -947,7 +947,7 @@ end
 function Ui.brand(parent: Instance, size: number?, props: { [string]: any }?): any
 	local s = size or 20
 	local square = math.max(8, math.floor(s * 0.6 + 0.5))
-	local wordW = math.floor(s * 2.25 + 0.5)
+	local wordW = math.floor(s * 5.4 + 0.5) -- (8.9: DELIVEROS, nine letters)
 	local frame = Ui.make("Frame", {
 		Name = "Brand",
 		Size = UDim2.fromOffset(square + 6 + wordW, s + 8),
@@ -961,7 +961,7 @@ function Ui.brand(parent: Instance, size: number?, props: { [string]: any }?): a
 		BackgroundColor3 = K.red,
 		BorderSizePixel = 0,
 	}, frame)
-	Ui.label(frame, "ZDC", UDim2.new(0, wordW, 1, 0), {
+	Ui.label(frame, "DELIVEROS", UDim2.new(0, wordW, 1, 0), {
 		Name = "Wordmark",
 		Position = UDim2.fromOffset(square + 6, 0),
 		Font = Theme.DisplayFont,

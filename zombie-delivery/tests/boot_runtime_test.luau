@@ -251,7 +251,7 @@ check("sandbox: no warnings", #E.warnings == 0, table.concat(E.warnings, " | "))
 
 -- ── Sandbox: the player ────────────────────────────────────────────────────
 local vanId = if Economy.isPlayerCar(Config.Sandbox.Van) then Config.Sandbox.Van else Config.CompanyVan.Car
-check("the van: Config.Sandbox.Van, else the ZDC Van while it is not in Config.Cars", Boot.vanId() == vanId, Boot.vanId())
+check("the van: Config.Sandbox.Van, else the Deliveros Van while it is not in Config.Cars", Boot.vanId() == vanId, Boot.vanId())
 
 local ann = newPlayer("Ann", 2)
 local plot = Map.Plots[2]

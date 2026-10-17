@@ -269,7 +269,7 @@ for _, s in SCREENS do
 		condition = 0.92, value = 800, income = 6.4, sale = 2000 }
 	fire(PRICING)
 	check(`{L}: the price picker ("price"): "🏷 FOR SALE SIGN", your stand, "🏷 On sale now at $2,000", what you get`, TradeUi.showing() == "price" and text("Title") == "🏷 FOR SALE SIGN"
-		and text("Sub") == "Your warehouse · stand 2" and text("Note") == "🏷 On sale now at $2,000" and text("Foot") == "You get $1,840 after the 8% ZDC fee."
+		and text("Sub") == "Your warehouse · stand 2" and text("Note") == "🏷 On sale now at $2,000" and text("Foot") == "You get $1,840 after the 8% Deliveros fee."
 		and text("TakeOff") == "TAKE OFF SALE" and text("SetPrice") == "SET $2,000", text("Foot"))
 	layoutChecks(`{L} price picker`)
 	press(named(card(), "Plus"))

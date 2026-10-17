@@ -135,7 +135,7 @@ check("the Old Van is meant for ★ jobs, the Rally Van for ★★★★", FuelM
 -- middle), more on the short ★ runs, never under 2 × Lasts on the long ★★★★ ones.
 local zdc = car(Config.CompanyVan.Car)
 local mid, long = FuelMath.jobsPerTank(zdc, 3), FuelMath.jobsPerTank(zdc, 4)
-check("7.x: the ZDC Van's tank: 3 – 5 ★★★ jobs × Lasts, at least 2 × Lasts at ★★★★", mid >= 3 * Config.Fuel.Lasts and mid <= 5 * Config.Fuel.Lasts
+check("7.x: the Deliveros Van's tank: 3 – 5 ★★★ jobs × Lasts, at least 2 × Lasts at ★★★★", mid >= 3 * Config.Fuel.Lasts and mid <= 5 * Config.Fuel.Lasts
 	and long >= 2 * Config.Fuel.Lasts and FuelMath.jobsPerTank(zdc, 1) > mid, `{mid} {long}`)
 
 -- ── The gas stations ───────────────────────────────────────────────────────

@@ -31,7 +31,7 @@ ok, why = Holding.can("gun", true, false, false)
 check("the gun only with a gun", not ok and why == "nogun" and (Holding.can("gun", false, true, false)), why)
 check("an unknown hand never", not Holding.can("phone", true, true, false))
 check("every refusal says why", string.find(Holding.whyText("bagdown"), "pick it up", 1, true) ~= nil and string.find(Holding.whyText("nogun"), "Lead & Co.", 1, true) ~= nil
-	and string.find(Holding.whyText("nobag"), "ZDC Bags", 1, true) ~= nil and #Holding.whyText(nil) > 0)
+	and string.find(Holding.whyText("nobag"), "Deliveros Bags", 1, true) ~= nil and #Holding.whyText(nil) > 0)
 
 -- The d-pad's cycle ------------------------------------------------------------------------------------------------
 

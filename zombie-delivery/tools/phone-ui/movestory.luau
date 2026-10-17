@@ -118,7 +118,7 @@ local card = {
 	estimate = 9000,
 	time = Config.Moving.Time,
 	hordeAt = Config.Moving.HordeAt,
-	truck = "ZDC Van",
+	truck = "Deliveros Van",
 	crew = 0,
 }
 local function story()
@@ -155,7 +155,7 @@ remote.OnClientEvent:Fire("contract", card)
 local intro = story()
 check("the first board: Marge's intro before the card", intro ~= nil and contractCard() == nil and MoveStoryUi.isOpen() and MovingHud.isOpen())
 check("… her portrait, her name, the company, the line", named(intro, "PortraitBack") ~= nil and has(intro, "MARGE") and has(intro, string.upper(MoveStory.Company))
-	and has(intro, MoveStory.Intro[1].text) and has(intro, "ZDC Moving & Evacuation"))
+	and has(intro, MoveStory.Intro[1].text) and has(intro, "Deliveros Moving & Evacuation"))
 check("… page 1 / 4, SKIP and NEXT, no ✕ (no way back)", page() == `1 / {#MoveStory.Intro}` and named(intro, "Skip") ~= nil and named(intro, "Next").Text == "NEXT ›"
 	and named(intro, "Close") == nil)
 local scale = named(intro, "Scale").Scale

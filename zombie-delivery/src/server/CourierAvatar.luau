@@ -131,7 +131,7 @@ local function loadLook(player: Player)
 			looks[player] = classic(result)
 		else
 			looks[player] = false
-			print(`[CourierAvatar] {player.Name} wears the ZDC workwear (their own look did not load: {result})`)
+			print(`[CourierAvatar] {player.Name} wears the Deliveros workwear (their own look did not load: {result})`)
 		end
 		local character = player.Character
 		if character and character:GetAttribute("CharacterArt") == "courier" then
