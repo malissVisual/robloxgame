@@ -3,7 +3,7 @@
 Logo hry **Deliveros**, čtyři náhledovky (thumbnails) a dvě ikony pro stránku hry na Robloxu. Ukazují hru, jak je
 teď: **stěhování**, **vzácné věci, které najdeš při jízdě**, a **byznys se skladem**. Postavy, dodávka, chata, sklad
 i sběratelské kousky jsou skutečné modely hry z Blenderu (`design/blender-*`). Stará zombie grafika (`art/promo/`)
-patří ke staré hře a už se nepoužívá.
+patřila ke staré hře; ve verzi 10.5 je smazaná (zůstává v historii Gitu do verze 10.4).
 
 | Soubor (`art/store/`) | Velikost | Co to je |
 | --- | --- | --- |

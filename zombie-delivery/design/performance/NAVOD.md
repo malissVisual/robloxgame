@@ -1,23 +1,16 @@
-# Výkon a mobily: návod pro majitele (6.13.1)
+# Výkon a mobily: návod pro majitele
 
-Hra je veřejná a hodně hráčů hraje na telefonu. Verze 6.13.1 je zrychlila:
-- **Méně stínů.** Stín vrhají jen díly, u kterých ho je vidět: ve městě ~14 100 dílů místo ~18 200. Sloupy lamp,
-  stříšky a palmy ho mají dál.
-- **Méně světel.** V noci svítí jen nejbližší světla: 40 na počítači, 16 na telefonu. Ostatní lampy dál září, jen
-  neosvětlují okolí. Světla se plynule rozsvěcují a zhasínají a obě světla auta svítí vždy spolu.
-- **Zaparkované auto drží server.** Když nikdo nesedí za volantem, auto nespadne skrz zem, ani když jsi daleko.
-- **Telefon šetří.** Animuje jen bližší postavy, auta a zvířata.
-- **Méně textu v dálce.** Malé texty (čísla domů, cedule) se kreslí jen zblízka.
-- **Přehled výkonu pro admina,** aby šel výkon změřit přímo na telefonu.
+Hodně hráčů hraje na telefonu. Hra je proto lehká: lobby má asi 1 300 dílů, malé nápisy se kreslí jen zblízka a sklady
+se se streamováním načítají vždy celé. Podrobnosti pro Clauda jsou v [`REPORT.md`](REPORT.md).
 
-Podrobnosti pro Clauda jsou v [`REPORT.md`](REPORT.md).
+(10.5: návod ke starému městu, jeho denní době a jeho místům je pryč i s městem; zůstává v historii Gitu do verze 10.4.)
 
 ## Krok 1: zapni streamování (jednou, ve Studiu)
 
 Rojo (`node tools/rojo-sync.js zombie-delivery`) synchronizuje jen skripty. Nastavení Workspace je uložené přímo v
 místě (place), proto se zapíná ve Studiu:
 
-1. Ve Studiu otevři místo Zombie Delivery, které publikuješ.
+1. Ve Studiu otevři místo, které publikuješ.
 2. V okně **Explorer** klikni na **Workspace**.
 3. V okně **Properties** najdi skupinu **Streaming** a nastav tyto hodnoty:
 
@@ -39,8 +32,9 @@ místě (place), proto se zapíná ve Studiu:
 ## Krok 2: zapni přehled výkonu
 
 Přehled vidí jen admin. Tvůj účet admin je, protože jsi tvůrce hry; další admini jsou v `Config.Admin.UserIds`.
-- **Na počítači:** stiskni **P**, otevři záložku **WORLD** a klikni na **PERFORMANCE · OFF** (přepne se na ON).
-- **Na telefonu:** po PLAY klepni vpravo nahoře na **🛠 ADMIN**, pak **WORLD** a **PERFORMANCE**.
+- **Na počítači:** stiskni **P** a klikni na **PERFORMANCE · OFF** (přepne se na ON; ve verzi 10.4 je v záložce
+  **WORLD**).
+- **Na telefonu:** po startu klepni vpravo nahoře na **🛠 ADMIN** a pak na **PERFORMANCE**.
 
 Malé okno se objeví nahoře uprostřed. Zůstane tam, i když admin panel zavřeš, a klepnutí jím projdou do hry. Tlačítko
 **✕** přehled vypne. Tlačítko **LITE** přepíná úsporný režim: telefon ho má zapnutý sám, na počítači si ho můžeš
@@ -51,12 +45,12 @@ vyzkoušet.
 1. Telefon nabij (ne úsporný režim baterie), připoj na Wi-Fi a zavři ostatní aplikace.
 2. Otevři **veřejnou hru** v aplikaci Roblox. Poznamenej si kvalitu grafiky v nastavení Roblox (nejlépe nech
    „Automaticky“).
-3. Dej PLAY a zapni přehled (krok 2).
+3. Spusť hru a zapni přehled (krok 2).
 4. Udělej screenshot na každém z těchto míst. Na každém nejdřív počkej asi 10 sekund, ať se čísla ustálí:
-   1. u depa (spawn), ve dne;
-   2. za jízdy autem centrem města (Downtown, mezi věžemi);
-   3. v noci v centru (admin panel → **WORLD** → **22:00 Night**);
-   4. u parku a Lantern Garden;
+   1. v lobby na náměstí;
+   2. ve svém skladu mezi plnými stojany;
+   3. v domě při běhu (nejlépe velký dům, The Old Farmstead);
+   4. v běhu na **Hard** nebo těžší, když jsou kolem zombie;
    5. na jednom místě dvakrát: s **LITE · ON** a s **LITE · OFF**.
 5. **Pošli mi:**
    - ty screenshoty;
@@ -77,54 +71,16 @@ Ve Studiu ukazuje přehled čísla tvého počítače. Opravdová čísla jsou j
 | **draws** | pod ~1 500 | nad ~3 000 | kolik věcí grafika kreslí zvlášť |
 | **MEMORY** | pod ~900 MB | nad ~1 400 MB (slabší telefon může spadnout) | paměť hry v telefonu; v závorce Lua (skripty) |
 | **PING** | pod 100 ms | nad 250 ms | odezva serveru; je to síť, ne telefon |
-| **PARTS** | se streamováním jen okolí (pár tisíc) | ~23 000 = streamování nejede | díly, které telefon právě drží |
+| **PARTS** | | | díly, které telefon právě drží (se streamováním jen okolí) |
 | **SHADOWS** | čím méně, tím lépe | | díly kolem tebe, které vrhají stín |
-| **LIGHTS on / all** | v noci na telefonu kolem 16 + pár stálých (interiéry) | desítky na telefonu | kolik světel právě svítí |
-| **NIGHT LIGHTS** | do 16 na telefonu, do 40 na počítači | | noční světla z rozpočtu: svítí / známá |
+| **LIGHTS on / all** | | | kolik světel právě svítí (lampy ve skladu, v domě, v dodávce) |
 | **STREAMING** | ON | OFF (červeně): udělej krok 1 | jestli je streamování zapnuté |
 | **PHONE · LITE** | na telefonu LITE | | úsporný režim zařízení |
 | **QUALITY** | | | kvalita grafiky v nastavení Roblox (AUTO = volí Roblox) |
-| **v…** | 6.13.1 nebo novější | starší = telefon nemá novou verzi | verze hry |
+| **v…** | nejnovější verze | starší = telefon nemá novou verzi | verze hry |
 
 **CPU, nebo GPU?** Vyšší z těch dvou čísel je brzda:
 - **GPU** = grafika: stíny, světla, počet dílů na obrazovce.
 - **CPU** = skripty a fyzika.
 
 Podle toho se rozhodne další krok, proto prosím pošli screenshot s oběma čísly.
-
-## Sandbox (8.2)
-
-Sandbox (malý testovací svět, který teď hraješ) je lehký. I v nejhorším případě má asi 5 100 dílů, šestinu města:
-4 hráči, ve skladu 20 plných stojanů, 4 dodávky, běžící stěhování s domem i s Dannym. Verze 8.2 ho ještě odlehčila:
-- **Malé nápisy** na dodávkách (název firmy, loga, SPZ) a na nábytku se kreslí jen zblízka (do 220 studů). Dřív je
-  telefon kreslil přes celou mapu.
-- **Sklady a chata** se se streamováním načítají vždy celé najednou, takže nikdy neuvidíš jen půlku haly.
-- **Pár skriptů**, které běží každý snímek, dělá méně práce.
-
-Vzhled ani hratelnost se nezměnily.
-
-**Co nastavit ve Studiu.** Stačí jednou. Pokud už máš nastavený krok 1 výše, nic neměň.
-1. **Workspace:**
-
-   | Vlastnost | Hodnota |
-   |---|---|
-   | StreamingEnabled | ✔ |
-   | StreamingMinRadius | 128 |
-   | StreamingTargetRadius | 512 |
-   | StreamOutBehavior | Opportunistic |
-   | StreamingIntegrityMode | PauseOutsideLoadedArea |
-   | ModelStreamingBehavior | Improved (pokud tam je) |
-
-   V sandboxu pak telefon drží jen to, co je blízko. Když jsi doma u skladu, chata se uvolní, a vnitřek domu se
-   načte jen tomu, kdo v něm je.
-2. **Lighting → Technology:** pokud je tam **Future**, zkus **ShadowMap**. Pak porovnej FPS na telefonu v přehledu
-   výkonu (krok 2). Když se ti vzhled nebude líbit, vrať to zpátky.
-3. **Ulož a publikuj** (File → Publish to Roblox).
-
-**Test na telefonu.** Postupuj jako v kroku 3, jen v sandboxu. Udělej screenshot přehledu na těchto místech:
-1. u svého skladu;
-2. v hale mezi plnými stojany;
-3. za jízdy dodávkou k chatě;
-4. v domě při stěhování.
-
-Pošli mi screenshoty s **FPS, CPU a GPU** a model telefonu.

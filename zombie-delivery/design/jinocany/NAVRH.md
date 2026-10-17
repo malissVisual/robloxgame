@@ -107,6 +107,7 @@ Domy proto musí být lehké (jedna krabice, střecha, dveře, okna, plot), vzd�
 2. **Domy v kroku 1:** 6 (Statek + 5 rodinných domů).
 3. **Stavebniny Sýkorka:** s lakovnou dodávky (krok 2). Lakovat půjde jen tam, ne už u skladu.
 4. **Město a alpské údolí:** město zůstane, jak je (je vypnuté), plán `design/rework/MAPA-KROK2.md` je odložený.
+   (10.5: město je ze hry pryč a ten plán taky; obojí zůstává v historii Gitu do verze 10.4.)
 5. **Názvy ulic:** česky s háčky a čárkami.
 
 ## Jak se to postaví
