@@ -62,7 +62,7 @@ export type Chip = { id: string, icon: string, word: string, key: string, pad: s
 export type Action = { key: string, pad: { string }, tap: string?, hold: boolean? }
 
 -- (each one's own: the prompts' GamepadKeyCode is server/Moving.luau's, server/Warehouse.luau's and Roblox's default X;
--- the seat's way out client/CarBoarding.luau's; the grip client/CarryGripUi.luau's; Danny's client/MoveHelperCard.luau's)
+-- the seat's way out Roblox's; the grip client/CarryGripUi.luau's; Danny's client/MoveHelperCard.luau's)
 SandboxPad.Actions = {
 	use = { key = "E", pad = { "ButtonX" } }, -- a prompt: Use, Pick up, Load, Display, the UPGRADES desk
 	getout = { key = "E", pad = { "ButtonX" } }, -- out of a seat

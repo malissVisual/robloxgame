@@ -386,9 +386,6 @@ function RunUi.isOpen(): boolean
 end
 
 function RunUi.start()
-	if not Config.Sandbox.On then
-		return
-	end
 	local r = Net.get("Runs")
 	remote = r
 	r.OnClientEvent:Connect(onMessage)

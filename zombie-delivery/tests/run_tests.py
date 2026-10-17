@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Runs the logic tests of the pure shared modules (Config, Economy, Map, Roads, Icons, Levels, TrafficLanes, Crossings, SoundSheet, Missions, Challenges, Melee, Boarding, BuddyBrain, Goal, Tasks, 6.14: Regulars, SpecialOrders, 6.15: LiveEvents, 6.17: JobPick ...) in the
+Runs the logic tests of the pure shared modules (Config, Economy, Map, Roads, Icons, Levels, TrafficLanes, Crossings, SoundSheet, Missions, Challenges, Melee, Boarding, BuddyBrain, Tasks, 6.14: Regulars, SpecialOrders, 6.15: LiveEvents, 6.17: JobPick ...) in the
 standalone Luau CLI: every tests/*_test.luau file, each must print "ALL CHECKS PASSED".
 
     python3 zombie-delivery/tests/run_tests.py [path to the luau binary]
@@ -9,7 +9,7 @@ import glob, json, os, re, shutil, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SHARED = os.path.join(os.path.dirname(HERE), "src", "shared")
-PURE = ("Config", "ZombieKinds", "Economy", "Map", "FootbridgeShape", "Explore", "Roads", "Icons", "Levels", "TrafficLanes", "Crossings", "SoundSheet", "Cast", "NpcLooks", "Missions", "Challenges", "TutorialSteps", "Melee", "Boarding", "Freight", "BuddyBrain", "Career", "JobRules", "Transport", "VanQuest", "KitFit", "RiderPose", "Bag", "Deliveries", "FuelMath", "Residents", "BusLines", "Shortcuts", "RentalDocks", "ZipLines", "Gestures", "FootEvents", "TowerLooks", "StreetProps", "WeatherPlan", "InteractPose", "Armour", "Throws", "RunCycle", "Holding", "BagFill", "Goal", "BodyMotion", "AvatarLook", "ScooterRide", "CurbShape", "Tasks", "SoundPlan", "Style", "StyleLooks", "JobQueue", "JobThumbs", "MissionArt", "AnalyticsPlan", "RenderBudget", "Shift", "Regulars", "SpecialOrders", "Readiness", "OutlinePick", "MissionPlan", "LiveEvents", "ShotFeel", "Suspension", "DriveFeel", "ZombieStyle", "CardLayout", "ShopPick", "Skills", "Inventory", "KitArt", "CarUpright", "SpawnSpot", "Gait", "MovingRules", "MoveStory", "MoveHelperBrain", "MoveRoles", "CarryGrip", "ChaletLooks", "AlpineLayout", "SandboxMap", "SandboxAdmin", "CollectionRules", "SandboxSteps", "WarehouseLayout", "SprinterLooks")
+PURE = ("Config", "ZombieKinds", "Economy", "Map", "FootbridgeShape", "Roads", "Icons", "Levels", "TrafficLanes", "Crossings", "SoundSheet", "Cast", "NpcLooks", "Missions", "Challenges", "TutorialSteps", "Melee", "Boarding", "Freight", "BuddyBrain", "Career", "JobRules", "Transport", "VanQuest", "KitFit", "Bag", "Deliveries", "FuelMath", "Residents", "BusLines", "Shortcuts", "RentalDocks", "ZipLines", "Gestures", "FootEvents", "TowerLooks", "StreetProps", "WeatherPlan", "Armour", "Throws", "RunCycle", "Holding", "BagFill", "BodyMotion", "AvatarLook", "CurbShape", "Tasks", "SoundPlan", "Style", "StyleLooks", "JobQueue", "JobThumbs", "AnalyticsPlan", "RenderBudget", "Shift", "Regulars", "SpecialOrders", "OutlinePick", "MissionPlan", "LiveEvents", "ZombieStyle", "CardLayout", "Skills", "KitArt", "CarUpright", "SpawnSpot", "Gait", "MovingRules", "MoveStory", "MoveHelperBrain", "MoveRoles", "CarryGrip", "ChaletLooks", "AlpineLayout", "SandboxMap", "SandboxAdmin", "CollectionRules", "SandboxSteps", "WarehouseLayout", "SprinterLooks")
 PURE += ("SandboxScenery",)  # 8.0 sandbox, the map (tests/sandboxworld_test.luau)
 PURE += ("PairCarry",)  # 8.1 carrying in two: the leader's steering (tests/paircarry_test.luau)
 PURE += ("UpgradeRules",)  # 8.1 sandbox, the upgrades (tests/upgrades_test.luau)
@@ -32,7 +32,6 @@ PURE += ("VillageLooks",)  # 8.9 sandbox, Jinočany: the village's art kit (test
 PURE += ("VillageScenery",)  # 8.9 sandbox on the map, 9.4 the countryside: where everything stands (tests/villageworld_test.luau)
 PURE += ("CountryLooks",)  # 9.4 sandbox, the countryside's art kit (tests/countrylooks_test.luau)
 PURE += ("HouseRoute",)  # 9.0 Danny's way inside a house, on its plan's grid (tests/houseroute_test.luau, tests/dannynav_runtime_test.luau; 9.3 his walk along it, audited against the built parts: tests/movehelper_stuck_runtime_test.luau)
-PURE += ("PedalRules",)  # 9.1 the drive pedals: the input, the press, where they go (tests/drivepedals_test.luau)
 PURE += ("CharacterLooks", "SaveSlotRules")  # 10.1 the start: the courier you make, the save slots (tests/characterlooks_test.luau, tests/saveslots_test.luau, tests/saveslots_runtime_test.luau)
 PURE += ("RunRules",)  # 9.7 runs: the difficulties and their unlocks, the pads, the votes, whose stock (tests/runrules_test.luau)
 PURE += ("LootRules",)  # 9.x loot: a house's pieces' rarities by the difficulty, the stars, the toasts (tests/loot_test.luau)
@@ -219,7 +218,7 @@ with tempfile.TemporaryDirectory() as tmp:
         + source + "\nend\n")
     # 9.0 (the sandbox's free mouse): the real client/CameraRig.luau as CameraRigClient.luau for tests/camerarig_test.luau:
     # a function of the globals it reads (the test's services, workspace, script, require, Instance, RaycastParams, task
-    # and clock; ClientRuntime.luau's frames, vectors and colours), made afresh for each world (the sandbox, the city).
+    # and clock; ClientRuntime.luau's frames, vectors and colours), made afresh for each world (a computer, a touch screen).
     source = open(os.path.join(os.path.dirname(SHARED), "client", "CameraRig.luau"), encoding="utf-8").read()
     open(os.path.join(tmp, "CameraRigClient.luau"), "w", encoding="utf-8").write(
         "return function(game: any, workspace: any, script: any, require: any, Instance: any, RaycastParams: any, task: any, os: any, "
@@ -713,59 +712,33 @@ def analytics_check():
 if not analytics_check():
     ok = False
 
-# 8.0 SANDBOX: the HUD's city parts stay hidden in the sandbox (client/Hud.luau ── Sandbox ──, read as text: the HUD is
-# Roblox's through and through) and the key hints show the move's keys and the car's only (client/KeyHints.luau
-# sandboxLines). What the client starts there: tests/clientboot_test.luau.
+# 10.5 (only the sandbox is the game): the HUD is the game's only (client/Hud.luau, read as text: the HUD is Roblox's
+# through and through): the groups the other modules find by name, Hud.topSlot, Hud.toast and ESC's close, and no city
+# module required; the key hints show the move's keys only (client/KeyHints.luau sandboxLines). What the client starts:
+# tests/clientboot_test.luau.
 def sandbox_hud_check():
     root = os.path.dirname(HERE)
     hud = open(os.path.join(root, "src", "client", "Hud.luau"), encoding="utf-8").read()
     bad = []
-    at = hud.find("function view.sandbox()")
-    body = hud[at:hud.index("\nend\n", at)] if at >= 0 else ""
-    if not body:
-        bad.append("client/Hud.luau has no view.sandbox")
-    cash = re.search(r'local (\w+) = leftStack:FindFirstChild\("Cash"\)', body)
-    if not cash or f"{cash.group(1)}.Visible = false" not in body or 'Name = "Cash"' not in hud:
-        bad.append("view.sandbox does not hide the cash line (the money, the level, the XP bar)")
-    for text, what in (('Hud.topSlot("job").Visible = false', "the NEXT card and the contract group (the job slot)"),
-                       ("hudButtons.more.Visible = false", "PHONE / MENU"), ("view.menu.Visible = false", "MENU's list"),
-                       ("hudButtons.mouse.Visible = false", "MOUSE [ALT] (9.0: the cursor is free there)"),
-                       ("weaponBar.Visible = false", "the weapon line"), ("fire.Visible = false", "FIRE"),
-                       ("for _, button in view.touchHands do", "the touch hands"), ("LEFT_H = ", "the left column's room for the minimap")):
-        if text not in body:
-            bad.append(f"view.sandbox does not hide {what}")
-    start = hud[hud.index("function Hud.start()"):]
-    lines = start[:start.index("\nend\n")].split("\n")
-
-    # Is the line holding `needle` inside an `if not Config.Sandbox.On then` (its nearest less indented line above)?
-    def city_only(needle):
-        for i, line in enumerate(lines):
-            if needle in line:
-                depth = len(line) - len(line.lstrip("\t"))
-                for above in reversed(lines[:i]):
-                    if above.strip() and not above.strip().startswith("--") and len(above) - len(above.lstrip("\t")) < depth:
-                        return above.strip() == "if not Config.Sandbox.On then"
-        return False
-    for needle, what in (("Hotbar).start(gui)", "the bottom bar (the hands, the city's items)"), ("view.goal.start()", "the NEXT card's remotes"),
-                         ("MapView.start(gui, leftStack)", "the minimap and the big map")):
-        if not city_only(needle):
-            bad.append(f"Hud.start starts {what} in the sandbox too")
-    if not any(line.strip() == "view.sandbox()" for line in lines):
-        bad.append("Hud.start never calls view.sandbox()")
-    for text, what in (("fire.Visible = touch and not Config.Sandbox.On", "FIRE comes back every frame"),
-                       ("touchHands.melee.Visible = not seatedNow and not holding and not Config.Sandbox.On", "PUNCH comes back"),
-                       ("Holster.armed() and not Config.Sandbox.On", "DRAW comes back"),
-                       ("view.goal.quiet() or Config.Sandbox.On)", "the job board's marker shows"),
-                       ("if processed or Config.Sandbox.On then", "the keys J, M, I, Y and 1-9 work")):
+    own = set(re.findall(r"require\(script\.Parent\.(\w+)\)", hud)) - {"Ui", "Theme", "TouchLayout", "HudContract", "TouchControls", "Stamina"}
+    shared = set(re.findall(r"require\(Shared\.(\w+)\)", hud)) - {"Config"}
+    if own or shared:
+        bad.append("client/Hud.luau requires " + ", ".join(sorted(own | shared)))
+    for name in ("LeftStack", "Health", "TopStack", "HudButtons", "Hint"):
+        if f'Name = "{name}"' not in hud:
+            bad.append(f"client/Hud.luau builds no {name}")
+    for text, what in (("function Hud.topSlot(", "the column's slots"), ("function Hud.toast(", "the toasts"),
+                       ("function Hud.closeWindows(", "ESC's close"), ("function Hud.setVisible(", "PLAY's show"),
+                       ('"Put it down", "G"', "the action (G puts down a piece carried alone)"), (".build(gui)", "the touch buttons")):
         if text not in hud:
-            bad.append(f"in the sandbox {what}")
+            bad.append(f"client/Hud.luau lost {what}")
     keys = open(os.path.join(root, "src", "client", "KeyHints.luau"), encoding="utf-8").read()
     at = keys.find("local function sandboxLines(")
     chips = re.findall(r'chipText\("([^"]+)", "([^"]+)"', keys[at:keys.index("\nend\n", at)]) if at >= 0 else []
-    city = [f"[{key}] {word}" for key, word in chips if key not in ("W/S", "A/D", "H", "E", "G", "LMB/F", "O", "T", "LMB", "Q", "E/LMB")]  # (8.5: Danny's clipboard, LMB and Q; 9.0: E/LMB)
-    if not chips or city or "if Config.Sandbox.On then\n\t\treturn sandboxLines(" not in keys:
-        bad.append("KeyHints: the sandbox's keys are not the move's and the car's only" + (f" ({', '.join(city)})" if city else ""))
-    print("== sandbox hud: " + (f"the HUD hides its city parts in the sandbox, the key hints show {len(chips)} move and car keys" if not bad else "; ".join(bad)))
+    city = [f"[{key}] {word}" for key, word in chips if key not in ("E", "G", "LMB/F", "O", "T", "Q", "E/LMB")]  # (8.5: Danny's clipboard, Q; 9.0: E/LMB)
+    if not chips or city or "return sandboxLines(character)" not in keys:
+        bad.append("KeyHints: the keys are not the move's only" + (f" ({', '.join(city)})" if city else ""))
+    print("== sandbox hud: " + (f"the HUD is the game's only (no city module), the key hints show {len(chips)} move keys" if not bad else "; ".join(bad)))
     return not bad
 
 if not sandbox_hud_check():

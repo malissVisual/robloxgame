@@ -111,16 +111,7 @@ end
 M.MUi.MinTouch = 44
 M.MTheme.PanelTransparency = 0.12
 M.MTheme.WindowTransparency = 0.02
-M.MKeys = { open = function() end, close = function() end, isOpen = function()
-	return false
-end, hint = function()
-	return "SPACE"
-end }
 M.MFade = { out = function() end, into = function() end, arrival = function() return nil end } -- (8.3: a trip's arrival)
-M.MapView.waypointAt = function()
-	return M.waypoint
-end
-M.MapView.onWaypoint = function() end
 M.played = {}
 M.Sounds.play = function(name)
 	table.insert(M.played, name)
@@ -182,8 +173,6 @@ end
 
 local Config = require("./Config")
 local CarryGrip = require("./CarryGrip")
-local Inventory = require("./Inventory")
-local Holding = require("./Holding")
 local TouchLayout = require("./TouchLayout")
 local MoveLayout = require("./MoveLayout")
 local TopBlocks = require("./TopBlocks")
@@ -335,7 +324,7 @@ end
 
 -- ── A phone sideways, with the HUD's groups where client/Hud.luau puts them ──
 local hud = named(M.gui, "ZombieDeliveryHud")
-local HUD_NAMES = { "HudButtons", "Fire", "RightStack", "BottomBar", "Hint", "LeftStack" }
+local HUD_NAMES = { "HudButtons", "Fire", "RightStack", "Money", "Hint", "LeftStack" }
 local guideGui = M.make("ScreenGui", { Name = "SandboxGuide", DisplayOrder = 2 }, M.gui)
 local guide = M.make("TextLabel", { Name = "GuideLine", Text = "Carry the Old TV to your van", TextSize = 15, TextColor3 = M.MTheme.Contract.text, BackgroundColor3 = M.MTheme.Contract.charcoal, BackgroundTransparency = 0.25 }, guideGui)
 -- The HUD's groups on a screen of M.width × M.height at M.scale (the old ones go): (the touch cluster, the touch
@@ -360,27 +349,20 @@ local function layoutHud()
 		table.insert(names, name)
 		table.insert(boxes, b)
 	end
-	local barW, barH = Inventory.size(#Holding.Order + 2, true)
-	local barScale = math.max(scale, Inventory.minScale(M.touch))
 	if M.touch then
-		-- (client/Hud.luau's touch layout: the actions' row 170 × 44 at 0.8 top right, FIRE (hidden in the sandbox,
-		-- kept here: the harder case), the right column 300 × 130, the bottom bar, the contextual action over it)
+		-- (client/Hud.luau's touch layout: its buttons' row 170 × 44 at 0.8 top right, the health top left, the
+		-- contextual action between the thumbstick and the touch buttons; FIRE's place kept clear, here as a group: the
+		-- harder case)
 		local rowW, rowH = 170 * 0.8, 44 * 0.8
 		hudGroup("HudButtons", TouchLayout.box(W - 16 - rowW, 16, W - 16, 16 + rowH), "≡ ⚙")
-		hudGroup("Fire", c.fire, "FIRE")
-		local column, _, bar = TouchLayout.dock(c, W, H, 300 * scale, 130 * scale, 16 + rowH, W - 16 - rowW, barW * barScale, barH * barScale)
-		hudGroup("RightStack", column, "")
-		hudGroup("BottomBar", bar, "▣ ▣ ▣")
-		local buttons = table.clone(TouchLayout.buttons(c))
-		table.insert(buttons, column)
-		local hintX, hintBottom, hintW = TouchLayout.hint(c, buttons, W, H, scale, bar.y0)
+		hudGroup("Fire", c.fire, "")
+		local hintX, hintBottom, hintW = TouchLayout.hint(c, TouchLayout.buttons(c), W, H, scale, nil)
 		hudGroup("Hint", TouchLayout.box(hintX - hintW / 2, hintBottom - 96 * scale, hintX + hintW / 2, hintBottom), "")
-		hudGroup("LeftStack", TouchLayout.box(16, 16, 16 + 200 * scale, 16 + 90 * scale), "$1,240 · +$3/min")
+		hudGroup("LeftStack", TouchLayout.box(16, 16, 16 + 200 * scale, 16 + 44 * scale), "♥ 100")
 	else
-		-- (a computer: the money top left, the bottom bar in the middle at the bottom, the key hints top right)
-		local w, h = barW * barScale, barH * barScale
-		hudGroup("BottomBar", TouchLayout.box(W / 2 - w / 2, H - 16 - h, W / 2 + w / 2, H - 16), "▣ ▣ ▣")
-		hudGroup("LeftStack", TouchLayout.box(16, 16, 16 + 200 * scale, 16 + 90 * scale), "$1,240 · +$3/min")
+		-- (a computer: the health bottom left, SandboxHud's money top left, the key hints top right)
+		hudGroup("LeftStack", TouchLayout.box(16, H - 16 - 44 * scale, 16 + 200 * scale, H - 16), "♥ 100")
+		hudGroup("Money", TouchLayout.box(16, 16, 16 + 200 * scale, 16 + 90 * scale), "$1,240 · +$3/min")
 		hudGroup("RightStack", TouchLayout.box(W - 16 - 300 * scale, 56, W - 16, 56 + 130 * scale), "[E] Use [G] Put down [LMB/F] Grip")
 	end
 	-- the sandbox's guide line under the move's panel and Danny's strip (TopBlocks: the widget keeps clear of it)
@@ -743,16 +725,6 @@ wire = open("wobble", false)
 frames(1)
 check("a phone with a gamepad used last: \"Press R2\" and its glyph", hint.Text == "Press R2" and padKey.Visible, hint.Text)
 moving.OnClientEvent:Fire("grip", "close", wire.id)
--- 8.3 keys: the city's words as before (a touch screen first, its E; no glyph)
-Config.Sandbox.On = false
-wire = open("lift", false)
-frames(1)
-check("the city: a phone with a gamepad: \"Tap GRIP\" as before, no glyph", string.find(hint.Text, "Tap GRIP", 1, true) == 1 and not padKey.Visible, hint.Text)
-result(wire.id, "knock", 87)
-frames(1)
-check("… its knock: \"87% left · try again (E)\" as before", hint.Text == "87% left · try again (E)", hint.Text)
-frames(math.ceil(G.Ui.Linger * 60) + 2)
-Config.Sandbox.On = true
 M.touch = false
 useGamepad(false)
 frames(1)

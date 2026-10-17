@@ -1,58 +1,43 @@
 --!strict
 -- 6.12, the world sounds alive (the owner: "more sounds so the game feels alive"; Config.Soundscape, the sounds in
--- art/audio/sfx3.ogg, what plays where: shared/SoundPlan.luau). Started by client/Sounds.luau (Sounds.start), which
--- hands over how to play (SoundScape.start(api): its regions, its stand-ins, the SOUND setting):
+-- art/audio/sfx3.ogg and sfx4.ogg, what plays where: shared/SoundPlan.luau). Started by client/Sounds.luau
+-- (Sounds.start), which hands over how to play (SoundScape.start(api): its regions, its stand-ins, the SOUND setting):
 --   footsteps  yours and the nearest other players' (Others within OthersRange of the camera, looked for every
 --              OthersEvery s): one every Config.Juice.StepStride studs walked on the ground (ClimbStride climbed on a
---              ladder, WadeStride longer in the water), the a / b step in turn of the surface under the feet (a ray
---              down, Terrain too: SoundPlan.surface, the park's lawns, the water); yours 2D, theirs 3D at their feet
---              (one Sound per step in their root: no one-shot voices). Roblox's own running and climbing sounds
---              (RbxCharacterSounds, in the root) are muted on a body that steps here; with sfx3 its splash and swim too.
---   splashes   a body going into the water (its feet under SoundPlan.waterTop: the park's pond, the river, the sea),
---              louder falling fast; a car driving in (every Tick)
---   doors      a cabin door opening and shut, the back opening and closing (two rear doors, a roll-up door, a
---              tailgate), on every car near the camera (client/CarVisuals.luau onSwing → SoundPlan.swingSound)
---   the horn   H in the driver's seat (client/KeyHints.luau shows it; client/EstateUi.luau leaves H to it there): your
---              horn at once and the Horn remote; server/Horn.luau checks it and sends the car to the players near it,
---              who hear its class's horn from it (SoundPlan.horn: a car, a van, a truck, a bike's bell, a scooter's beep)
---   ambience   the day's and the night's loops blended by the clock (the workspace's ClockHour from server/DayNight,
---              Map.nightFactor), a rooftop's wind by your height (SoundPlan.ambience), only in the game; without
---              sfx3.ogg the 5.7 hum and wind as before (moved here from client/Sounds.luau); the park's fountain, a 3D
---              loop at it (Map.Park) while the camera is near
---   8.0.1, the sandbox (Config.Sandbox.On): none of the city's places (SoundPlan.cityPlaces): no fountain (Map.Park's
---              (0, 0) is on its Pražská street), no pond, river or sea to splash or wade in, no park lawn under the feet
---   8.1, the sandbox's own ambience (Config.Soundscape.Sandbox, art/audio/sfx4.ogg's 8.1 part): never the city's day
---              (its traffic) or night; where you are (SoundPlan.sandboxPlace: the move's state says when you are in the
---              farmstead, client/MoveSounds.luau inside) blends the fields (SoundPlan.SandboxLoops), a warehouse's hall
---              (its lights' hum; a little of the fields through its roller door) or the farmstead's quiet room
+--              ladder, WadeStride longer swimming), the a / b step in turn of the surface under the feet (a ray down,
+--              Terrain too: SoundPlan.surface by its material); yours 2D, theirs 3D at their feet (one Sound per step in
+--              their root: no one-shot voices). Roblox's own running and climbing sounds (RbxCharacterSounds, in the
+--              root) are muted on a body that steps here; with sfx3 its splash and swim too.
+--   splashes   a body going into the water (swimming), louder falling fast
+--   doors      the van's back opening and closing (two rear doors, a roll-up door, a tailgate), on every van near the
+--              camera (client/CarVisuals.luau onSwing → SoundPlan.swingSound); the ZDC Sprinter's back doors have
+--              their own swing (by its CarId)
+--   ambience   8.1, the game's own (Config.Soundscape.Sandbox, art/audio/sfx4.ogg's 8.1 part), only past the start
+--              screen: where you are (SoundPlan.sandboxPlace: the move's state says when you are in the farmstead,
+--              client/MoveSounds.luau inside) blends the fields (SoundPlan.SandboxLoops), a warehouse's hall (its
+--              lights' hum; a little of the fields through its roller door) or the farmstead's quiet room
 --              (SoundPlan.sandboxAmbience); in a warehouse the room's echo (SoundService.AmbientReverb,
---              SoundPlan.reverb; NoReverb elsewhere, on the start screen and with SOUND all off). The ZDC Sprinter's
---              back doors have their own swing (SoundPlan.swingSound by its CarId). 8.3: a warehouse's hall is the
---              building of its plot's level (workspace.Warehouses' Level<id>, 1 … 5: the Garage is small, the
---              Logistics Center big; SoundPlan.sandboxPlace's levelOf).
---   8.9 in place of the Alps (no cowbell, no alpine meadow), 9.4 the countryside (no village): the fields outdoors
---              (birds and larks over them, a breeze), the D5 motorway's far hum (a 3D loop on the motorway at its
---              point nearest you: always from the east; faint in a warehouse, none in the house), and outdoors now and
---              then, each on its own clock (SoundPlan.farGap) and 3D (you hear where): a woodpecker drumming in the
---              forest (a few drums), a dog barking far off, a tractor driving past on the fields (a 3D loop that moves
---              across your view, fading in and out). Every one is a sound wanted on the next sheet; until then its
---              stand-in plays (SoundPlan.sandboxSound, picked once: the sheets do not change while you play).
+--              SoundPlan.reverb; NoReverb elsewhere, on the start screen and with SOUND all off). 8.3: a warehouse's
+--              hall is the building of its plot's level (workspace.Warehouses' Level<id>, 1 … 5: the Garage is small,
+--              the Logistics Center big; SoundPlan.sandboxPlace's levelOf).
+--   8.9, 9.4 the countryside: the fields outdoors (birds and larks over them, a breeze), the D5 motorway's far hum (a
+--              3D loop on the motorway at its point nearest you: always from the east; faint in a warehouse, none in
+--              the house), and outdoors now and then, each on its own clock (SoundPlan.farGap) and 3D (you hear
+--              where): a woodpecker drumming in the forest (a few drums), a dog barking far off, a tractor driving past
+--              on the fields (a 3D loop that moves across your view, fading in and out). Every one is a sound wanted on
+--              the next sheet; until then its stand-in plays (SoundPlan.sandboxSound, picked once: the sheets do not
+--              change while you play).
 -- Every look is throttled (Tick, OthersEvery); the steps run on Heartbeat for a handful of bodies.
 
-local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local SoundService = game:GetService("SoundService")
-local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
-local Map = require(Shared.Map)
-local Net = require(Shared.Net)
 local SoundPlan = require(Shared.SoundPlan)
 local CarVisuals = require(script.Parent.CarVisuals)
-local Drive = require(script.Parent.Drive)
 local MoveSounds = require(script.Parent.MoveSounds) -- (8.1: are you in the move's house)
 
 local SoundScape = {}
@@ -133,7 +118,7 @@ local function stepFor(character: Model, dt: number, mine: boolean, now: number)
 	local walker = walkerOf(character)
 	local state = humanoid:GetState()
 	if humanoid.Health <= 0 or humanoid.SeatPart ~= nil or humanoid.Sit or humanoid.PlatformStand
-		or state == Enum.HumanoidStateType.Seated or character:GetAttribute("ZipLine") ~= nil then
+		or state == Enum.HumanoidStateType.Seated then
 		walker.distance = J.StepStride * 0.6 -- the first step after it comes soon
 		walker.wet = false
 		return
@@ -141,13 +126,12 @@ local function stepFor(character: Model, dt: number, mine: boolean, now: number)
 	local position = root.Position
 	local foot = position.Y - humanoid.HipHeight - root.Size.Y / 2
 	-- Into the water: a splash where it was broken.
-	local top = SoundPlan.waterTop(position.X, position.Z)
-	local wet = (top ~= nil and foot < top) or state == Enum.HumanoidStateType.Swimming
+	local wet = state == Enum.HumanoidStateType.Swimming
 	local v = root.AssemblyLinearVelocity
 	if wet and not walker.wet and now - walker.splashAt > S.SplashGap then
 		walker.splashAt = now
 		local fall = math.max(0, -v.Y)
-		splashAt(Vector3.new(position.X, top or foot, position.Z), S.SplashVolume * math.clamp(0.45 + fall / 40, 0.45, 1), 0.9 + math.random() * 0.2)
+		splashAt(Vector3.new(position.X, foot, position.Z), S.SplashVolume * math.clamp(0.45 + fall / 40, 0.45, 1), 0.9 + math.random() * 0.2)
 	end
 	walker.wet = wet
 	local climbing = state == Enum.HumanoidStateType.Climbing
@@ -166,7 +150,7 @@ local function stepFor(character: Model, dt: number, mine: boolean, now: number)
 	walker.distance = math.min(walker.distance - stride, stride * 0.5)
 	local surface: string
 	if climbing then
-		surface = "metal" -- (the zip lines' ladders are metal trusses)
+		surface = "metal" -- (a ladder's rungs)
 	elseif wet then
 		surface = "water"
 	else
@@ -175,7 +159,7 @@ local function stepFor(character: Model, dt: number, mine: boolean, now: number)
 		if not hit then
 			return -- (over nothing: a ledge, a step down)
 		end
-		surface = SoundPlan.surface(hit.Material.Name, hit.Position.X, hit.Position.Y, hit.Position.Z)
+		surface = SoundPlan.surface(hit.Material.Name)
 	end
 	walker.left = not walker.left
 	local name = SoundPlan.stepName(surface, walker.left)
@@ -235,98 +219,6 @@ local function lookForOthers()
 	for i = 1, math.min(#near, S.Others) do
 		table.insert(others, near[i].character)
 	end
-end
-
--- A car driving into the water (yours or anybody's near the camera): a big, low splash.
-local carWet: { [Model]: boolean } = setmetatable({}, { __mode = "k" }) :: any
-local function carSplashes()
-	local camera = workspace.CurrentCamera
-	local cars = workspace:FindFirstChild("Cars")
-	if not camera or not cars then
-		return
-	end
-	local eye = camera.CFrame.Position
-	for _, car in cars:GetChildren() do
-		local chassis = car:IsA("Model") and car.PrimaryPart
-		if chassis and car:IsA("Model") then
-			local p = chassis.Position
-			if (p - eye).Magnitude < S.SplashRange then
-				local top = SoundPlan.waterTop(p.X, p.Z)
-				local wet = top ~= nil and p.Y < top + 0.5
-				if wet and carWet[car] == false then
-					splashAt(Vector3.new(p.X, top or p.Y, p.Z), S.SplashVolume, 0.7)
-				end
-				carWet[car] = wet
-			else
-				carWet[car] = nil
-			end
-		end
-	end
-end
-
--- ── The horn ──────────────────────────────────────────────────────────────
-
-local hornSounds: { [Model]: Sound } = setmetatable({}, { __mode = "k" }) :: any
-
-local function hornOf(car: Model): string
-	local id = car:GetAttribute("CarId")
-	return SoundPlan.horn(if type(id) == "string" then id else nil, car:GetAttribute("Bike") == true, car:GetAttribute("BikeStand") == true)
-end
-
--- The car's own horn from the car (it moves with it).
-local function honk(car: Model)
-	local chassis = car.PrimaryPart
-	if not chassis or not api.on() then
-		return
-	end
-	local name = hornOf(car)
-	local sound = hornSounds[car]
-	if not sound or sound.Parent ~= chassis or sound.Name ~= "Horn_" .. name then
-		if sound then
-			sound:Destroy()
-		end
-		local made = api.make(name, chassis, false)
-		if not made then
-			return
-		end
-		made.Name = "Horn_" .. name
-		made.RollOffMode = Enum.RollOffMode.InverseTapered
-		made.RollOffMinDistance = 18
-		made.RollOffMaxDistance = S.HornRange
-		hornSounds[car] = made
-		sound = made
-	end
-	assert(sound)
-	sound.Volume = S.HornVolume
-	sound.TimePosition = sound.PlaybackRegion.Min
-	sound:Play()
-end
-
-local function listenHorn()
-	local remote = Net.get("Horn")
-	local last = 0
-	UserInputService.InputBegan:Connect(function(input, processed)
-		if processed or input.KeyCode ~= Enum.KeyCode.H or UserInputService:GetFocusedTextBox() then
-			return
-		end
-		local car, driving = Drive.seatedCar()
-		local now = os.clock()
-		if not car or not driving or now - last < S.HornGap then
-			return
-		end
-		last = now
-		honk(car)
-		remote:FireServer()
-	end)
-	remote.OnClientEvent:Connect(function(car: any)
-		local camera = workspace.CurrentCamera
-		if typeof(car) ~= "Instance" or not car:IsA("Model") or not car.Parent or not camera then
-			return
-		end
-		if (car:GetPivot().Position - camera.CFrame.Position).Magnitude < S.HornRange then
-			honk(car)
-		end
-	end)
 end
 
 -- ── The doors ─────────────────────────────────────────────────────────────
@@ -408,10 +300,9 @@ local function where(): Vector3
 	return if camera then camera.Focus.Position else Vector3.zero
 end
 
--- 8.1 SANDBOX: the fields, a warehouse's hall or the farmstead's room in place of the city's day and night; the room's
--- echo. The D5's far hum, and now and then outdoors a woodpecker in the forest, a dog and a tractor far off.
+-- 8.1: the fields, a warehouse's hall or the farmstead's room; the room's echo. The D5's far hum, and now and then
+-- outdoors a woodpecker in the forest, a dog and a tractor far off.
 local SB = S.Sandbox
-local CITY_LOOPS = { "amb_day", "amb_night", "amb_roof", "ambience", "wind" }
 local reverbName = "" -- the AmbientReverb set here ("": none yet; nothing else in the game sets it)
 
 -- What plays for a wanted sound (SoundPlan.sandboxSound: itself or its stand-in), picked once (chosen nil:
@@ -594,14 +485,12 @@ local function warehouseLevel(id: number): number?
 	return if type(level) == "number" then level else nil
 end
 
-local function updateSandbox(playing: boolean)
+local function updateAmbience()
+	local playing = api.inGame()
 	local at = where()
 	local place = SoundPlan.sandboxPlace(at.X, at.Y, at.Z, MoveSounds.inside(), warehouseLevel)
 	local mix = SoundPlan.sandboxAmbience(place, api.sheet4)
 	local on = if playing then 1 else 0
-	for _, name in CITY_LOOPS do
-		toward(name, 0)
-	end
 	local names = SoundPlan.SandboxLoops
 	local fields = pick(names.fields)
 	if fields then
@@ -630,64 +519,6 @@ local function updateSandbox(playing: boolean)
 	end
 end
 
-local function updateAmbience()
-	local playing = api.inGame()
-	if not SoundPlan.cityPlaces() then
-		updateSandbox(playing)
-		return
-	end
-	local hour = workspace:GetAttribute("ClockHour")
-	local clock = if type(hour) == "number" then hour else Lighting.ClockTime
-	local mix = SoundPlan.ambience(Map.nightFactor(clock), where().Y, api.sheet3)
-	local on = if playing then 1 else 0
-	toward("amb_day", mix.day * on)
-	toward("amb_night", mix.night * on, 5) -- (the loops out of step with each other)
-	toward("amb_roof", mix.roof * on, 2)
-	toward("ambience", mix.hum * on)
-	toward("wind", mix.wind * on, 3)
-end
-
--- The park's fountain: a 3D loop at it while the camera is near (made and gone with the distance). 8.0.1: only where
--- the city's park is (SoundPlan.cityPlaces: never in the sandbox, where Map.Park's middle is on Pražská).
-local fountain: Attachment? = nil
-local function updateFountain()
-	local camera = workspace.CurrentCamera
-	if not camera or not api.sheet3 then
-		return
-	end
-	if not SoundPlan.cityPlaces() then
-		if fountain then
-			fountain:Destroy()
-			fountain = nil
-		end
-		return
-	end
-	local park = Map.Park
-	local spot = Vector3.new(park.x, Map.WalkTop + S.FountainHeight, park.z)
-	local near = api.inGame() and (camera.CFrame.Position - spot).Magnitude < S.FountainRange + 30
-	local holder = fountain
-	if near and not holder then
-		local made = Instance.new("Attachment")
-		made.Name = "FountainSound"
-		made.WorldPosition = spot
-		local sound = api.make("amb_fountain", made, true)
-		if not sound then
-			made:Destroy()
-			return
-		end
-		sound.RollOffMode = Enum.RollOffMode.InverseTapered
-		sound.RollOffMinDistance = 10
-		sound.RollOffMaxDistance = S.FountainRange
-		sound.Volume = S.Fountain
-		made.Parent = workspace.Terrain
-		sound:Play()
-		fountain = made
-	elseif not near and holder then
-		holder:Destroy()
-		fountain = nil
-	end
-end
-
 function SoundScape.start(given: Api)
 	if started then
 		return
@@ -700,7 +531,6 @@ function SoundScape.start(given: Api)
 		table.insert(MUTE, "Swimming")
 	end
 	listenDoors()
-	listenHorn()
 	RunService.Heartbeat:Connect(function(dt: number)
 		if not stepsOn or not api.on() then
 			return
@@ -727,11 +557,7 @@ function SoundScape.start(given: Api)
 					since = 0
 					lookForOthers()
 				end
-				if api.on() then
-					carSplashes()
-				end
 				updateAmbience()
-				updateFountain()
 			end)
 			if not ok and not warned then
 				warned = true

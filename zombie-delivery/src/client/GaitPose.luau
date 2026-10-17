@@ -1,17 +1,16 @@
 --!strict
 -- 6.24: the gait (the owner: "better animations, how he walks and moves"), on this client, for every courier's
 -- character and every person in workspace.Npcs within Config.Gait.Range of the camera (yours always; at most MaxPosed,
--- the nearest). shared/Gait.luau is the maths (the planted walk, the run and the tired sprint, any way while aiming,
--- the leans, the jump and the landing, the idle's fidgets and holds); here each body's look goes in every frame (its
+-- the nearest). shared/Gait.luau is the maths (the planted walk, the run and the tired sprint, the leans, the jump and
+-- the landing, the idle's fidgets and holds); here each body's look goes in every frame (its
 -- velocity in its own frame, its turn, in the air or not, the slope under it, the breath, what its hands hold) and the
--- pose comes out into the R15 joints' Transform: the first stage of client/PoseLedger.luau (before client/ArmPose's aim,
--- carry and gestures, client/BodyLife's breath, look and flinch, client/BagSway's bag arm: they lay their poses over
--- it), never C0 (shared/Joints.luau). It replaces 6.0's client/SprintPose.luau (its run is the gait's from RunFrom).
+-- pose comes out into the R15 joints' Transform: the first stage of client/PoseLedger.luau (before client/ArmPose's
+-- carry, swings and gestures, client/BodyLife's breath, look and flinch: they lay their poses over it), never C0
+-- (shared/Joints.luau).
 --   * The stock tracks (server/CharacterArt/Animate.client.luau: idle, walk, run, jump, fall) keep playing underneath:
 --     a body farther than Range, or one the gait lets go, shows them alone. Each joint is laid over them by the pose's
 --     own weight (standing still most go back to the stock idle).
---   * Nothing is posed in a seat, on a bike, a zip line or a ladder, climbing, swimming, dead or in a move of
---     client/Interact.luau: the joints go back to the animation (once).
+--   * Nothing is posed in a seat, climbing, swimming or dead: the joints go back to the animation (once).
 --   * Within Config.Gait.Detail (yours always) the whole gait each frame, a ray down for the slope every SlopeEvery;
 --     farther the pose is worked out FarHz times a second and the same pose written every frame (the Animator writes
 --     over the joints each frame), no ray, no fidget. A phone poses fewer bodies, nearer (client/DeviceBudget.luau).
@@ -31,10 +30,6 @@ local Gait = require(Shared.Gait)
 local Gestures = require(Shared.Gestures)
 local Bodies = require(script.Parent.Bodies)
 local DeviceBudget = require(script.Parent.DeviceBudget)
-local CameraRig = require(script.Parent.CameraRig)
-local Holster = require(script.Parent.Holster)
-local Interact = require(script.Parent.Interact)
-local BikeRider = require(script.Parent.BikeRider)
 local Stamina = require(script.Parent.Stamina)
 local PhoneMotion = require(script.Parent.PhoneMotion)
 local Ledger = require(script.Parent.PoseLedger)
@@ -77,7 +72,6 @@ type Walker = {
 	lookAt: number, -- when to look at the hands again
 	hands: string,
 	heavy: number,
-	aiming: boolean,
 }
 
 local rigs: { [Model]: Rig } = {}
@@ -173,7 +167,6 @@ local function walkerOf(character: Model): Walker
 		lookAt = 0,
 		hands = "free",
 		heavy = 0,
-		aiming = false,
 	}
 	walkers[character] = made
 	return made
@@ -214,8 +207,7 @@ local function onFoot(character: Model, humanoid: Humanoid, mine: boolean, air: 
 	if air == false and (state == Enum.HumanoidStateType.Jumping or state == Enum.HumanoidStateType.Freefall) then
 		return false
 	end
-	return character:GetAttribute("ZipLine") == nil and character:GetAttribute("ClimbLine") == nil
-		and not Interact.posing(character) and not BikeRider.riding(character)
+	return true
 end
 GaitPose.onFoot = onFoot
 
@@ -228,7 +220,6 @@ local function look(character: Model, w: Walker, mine: boolean, now: number)
 	local carrying = character:GetAttribute("Carrying")
 	local speed = character:GetAttribute("CarrySpeed")
 	w.heavy = if type(speed) == "number" then 1 else 0
-	w.aiming = if mine then false else character:GetAttribute("Aiming") == true
 	if type(carrying) == "string" and carrying ~= "" then
 		w.hands = "carry"
 		return
@@ -236,18 +227,11 @@ local function look(character: Model, w: Walker, mine: boolean, now: number)
 	local gestureAt, gesture = character:GetAttribute("GestureAt"), character:GetAttribute("Gesture")
 	local gesturing = type(gestureAt) == "number" and type(gesture) == "string"
 		and workspace:GetServerTimeNow() - gestureAt < (Gestures.seconds(gesture) or 0)
-	if character:GetAttribute("PhoneHeld") == true or character:GetAttribute("ClipboardHeld") == true or gesturing then -- (8.5: Danny's clipboard)
+	if character:GetAttribute("ClipboardHeld") == true or gesturing then -- (8.5: Danny's clipboard)
 		w.hands = "busy"
 		return
 	end
-	local holstered = if mine then Holster.holstered() else character:GetAttribute("Holstered") == true
-	if character:GetAttribute("Hand") == "gun" and not holstered and character:FindFirstChild("HandGun") then
-		w.hands = "gun"
-	elseif character:GetAttribute("BagWorn") == "hand" then
-		w.hands = "bag"
-	else
-		w.hands = "free"
-	end
+	w.hands = "free"
 end
 
 -- The ground's rise a stud forward and a stud right under the body (its frame), from a ray down.
@@ -342,12 +326,8 @@ local function walk(character: Model, humanoid: Humanoid, root: BasePart, dt: nu
 		i.slopeF, i.slopeR = 0, 0
 	end
 	i.breath = if mine then Stamina.breath() else -1
-	local aiming = w.aiming
-	if mine then
-		aiming = (CameraRig.aimPose())
-	end
-	i.aiming = aiming
-	i.hands = if aiming and w.hands ~= "carry" then "busy" else w.hands
+	i.aiming = false
+	i.hands = w.hands
 	i.heavy = w.heavy
 	i.detail = detail
 	i.calm = calm

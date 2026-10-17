@@ -1,86 +1,40 @@
 --!strict
--- What every client does for every car: spins the tyres with the speed and turns the front ones, shows only the
--- prompts that fit (Drive at your own car's driver's door, Ride along at a friend's car's door with a free seat
--- behind it; 3.7: every door has its own, server/Vehicles.luau doorsOf) and puts the owner's name over other players'
--- cars.
--- 3.7: swings the cabin doors (the Motor6Ds "DoorHinge") open and shut: somebody gets in or out. 3.10: from their
--- attributes DoorOpenAt to DoorCloseAt (server times, server/Vehicles.luau), open in Config.Cargo.DoorSwingSeconds,
--- shut in DoorShutSeconds (shared/Boarding.luau); getting out, your own door opens at once (Drive.doorHeld). No door
--- prompts while a chauffeur drives the car (Chauffeured), your hands are full (the Carrying attribute: you could not
--- get in anyway), you sit in a car or are getting in (3.10: E gets you out there), or the seat is taken or reserved
--- (8.3 review: a seat Danny of your move sits in is not taken for you: he gets out for you).
--- 3.2: swings the back that opens (rear doors, a tailgate, a trunk lid, a ramp: the Motor6Ds "BackHinge" on the
--- chassis, server/Vehicles.luau) toward the car's attribute BackOpen, a short eased swing.
--- The back's prompt shows only to the owner and the crew of the owner's job (the attribute BackCrew, server/Cargo.luau).
--- 3.6: the owner's name sits on a cream pill in ink (Theme.Postage.pill), readable over a night street and a sunny one.
--- 4.0: the Rusty Van's exhaust smokes (the car's attribute Smoky, server/Vehicles.luau: till Engine level 1): a cheap
--- ParticleEmitter at its Attachment "Exhaust", made the first time it is near, puffing more at idle than on the move.
--- 5.1, a bike (the car's attribute Bike, server/Vehicles.luau): its frame leans into the turns (the Motor6D BikeLean,
--- by how fast it turns at its speed: only the look, the physics stay upright), the cranks and pedals turn with the
--- speed (CrankMotor), the front wheel does not steer (the fork is part of the frame), and the rider sits posed
--- (client/BikeRider.luau: leaning forward, hands on the grips, 6.19: the feet on the pedals). A trailer's wheels are in
--- the kit: found again when the car's KitBuilt changes.
--- 5.1.1, the E-Scooter (the car's attributes Bike and BikeStand): it leans the same way, has no cranks, and its rider
--- stands (BikeRider.pose's stand: the legs straight on the deck, the hands on the bar).
--- 6.10: a scooter leans on Config.Scooter's numbers (shared/ScooterRide.luau lean; a bike on LEAN_MAX, LEAN_RATE).
--- (6.14.2: its wheelie is gone.)
--- 6.19: the crank turns by shared/RiderPose.luau crankStep (the E-Bike, CarId "ebike", at a calmer cadence; stopped,
--- it settles with one pedal forward) and the rider is posed after it, on this frame's crank: the feet on the pedals.
--- 6.12: says when a cabin door starts to open or is shut and when the back starts to open or to close
--- (CarVisuals.onSwing, set by client/SoundScape.luau: the doors' and the back's sounds where they are); the back's kind
--- (two rear doors, a roll-up door, a tailgate / trunk lid / ramp) from its hinge (shared/SoundPlan.luau backKind). A car
--- just seen (streamed in, its back already open) stays quiet its first second.
--- 6.13.1 (performance): the prompts and the name tags are looked at PROMPT_EVERY seconds (not every frame); a phone
--- spins the wheels, poses the riders and smokes the exhausts of the nearer cars only (client/DeviceBudget.luau).
--- 6.16: CarVisuals.perCar, the hooks every car runs each frame (client/CarSway.luau the body's sway, client/TyreFx.luau
--- the tyres' dust, smoke and skid marks, client/CrashFx.luau a crash's sparks; each keeps to its own range).
+-- What every client does for every van (the run's truck parked at its house's curb, server/Runs.luau; nobody drives
+-- since 10.0): the back that opens (rear doors, a roll-up door, a tailgate: the Motor6Ds "BackHinge" on the chassis,
+-- server/Vehicles.luau) swings toward the car's attribute BackOpen, a short eased swing; the back's prompt shows only
+-- to the owner and the crew (the attribute BackCrew); its cabin doors' prompts (Drive, Ride along) stay off (9.7: a
+-- run's truck is never driven nor ridden, its seats off); the owner's name sits over other players' vans on a cream
+-- pill in ink (Theme.Postage.pill).
+-- 6.12: says when the back starts to open or to close and when it is shut (CarVisuals.onSwing, set by
+-- client/SoundScape.luau: the back's sounds where it is); the back's kind (two rear doors, a roll-up door, a tailgate)
+-- from its hinge (shared/SoundPlan.luau backKind). A van just seen (streamed in, its back already open) stays quiet its
+-- first second.
+-- 6.13.1 (performance): the prompts and the name tags are looked at PROMPT_EVERY seconds (not every frame); only the vans
+-- within RANGE of the camera swing.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
-local Boarding = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Boarding"))
-local ScooterRide = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("ScooterRide"))
 local SoundPlan = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("SoundPlan"))
-local RiderPose = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("RiderPose"))
 
-local BikeRider = require(script.Parent.BikeRider)
-local Drive = require(script.Parent.Drive)
 local Theme = require(script.Parent.Theme)
 local DeviceBudget = require(script.Parent.DeviceBudget)
 
 local CarVisuals = {}
 
--- 6.12: set by client/SoundScape.luau. what: "door" or the back's kind (SoundPlan.backKind); moment: "opening" (it
--- starts to open), "closing" (the back starts to close) or "shut"; part: the leaf that moves.
+-- 6.12: set by client/SoundScape.luau. what: the back's kind (SoundPlan.backKind); moment: "opening" (it starts to open),
+-- "closing" (it starts to close) or "shut"; part: the leaf that moves.
 CarVisuals.onSwing = nil :: ((what: string, moment: string, part: BasePart) -> ())?
--- 6.16: run for every car each frame (Stepped): the car, its chassis, dt, its distance from the camera, is it yours.
-CarVisuals.perCar = {} :: { (car: Model, chassis: BasePart, dt: number, distance: number, mine: boolean) -> () }
 
-type Wheel = { motor: Motor6D, front: boolean, radius: number }
 type Hinge = { motor: Motor6D, axis: Vector3, angle: number } -- angle: the open turn in radians
-type DoorHinge = { motor: Motor6D, angle: number, open: number, door: number } -- open: 0 shut … 1 open
-type DoorPrompt = { prompt: ProximityPrompt, driver: boolean, seats: { Seat } }
 type CarState = {
-	wheels: { Wheel },
 	hinges: { Hinge },
-	doorHinges: { DoorHinge },
-	doorPrompts: { DoorPrompt },
+	doorPrompts: { ProximityPrompt },
 	back: number,
-	spin: number,
-	steer: number,
 	tagged: boolean,
 	backReach: number?, -- the BackPrompt's own reach (the server's), before it was hidden here
-	trolleyReach: number?, -- 4.0: the same for the trolley's "Take trolley" (server/Equipment.luau, TrolleyTake)
-	smoke: ParticleEmitter?, -- 4.0: the exhaust smoke (made when first needed)
-	-- 5.1, a bike: its lean and crank joints, how far it leans and where the crank is, the rider posed, the kit seen.
-	lean: Motor6D?,
-	crankMotor: Motor6D?,
-	tilt: number,
-	crank: number,
-	rider: Model?,
-	kitBuilt: any,
-	-- 6.12: the back's kind for its sounds, and no sounds before this (os.clock: a car just seen).
+	-- 6.12: the back's kind for its sounds, and no sounds before this (os.clock: a van just seen).
 	backKind: string,
 	quietUntil: number,
 }
@@ -88,11 +42,8 @@ type CarState = {
 local player = Players.LocalPlayer
 local states: { [Model]: CarState } = {}
 local RANGE = 260
-local RIDER_RANGE = 160 -- 5.1: riders posed this close to the camera
-local PROMPT_EVERY = 0.1 -- 6.13.1: seconds between the looks at the door, back and trolley prompts
+local PROMPT_EVERY = 0.1 -- 6.13.1: seconds between the looks at the prompts
 local promptClock = { at = 0 }
-local LEAN_MAX = 0.16 -- 5.1: radians (about 9°) a bike leans at most (its load, welded to the hull, does not lean)
-local LEAN_RATE = 0.006 -- per (rad/s of turning × stud/s of speed)
 local BACK_TIME = 0.45 -- seconds for the back to swing open or shut
 
 local function stateOf(car: Model): CarState?
@@ -104,34 +55,11 @@ local function stateOf(car: Model): CarState?
 	if not chassis then
 		return nil
 	end
-	local wheels: { Wheel } = {}
 	local hinges: { Hinge } = {}
-	local doorHinges: { DoorHinge } = {}
-	local doorPrompts: { DoorPrompt } = {}
-	local lean: Motor6D?, crankMotor: Motor6D? = nil, nil
+	local doorPrompts: { ProximityPrompt } = {}
 	local backKind = "swing"
-	-- 3.7: the seats behind each door (their attribute Door).
-	local seatsAt: { [number]: { Seat } } = {}
-	for _, child in car:GetChildren() do
-		local index = child:GetAttribute("Door")
-		if child:IsA("Seat") and type(index) == "number" then
-			local list = seatsAt[index] or {}
-			seatsAt[index] = list
-			table.insert(list, child)
-		end
-	end
 	for _, child in chassis:GetChildren() do
-		if child:IsA("Motor6D") and child.Name == "WheelMotor" then
-			table.insert(wheels, {
-				motor = child,
-				front = child:GetAttribute("Front") == true,
-				radius = (child:GetAttribute("Radius") or 1.3) :: number,
-			})
-		elseif child:IsA("Motor6D") and child.Name == "BikeLean" then
-			lean = child
-		elseif child:IsA("Motor6D") and child.Name == "CrankMotor" then
-			crankMotor = child
-		elseif child:IsA("Motor6D") and child.Name == "BackHinge" then
+		if child:IsA("Motor6D") and child.Name == "BackHinge" then
 			local angle = child:GetAttribute("Angle")
 			if #hinges == 0 then
 				-- 6.12: C1 = the hinge from the leaf's middle (server/Vehicles.luau buildBack): a roll-up door hangs from
@@ -143,113 +71,27 @@ local function stateOf(car: Model): CarState?
 				axis = if child:GetAttribute("Axis") == "X" then Vector3.xAxis else Vector3.yAxis,
 				angle = math.rad(if type(angle) == "number" then angle else 90),
 			})
-		elseif child:IsA("Motor6D") and child.Name == "DoorHinge" then
-			local angle = child:GetAttribute("Angle")
-			local index = child:GetAttribute("Door")
-			table.insert(doorHinges, {
-				motor = child,
-				angle = math.rad(if type(angle) == "number" then angle else 70),
-				open = 0,
-				door = if type(index) == "number" then index else 0,
-			})
 		elseif child:IsA("Attachment") and string.sub(child.Name, 1, 4) == "Door" then
 			local prompt = child:FindFirstChildOfClass("ProximityPrompt")
-			local index = prompt and prompt:GetAttribute("Door")
 			if prompt then
-				table.insert(doorPrompts, {
-					prompt = prompt,
-					driver = prompt.Name == "DrivePrompt",
-					seats = if type(index) == "number" then seatsAt[index] or {} else {},
-				})
+				table.insert(doorPrompts, prompt)
 			end
 		end
 	end
 	state = {
-		wheels = wheels,
 		hinges = hinges,
-		doorHinges = doorHinges,
 		doorPrompts = doorPrompts,
 		back = 0,
-		spin = 0,
-		steer = 0,
 		tagged = false,
 		backReach = nil,
-		trolleyReach = nil,
-		smoke = nil,
-		lean = lean,
-		crankMotor = crankMotor,
-		tilt = 0,
-		crank = 0,
-		rider = nil,
-		kitBuilt = nil,
 		backKind = backKind,
 		quietUntil = os.clock() + 1,
 	}
 	states[car] = state
 	car.Destroying:Connect(function()
-		local rider = state and state.rider
-		if rider then
-			BikeRider.release(rider)
-		end
 		states[car] = nil
 	end)
 	return state
-end
-
--- 5.1: the wheels in the car's kit (a bike trailer's: WheelMotors under UpgradeKit) replace the old kit's.
-local function kitWheels(car: Model, state: CarState)
-	local chassis = car.PrimaryPart
-	local kept: { Wheel } = {}
-	for _, wheel in state.wheels do
-		if wheel.motor.Parent == chassis then
-			table.insert(kept, wheel)
-		end
-	end
-	local kit = car:FindFirstChild("UpgradeKit")
-	if kit then
-		for _, d in kit:GetDescendants() do
-			if d:IsA("Motor6D") and d.Name == "WheelMotor" then
-				table.insert(kept, { motor = d, front = false, radius = (d:GetAttribute("Radius") or 1.3) :: number })
-			end
-		end
-	end
-	state.wheels = kept
-end
-
--- 5.1: the rider on a bike's saddle near the camera is posed (client/BikeRider.luau), the one before let go.
-local function poseRider(car: Model, state: CarState, near: boolean)
-	local seat = car:FindFirstChild("DriverSeat")
-	local occupant = if near and seat and seat:IsA("VehicleSeat") then seat.Occupant else nil
-	local character = occupant and occupant.Parent
-	local rider: Model? = if character and character:IsA("Model") and occupant and occupant.Health > 0 then character else nil
-	if state.rider and state.rider ~= rider then
-		BikeRider.release(state.rider)
-	end
-	state.rider = rider
-	if rider then
-		BikeRider.pose(rider, state.crank, car:GetAttribute("BikeStand") == true) -- (5.1.1: the E-Scooter: standing)
-	end
-end
-
--- 4.0: a thin grey-blue puff out of the exhaust pipe, drifting back and up.
-local SMOKE_RANGE = 140
-local function makeSmoke(at: Attachment): ParticleEmitter
-	local smoke = Instance.new("ParticleEmitter")
-	smoke.Name = "ExhaustSmoke"
-	smoke.Texture = "rbxasset://textures/particles/smoke_main.dds"
-	smoke.Color = ColorSequence.new(Color3.fromRGB(120, 122, 128), Color3.fromRGB(170, 170, 172))
-	smoke.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.35), NumberSequenceKeypoint.new(1, 1.8) })
-	smoke.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.45), NumberSequenceKeypoint.new(1, 1) })
-	smoke.Lifetime = NumberRange.new(1.0, 1.6)
-	smoke.Speed = NumberRange.new(1.5, 2.5)
-	smoke.SpreadAngle = Vector2.new(18, 18)
-	smoke.EmissionDirection = Enum.NormalId.Back -- out of the back of the car
-	smoke.Acceleration = Vector3.new(0, 1.4, 0)
-	smoke.Drag = 1
-	smoke.LightInfluence = 1
-	smoke.Rate = 0
-	smoke.Parent = at
-	return smoke
 end
 
 local function nameTag(car: Model, chassis: BasePart)
@@ -267,7 +109,7 @@ local function nameTag(car: Model, chassis: BasePart)
 	label.AnchorPoint = Vector2.new(0.5, 0)
 	label.BackgroundColor3 = Theme.Postage.pill
 	label.BackgroundTransparency = 0.05
-	label.Text = `{car:GetAttribute("OwnerName") or "?"}'s {if car:GetAttribute("Bike") == true then "bike" else "car"}`
+	label.Text = `{car:GetAttribute("OwnerName") or "?"}'s van`
 	label.TextColor3 = Theme.Postage.ink
 	label.Font = Theme.HeadingFont
 	label.TextSize = 15
@@ -285,73 +127,40 @@ local function nameTag(car: Model, chassis: BasePart)
 	padding.Parent = label
 end
 
--- (8.3 review: a seat Danny of your move sits in counts as free: he gets out for you, server/MoveHelper.luau's
--- Vehicles.yieldSeat; his body's MoveHelper is his id, your MoveHelperId the same while you are of his move's crew)
-local function freeSeat(seats: { Seat }): boolean
-	local danny = player:GetAttribute("MoveHelperId")
-	for _, seat in seats do
-		local occupant = seat.Occupant
-		local body = if occupant then occupant.Parent else nil
-		local yields = danny ~= nil and body ~= nil and body:GetAttribute("MoveHelper") == danny
-		if (occupant == nil or yields) and seat:GetAttribute("Reserved") == nil then
-			return true
-		end
-	end
-	return false
-end
-
--- 3.10: the driver's seat is empty and nobody is getting into it.
-local function driverFree(car: Model): boolean
-	local seat = car:FindFirstChild("DriverSeat")
-	return seat ~= nil and seat:IsA("VehicleSeat") and seat.Occupant == nil and seat:GetAttribute("Reserved") == nil
-end
-
--- 5.9.2: every car, one list kept and built again only when a car comes or goes (no new table every frame).
-local CAR_FOLDERS = { "Cars", "BanditCars" }
+-- 5.9.2: every van, one list kept and built again only when a van comes or goes (no new table every frame).
 local carList: { Instance } = {}
-local carFolders: { [string]: Instance } = {}
+local carFolder: { folder: Instance? } = { folder = nil }
 local carListDirty = true
 
 local function allCars(): { Instance }
-	for _, name in CAR_FOLDERS do
-		local known = carFolders[name]
-		if known and known.Parent == workspace then
-			continue
-		end
-		local folder = workspace:FindFirstChild(name)
+	local known = carFolder.folder
+	if not (known and known.Parent == workspace) then
+		local folder = workspace:FindFirstChild("Cars")
 		if folder ~= known then
 			carListDirty = true
+			carFolder.folder = folder
 			if folder then
-				carFolders[name] = folder
 				local function changed()
 					carListDirty = true
 				end
 				folder.ChildAdded:Connect(changed)
 				folder.ChildRemoved:Connect(function(child: Instance)
 					carListDirty = true
-					-- 6.13.1 (StreamingEnabled): a car that streams out is forgotten here too (its rider let go)
-					local gone = if child:IsA("Model") then states[child] else nil
-					if gone and child:IsA("Model") then
-						if gone.rider then
-							BikeRider.release(gone.rider)
-						end
+					-- 6.13.1 (StreamingEnabled): a van that streams out is forgotten here too
+					if child:IsA("Model") then
 						states[child] = nil
 					end
 				end)
-			else
-				carFolders[name] = nil
 			end
 		end
 	end
 	if carListDirty then
 		carListDirty = false
 		table.clear(carList)
-		for _, name in CAR_FOLDERS do
-			local folder = carFolders[name]
-			if folder then
-				for _, car in folder:GetChildren() do
-					table.insert(carList, car)
-				end
+		local folder = carFolder.folder
+		if folder then
+			for _, car in folder:GetChildren() do
+				table.insert(carList, car)
 			end
 		end
 	end
@@ -364,18 +173,13 @@ local function step(dt: number)
 		return
 	end
 	local eye = camera.CFrame.Position
-	local seatedIn = Drive.seatedCar()
-	local character = player.Character
-	local handsFull = character ~= nil and character:GetAttribute("Carrying") ~= nil
-	local boarding = character ~= nil and character:GetAttribute("Boarding") ~= nil -- 3.10: on the way into a seat
-	local now = workspace:GetServerTimeNow()
-	-- 6.13.1: the prompts a few times a second; the ranges a phone's
+	-- 6.13.1: the prompts a few times a second; the range a phone's
 	local clock = os.clock()
 	local prompts = clock - promptClock.at >= PROMPT_EVERY
 	if prompts then
 		promptClock.at = clock
 	end
-	local range, riderRange, smokeRange = DeviceBudget.range(RANGE), DeviceBudget.range(RIDER_RANGE), DeviceBudget.range(SMOKE_RANGE)
+	local range = DeviceBudget.range(RANGE)
 	for _, car in allCars() do
 		if not car:IsA("Model") then
 			continue
@@ -387,26 +191,19 @@ local function step(dt: number)
 		end
 		local mine = car:GetAttribute("OwnerId") == player.UserId
 
-		-- Prompts: 3.7, one at every door.
 		if prompts then
-			-- (9.7 runs: a truck parked at a run's house is never driven nor ridden: Config.Runs.Truck.Attribute)
-			local enterable = car:GetAttribute("Chauffeured") ~= true and not handsFull and not boarding and seatedIn == nil
-				and (car:GetAttribute("Health") or 0) > 0 and car:GetAttribute("RunParked") ~= true
-			for _, entry in state.doorPrompts do
-				local want = if entry.driver
-					then enterable and mine and driverFree(car)
-					else enterable and not mine and car:GetAttribute("Repairing") ~= true and freeSeat(entry.seats)
-				if entry.prompt.Enabled ~= want then
-					entry.prompt.Enabled = want
+			-- The cabin doors: nobody gets in (9.7 runs: a truck parked at a run's house is never driven nor ridden).
+			for _, prompt in state.doorPrompts do
+				if prompt.Enabled then
+					prompt.Enabled = false
 				end
 			end
-			-- 3.2: the back's prompt only for the owner and the crew of the owner's job (the car's BackCrew, server/Cargo.luau);
-			-- out of reach for everybody else, so a stranger's car does not take the E. (Enabled is the server's: one E at a time.)
+			-- 3.2: the back's prompt only for the owner and the crew (the car's BackCrew); out of reach for everybody else,
+			-- so a stranger's van does not take the E. (Enabled is the server's: one E at a time.)
 			local door = chassis:FindFirstChild("CargoDoor")
 			local back = door and door:FindFirstChild("BackPrompt")
 			local crew = car:GetAttribute("BackCrew")
-			-- (3.10: not from a seat: E there gets you out.)
-			local usable = seatedIn == nil and (mine or (type(crew) == "string" and string.find(`,{crew},`, `,{player.UserId},`, 1, true) ~= nil))
+			local usable = mine or (type(crew) == "string" and string.find(`,{crew},`, `,{player.UserId},`, 1, true) ~= nil)
 			if back and back:IsA("ProximityPrompt") then
 				local reach: number = state.backReach or back.MaxActivationDistance
 				state.backReach = reach
@@ -415,118 +212,14 @@ local function step(dt: number)
 					back.MaxActivationDistance = want
 				end
 			end
-			-- 4.0: the trolley's "Take trolley" (server/Equipment.luau, the chassis' TrolleyTake) the same way, and only with
-			-- empty hands (the server refuses everybody else anyway).
-			local take = chassis:FindFirstChild("TrolleyTake")
-			local takePrompt = take and take:FindFirstChildOfClass("ProximityPrompt")
-			if takePrompt then
-				local reach: number = state.trolleyReach or takePrompt.MaxActivationDistance
-				state.trolleyReach = reach
-				local want = if usable and not handsFull then reach else 0
-				if takePrompt.MaxActivationDistance ~= want then
-					takePrompt.MaxActivationDistance = want
-				end
-			end
 			if not mine and not state.tagged and car:GetAttribute("OwnerId") ~= nil then
 				state.tagged = true
 				nameTag(car, chassis)
 			end
 		end
 
-		-- 4.0: the smoking exhaust, near the camera only.
-		local distance = (chassis.Position - eye).Magnitude
-		local smoky = car:GetAttribute("Smoky") == true and distance < smokeRange
-		local smoke = state.smoke
-		if smoky and not smoke then
-			local exhaust = chassis:FindFirstChild("Exhaust")
-			if exhaust and exhaust:IsA("Attachment") then
-				smoke = makeSmoke(exhaust)
-				state.smoke = smoke
-			end
-		end
-		if smoke then
-			local rate = if not smoky then 0 elseif chassis.AssemblyLinearVelocity.Magnitude < 6 then 7 else 2.5
-			if smoke.Rate ~= rate then
-				smoke.Rate = rate
-			end
-		end
-
-		for _, hook in CarVisuals.perCar do
-			hook(car, chassis, dt, distance, mine) -- 6.16: the body's sway, the tyres, the sparks
-		end
-
-		-- Wheels.
-		local bike = state.lean ~= nil
-		local riding = bike and distance <= riderRange and distance <= range
-		if bike and not riding then
-			poseRider(car, state, false) -- (6.19: a rider near is posed below, after the crank turned)
-		end
-		if distance > range then
+		if (chassis.Position - eye).Magnitude > range then
 			continue
-		end
-		local forward = chassis.AssemblyLinearVelocity:Dot(chassis.CFrame.LookVector)
-		local targetSteer: number
-		if bike then
-			targetSteer = 0 -- 5.1: the fork is part of the frame (it leans instead)
-		elseif mine and Drive.isDriving() then
-			targetSteer = -Drive.steer() * 0.45
-		else
-			targetSteer = math.clamp(chassis.AssemblyAngularVelocity.Y * 0.35, -0.45, 0.45) * (if forward >= 0 then 1 else -1)
-		end
-		state.steer += (targetSteer - state.steer) * math.min(1, dt * 10)
-		for _, wheel in state.wheels do
-			if not wheel.motor.Parent then
-				continue
-			end
-			local spin = state.spin * 1.3 / wheel.radius
-			local turn = if wheel.front then CFrame.Angles(0, state.steer, 0) else CFrame.identity
-			wheel.motor.Transform = turn * CFrame.Angles(spin, 0, 0)
-		end
-		state.spin -= forward / 1.3 * dt
-
-		-- 5.1, a bike: the lean into the turn (how fast it turns at its speed), the cranks with the wheels, the kit's
-		-- trailer wheels found again after a new kit.
-		local leanMotor = state.lean
-		if leanMotor and leanMotor.Parent then
-			local scooter = car:GetAttribute("BikeStand") == true
-			local goal = if scooter then ScooterRide.lean(chassis.AssemblyAngularVelocity.Y, forward)
-				else math.clamp(chassis.AssemblyAngularVelocity.Y * forward * LEAN_RATE, -LEAN_MAX, LEAN_MAX)
-			state.tilt += (goal - state.tilt) * math.min(1, dt * 6)
-			leanMotor.Transform = CFrame.Angles(0, 0, state.tilt)
-			local crankMotor = state.crankMotor
-			state.crank = RiderPose.crankStep(state.crank, forward, dt, car:GetAttribute("CarId") == "ebike") -- 6.19
-			if crankMotor and crankMotor.Parent then
-				crankMotor.Transform = CFrame.Angles(state.crank, 0, 0)
-			end
-			local built = car:GetAttribute("KitBuilt")
-			if built ~= state.kitBuilt then
-				state.kitBuilt = built
-				kitWheels(car, state)
-			end
-		end
-		if riding then
-			poseRider(car, state, true) -- 6.19: on this frame's crank (the feet on the pedals as they turn)
-		end
-
-		-- 3.7: the cabin doors swing open and shut (eased; held while open). 3.10: from DoorOpenAt to DoorCloseAt.
-		for _, swing in state.doorHinges do
-			local openAt, closeAt = swing.motor:GetAttribute("DoorOpenAt"), swing.motor:GetAttribute("DoorCloseAt")
-			local target = Boarding.doorGoal(now, if type(openAt) == "number" then openAt else nil, if type(closeAt) == "number" then closeAt else 0)
-			if Drive.doorHeld(car, swing.door) then
-				target = 1
-			end
-			local before = swing.open
-			swing.open = Boarding.doorStep(before, target, dt)
-			if (swing.open > 0 or before > 0) and swing.motor.Parent then
-				local t = swing.open * swing.open * (3 - 2 * swing.open)
-				swing.motor.Transform = CFrame.fromAxisAngle(Vector3.yAxis, swing.angle * t)
-			end
-			-- 6.12: the latch as it opens, the thunk as it shuts
-			local onSwing = CarVisuals.onSwing
-			local leaf = swing.motor.Part1
-			if onSwing and leaf and (before == 0) ~= (swing.open == 0) and os.clock() > state.quietUntil then
-				onSwing("door", if before == 0 then "opening" else "shut", leaf)
-			end
 		end
 
 		-- 3.2: the back swings toward BackOpen (eased); held there every frame while it is open.

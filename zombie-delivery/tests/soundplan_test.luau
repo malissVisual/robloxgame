@@ -1,24 +1,21 @@
--- 6.12, what the world sounds like where you are (shared/SoundPlan.luau): the footsteps' surface by the material and
--- the place (the park's lawns, the pond, the river), the horns by vehicle, the back's sounds, the ambience by the
--- clock and the height; every name it gives has its region in SoundSheet.Sfx3. 8.0.1: in the sandbox
--- (Config.Sandbox.On) none of the city's places (no pond, river, sea or park lawn; client/SoundScape.luau's fountain
--- asks SoundPlan.cityPlaces too). 8.1, the sandbox's own: where you are (outdoors, a warehouse, the farmstead), its
--- ambience (the countryside's fields, never the city's traffic; the hall's hum, the room's tone; their stand-ins), the
--- collection's cues (on a stand, taken down, home), the income's clink (soft, not too often), the Sprinter's sliding
--- door, step and back doors, no ramp and no Wall's gate on a sandbox move. 8.3, the 8.2 features' feedback: what the
--- book's, the tasks' and the collection's messages play (the discovery chime, a milestone's fanfare, a task done and
--- claimed, FILL BEST's few soft clicks, SELL…'s one bigger till), the existing sheets' sounds only, one after the other
--- (the lane: never two stings over each other, a burst is one). 8.9 in place of the Alps: no cowbell and no alpine meadow
--- left; 9.4 the countryside (design/countryside/plan.json, no village: no chapel's bell): the D5's far hum from the east
--- (on its motorway), a woodpecker in the forest, a dog and a tractor far off, each with a region or a stand-in that
--- plays. 8.9, the newest features' own
--- sounds (sfx5): every event a quiet sound of sfx5, the clipboard's out and away, a piece's tick and cross-off, an
--- order's chirp, an answer's nope after its Notice, Danny's whistle only when he needs you, the auction's tick, gavel
--- and bell, the trades' hook; Danny's van door as a player's. In the standalone Luau CLI.
+-- 6.12, what the world sounds like where you are (shared/SoundPlan.luau): the footsteps' surface by the material, the
+-- back's sounds; every name it gives has its region in SoundSheet.Sfx3. 7.1 the move's cues (no truck's ramp: the
+-- Sprinter's back doors are heard; no Wall's gate at the end; 8.8 no roles: a two-person piece alone is dragged). 8.1,
+-- the game's own: where you are (outdoors, a warehouse, the farmstead), its ambience (the countryside's fields; the
+-- hall's hum, the room's tone; their stand-ins), the collection's cues (on a stand, taken down, home), the income's
+-- clink (soft, not too often), the Sprinter's sliding door, step and back doors. 8.3, the 8.2 features' feedback: what
+-- the book's, the tasks' and the collection's messages play (the discovery chime, a milestone's fanfare, a task done
+-- and claimed, FILL BEST's few soft clicks, SELL…'s one bigger till), the existing sheets' sounds only, one after the
+-- other (the lane: never two stings over each other, a burst is one). 8.9 in place of the Alps: no cowbell and no
+-- alpine meadow left; 9.4 the countryside (design/countryside/plan.json, no village: no chapel's bell): the D5's far hum
+-- from the east (on its motorway), a woodpecker in the forest, a dog and a tractor far off, each with a region or a
+-- stand-in that plays. 8.9, the newest features' own sounds (sfx5): every event a quiet sound of sfx5, the clipboard's
+-- out and away, a piece's tick and cross-off, an order's chirp, an answer's nope after its Notice, Danny's whistle only
+-- when he needs you, the auction's tick, gavel and bell, the trades' hook; Danny's van door as a player's. In the
+-- standalone Luau CLI.
 -- Run: python3 tests/run_tests.py [path to the luau binary]
 
 local Config = require("./Config")
-local Map = require("./Map")
 local SoundSheet = require("./SoundSheet")
 local SoundPlan = require("./SoundPlan")
 local SandboxMap = require("./SandboxMap") -- (8.1: the sandbox's places)
@@ -35,57 +32,23 @@ local function check(name: string, ok: boolean, detail: any?)
 end
 
 local S = Config.Soundscape
-local park = Map.Park
-local sandboxOn = Config.Sandbox.On
-Config.Sandbox.On = false -- (the city's places first; the sandbox's at the end)
-check("the city: its places are there (SoundPlan.cityPlaces)", SoundPlan.cityPlaces())
 
 -- ── Surfaces ────────────────────────────────────────────────────────────────
-check("asphalt is concrete", SoundPlan.surface("Asphalt", 300, 0.4, 300) == "concrete")
-check("a sidewalk is concrete", SoundPlan.surface("Concrete", 300, 0.9, 300) == "concrete")
-check("an unknown material is concrete", SoundPlan.surface("Neon", 300, 1, 300) == "concrete")
-check("grass is grass", SoundPlan.surface("Grass", 300, 1, 300) == "grass")
-check("snow crunches like grass", SoundPlan.surface("Snow", 300, 1, 300) == "grass")
-check("planks are wood", SoundPlan.surface("WoodPlanks", 300, 1, 300) == "wood")
-check("a diamond plate is metal", SoundPlan.surface("DiamondPlate", 300, 40, 300) == "metal")
-check("a metal ladder is metal", SoundPlan.surface("Metal", 300, 40, 300) == "metal")
-check("terrain water is water", SoundPlan.surface("Water", 300, 0, 300) == "water")
+check("asphalt is concrete", SoundPlan.surface("Asphalt") == "concrete")
+check("a sidewalk is concrete", SoundPlan.surface("Concrete") == "concrete")
+check("an unknown material is concrete", SoundPlan.surface("Neon") == "concrete")
+check("grass is grass", SoundPlan.surface("Grass") == "grass")
+check("snow crunches like grass", SoundPlan.surface("Snow") == "grass")
+check("planks are wood", SoundPlan.surface("WoodPlanks") == "wood")
+check("a diamond plate is metal", SoundPlan.surface("DiamondPlate") == "metal")
+check("a metal ladder is metal", SoundPlan.surface("Metal") == "metal")
+check("terrain water is water", SoundPlan.surface("Water") == "water")
 for _, surface in SoundPlan.Surfaces do
 	check(`{surface} has a volume`, type(S.StepVolume[surface]) == "number" and S.StepVolume[surface] > 0 and S.StepVolume[surface] <= 1.5)
 end
 for material, surface in S.Materials do
 	check(`material {material} → a known surface`, table.find(SoundPlan.Surfaces, surface) ~= nil, surface)
 end
-
--- The park: a lawn between two paths is grass (its slab is concrete), the paths, the ring and the walk round the
--- block are not, the island's lawn is (its stone is slate), the fountain's basin is not.
-local lawnX, lawnZ = park.x + 30, park.z + 12 -- between the east path and the south-east corner path
-check("the park's lawn is grass", SoundPlan.surface("Concrete", lawnX, Map.WalkTop, lawnZ) == "grass")
-check("the park's lawn: parkLawn", SoundPlan.parkLawn(lawnX, lawnZ))
-check("the east path is not lawn", not SoundPlan.parkLawn(park.x + 30, park.z + 1))
-check("a corner path is not lawn", not SoundPlan.parkLawn(park.x + 30, park.z + 30))
-local ring = park.pond + 1.5 + park.ring / 2
-check("the ring path is not lawn", not SoundPlan.parkLawn(park.x + ring, park.z + 6))
-check("the walk round the block is not lawn", not SoundPlan.parkLawn(park.x + Map.BlockSize / 2 - 3, park.z + 20))
-check("off the park is not lawn", not SoundPlan.parkLawn(park.x + Map.BlockSize, park.z + 12))
-check("the island's lawn is grass", SoundPlan.surface("Slate", park.x + 4.5, Map.WalkTop + 0.3, park.z) == "grass")
-check("the fountain's basin is not lawn", not SoundPlan.parkLawn(park.x + 1, park.z + 1))
-check("the coping is stone", SoundPlan.surface("Slate", park.x + park.pond + 0.6, 1.6, park.z) == "concrete")
-check("a street's concrete elsewhere stays concrete", SoundPlan.surface("Concrete", lawnX + Map.Cell, Map.WalkTop, lawnZ) == "concrete")
-check("the bridge's planks are wood", SoundPlan.surface("WoodPlanks", park.x, Map.WalkTop + 1.3, park.z + 14) == "wood")
-
--- Water: the pond (its top the ground's 0), the river and the sea (Map.WaterLevel); dry over them.
-check("the pond's water top", SoundPlan.waterTop(park.x + 10, park.z) == 0)
-check("no water on the lawn", SoundPlan.waterTop(lawnX, lawnZ) == nil)
-check("wading in the pond", SoundPlan.inWater(park.x + 12, -3, park.z))
-check("the pond floor's mud is water", SoundPlan.surface("Mud", park.x + 12, -3.5, park.z) == "water")
-check("on the island: dry", not SoundPlan.inWater(park.x + 3, Map.WalkTop + 0.3, park.z))
-check("on the footbridge: dry", not SoundPlan.inWater(park.x, Map.WalkTop + 1.3, park.z + 14))
-local riverX = (Map.River.x0 + Map.River.x1) / 2
-check("the river's top", SoundPlan.waterTop(riverX, 0) == Map.WaterLevel)
-check("swimming in the river", SoundPlan.inWater(riverX, Map.WaterLevel - 2, 0))
-check("on a bridge over the river: dry", not SoundPlan.inWater(riverX, 1, 0.5 * Map.Cell))
-check("the sea", SoundPlan.inWater(Map.Sea.x0 + 50, Map.WaterLevel - 1, 0))
 
 -- The steps' names: a and b in turn, every one in the sheet.
 for _, surface in SoundPlan.Surfaces do
@@ -94,30 +57,6 @@ for _, surface in SoundPlan.Surfaces do
 		check(`{name} has its region`, SoundSheet.Sfx3[name] ~= nil)
 	end
 	check(`{surface}: the feet differ`, SoundPlan.stepName(surface, true) ~= SoundPlan.stepName(surface, false))
-end
-
--- ── Horns ───────────────────────────────────────────────────────────────────
-local carsSeen = 0
-for _, list in { Config.Cars, Config.AmbientCars } do -- (7.x: the ZDC Van and the bikes; the bodies nobody owns honk too)
-	for _, def in list do
-		carsSeen += 1
-		local name = SoundPlan.horn(def.id, def.bike == true, def.stand == true)
-		check(`{def.id}'s horn {name} has its region`, SoundSheet.Sfx3[name] ~= nil, name)
-		if def.stand then
-			check(`{def.id} beeps`, name == "scooter_beep")
-		elseif def.bike then
-			check(`{def.id} rings`, name == "bike_bell")
-		else
-			check(`{def.id} has a class horn`, S.Horns[def.id] ~= nil and name == S.Horns[def.id])
-		end
-	end
-end
-check("cars seen", carsSeen > 10)
-check("an unknown vehicle honks like a car", SoundPlan.horn("nope", false, false) == "horn_car")
-check("no car id honks like a car", SoundPlan.horn(nil, false, false) == "horn_car")
-check("the van and the truck differ", SoundPlan.horn("van", false, false) ~= SoundPlan.horn("boxtruck", false, false))
-for id, name in S.Horns do
-	check(`horn of {id} exists`, SoundSheet.Sfx3[name] ~= nil, name)
 end
 
 -- ── Doors and backs ─────────────────────────────────────────────────────────
@@ -142,34 +81,6 @@ for _, what in { "door", "swing", "rollup", "gate" } do
 	check(`{what} sounds as it shuts`, closed ~= nil)
 end
 check("nothing for an unknown swing", SoundPlan.swingSound("nope", "opening") == nil)
-
--- ── Ambience ────────────────────────────────────────────────────────────────
-check("street level: no roof wind", SoundPlan.roofShare(1) == 0)
-check("high up: full roof wind", SoundPlan.roofShare(S.RoofFull + 10) == 1)
-check("half way up", math.abs(SoundPlan.roofShare((S.RoofFrom + S.RoofFull) / 2) - 0.5) < 1e-6)
-local noon = SoundPlan.ambience(Map.nightFactor(12), 1, true)
-local midnight = SoundPlan.ambience(Map.nightFactor(0), 1, true)
-local dusk = SoundPlan.ambience(Map.nightFactor(Config.DayNight.NightFrom), 1, true)
-check("noon: the day's loop", math.abs(noon.day - S.Day) < 1e-6 and noon.night == 0)
-check("midnight: the night's loop", math.abs(midnight.night - S.Night) < 1e-6 and midnight.day == 0)
-check("dusk: both, half way", dusk.day > 0 and dusk.night > 0)
-check("with sfx3 the 5.7 hum and wind rest", noon.hum == 0 and noon.wind == 0 and midnight.hum == 0)
-local roofNoon = SoundPlan.ambience(0, S.RoofFull + 5, true)
-check("on a roof the wind rises", math.abs(roofNoon.roof - S.Roof) < 1e-6 and noon.roof == 0)
-check("on a roof the street quiets", roofNoon.day < noon.day and roofNoon.day > 0)
-local old = SoundPlan.ambience(0, 1, false)
-local oldNight = SoundPlan.ambience(1, 1, false)
-check("without sfx3: the 5.7 levels by day", old.hum == Config.Juice.AmbienceDay and old.wind == Config.Juice.WindDay and old.day == 0)
-check("without sfx3: the 5.7 levels by night", oldNight.hum == Config.Juice.AmbienceNight and oldNight.wind == Config.Juice.WindNight)
-check("without sfx3: more wind on a roof", SoundPlan.ambience(0, S.RoofFull, false).wind > old.wind)
-for _, mix in { noon, midnight, dusk, roofNoon, old, oldNight } do
-	for key, value in mix :: any do
-		check(`ambience {key} in 0 … 1`, value >= 0 and value <= 1, value)
-	end
-end
-for _, name in { "amb_day", "amb_night", "amb_roof", "amb_fountain" } do
-	check(name .. " loops", SoundSheet.Looped[name] == true and SoundSheet.Sfx3[name] ~= nil)
-end
 
 -- ── 7.1: the move's sounds ───────────────────────────────────────────────────
 -- (states shaped as server/Moving.luau's viewFor: what SoundPlan reads of them)
@@ -205,13 +116,18 @@ check("nothing changed: nothing plays", names(SoundPlan.moveCues(base, state({})
 check("the move over: nothing (its result plays)", names(SoundPlan.moveCues(base, nil, 1000 + 30)) == "")
 check("the horde comes: the siren", names(SoundPlan.moveCues(base, state({ horde = true }), 1000 + 420)) == "horde_siren")
 check("the horde stays: once", names(SoundPlan.moveCues(state({ horde = true }), state({ horde = true }), 1000 + 421)) == "")
-local opened = SoundPlan.moveCues(base, state({ backOpen = true }), 1000 + 30)
-check("the truck's back opens", names(opened) == "truck_ramp" and opened[1].pitch == 1)
-local shut = SoundPlan.moveCues(state({ backOpen = true }), base, 1000 + 30)
-check("… and shuts lower", names(shut) == "truck_ramp" and shut[1].pitch == MV.RampShut)
-check("in through the house's door", names(SoundPlan.moveCues(base, state({ inside = true }), 1000 + 30)) == "house_door_creak")
-local out = SoundPlan.moveCues(state({ inside = true }), base, 1000 + 30)
-check("… and out", names(out) == "house_door_creak" and out[1].pitch == MV.DoorOut)
+check("the Sprinter's back plays no truck ramp (its back doors are heard swinging)", names(SoundPlan.moveCues(base, state({ backOpen = true }), 1000 + 30)) == ""
+	and names(SoundPlan.moveCues(state({ backOpen = true }), base, 1000 + 30)) == "")
+check("8.3: the house's door creaks at its leaf as it swings (client/WalkDoors.luau), not again from the state", names(SoundPlan.moveCues(base, state({ inside = true }), 1000 + 30)) == ""
+	and names(SoundPlan.moveCues(state({ inside = true }), base, 1000 + 30)) == "")
+do
+	local swing = Config.Moving.Doors.Swing
+	Config.Moving.Doors.Swing = false
+	check("… its leaves still (Doors.Swing false): in through the house's door, the state's creak", names(SoundPlan.moveCues(base, state({ inside = true }), 1000 + 30)) == "house_door_creak")
+	local out = SoundPlan.moveCues(state({ inside = true }), base, 1000 + 30)
+	check("… and out", names(out) == "house_door_creak" and out[1].pitch == MV.DoorOut)
+	Config.Moving.Doors.Swing = swing
+end
 -- the pieces
 local carried = state({}, { piece(1, { state = "carried", mine = true }), piece(2, { state = "carried" }) })
 local loaded = SoundPlan.moveCues(carried, state({}, { piece(1, { state = "truck" }), piece(2, { state = "carried" }) }), 1000 + 30)
@@ -249,33 +165,15 @@ check("moveItem: no spot, no piece", SoundPlan.moveItem(carried, nil) == nil and
 local alone = state({}, { piece(3, { class = "pair", state = "carried", by = "Pavel", mine = true }) })
 check("a two-person piece alone is dragged", SoundPlan.dragged(alone, 3))
 check("… not with a helper", not SoundPlan.dragged(state({}, { piece(3, { class = "pair", state = "carried", by = "Pavel + Danny", mine = true }) }), 3))
-check("… not by a Mover (held up)", not SoundPlan.dragged(state({ team = { role = "mover" } }, alone.items), 3))
+check("8.8 no roles: a two-person piece alone is dragged by anybody (a stray Mover in the state too)", SoundPlan.dragged(state({ team = { role = "mover" } }, alone.items), 3))
 check("a one-person piece is carried", not SoundPlan.dragged(state({}, { piece(3, { class = "both", state = "carried", by = "Pavel", mine = true }) }), 3))
 check("nothing in your hands: no drag", not SoundPlan.dragged(alone, nil) and not SoundPlan.dragged(nil, 3))
 check("the drag's loop is a loop", SoundSheet.Looped.wood_scrape_loop == true)
--- the end
-local gate = SoundPlan.resultCue({ how = "done" })
-check("delivered: the Wall's gate", gate ~= nil and gate.name == "checkpoint_gate" and SoundSheet.Sfx4[gate.name] ~= nil)
-check("late: the gate too", SoundPlan.resultCue({ how = "late" }) ~= nil)
-check("lost or called off: no gate", SoundPlan.resultCue({ how = "failed" }) == nil and SoundPlan.resultCue({ how = "cancelled" }) == nil and SoundPlan.resultCue(nil) == nil)
 for key, value in MV do
 	check(`Config.Soundscape.Move.{key} is a sane number`, type(value) == "number" and value >= 0 and value <= 60, value)
 end
 
--- ── 8.0.1: the sandbox has none of the city's places ────────────────────────
--- Its Pražská runs over the park's (0, 0): no pond to wade or splash in there (nor a river or a sea), no park lawn
--- under its concrete pads, no fountain (SoundScape plays it only when SoundPlan.cityPlaces says so).
-Config.Sandbox.On = true
-check("the sandbox: no city places (no fountain at Map.Park)", not SoundPlan.cityPlaces())
-check("… no pond's water at the park's middle (the sandbox's Pražská)", SoundPlan.waterTop(park.x + 10, park.z) == nil and not SoundPlan.inWater(park.x + 18.5, -0.1, park.z))
-check("… steps where the pond was (the grass by Pražská, its asphalt): grass and concrete, not water", SoundPlan.surface("Grass", park.x + 18.5, 0, park.z) == "grass" and SoundPlan.surface("Asphalt", park.x + 12, -3.5, park.z) == "concrete")
-check("… no river, no sea", SoundPlan.waterTop(riverX, 0) == nil and SoundPlan.waterTop(Map.Sea.x0 + 50, 0) == nil)
-check("8.8 no roles in the sandbox: a two-person piece alone is dragged by anybody (a stray Mover in the state too)", SoundPlan.dragged(alone, 3)
-	and SoundPlan.dragged(state({ team = { role = "mover" } }, alone.items), 3))
-check("… a plot's concrete where the park's lawn was: concrete", not SoundPlan.parkLawn(lawnX, lawnZ) and SoundPlan.surface("Concrete", -65, 0, -85) == "concrete")
-check("… the materials still say their surface (terrain water, grass, planks)", SoundPlan.surface("Water", 0, 0, 0) == "water" and SoundPlan.surface("Grass", 0, 0, 0) == "grass" and SoundPlan.surface("WoodPlanks", 0, 0, 0) == "wood")
-
--- ── 8.1: the sandbox's own sounds ───────────────────────────────────────────
+-- ── 8.1: the game's own sounds ───────────────────────────────────────────
 local SB = S.Sandbox
 local function sfx4(name: string): boolean
 	return SoundSheet.Sfx4[name] ~= nil
@@ -581,17 +479,6 @@ check("the Sprinter's back doors swing round with their own sound", open == "spr
 check("… and shut with their own", close == "sprinter_back_close" and sfx4(close :: string))
 check("… its cabin doors as any car's", SoundPlan.swingSound("door", "opening", "sprinter") == "car_door_open" and SoundPlan.swingSound("door", "shut", "sprinter") == "car_door_close")
 check("another van's back as before", SoundPlan.swingSound("swing", "opening", "van") == "van_back_open" and SoundPlan.swingSound("swing", "opening") == "van_back_open")
--- The moves in the sandbox: no ramp (the Sprinter's doors are heard), no Wall's gate (the trip home's fanfare).
-check("the sandbox: the Sprinter's back plays no truck ramp", names(SoundPlan.moveCues(base, state({ backOpen = true }), 1000 + 30)) == "" and names(SoundPlan.moveCues(state({ backOpen = true }), base, 1000 + 30)) == "")
-check("… 8.3: the house's door creaks at its leaf as it swings (client/WalkDoors.luau), not again from the state", names(SoundPlan.moveCues(base, state({ inside = true }), 1000 + 30)) == ""
-	and names(SoundPlan.moveCues(state({ inside = true }), base, 1000 + 30)) == "")
-do
-	local swing = Config.Moving.Doors.Swing
-	Config.Moving.Doors.Swing = false
-	check("… its leaves still (Doors.Swing false): the state's creak as before", names(SoundPlan.moveCues(base, state({ inside = true }), 1000 + 30)) == "house_door_creak")
-	Config.Moving.Doors.Swing = swing
-end
-check("… and no Wall's gate at the end", SoundPlan.resultCue({ how = "done" }) == nil and SoundPlan.resultCue({ how = "late" }) == nil)
 -- 8.3: the 8.2 features' feedback (the book, the tasks, the bulk actions), from the remotes' existing messages, with
 -- the existing sheets' sounds only, one after the other.
 local function onASheet(name: string): boolean
@@ -823,7 +710,6 @@ end
 for key, value in { D.ClipOut, D.ClipAway, D.Give, D.TakeBack, D.Nope, D.Ack, D.Whistle, TR.Sold, TR.Offer, TR.Price, AU.Bid, AU.Gavel, AU.Sold, AU.SoldMine } do
 	check(`8.9 a quiet UI volume ({key})`, value > 0 and value <= 0.7, value)
 end
-Config.Sandbox.On = sandboxOn
 
 if failures == 0 then
 	print("ALL CHECKS PASSED")

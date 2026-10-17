@@ -1,9 +1,9 @@
 --!strict
--- 6.0.1: a safety net for your own courier ending up sunk in the ground (the owner saw it after a delivery; the cause
--- is still being looked for). Twice a second: when a foot's middle sits INSIDE a solid, anchored world part (never so
--- when you stand on it: the feet rest on its top) two checks in a row, the body is lifted onto that part's top. Not
--- while seated, climbing, swimming, flying, platform-standing (zip lines, the interaction moves) or dead. Every lift
--- warns in the Output with what was going on, so the real cause can be found.
+-- 6.0.1: a safety net for your own character ending up sunk in the ground (the owner saw it once; the cause is still
+-- being looked for). Twice a second: when a foot's middle sits INSIDE a solid, anchored world part (never so when you
+-- stand on it: the feet rest on its top) two checks in a row, the body is lifted onto that part's top. Not while
+-- seated, climbing, swimming, flying, platform-standing or dead. Every lift warns in the Output with what was going
+-- on, so the real cause can be found.
 -- 6.13, the other safety net: a script error on this device goes to the server as its script's name and line only
 -- (the ClientError remote; server/Analytics.luau counts it by script, Roblox's Error Report keeps the message). Each
 -- place once a session, one report every 1 / Config.Robust.Limits.ClientError s at most (the server's limit: none of
@@ -19,8 +19,8 @@ local Unstuck = {}
 
 local CHECK = 0.5
 local MAX_LIFT = 5 -- studs: deeper than this is not "sunk", leave it to the respawn
--- 6.5.1: shallower than this is the body's own feet standing a little in the kerb (the courier's blocky feet reach
--- 0.4 below its hip height: Output showed "0.4 studs in Depot.Sidewalk … lifted out" every second, a jitter)
+-- 6.5.1: shallower than this is the body's own feet standing a little in a kerb (blocky feet reach 0.4 below the hip
+-- height: the Output showed "0.4 studs in … lifted out" every second, a jitter)
 local MIN_LIFT = 1
 
 local player = Players.LocalPlayer
@@ -144,9 +144,8 @@ local function check()
 		return
 	end
 	warn(
-		`[Unstuck] your courier was {string.format("%.1f", lift)} studs in {if part then part:GetFullName() else "the ground"}`
-			.. ` (state {state.Name}, AlightAt {tostring(character:GetAttribute("AlightAt"))}, BoardAt {tostring(character:GetAttribute("BoardAt"))},`
-			.. ` Rental {tostring(player:GetAttribute("Rental"))}, Root joint offset {string.format("%.2f", root.Position.Y - (character:FindFirstChild("LowerTorso") and (character:FindFirstChild("LowerTorso") :: BasePart).Position.Y or root.Position.Y))}); lifted out`
+		`[Unstuck] your character was {string.format("%.1f", lift)} studs in {if part then part:GetFullName() else "the ground"}`
+			.. ` (state {state.Name}, Root joint offset {string.format("%.2f", root.Position.Y - (character:FindFirstChild("LowerTorso") and (character:FindFirstChild("LowerTorso") :: BasePart).Position.Y or root.Position.Y))}); lifted out`
 	)
 	root.AssemblyLinearVelocity = Vector3.zero
 	character:PivotTo(character:GetPivot() + Vector3.new(0, lift, 0))

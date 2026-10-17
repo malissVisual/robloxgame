@@ -1,15 +1,15 @@
 --!strict
 -- 6.13.1, the admin's performance overlay (design/performance/NAVOD.md: the owner opens the live game on a phone and
 -- sends a screenshot). Only for admins (the "Admin" attribute, or everybody in a Studio Play test like the P panel):
--- the P panel's WORLD tab turns it on and off (AdminPanel.onPerformance, set by client/Main.client.luau). A small
+-- the P panel's OP tab turns it on and off (AdminPanel.onPerformance, set by client/Main.client.luau). A small
 -- charcoal box at the top in the middle, taps go through it but for its two buttons:
 --   FPS        frames a second (the last half second) and the worst frame of the last 5 s, as frames a second
 --   CPU / GPU  the render's milliseconds a frame and the draw calls and triangles (Stats, where Roblox lets a script read)
 --   MEMORY     this client's memory (Stats:GetTotalMemoryUsageMb) and Lua's share; PING (Player:GetNetworkPing)
 --   WORLD      the instances and parts in the workspace now (with StreamingEnabled: only what streamed in), the parts
---              that throw a shadow, the lights and how many shine (and of the night lights, the budget's:
---              client/WorldFx.luau); counted every Overlay.Count seconds, Overlay.PerFrame instances a frame, never
---              all at once (the count itself must not make the hitch it measures)
+--              that throw a shadow, the lights and how many shine; counted every Overlay.Count seconds,
+--              Overlay.PerFrame instances a frame, never all at once (the count itself must not make the hitch it
+--              measures)
 --   STREAMING  on or off (workspace.StreamingEnabled), the device (PHONE / COMPUTER, LITE or FULL: client/DeviceBudget),
 --              the screen in px, the graphics quality (Roblox's slider, AUTO when Roblox picks) and the version
 -- LITE swaps this client between the phone's and the computer's budgets (to compare the frame rate on one device);
@@ -25,7 +25,6 @@ local Config = require(Shared.Config)
 local Theme = require(script.Parent.Theme)
 local Ui = require(script.Parent.Ui)
 local DeviceBudget = require(script.Parent.DeviceBudget)
-local WorldFx = require(script.Parent.WorldFx)
 
 local PerfOverlay = {}
 
@@ -186,8 +185,6 @@ local function refresh()
 	else
 		table.insert(lines, "INSTANCES …   PARTS … (counting)")
 	end
-	local known, shining = WorldFx.lightCount()
-	table.insert(lines, `NIGHT LIGHTS {shining} shine of {known} (budget)`)
 	local streaming = workspace.StreamingEnabled
 	table.insert(lines, `STREAMING {if streaming then "ON" else "<font color=\"#D74A46\">OFF</font>"}   {if DeviceBudget.touch then "PHONE" else "COMPUTER"} · {if DeviceBudget.lite then "LITE" else "FULL"}`)
 	local camera = workspace.CurrentCamera

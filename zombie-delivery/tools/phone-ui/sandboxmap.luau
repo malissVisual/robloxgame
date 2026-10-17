@@ -300,11 +300,6 @@ local Data = require("./SandboxMapData")
 local Draw = require("./SandboxMapDraw")
 
 -- Off: nothing
-Config.Sandbox.On = false
-SandboxMapUi.start()
-SandboxMiniMap.start()
-check("Config.Sandbox.On false: neither the map nor the minimap start (no chip, no gui)", SandboxMapUi.parts().chip == nil and SandboxMiniMap.frame() == nil)
-Config.Sandbox.On = true
 SandboxMapUi.start()
 SandboxMiniMap.start()
 SandboxMiniMap.covered = SandboxMapUi.isOpen -- (Main's: CameraRig.windowOpen, the big map one of its windows)

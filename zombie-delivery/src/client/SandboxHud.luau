@@ -27,8 +27,7 @@
 -- at the top right (9.0: no MOUSE [ALT] there), the move's blocks at the top in the middle (tools/phone-ui/sandbox.luau
 -- checks it).
 -- A touch screen: the block is never smaller than Config.SandboxHud.TouchScale and its chip is a finger's size
--- (Ui.MinTouch screen px). SandboxHud.start() does nothing when Config.Sandbox.On is false; it also starts
--- client/WarehouseUi.luau (once).
+-- (Ui.MinTouch screen px). SandboxHud.start() also starts client/WarehouseUi.luau (once).
 -- 8.3, every device (shared/SandboxPad.luau, client/PadGlyph.luau): a chip's key outline shows its key on a computer
 -- (B, C), the gamepad's D-pad glyph while a gamepad is used (← the STOCK list, → the book; drawn again when the device
 -- changes), nothing on a touch screen; the D-pad's ← opens and closes the STOCK list (not while a window has the
@@ -77,11 +76,6 @@ local arrangeQueued = false
 local toastOrder = 0
 local marketTold: number? = nil -- 8.3: the market day the "Hot today" toast was for
 local marketToast: string? = nil -- 8.3: … waiting for the HUD to show
-
-local function sandboxOn(): boolean
-	local sandbox = (Config :: any).Sandbox
-	return type(sandbox) == "table" and sandbox.On == true
-end
 
 -- The scale the HUD's columns put on `object` (the UIScales above it multiplied, up to its ScreenGui).
 local function scaleAbove(object: Instance): number
@@ -475,7 +469,7 @@ function SandboxHud.gui(): any
 end
 
 function SandboxHud.start()
-	if started or not sandboxOn() then
+	if started then
 		return
 	end
 	started = true

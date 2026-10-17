@@ -185,7 +185,7 @@ local function soft(colors: { Color3 }, face: Color3, lip: Color3, text: Color3,
 end
 local C = Theme.Colors
 -- The old (3.5 dark, 3.6 pastel) values too: a module that still writes one of them gets the new face.
--- 5.8: the primary action, the phone's red button (Contract.red; PhoneContract.primary draws the same).
+-- 5.8: the primary action, the red button (Contract.red).
 soft({ K.red }, K.red, K.red, K.text, true, false, true)
 -- The main action: raised charcoal (a step from Contract.raised) with the red rule.
 local MAIN_FACE = Color3.fromRGB(33, 37, 45)

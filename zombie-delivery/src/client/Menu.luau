@@ -1,22 +1,13 @@
 --!strict
--- The start screen: the camera drifts over the city (the zombies roam the streets), the title, your company's
--- money and deliveries, and PLAY. PLAY fades to black, gives the camera back to your character and asks the server
--- for your car.
--- 3.8 (the contract UI, design/ui-contract/): the card is a flat charcoal rectangle with a thin red rule, over a
--- charcoal scrim that fades out to the right (the city stays the main view); PLAY is the main action (a red rule
--- under it); the controls are a second card.
--- 5.8 (the courier phone's look, design/phone-ui/): the card carries the ZDC mark (the red square, the wordmark, a
--- thin rule, COURIER TERMINAL), PLAY is the phone's red primary action, the company line and the controls are slim
--- hairline rows (no corners), and the controls card has the ZDC heading.
--- 8.0 SANDBOX (Config.Sandbox.On, design/sandbox/KONTRAKT.md): a simple screen instead (showSandbox): the mark
--- (8.9: DELIVEROS) over its slogan MOVE · FIND · GROW, PLAY (ENTER) and the version; the camera drifts slowly over the
--- sandbox (shared/SandboxMap.luau: the farmstead, Pražská, your plot), never over the old city. PLAY does what the
--- city's does.
+-- The start screen (8.0, design/sandbox/KONTRAKT.md): a charcoal card with the mark (8.9: DELIVEROS) over its slogan
+-- MOVE · FIND · GROW and the version, over a charcoal scrim that fades out to the right; the camera drifts slowly over
+-- the lobby (shared/SandboxMap.luau: its plaza, its portals, your plot's warehouse). PLAY (ENTER) fades to black, gives
+-- the camera back to your character and runs onPlay (the server's Play).
 -- 8.3 (design/warehouse-levels/KONTRAKT.md): the two shots of your warehouse look at the building of its level
 -- (WarehouseLayout.site: 1 the Garage … 5 the Logistics Center).
--- 10.1 (Config.SaveSlots): the sandbox's card lists your save slots (CONTINUE, NEW GAME, LOOK, START OVER; the Slots
--- remote, server/SaveSlots.luau) and opens the character creator (client/CharacterCreator.luau); the game starts once
--- the server says the save is in. Up, it sets the player attribute StartScreen (the loading screen's cue to go).
+-- 10.1 (Config.SaveSlots): the card lists your save slots (CONTINUE, NEW GAME, LOOK, START OVER; the Slots remote,
+-- server/SaveSlots.luau) and opens the character creator (client/CharacterCreator.luau); the game starts once the
+-- server says the save is in. Up, it sets the player attribute StartScreen (the loading screen's cue to go).
 -- Its sounds (Sounds.play, art/audio/sfx6.ogg): a save picked (menu_select), START OVER's question (menu_warn) and
 -- CANCEL (menu_back), the game starting (menu_start, as the fade begins); the creator plays its own.
 
@@ -26,7 +17,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
-local SandboxMap = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("SandboxMap")) -- 8.0 SANDBOX
+local SandboxMap = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("SandboxMap")) -- (the lobby's shots)
 local WarehouseLayout = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("WarehouseLayout")) -- 8.3: its level's building
 local Net = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Net")) -- 10.1: the Slots remote
 local CharacterLooks = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("CharacterLooks")) -- 10.1: the slots' busts
@@ -40,22 +31,10 @@ local Menu = {}
 
 local player = Players.LocalPlayer
 local gui: any = nil
-local infoLabel: any = nil
 local flying = false
-local lastState: any = nil
 
--- Camera stops around the depot (close enough to be streamed in), looped. 6.11: the Central Park's pond in the middle
--- first, then over it to the depot north-east of it (Map.Park, Map.Depot).
-local SHOTS = {
-	{ Vector3.new(-200, 60, 230), Vector3.new(0, 6, 0) },
-	{ Vector3.new(-30, 34, 70), Vector3.new(144, 18, -150) },
-	{ Vector3.new(560, 45, 140), Vector3.new(840, 0, 72) },
-	{ Vector3.new(300, 110, -420), Vector3.new(0, 0, -150) },
-	{ Vector3.new(-420, 40, -200), Vector3.new(-200, 5, 0) },
-}
-
-local shots = SHOTS -- (8.0 SANDBOX: sandboxShots instead)
-local shotSeconds = 9 -- one camera move
+local shots: { { Vector3 } } = {} -- (sandboxShots, below)
+local shotSeconds = 12 -- one camera move
 
 local function shot(n: number): CFrame
 	local s = shots[(n - 1) % #shots + 1]
@@ -73,7 +52,7 @@ local function warehouseLevel(id: number, mine: boolean): number
 	return if type(level) == "number" then level else 4
 end
 
--- 8.0 SANDBOX: the slow drift over the sandbox (shared/SandboxMap.luau), looped. 9.7 runs: over the lobby (its
+-- 8.0: the slow drift over the game's world (shared/SandboxMap.luau), looped. 9.7 runs: over the lobby (its
 -- plaza from the south, its portals from the west, your plot's warehouse (the player's Plot attribute; the first plot
 -- before the server gave you one; 8.3: the building of its level, the shot pulling back with its footprint), its bay
 -- and the plaza from high up).
@@ -107,9 +86,7 @@ local function fly()
 		camera.CFrame = shot(n)
 		while flying do
 			camera.CameraType = Enum.CameraType.Scriptable
-			if Config.Sandbox.On then
-				shots = sandboxShots() -- (8.3: your plot and warehouse level can come after the start screen)
-			end
+			shots = sandboxShots() -- (8.3: your plot and warehouse level can come after the start screen)
 			local tween = TweenService:Create(camera, TweenInfo.new(shotSeconds, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { CFrame = shot(n + 1) })
 			tween:Play()
 			local started = os.clock()
@@ -139,13 +116,6 @@ local function controls(enabled: boolean)
 			c:Disable()
 		end
 	end)
-end
-
-function Menu.setState(state: any)
-	lastState = state
-	if infoLabel and state then
-		infoLabel.Text = `{Ui.money(state.money)}  ·  {state.deliveries} deliveries  ·  {state.kills} kills`
-	end
 end
 
 -- 10.1: a slot card's little bust: a made courier in flat blocks (its hat, hair, skin and top), your own avatar's head
@@ -251,14 +221,14 @@ local function slotCard(parent: Instance, summary: any, y: number, latest: boole
 	return card
 end
 
--- 8.0 SANDBOX: the sandbox's start screen. The city's charcoal card, smaller: the mark (8.9: DELIVEROS), its slogan and
--- the version; PLAY fades out the same way and runs onPlay (the server's Play).
+-- The start screen: the charcoal card, the mark (8.9: DELIVEROS), its slogan and the version; PLAY fades out and runs
+-- onPlay (the server's Play).
 -- 10.1 (Config.SaveSlots.On): the card lists your save slots (slotCard) in place of PLAY. CONTINUE asks the server for
 -- that save (the Slots remote), NEW GAME and LOOK open the character creator (client/CharacterCreator.luau), START OVER
 -- asks first, then the creator: a fresh game in the slot. While the save loads the card says so; once the server says
 -- it is in ("ready") the fade runs as PLAY's did. ENTER (a gamepad's A) continues the save played last (none: a new
 -- game in the first empty slot). Without slots: PLAY (ENTER) as before.
-local function showSandbox(onPlay: () -> ())
+function Menu.show(onPlay: () -> ())
 	gui = Ui.make("ScreenGui", {
 		Name = "StartScreen",
 		ResetOnSpawn = false,
@@ -587,287 +557,9 @@ local function showSandbox(onPlay: () -> ())
 	end)
 
 	task.spawn(controls, false)
-	shots, shotSeconds = sandboxShots(), 12
+	shots = sandboxShots()
 	fly()
 	player:SetAttribute("StartScreen", true) -- 10.1: the loading screen (ReplicatedFirst) may go: the start screen is up
-end
-
-function Menu.show(onPlay: () -> ())
-	if Config.Sandbox.On then
-		showSandbox(onPlay)
-		return
-	end
-	gui = Ui.make("ScreenGui", {
-		Name = "StartScreen",
-		ResetOnSpawn = false,
-		IgnoreGuiInset = false,
-		DisplayOrder = 20,
-		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
-	}, player:WaitForChild("PlayerGui"))
-
-	local C = Theme.Colors
-	local P = Theme.Postage
-	local K = Theme.Contract
-	if Theme.Images.menuBackground ~= "" then
-		Ui.make("ImageLabel", {
-			Name = "MenuArtwork", Size = UDim2.fromScale(1, 1), Image = Theme.Images.menuBackground,
-			ScaleType = Enum.ScaleType.Crop, BackgroundTransparency = 1, ZIndex = 1,
-		}, gui)
-	end
-	-- A localized charcoal scrim (opaque on the left, gone on the right) keeps the real-time city the focal point.
-	local veil = Ui.make("Frame", {
-		Size = UDim2.fromScale(1, 1), BackgroundColor3 = K.charcoal,
-		BackgroundTransparency = 0.45, BorderSizePixel = 0, Active = false, ZIndex = 2,
-	}, gui)
-	Ui.make("UIGradient", {
-		Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 0.8) }),
-		Rotation = 0,
-	}, veil)
-
-	local center = Ui.make("Frame", {
-		Name = "DispatchMenu", Size = UDim2.fromOffset(560, 500),
-		Position = UDim2.new(0.08, 0, 0.5, 0), AnchorPoint = Vector2.new(0, 0.5),
-		BackgroundTransparency = 1, ZIndex = 5,
-	}, gui)
-	local menuScale = Ui.make("UIScale", {}, center)
-	-- The shift card: a flat charcoal rectangle with the ZDC mark at its top (the phone's brand).
-	local face = Ui.ticket(center, UDim2.fromScale(1, 1), UDim2.new())
-	face.BackgroundColor3 = K.charcoal
-	face.BackgroundTransparency = 0.06
-	local faceTicket = face.Parent
-	faceTicket.Name = "ShiftCard"
-	faceTicket.ZIndex = 5
-	local brand = Ui.brand(face, 24, { Position = UDim2.fromOffset(24, 16), ZIndex = 6 })
-	for _, part in brand:GetChildren() do
-		if part:IsA("GuiObject") then
-			part.ZIndex = 6
-		end
-	end
-	local brandEnd = 24 + brand.Size.X.Offset
-	Ui.make("Frame", {
-		Name = "BrandRule", Size = UDim2.fromOffset(1, 20), Position = UDim2.fromOffset(brandEnd + 10, 22),
-		BackgroundColor3 = K.rule, BorderSizePixel = 0, ZIndex = 6,
-	}, face)
-	Ui.caps(face, "Courier terminal   ·   Dead End Dispatch", UDim2.fromOffset(536 - (brandEnd + 22), 20), {
-		Position = UDim2.fromOffset(brandEnd + 22, 22), TextSize = 13, ZIndex = 6,
-	})
-	local topTitle = Ui.label(face, "ZOMBIE", UDim2.fromOffset(510, 76), {
-		Position = UDim2.fromOffset(24, 60), TextSize = 64, Font = Theme.DisplayFont, ZIndex = 6,
-	})
-	local bottomTitle = Ui.label(face, "DELIVERY", UDim2.fromOffset(510, 76), {
-		Position = UDim2.fromOffset(24, 128), TextSize = 64, TextColor3 = K.text, Font = Theme.DisplayFont, ZIndex = 6,
-	})
-	if Theme.Images.logo ~= "" then
-		topTitle.Visible, bottomTitle.Visible = false, false
-		Ui.make("ImageLabel", {
-			Size = UDim2.fromOffset(510, 158), Position = UDim2.fromOffset(24, 52),
-			Image = Theme.Images.logo, ScaleType = Enum.ScaleType.Fit, BackgroundTransparency = 1, ZIndex = 6,
-		}, face)
-	end
-	local tagline = Ui.label(face, "Deliver. Survive. Get paid.", UDim2.fromOffset(510, 30), {
-		Position = UDim2.fromOffset(24, 216), TextSize = 22, Font = Theme.Font, TextColor3 = C.dim, ZIndex = 6,
-	})
-	-- Your company: a slim hairline row.
-	local company = Ui.make("Frame", {
-		Size = UDim2.fromOffset(512, 64), Position = UDim2.fromOffset(24, 264),
-		BackgroundColor3 = K.row, BorderSizePixel = 0, ZIndex = 6,
-	}, face)
-	Ui.stroke(company, K.line, 1).Transparency = Ui.HAIRLINE
-	Ui.caps(company, "Your company", UDim2.fromOffset(488, 16), {
-		Position = UDim2.fromOffset(12, 10), ZIndex = 7,
-	})
-	infoLabel = Ui.label(company, "Loading your company...", UDim2.fromOffset(488, 24), {
-		Position = UDim2.fromOffset(12, 30), TextSize = 17, ZIndex = 7,
-	})
-	Menu.setState(lastState)
-	-- PLAY: the phone's red primary action (Contract.red: a red face, white caps, square).
-	local play = Ui.button(face, "PLAY  /  START YOUR SHIFT", UDim2.fromOffset(512, 72), K.red, function() end)
-	play.Position = UDim2.fromOffset(24, 344)
-	play.TextSize = 23
-	play.ZIndex = 7
-
-	-- Controls live on a separate card so the start screen remains readable on phones.
-	local help = Ui.ticket(center, UDim2.fromScale(1, 1), UDim2.new())
-	help.BackgroundColor3 = K.charcoal
-	help.BackgroundTransparency = 0.06
-	local helpTicket = help.Parent
-	helpTicket.Name = "ControlsCard"
-	helpTicket.ZIndex, helpTicket.Visible = 15, false
-	-- The ZDC heading: [■ ZDC] | [glyph] CONTROLS.
-	local helpHeading = Ui.heading(help, "Controls", { glyph = "settings", textSize = 22, height = 38 })
-	helpHeading.frame.Size = UDim2.fromOffset(380, 38)
-	helpHeading.frame.Position = UDim2.fromOffset(24, 25)
-	for _, part in helpHeading.frame:GetDescendants() do
-		if part:IsA("GuiObject") then
-			part.ZIndex = 16
-		end
-	end
-	local closeHelp = Ui.ghostButton(help, "‹  BACK", UDim2.fromOffset(116, 48), nil, function()
-		helpTicket.Visible, faceTicket.Visible = false, true
-	end)
-	closeHelp.Position, closeHelp.ZIndex = UDim2.fromOffset(420, 20), 16
-	local touchLayout = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
-	local controlsText: { { string } } = if touchLayout then {
-		{ "MOVE", "Left thumbstick    ·    SPRINT: on / off (breath)" }, { "SHOOT", "FIRE button (take the gun first: DRAW)" },
-		{ "HANDS", "DRAW / PUNCH buttons left of FIRE" },
-		{ "CARGO", "Tap prompts to pick up and load" }, { "PUT DOWN", "PUT DOWN / LET GO / SET DOWN button" },
-		{ "WEAPONS", "Tap the weapon line: the wheel" }, { "ITEMS", "Tap the item tags" },
-		{ "NAVIGATE", "MAP / CREW / MENU buttons" }, { "EXIT CAR", "EXIT button or the jump button" },
-	} else {
-		{ "MOVE", "WASD / arrows    ·    Shift: sprint (breath)" }, { "COMBAT", "Mouse: aim    ·    RMB: aim    ·    LMB: shoot" },
-		{ "HANDS", "B: holster / draw    ·    V: punch / strike" },
-		{ "CARGO", "E: pick up / load    ·    G: put down" }, { "EQUIPMENT", "T: switch weapon    ·    Q: phone    ·    1–5: items" },
-		{ "WINDOWS", "J: jobs  ·  M: map  ·  I: bag  ·  C: career" }, { "MOUSE", "Alt: free cursor" },
-		{ "VEHICLE", "E: get in / get out    ·    Space: out too" }, { "ADMIN", "P: admin (when authorized)" },
-	}
-	local rows = {}
-	for i, entry in controlsText do
-		local row = Ui.make("Frame", {
-			Size = UDim2.fromOffset(512, 40), Position = UDim2.fromOffset(24, 84 + (i - 1) * 42), -- 3.9: nine rows fit
-			BackgroundColor3 = K.row, BackgroundTransparency = if i % 2 == 0 then 1 else 0,
-			BorderSizePixel = 0, ZIndex = 16,
-		}, help)
-		Ui.label(row, entry[1], UDim2.fromOffset(128, 40), { Position = UDim2.fromOffset(10, 0), TextSize = 14, TextColor3 = K.secondary, ZIndex = 17 })
-		Ui.label(row, entry[2], UDim2.fromOffset(366, 40), { Position = UDim2.fromOffset(140, 0), TextSize = 16, Font = Theme.Font, ZIndex = 17 })
-		table.insert(rows, row)
-	end
-	local controlsButton = Ui.ghostButton(face, "CONTROLS", UDim2.fromOffset(240, 44), nil, function()
-		helpTicket.Visible, faceTicket.Visible = true, false
-	end)
-	controlsButton.Position, controlsButton.ZIndex = UDim2.fromOffset(24, 430), 7
-	local enterHint = Ui.label(face, if touchLayout then "Tap PLAY to begin" else "Press ENTER to begin", UDim2.fromOffset(244, 44), {
-		Position = UDim2.fromOffset(292, 430), TextSize = 15, TextColor3 = C.dim, TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 7,
-	})
-	-- Over the world: a compact charcoal label behind the text.
-	local version = Ui.make("TextLabel", {
-		Size = UDim2.fromOffset(0, 24), AutomaticSize = Enum.AutomaticSize.X, Position = UDim2.new(1, -12, 1, -10), AnchorPoint = Vector2.new(1, 1),
-		BackgroundTransparency = 0, BackgroundColor3 = P.pill, Text = `version {Config.Version}`,
-		TextSize = 14, Font = Theme.MonoFont, TextColor3 = C.dim, ZIndex = 6,
-	}, gui)
-	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) }, version)
-
-	local viewportConnection: RBXScriptConnection? = nil
-	local cameraConnection: RBXScriptConnection? = nil
-	local function fitMenu()
-		local camera = workspace.CurrentCamera
-		local v = if camera then camera.ViewportSize else Vector2.new(1280, 720)
-		local compact = v.Y < 480
-		local narrow = v.X < 600 and not compact
-		local height = if compact then 440 elseif narrow and helpTicket.Visible then 820 elseif narrow then 650 else 500
-		local factor = math.max(0.35, math.min((v.X - 32) / 560, (v.Y - 64) / height, 1.05))
-		menuScale.Scale = factor
-		center.Size = UDim2.fromOffset(560, height)
-		center.Position = if v.X < 900 then UDim2.fromScale(0.5, 0.5) else UDim2.new(0.08, 0, 0.5, 0)
-		center.AnchorPoint = if v.X < 900 then Vector2.new(0.5, 0.5) else Vector2.new(0, 0.5)
-		topTitle.Position = UDim2.fromOffset(24, if compact then 48 else 60)
-		bottomTitle.Position = UDim2.fromOffset(24, if compact then 110 else 128)
-		tagline.Position = UDim2.fromOffset(24, if compact then 192 else 216)
-		company.Position = UDim2.fromOffset(24, if compact then 234 else 264)
-		company.Size = UDim2.fromOffset(512, if narrow then 112 else 64)
-		infoLabel.TextSize = math.max(17, 14 / factor)
-		infoLabel.Size = UDim2.fromOffset(488, if narrow then 70 else 24)
-		tagline.TextSize = math.max(22, 14 / factor)
-		enterHint.TextSize = math.max(15, 12 / factor)
-		play.Position = UDim2.fromOffset(24, if compact then 308 elseif narrow then 392 else 344)
-		play.Size = UDim2.fromOffset(512, math.max(if compact then 56 else 72, 44 / factor))
-		local controlY = if compact then 374 elseif narrow then 498 else 430
-		controlsButton.Position = UDim2.fromOffset(24, controlY)
-		controlsButton.Size = UDim2.fromOffset(240, math.max(44, 44 / factor))
-		enterHint.Position = UDim2.fromOffset(292, controlY)
-		closeHelp.Size = UDim2.fromOffset(116, math.max(48, 44 / factor))
-		for i, row in rows do
-			local gap = if compact then 38 elseif narrow then 82 else 46 -- (3.9: nine rows still fit the card)
-			local rowHeight = if narrow then 80 else 44
-			row.Position = UDim2.fromOffset(24, 84 + (i - 1) * gap)
-			row.Size = UDim2.fromOffset(512, rowHeight)
-			for _, child in row:GetChildren() do
-				if child:IsA("TextLabel") then
-					child.Size = UDim2.new(child.Size.X.Scale, child.Size.X.Offset, 0, rowHeight)
-					child.TextSize = math.max(16, 13 / factor)
-				end
-			end
-		end
-	end
-	local function watchCamera()
-		if viewportConnection then viewportConnection:Disconnect() end
-		local camera = workspace.CurrentCamera
-		viewportConnection = if camera then camera:GetPropertyChangedSignal("ViewportSize"):Connect(fitMenu) else nil
-		fitMenu()
-	end
-	cameraConnection = workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(watchCamera)
-	watchCamera()
-	helpTicket:GetPropertyChangedSignal("Visible"):Connect(fitMenu)
-
-	-- The black fade only shows (and only exists in front of PLAY) after PLAY was pressed.
-	local fade = Ui.make("Frame", {
-		Size = UDim2.fromScale(1, 1),
-		BackgroundColor3 = P.veil,
-		BackgroundTransparency = 1,
-		Visible = false,
-		Active = false,
-		ZIndex = 50,
-	}, gui)
-
-	local pressed = false
-	local keyConnection: RBXScriptConnection? = nil
-	local function start()
-		if pressed then
-			return
-		end
-		pressed = true
-		if viewportConnection then viewportConnection:Disconnect() end
-		if cameraConnection then cameraConnection:Disconnect() end
-		if keyConnection then
-			keyConnection:Disconnect()
-		end
-		fade.Visible = true
-		local t = TweenService:Create(fade, TweenInfo.new(0.4), { BackgroundTransparency = 0 })
-		t:Play()
-		task.wait(0.45)
-		flying = false
-		for _, child in gui:GetChildren() do
-			if child ~= fade then
-				child:Destroy()
-			end
-		end
-		local cam = workspace.CurrentCamera
-		local character = player.Character
-		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-		if cam then
-			cam.CameraType = Enum.CameraType.Custom
-			if humanoid then
-				cam.CameraSubject = humanoid
-			end
-		end
-		task.spawn(controls, true)
-		local ok, err = pcall(function()
-			onPlay()
-		end)
-		if not ok then
-			warn("[Menu] starting the game failed: " .. tostring(err))
-		end
-		task.wait(0.6)
-		TweenService:Create(fade, TweenInfo.new(0.6), { BackgroundTransparency = 1 }):Play()
-		task.wait(0.65)
-		gui:Destroy()
-		gui = nil
-		infoLabel = nil
-	end
-	play.Activated:Connect(start)
-	keyConnection = UserInputService.InputBegan:Connect(function(input, processed)
-		-- (not the Enter that sends a chat line, nor a press a button already took)
-		if processed or UserInputService:GetFocusedTextBox() then
-			return
-		end
-		local key = input.KeyCode
-		if key == Enum.KeyCode.Return or key == Enum.KeyCode.KeypadEnter or key == Enum.KeyCode.ButtonA then
-			task.spawn(start)
-		end
-	end)
-
-	task.spawn(controls, false)
-	fly()
-	player:SetAttribute("StartScreen", true) -- 10.1: the loading screen (ReplicatedFirst) may go
 end
 
 return Menu

@@ -72,7 +72,7 @@ end
 
 function TradePrompts.start()
 	local trade = tune()
-	if started or not Config.Sandbox.On or type(trade) ~= "table" or trade.On ~= true then
+	if started or type(trade) ~= "table" or trade.On ~= true then
 		return
 	end
 	started = true

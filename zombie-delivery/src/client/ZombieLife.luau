@@ -6,7 +6,7 @@
 --   * Eyes: the Neon eyes (the native body's EyeL / EyeR, the block fallback's Eye) take EyeDay's dull colour by day and
 --     the kind's Glow at night, faded through dusk and dawn by the clock (the workspace's ClockHour, Map.nightFactor):
 --     a faint glow, no lights. Within EyeRange of the camera, looked at every EyeEvery s; a body is painted again only
---     when the glow has moved on since (or when it comes near). Never the people (bandits, gunners).
+--     when the glow has moved on since (or when it comes near). Never a person's style (ZombieStyle's "person").
 --   * Voices: the existing zombie_a / zombie_b cues pitched (client/Sounds.luau Sounds.playAt: 3D, at the zombie):
 --       groans  the nearest within Groan.Range of the camera, each zombie with a pause of its own (Min … Max s,
 --               × Night at night, × Hunt while it moves fast), at most Groan.Voices at once and Gap s apart (this took
@@ -80,7 +80,7 @@ local function knownOf(model: Model, now: number): Known
 	local gait = ZombieStyle.gait(name, if type(seed) == "number" then seed else 0)
 	local made: Known = {
 		kind = name,
-		person = gait.style == "person" or model:GetAttribute("Bandit") == true,
+		person = gait.style == "person",
 		pitch = gait.pitch,
 		eyes = nil,
 		glow = rgb(Tuning.Glow[name] or Tuning.GlowDefault),

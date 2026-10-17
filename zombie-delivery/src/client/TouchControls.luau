@@ -4,14 +4,10 @@
 --     sprint whenever you move and have breath, on the same breath (client/Stamina.luau, through
 --     CameraRig.setTouchSprint); it turns itself off when the breath runs dry, in a seat or on death. Lit while on.
 --     Shown on foot with free hands.
---   * The hand button's place (Hud's PUNCH / STRIKE on foot, client/Holster.luau) says:
---       EXIT      while you sit in a car seat: out at your door the way E does it (CarBoarding.exit). Roblox's jump
---                 button still gets you out too (the seat's own jump, like Space).
---       PUT DOWN  while you carry a piece, LET GO while you lead a horse, SET DOWN while you push the trolley or the
---                 pallet jack: what the G prompt in your hands does (the "PutDown" remote; the server checks it,
---                 server/Cargo.luau, server/Equipment.luau). The prompt itself still works when you tap it.
+--   * PUT DOWN over it while you carry a piece: what the G prompt in your hands does (the "PutDown" remote; the server
+--     checks it, server/Moving.luau). The prompt itself still works when you tap it.
 -- Hud builds them into its ScreenGui (TouchControls.build) and its layout() places them (TouchControls.place, the boxes
--- of client/TouchLayout.luau), so they hide with the HUD. The 3.8 contract look, like FIRE and the hand buttons: a
+-- of client/TouchLayout.luau: SPRINT's and the hand button's), so they hide with the HUD. The 3.8 contract look: a
 -- charcoal face, white type, a fine light line, the red accent; at least 44 px each way.
 
 local Players = game:GetService("Players")
@@ -22,7 +18,6 @@ local Net = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Net")
 local Theme = require(script.Parent.Theme)
 local Ui = require(script.Parent.Ui)
 local CameraRig = require(script.Parent.CameraRig)
-local CarBoarding = require(script.Parent.CarBoarding)
 
 local TouchControls = {}
 
@@ -36,13 +31,13 @@ type Parts = {
 	sprintStroke: UIStroke,
 	sprintAccent: Frame,
 	act: TextButton,
-	actKind: string, -- "" (hidden) | "exit" | "put"
+	actKind: string, -- "" (hidden) | "put"
 }
 
 local player = Players.LocalPlayer
 local parts: Parts? = nil
 
--- A square touch button in the contract look (Hud's FIRE and hand buttons).
+-- A square touch button in the contract look.
 local function button(parent: Instance, name: string, text: string): (TextButton, UIStroke, Frame)
 	local made: TextButton = Ui.make("TextButton", {
 		Name = name,
@@ -68,22 +63,16 @@ local function button(parent: Instance, name: string, text: string): (TextButton
 	return made, stroke, accent
 end
 
--- What the hand button's place says now: "exit" in a car seat, "put" with something in your hands (and its word).
+-- What the hand button's place says now: "put" with something in your hands (and its word).
 local function actFor(character: Model?, humanoid: Humanoid?): (string, string)
 	if not character or not humanoid or humanoid.Health <= 0 then
 		return "", ""
-	end
-	if CarBoarding.seated() then
-		return "exit", "EXIT"
 	end
 	local carrying = character:GetAttribute("Carrying")
 	if type(carrying) ~= "string" or carrying == "" then
 		return "", ""
 	end
-	if character:GetAttribute("Pushing") ~= nil then
-		return "put", "SET DOWN"
-	end
-	return "put", if carrying == "horse" then "LET GO" else "PUT DOWN"
+	return "put", "PUT DOWN"
 end
 
 local function refresh(p: Parts)
@@ -96,7 +85,7 @@ local function refresh(p: Parts)
 		p.act.Text = words
 	end
 	-- SPRINT: on foot, free hands, alive, out of any seat.
-	local onFoot = character ~= nil and humanoid ~= nil and humanoid.Health > 0 and humanoid.SeatPart == nil and not CarBoarding.seated()
+	local onFoot = character ~= nil and humanoid ~= nil and humanoid.Health > 0 and humanoid.SeatPart == nil
 	local free = onFoot and character ~= nil and character:GetAttribute("Carrying") == nil
 	p.sprint.Visible = free
 	local on, running = CameraRig.touchSprint()
@@ -119,7 +108,7 @@ function TouchControls.build(gui: Instance)
 		return
 	end
 	local sprint, sprintStroke, sprintAccent = button(gui, "Sprint", "SPRINT")
-	local act = button(gui, "TouchAct", "EXIT")
+	local act = button(gui, "TouchAct", "PUT DOWN")
 	local made: Parts = {
 		sprint = sprint,
 		sprintStroke = sprintStroke,
@@ -142,13 +131,11 @@ function TouchControls.build(gui: Instance)
 		if click then
 			click()
 		end
-		if made.actKind == "exit" then
-			CarBoarding.exit()
-		elseif made.actKind == "put" then
+		if made.actKind == "put" then
 			Net.get("PutDown"):FireServer()
 		end
 	end)
-	-- A few times a second is plenty for what they show (a seat, the hands, the toggle).
+	-- A few times a second is plenty for what they show (the hands, the toggle).
 	local since = 0
 	RunService.Heartbeat:Connect(function(dt: number)
 		since += dt
@@ -167,7 +154,7 @@ local function put(object: GuiObject, b: Box)
 	object.Size = UDim2.fromOffset(math.floor(b.x1 - b.x0 + 0.5), math.floor(b.y1 - b.y0 + 0.5))
 end
 
--- Hud's layout(): SPRINT next to the jump button, EXIT / PUT DOWN in the hand button's place (px in the HUD's gui).
+-- Hud's layout(): SPRINT next to the jump button, PUT DOWN over it in the hand button's place (px in the HUD's gui).
 function TouchControls.place(sprint: Box, act: Box, textSize: number)
 	local p = parts
 	if not p then

@@ -24,7 +24,7 @@
 -- The values (WarehouseUi.values): the entry's own (rarity, perMinute, sell) when the server sends them, else
 -- shared/CollectionRules.luau's (RULES below: the function names asked, with the entry, then with item, condition,
 -- variant), else Config.SandboxHud.Fallback's guess from the piece's catalogue value.
---   WarehouseUi.start()                  listens (once; nothing when Config.Sandbox.On is false)
+--   WarehouseUi.start()                  listens (once)
 --   WarehouseUi.openPicker(stand) / openStock() / toggleStock() / close() / isOpen() / showing() ("picker", "stock")
 --   WarehouseUi.state()                  the last state (nil: none yet); WarehouseUi.onState(fn(state, previous))
 --   WarehouseUi.values(entry)            { rarity, perMinute, sell } of a stock entry (perMinute as it is: the
@@ -1579,11 +1579,6 @@ local function onEvent(message: any)
 	end
 end
 
-local function sandboxOn(): boolean
-	local sandbox = (Config :: any).Sandbox
-	return type(sandbox) == "table" and sandbox.On == true
-end
-
 local function findRules(): any
 	local ok, found = pcall(function(): any
 		local module = Shared:FindFirstChild("CollectionRules") :: ModuleScript?
@@ -1593,7 +1588,7 @@ local function findRules(): any
 end
 
 function WarehouseUi.start()
-	if started or not sandboxOn() then
+	if started then
 		return
 	end
 	started = true

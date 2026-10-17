@@ -199,8 +199,8 @@ function M.P.button(parent,value,size,kind,fn)
 end
 function M.P.dot(parent,props) return M.Ui.label(parent,"",M.UDim2.fromOffset(14,14),props) end
 function M.P.tag(parent,value) return M.Ui.label(parent,value,M.UDim2.fromOffset(100,20)) end
--- 6.21: an icon (no uploaded ids here: the emoji as a label, like Ui.icon without its picture), the bottom bar's colours
--- (HudContract), the bag's fill ring's gradient and what is in your hand (client/Holster.luau, recorded).
+-- 6.21: an icon (no uploaded ids here: the emoji as a label, like Ui.icon without its picture) and the contract's
+-- colours (HudContract).
 function M.Ui.icon(parent,iconName,fallback,size,props)
 	local made=M.make("TextLabel",{Name="Icon",Text=fallback,Size=size,BackgroundTransparency=1},parent)
 	for key,value in props or {} do if string.sub(key,1,5)~="Image" then made[key]=value end end
@@ -229,72 +229,16 @@ M.ItemLooks={
 	frame=function() return {3,2,-4},{0,0,0} end,
 }
 M.NumberSequenceKeypoint={new=function(time,value) return {Time=time,Value=value} end}
-M.hand="fists"
-M.chosen={}
-M.Holster={hand=function() return M.hand end,choose=function(hand) table.insert(M.chosen,hand) end}
-M.MapView={isOpen=function() return M.mapOpen==true end,toggle=function() M.mapOpen=not M.mapOpen end,setWaypoint=function(at) M.waypoint=at end}
--- 6.12, the clerks: where the local character stands (STYLE's BUY only at a shop that sells the look; the GPS above)
-function M.stand(x,z) M.root.Position=M.Vector3.new(x,0,z) end
-M.KitShop={owned=function(state) return state.kit or {} end,roomText=function() return "HANDS 2 / PACK 3" end}
-M.CareerUi={toGo=function() return "8 runs" end,unlockText=function() return "Next unlock" end}
-M.BagUi={line=function() return nil end,open=function() M.bagOpen=true end,render=function(parent,job,order) M.bagRendered=(M.bagRendered or 0)+1;M.make("Frame",{Name="BagRows",LayoutOrder=order},parent);return order+1 end}
--- 6.5: BAG & ITEMS' BAGS tab and ITEMS' USE (the bottom bar's path).
-M.BagUi.bags=function(parent,state,order) M.bagsRendered=(M.bagsRendered or 0)+1;M.make("Frame",{Name="BagsRows",LayoutOrder=order},parent);return order+1 end
-M.Hotbar={slotOf=function(id) return if id=="medkit" then 5 else nil end}
-M.Hotbar.onUse=function(id) M.used=id end
 M.Sounds={cycle=function() M.soundCycles=(M.soundCycles or 0)+1 end}
--- 6.12: STYLE's sound on a purchase, its 3D preview (client/StylePreview.luau: recorded, not drawn) and its keys
+-- the sounds played (recorded) and the keys bound
 M.played={}
 M.Sounds.play=function(name) table.insert(M.played,name) end
-M.previews={}
-M.StylePreview={show=function(holder,tab,def) table.insert(M.previews,{holder=holder,tab=tab,id=def and def.id}); return "courier",nil end,clear=function() M.previewCleared=(M.previewCleared or 0)+1 end}
 M.actions={}
 M.services.ContextActionService={
 	BindActionAtPriority=function(_,name,fn,_,priority,...) M.actions[name]={fn=fn,keys={...},priority=priority} end,
 	UnbindAction=function(_,name) M.actions[name]=nil end,
 }
 M.Enum.ContextActionPriority.High.Value=3000
-M.Discovery={grid={X0=-2200,Z0=-3000,Size=120,Rows=40,Cols=36},changed=signal(),uncoveredCell=function() return M.discovered==true end}
--- 6.12.8, the NEXT UP queue: what the client last sent on a remote, and the server's data for a run on the board
--- (a Job payload with two open orders and one done, the board's rows with their + QUEUE / lock / queue-full fields and
--- ADD ALL's plan, the JobQueue remote's state with the head waiting for its car).
+-- What the client last sent on a remote.
 function M.lastSent(name) for index=#M.sent,1,-1 do if M.sent[index].name==name then return M.sent[index] end end return nil end
-M.queueFixture={
-	run=function(now) return {cargo="Pizza",customer="Bob",total=2,pay=120,endsAt=now+200,mode="foot",stopLabel="PICK UP at Luigi's Pizza",stack={can=true,open=2,max=2},
-		orders={{id=1,state="open",focused=true,title="Pizza → Bob",pay=120,endsAt=now+200,mode="foot",from="Luigi's Pizza",to="3 Oak Ave"},
-			{id=2,state="open",title="Letters → Ann",pay=40,endsAt=now+90,mode="foot",from="Post Office",to="12 Elm St"},
-			{id=3,state="done",title="Cake → Flo",pay=60}}} end,
-	board=function() return {
-		{index=21,mode="foot",cargo="Flowers",customer="Cy",first="Bloom",address="7 Ash St",distance=200,time=150,pay=55,stars=1,orderButton="ORDERS FULL (2/2)",queue=true},
-		{index=22,mode="bike",cargo="Parcels",customer="Di",first="Post Office",address="Harbor",distance=700,time=240,pay=130,stars=1,tooBig=true,lockButton="🚲 RIDE YOUR BIKE",lockText="Bike jobs are ridden.",queue=true},
-		{index=23,mode="car",cargo="Gold",customer="Dee",first="Bank",address="Vault",distance=1200,time=300,pay=900,stars=3,tierName="Deadly",locked=true,level=7},
-		{index=24,mode="foot",cargo="Bread",customer="Ed",first="Bakery",address="2 Elm St",distance=150,time=120,pay=50,stars=1,queueButton="QUEUE FULL (6/6)",queueText="NEXT UP holds 6 jobs."},
-		{index=25,mode="car",cargo="Cash",customer="Vault",first="Bank",address="Depot",distance=900,time=300,pay=700,stars=2,tierName="Risky",jobType={name="Cash Transport",description=""}},
-		{index=26,mode="foot",cargo="Morning papers",customer="12 doors on Elm St",first="The Daily Undead",address="Elm St",distance=600,time=420,pay=95,stars=1,round=true},
-	} end,
-	-- review: the rows as server/JobQueue.luau's plan sees them (Jobs.queueApi.candidate): locked, a special or the
-	-- round never queue; the bike job waits for your bike; ★ / ★★ and the light runs stack.
-	candidates=function(rows)
-		local out={}
-		for _,row in rows do
-			local special=type(row.jobType)=="table"
-			table.insert(out,{id=row.index,mode=row.mode,pieces=1,pay=row.pay,stackable=not special and not row.round and (row.mode~="car" or (row.stars or 1)<=2),
-				queueable=not special and not row.round and row.locked~=true,ready=row.tooBig~=true and row.locked~=true,locked=row.locked==true,fits=false})
-		end
-		return out
-	end,
-	info={onDuty=true,addAll={count=2,total=185,started=0,added=0,queued=2},queue={size=2,max=6}},
-	queue={max=6,list={
-		{id=5,title="Crates → Cid",cargo="Crates",customer="Cid",mode="car",stars=2,from="Depot",to="Harbor",pay=300,why="needs your car: CALL CAR"},
-		{id=6,title="Soup → Flo",cargo="Soup",customer="Flo",mode="foot",stars=1,from="Wok Dead",to="9 Oak Ave",pay=70},
-	}},
-	-- review: the idle start waiting its StartDelay, and the queue PAUSED after a failed delivery
-	starting={max=6,list={
-		{id=6,title="Soup → Flo",cargo="Soup",customer="Flo",mode="foot",stars=1,from="Wok Dead",to="9 Oak Ave",pay=70,starting=true},
-	}},
-	paused={max=6,paused=true,pausedWhy="after a failed delivery",list={
-		{id=5,title="Crates → Cid",cargo="Crates",customer="Cid",mode="car",stars=2,from="Depot",to="Harbor",pay=300,why="needs your car: CALL CAR"},
-		{id=6,title="Soup → Flo",cargo="Soup",customer="Flo",mode="foot",stars=1,from="Wok Dead",to="9 Oak Ave",pay=70},
-	}},
-}
 return M

@@ -2,7 +2,7 @@
 -- beside the real client/SandboxHud.luau (the money block) and client/SandboxTasksUi.luau (the TASKS chip), Hud's groups
 -- where client/Hud.luau puts them, on phones held sideways (844 × 390 and 667 × 375: under Roblox's top bar, the touch
 -- layout), a computer (1280 × 800) and a big screen (1920 × 1080):
---   * nothing when Config.Sandbox.On is false; the Runs remote's "state" asked once at the start;
+--   * the Runs remote's "state" asked once at the start;
 --   * the pad panel (the host's): the house, the countdown and how many go, the line (the host first, the fifth
 --     "waits"), five difficulty buttons (the locked ones 🔒); on the screen, clear of the HUD's chips and groups, the
 --     touch buttons, the thumbstick and the jump button; its words fitting; on a phone its buttons a finger's size; a
@@ -135,10 +135,6 @@ end
 local RunUi = require("./RunUi")
 local remote = M.Net.get("Runs")
 screen(true, 844, 354)
-Config.Sandbox.On = false
-RunUi.start()
-check("Config.Sandbox.On false: RunUi.start() does nothing (no state asked)", #sentOn("Runs") == 0)
-Config.Sandbox.On = true
 
 -- ── On: the HUD's chips ─────────────────────────────────────────────────────
 local SandboxHud = require("./SandboxHud")

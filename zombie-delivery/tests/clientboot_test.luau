@@ -6,16 +6,14 @@
 --   * the sandbox (On = true): only the sandbox's systems start, none of the city's is even required; the sandbox's
 --     own modules (SandboxHud, WarehouseUi, SandboxGuide: other workers') start only when they are there, one that
 --     fails to load or has no start is skipped; 8.1: SandboxSounds (the sandbox's sounds) starts last, with or without
---     them; PLAY still fires the server's Play; the State reaches the HUD, the start screen, the key hints and
---     SandboxHud.setState; ESC closes the warehouse's picker; the picker frees the mouse; 8.3: the server's notices go
+--     them; PLAY still fires the server's Play; the State reaches SandboxHud.setState; ESC closes the warehouse's picker; the picker frees the mouse; 8.3: the server's notices go
 --     through SandboxHud.notice (in this device's words) when it has one, else straight to the HUD's toasts; 8.3:
 --     SandboxLight (the eyes) starts after SandboxSounds; 8.3 review: another window opening only hides a visitor's
 --     offer card (OfferCard.hide), ESC declines it (OfferCard.close); 8.7: TradePrompts (the trade prompts on your own
 --     stands hidden) right after CargoPrompts, TradeUi (trading between players) a window like the others, the STOCK
---     list's 🏷 opening its price picker and the picker going back to the list; 9.0: the camera's cursor free unless a
---     weapon is in the hands (CameraRig.aimOnly, CameraRig.armed: tests/camerarig_test.luau runs the rig itself), the
---     city's never; 9.1: the drive pedals (DrivePedals) start with the own modules and step aside under a window or the
---     result card, not for a visitor's offer card. Run with tests/run_tests.py.
+--     list's 🏷 opening its price picker and the picker going back to the list; 10.5: nothing of the driving starts
+--     (nobody drives since 10.0: no Drive, no boarding, no pedals, no car's sway, tyres or crashes). Run with
+--     tests/run_tests.py.
 
 local Config = require("./Config")
 local ClientMain = require("./ClientMain")
@@ -30,27 +28,27 @@ local function check(name: string, ok: boolean, detail: any?)
 	end
 end
 
--- The sandbox's client: walking, the camera and the body, the cars, the sounds, the admin, the move's horde, the moves
--- (with the crew panel for the planning's + INVITE; 8.3 the walk-in doors' leaves and arrival: WalkDoors), the HUD and
--- the key hints; then its own modules.
+-- The game's client: walking, the camera and the body, the vans, the sounds, the admin, the run's horde, the moves
+-- (8.3 the walk-in doors' leaves and arrival: WalkDoors), the HUD and the key hints; then its own modules.
 local SANDBOX = {
-	"Drive", "ZombieAnimator", "CarVisuals", "Hud", "CameraRig", "ArmPose", "AdminPanel", "AdminFly", "CrewPanel",
-	"Sounds", "Stamina", "CarBoarding", "GaitPose", "BodyLife", "KeyHints", "Unstuck", "CurbRide", "PerfOverlay",
-	"EnemyOutline", "ZombieLife", "ZombieFx", "CarSway", "TyreFx", "CrashFx", "MovingHud", "MoveHelperHud", "DannyBubble",
-	"MoveLobbyUi", "QuickChat", "CarryGripUi", "WalkDoors", "CargoPrompts", "TradePrompts", -- (8.3: WalkDoors, the doors' leaves swing and the trip's camera; 8.6: DannyBubble, what Danny does over his head; 8.7: TradePrompts)
+	"ZombieAnimator", "CarVisuals", "Hud", "CameraRig", "ArmPose", "AdminPanel", "AdminFly",
+	"Sounds", "Stamina", "GaitPose", "BodyLife", "KeyHints", "Unstuck", "PerfOverlay",
+	"EnemyOutline", "ZombieLife", "ZombieFx", "MovingHud", "MoveHelperHud", "DannyBubble",
+	"QuickChat", "CarryGripUi", "WalkDoors", "CargoPrompts", "TradePrompts", -- (8.3: WalkDoors, the doors' leaves swing and the trip's camera; 8.6: DannyBubble, what Danny does over his head; 8.7: TradePrompts)
 }
 local OWN = { "SandboxHud", "WarehouseUi", "SandboxGuide", "UpgradeUi", "CollectionBookUi", "SandboxTasksUi", "MoveHelperCard", "DannyOrders", "OfferCard", "VanPaintUi", "TradeUi" } -- (8.7: TradeUi, trading between players; 8.1: UpgradeUi, the UPGRADES desk's window; 8.2: CollectionBookUi, the collection book; SandboxTasksUi, the TASKS chip and panel; 8.3: MoveHelperCard, Danny's card: his list (10.1 no hire); 8.5: DannyOrders, Danny's clipboard, orders mode; OfferCard, a visitor's offer; VanPaintUi, the PAINT shop's window)
 local LAST = { "SandboxSounds", "SandboxLight" } -- 8.1: the sandbox's sounds, after its own modules (client/SandboxSounds.luau); 8.3: the eyes (client/SandboxLight.luau)
 
 -- The city's systems the sandbox must never require (the phone, the board, the windows, the maps, the tutorial, the
 -- buses, the rentals, the zips, the guns and the hands, the throw, the chips and banners, the leaderboard, the weather,
--- the traffic, the animals ...).
+-- the traffic, the animals, 10.5 the driving ...).
 local CITY_ONLY = {
 	"Phone", "MissionsUi", "DispatchUi", "EstateUi", "BusinessUi", "GarageUi", "CareerUi", "Discovery", "TutorialUi",
 	"LocationTag", "RoadEventUi", "BusRide", "BusMapBoard", "RentalUi", "ZipRide", "Throw", "GrindChips", "EventBanner",
 	"JobThumbUi", "ReadyCheck", "Leaderboard", "Weather", "Shooting", "Holster", "WeaponWheel", "Secrets",
 	"AnimalAnimator", "TrafficAnimator", "BagSway", "ShopPropMotion", "SpeedLines", "SavingsLine",
-	"ShopWindow", "RegularsApp", "SpecialOrderUi", "JobStartCard", "MapView",
+	"ShopWindow", "RegularsApp", "SpecialOrderUi", "JobStartCard", "MapView", "CrewPanel", "MoveLobbyUi",
+	"Drive", "CarBoarding", "CurbRide", "CarSway", "TyreFx", "CrashFx", "DrivePedals", "MoveStoryUi",
 }
 
 type Run = {
@@ -100,7 +98,7 @@ local function boot(sandbox: boolean, own: { [string]: string }, warehouseOpen: 
 	local run: Run = { calls = {}, args = {}, required = {}, order = {}, warnings = {}, modules = {} }
 	Config.Sandbox.On = sandbox
 	-- the windows' checks: nothing open but (maybe) the warehouse's picker
-	for _, name in { "Hud", "AdminPanel", "CrewPanel", "MovingHud", "MoveLobbyUi", "QuickChat" } do
+	for _, name in { "Hud", "AdminPanel", "MovingHud", "QuickChat" } do
 		local module = proxy(run, name)
 		module[if name == "Hud" then "anyWindowOpen" else "isOpen"] = function()
 			return false
@@ -291,7 +289,7 @@ do
 		end
 	end
 	check("the sandbox never requires a city system (the phone, the board, the maps, the guns ...)", #city == 0, table.concat(city, ", "))
-	local allowed: { [string]: boolean } = { Menu = true, MoveStoryUi = true }
+	local allowed: { [string]: boolean } = { Menu = true }
 	for _, name in concat(SANDBOX, OWN, LAST) do
 		allowed[name] = true
 	end
@@ -301,7 +299,7 @@ do
 			table.insert(extra, name)
 		end
 	end
-	check("… nor anything but its own systems, the start screen and the move's story cards", #extra == 0, table.concat(extra, ", "))
+	check("… nor anything but its own systems and the start screen", #extra == 0, table.concat(extra, ", "))
 	check("the sandbox: no warnings", #run.warnings == 0, table.concat(run.warnings, " | "))
 
 	-- PLAY: the HUD, the camera, the sounds, the server's Play.
@@ -318,17 +316,16 @@ do
 	if connect and type(connect[2]) == "function" then
 		connect[2]({ money = 100 })
 	end
-	check("the State reaches the HUD, the start screen, the key hints and SandboxHud.setState", called(run, "Hud.setState") and called(run, "Menu.setState") and called(run, "KeyHints.setState") and called(run, "SandboxHud.setState"))
+	check("the State reaches SandboxHud.setState (10.5: the start screen reads none of it)", called(run, "SandboxHud.setState") and not called(run, "Menu.setState"))
 	local notice = run.args["Net.get(Notice).OnClientEvent.Connect"]
 	check("the server's notices go through SandboxHud.notice (8.3: in this device's words)", notice ~= nil and notice[2] == run.modules.SandboxHud.notice and type(notice[2]) == "function")
-	check("toasts for the car and the sounds", run.modules.Drive.notify == run.modules.Hud.toast and run.modules.Sounds.notify == run.modules.Hud.toast)
-	check("the planning's + INVITE opens the crew panel", run.modules.MoveLobbyUi.onInvite == run.modules.CrewPanel.open and run.modules.MoveLobbyUi.crewOpen == run.modules.CrewPanel.isOpen)
+	check("toasts for the sounds", run.modules.Sounds.notify == run.modules.Hud.toast)
 	local close = run.modules.Hud.onCloseWindows
 	check("ESC has a sandbox's close", type(close) == "function")
 	if type(close) == "function" then
 		close()
 	end
-	check("ESC closes the crew panel, folds the planning, closes the move's cards, the quick chat and the warehouse's picker", called(run, "CrewPanel.close") and called(run, "MoveLobbyUi.minimize") and called(run, "MovingHud.closeAll") and called(run, "QuickChat.close") and called(run, "WarehouseUi.close"))
+	check("ESC closes the move's cards, the quick chat and the warehouse's picker", called(run, "MovingHud.closeAll") and called(run, "QuickChat.close") and called(run, "WarehouseUi.close"))
 	check("… and the UPGRADES window (8.1 review)", called(run, "UpgradeUi.close"))
 	check("… and 8.3 Danny's card (his list, 10.1 no hire: a window like the others, with its onOpen)", called(run, "MoveHelperCard.close") and type(run.modules.MoveHelperCard.onOpen) == "function")
 	check("… and 8.3 the PAINT shop's window (a window like the others, with its onOpen)", called(run, "VanPaintUi.close") and type(run.modules.VanPaintUi.onOpen) == "function")
@@ -347,13 +344,11 @@ do
 		table.clear(run.calls)
 		run.modules.Hud.closeWindows = close -- (the real Hud.closeWindows ends in Hud.onCloseWindows)
 		onOpen()
-		check("… which closes the picker and the crew panel but not itself", called(run, "WarehouseUi.close") and called(run, "CrewPanel.close") and not called(run, "UpgradeUi.close"))
+		check("… which closes the picker but not itself", called(run, "WarehouseUi.close") and not called(run, "UpgradeUi.close"))
 	end
 	local windowOpen = run.modules.CameraRig.windowOpen
 	check("the warehouse's open picker frees the mouse (CameraRig.windowOpen)", type(windowOpen) == "function" and windowOpen() == true)
 	check("… and so does every window the camera's mouseNeeded asks about", run.modules.CameraRig.mouseNeeded == windowOpen)
-	check("9.0: the sandbox's cursor is free unless a weapon is in the hands (CameraRig.aimOnly; armed: a Tool equipped, the rig's toolEquipped)",
-		run.modules.CameraRig.aimOnly == true and run.modules.CameraRig.armed == run.modules.CameraRig.toolEquipped)
 	local covered = run.modules.KeyHints.covered
 	check("the key hints hide under a window", type(covered) == "function" and covered() == true)
 end
@@ -429,25 +424,6 @@ do -- 8.8 the Auction House's window alone (a window like the others): open, it 
 	check("… ESC (the HUD's close) closes it like the others", called(run, "AuctionUi.close"))
 end
 
-do -- 9.1 the drive pedals: started with the sandbox's own modules; they step aside under a window, not for an offer card
-	local run = boot(true, { DrivePedals = "ok", OfferCard = "ok" }, true)
-	check("9.1 the drive pedals start with the sandbox's own modules", called(run, "DrivePedals.start"))
-	local covered = run.modules.DrivePedals.covered
-	check("… with Main's covered check", type(covered) == "function")
-	check("… a visitor's offer card open alone does not hide them (they keep clear of each other)", type(covered) == "function" and covered() == false
-		and run.modules.CameraRig.windowOpen() == true)
-	local withWindow = boot(true, { DrivePedals = "ok", OfferCard = "ok", WarehouseUi = "ok" }, true)
-	local covered2 = withWindow.modules.DrivePedals.covered
-	check("… a sandbox window (the warehouse's picker) open hides them", type(covered2) == "function" and covered2() == true)
-	local plain = boot(true, { DrivePedals = "ok" }, false)
-	local covered3 = plain.modules.DrivePedals.covered
-	check("… nothing open: they show", type(covered3) == "function" and covered3() == false)
-	plain.modules.Hud.resultOpen = function()
-		return true
-	end
-	check("… the result card open: they step aside", covered3() == true)
-end
-
 do -- 10.1 the CREW window (CrewUi): one of the sandbox's own modules, a window like the others; never in the city
 	local alone = boot(true, { CrewUi = "ok" }, true)
 	check("10.1 the CREW window (CrewUi) starts with the sandbox's own modules", called(alone, "CrewUi.start"))
@@ -503,7 +479,7 @@ do -- none of the sandbox's own modules there yet (the other workers' branches n
 	check("… ESC still works", fine)
 	check("… nothing frees the mouse", run.modules.CameraRig.windowOpen() == false)
 	local connect = run.args["Net.get(State).OnClientEvent.Connect"]
-	check("… the State still reaches the HUD", pcall(connect[2], { money = 5 }) and called(run, "Hud.setState"))
+	check("… the State does no harm", pcall(connect[2], { money = 5 }))
 	local notice = run.args["Net.get(Notice).OnClientEvent.Connect"]
 	check("… the server's notices are the HUD's toasts", notice ~= nil and notice[2] == run.modules.Hud.toast)
 end

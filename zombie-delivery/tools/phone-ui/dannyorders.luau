@@ -241,10 +241,6 @@ end
 local MoveHelperHud = require("./MoveHelperHud")
 local MoveHelperCard = require("./MoveHelperCard")
 local DannyOrders = require("./DannyOrders")
-Config.Sandbox.On = false
-DannyOrders.start()
-check("Config.Sandbox.On false: DannyOrders.start() does nothing (no line, no button)", M.gui:FindFirstChild("DannyOrders") == nil and DannyOrders.hint() == nil)
-Config.Sandbox.On = true
 
 -- ── On: the HUD's chips, Danny hired ────────────────────────────────────────
 screen(true, 844, 354)

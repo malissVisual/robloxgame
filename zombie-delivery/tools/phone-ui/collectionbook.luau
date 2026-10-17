@@ -1,8 +1,8 @@
 -- 8.2 SANDBOX: the collection book (client/CollectionBookUi.luau, with client/CardKit.luau and the real shared data:
 -- shared/CollectionBookRules.luau, Config.CollectionBook, the furniture's real catalogue) and its 📖 BOOK chip in the
 -- real client/SandboxHud.luau, run for real on sandbox_mock.luau's recorder, on a phone held sideways (844 × 390:
--- 844 × 354 under Roblox's top bar, the touch layout), a computer (1280 × 800) and a big screen (1920 × 1080): nothing
--- when Config.Sandbox.On is false; the state asked at the start; the chip beside "📦 N in stock" (a finger's size on a
+-- 844 × 354 under Roblox's top bar, the touch layout), a computer (1280 × 800) and a big screen (1920 × 1080): the
+-- state asked at the start; the chip beside "📦 N in stock" (a finger's size on a
 -- phone, its key C on a computer, the HUD's block still clear of the touch buttons) opening and closing the book; the
 -- key C (not when something else took it, not on the start screen); the book: "23 / 97 found" and its bar, the counts,
 -- the milestones (✔ when paid, else how far, and the reward), the tabs ALL / COLLECTIBLES / FURNITURE with their counts,
@@ -274,10 +274,6 @@ local SandboxHud = require("./SandboxHud")
 local Book = require("./CollectionBookUi")
 local WarehouseUi = require("./WarehouseUi")
 screen(true, 844, 354)
-Config.Sandbox.On = false
-Book.start()
-check("Config.Sandbox.On false: CollectionBookUi.start() does nothing", M.remotes.CollectionBook == nil and #sentOn("CollectionBook") == 0)
-Config.Sandbox.On = true
 
 -- ── On: the HUD's chip, the state asked ────────────────────────────────────
 SandboxHud.start() -- (client/Main.client.luau starts SandboxHud before the book)

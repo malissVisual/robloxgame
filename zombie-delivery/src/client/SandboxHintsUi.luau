@@ -23,7 +23,7 @@
 -- put away, the warehouse left, a sign set) is left out; one
 -- whose window the player opened alone while it waited (the book, the TASKS panel) is not needed any more.
 -- client/SandboxHud.luau starts it.
---   SandboxHintsUi.start()            listens (once; nothing when Config.Sandbox.On is false)
+--   SandboxHintsUi.start()            listens (once)
 --   SandboxHintsUi.step()             looks once: the hint due now (the loop does it every Hints.Every s while one waits)
 --   SandboxHintsUi.queue()            the hints' queue (SandboxHints.Queue: seen, waiting)
 --   SandboxHintsUi.isCovered()        8.3: does something cover the screen now (as the hints wait for it)?
@@ -386,13 +386,8 @@ local function watch()
 	end)
 end
 
-local function sandboxOn(): boolean
-	local sandbox = (Config :: any).Sandbox
-	return type(sandbox) == "table" and sandbox.On == true
-end
-
 function SandboxHintsUi.start()
-	if started or not sandboxOn() then
+	if started then
 		return
 	end
 	started = true

@@ -340,7 +340,7 @@ function RunDangerUi.view(): { [string]: any }?
 end
 
 function RunDangerUi.start()
-	if started or not Config.Sandbox.On then
+	if started then
 		return
 	end
 	started = true

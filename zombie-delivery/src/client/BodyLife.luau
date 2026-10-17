@@ -6,16 +6,14 @@
 --   * standing still: the breath (the chest tips back and the shoulders rise on a breath in; quicker and deeper after a
 --     sprint), the weight shifting from one foot to the other every few seconds (the hips sway and tip, the free knee
 --     bends, the legs keep the feet where they stand), blinks (the eyes' sphere meshes squeezed shut);
---   * the head turns to a person or a courier near and in front (your own courier also to the job's ring), the chest a
---     little with it, smoothly; the people look at the players who come up to them;
+--   * the head turns to a person or a courier near and in front, the chest a little with it, smoothly; the people look
+--     at the players who come up to them;
 --   * hit (health lost): a flinch, the chest jerked back, the head turned away;
 --   (6.24: the walk's weight and the landing's dip are client/GaitPose.luau's gait now: this is its third stage in
 --   client/PoseLedger.luau, laid on top of the gait; the weight shift steps aside while the gait holds the legs)
---   (the bag in the hand holds its arm out itself: client/BagSway.luau, 6.7 A)
--- The arms are client/ArmPose.luau's while it has them (ArmPose.armsBusy: the aim, the carry, the phone, a swing, a
+-- The arms are client/ArmPose.luau's while it has them (ArmPose.armsBusy: the carry, the clipboard, a swing, a
 -- gesture), the waist, the head and the legs while a gesture bends the body (ArmPose.legsBusy: the pick-up). Nothing
--- moves in a seat, on a zip line or a ladder, swimming, climbing, dead or in an interaction move (client/Interact.luau):
--- the joints go back to the animation. Beyond Config.Body.Detail studs only the flinch is drawn. Joints and eyes are
+-- moves in a seat, swimming, climbing or dead: the joints go back to the animation. Beyond Config.Body.Detail studs only the flinch is drawn. Joints and eyes are
 -- looked up once per body (again every RIG_REFRESH seconds); the bodies to pose are chosen every Config.Body.Retarget
 -- seconds; no tables are made per frame.
 
@@ -30,8 +28,6 @@ local Bodies = require(script.Parent.Bodies)
 local Ledger = require(script.Parent.PoseLedger)
 local ArmPose = require(script.Parent.ArmPose)
 local GaitPose = require(script.Parent.GaitPose) -- 6.24: the gait holds the legs (the weight shift steps aside)
-local Interact = require(script.Parent.Interact)
-local BikeRider = require(script.Parent.BikeRider)
 local DeviceBudget = require(script.Parent.DeviceBudget) -- 6.13.1: a phone poses only the nearer bodies
 
 local BodyLife = {}
@@ -244,13 +240,11 @@ local function able(character: Model, humanoid: Humanoid, mine: boolean): boolea
 	if OFF_STATES[state] or (mine and state == Enum.HumanoidStateType.Physics) then
 		return false
 	end
-	return character:GetAttribute("ZipLine") == nil and character:GetAttribute("ClimbLine") == nil
-		and not Interact.posing(character) and not BikeRider.riding(character)
+	return true
 end
 
--- 6.7: what a head looks at: the nearest other body's head in front within LookRange (your own courier: the job's ring
--- within LookRing too, workspace.DeliveryGuide's Ring that client/Hud.luau moves), else nothing.
-local function chooseLook(character: Model, root: BasePart, mine: boolean): BasePart?
+-- 6.7: what a head looks at: the nearest other body's head in front within LookRange, else nothing.
+local function chooseLook(character: Model, root: BasePart): BasePart?
 	local best: BasePart? = nil
 	local bestDistance = B.LookRange
 	local here = root.Position
@@ -268,13 +262,6 @@ local function chooseLook(character: Model, root: BasePart, mine: boolean): Base
 			if distance < bestDistance and distance > 0.5 and ahead:Dot(offset / distance) > behind then
 				best, bestDistance = head, distance
 			end
-		end
-	end
-	if mine and not best then
-		local guide = workspace:FindFirstChild("DeliveryGuide")
-		local ring = guide and guide:FindFirstChild("Ring")
-		if ring and ring:IsA("BasePart") and (ring.Position - here).Magnitude < B.LookRing and ring.Position.Y > here.Y - 50 then
-			best = ring
 		end
 	end
 	return best
@@ -322,7 +309,7 @@ local function live(character: Model, humanoid: Humanoid, root: BasePart, dt: nu
 	-- The head.
 	if detail and now >= life.lookAt then
 		life.lookAt = now + B.Retarget * (0.8 + 0.4 * life.seed)
-		life.target = chooseLook(character, root, mine)
+		life.target = chooseLook(character, root)
 	end
 	local yawGoal, pitchGoal = 0, 0
 	local target, head = life.target, rig.head

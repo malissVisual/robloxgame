@@ -1,7 +1,7 @@
 -- 10.1 the helpers' crew: the CREW window and the down ring (client/CrewUi.luau), run for real on sandbox_mock.luau's
 -- recorder with the real shared/CrewRules.luau rows (crewenv.py builds the folder), on phones held sideways (844 × 390
 -- and 667 × 375: under Roblox's top bar, the touch layout), a computer (1280 × 800) and a big screen (1920 × 1080):
---   * nothing when Config.Sandbox.On is false; the Crew remote's "state" asked once at the start;
+--   * the Crew remote's "state" asked once at the start;
 --   * the window ({ kind = "open" }): whole on the screen, its words fitting (what a helper does in two lines at most),
 --     on a phone its buttons a finger's size; a row a kind in Config.Crew.Order: the pick ✓ PICKED, a ready one PICK
 --     ({ kind = "pick", id } once for a double tap), one in hospital its time left counting down in place and DISCHARGE
@@ -192,10 +192,6 @@ end
 local CrewUi = require("./CrewUi")
 local remote = M.Net.get("Crew")
 screen(true, 844, 354)
-Config.Sandbox.On = false
-CrewUi.start()
-check("Config.Sandbox.On false: CrewUi.start() does nothing (no state asked)", #sentOn("Crew") == 0)
-Config.Sandbox.On = true
 CrewUi.start()
 check("CrewUi.start(): the Crew remote's \"state\" asked once", #sentOn("Crew") == 1 and sentOn("Crew")[1].kind == "state")
 

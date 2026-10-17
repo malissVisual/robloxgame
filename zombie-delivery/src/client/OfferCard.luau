@@ -14,9 +14,8 @@
 --     ends it there as anywhere.
 --   * Where (OfferCard.layout, pure): at the screen's right a little over the middle, clear of the HUD's groups
 --     (client/Hud.luau's), the sandbox's chips (client/SandboxHud.luau's money block, client/SandboxTasksUi.luau's TASKS
---     chip), the move's top blocks (client/TopBlocks.luau), the quick chat's button, the move's list, 9.1 the drive
---     pedals while you drive (client/DrivePedals.luau: they keep clear of the card too) and on a touch screen the touch
---     controls (client/TouchLayout.luau); none clear, the place that covers the least. A touch screen's
+--     chip), the move's top blocks (client/TopBlocks.luau), the quick chat's button, the move's list and on a touch
+--     screen the touch controls (client/TouchLayout.luau); none clear, the place that covers the least. A touch screen's
 --     buttons are at least Ui.MinTouch; 8.3 review: on a small one (667 × 375) the card shrinks, SHRINK at a time down
 --     to the HUD's scale, until a place is clear (only its buttons stay Ui.MinTouch tall). Placed again on a resize or
 --     when the top blocks move.
@@ -583,7 +582,7 @@ local function onMessage(message: any, player: boolean)
 end
 
 function OfferCard.start()
-	if started or not Config.Sandbox.On then
+	if started then
 		return
 	end
 	started = true

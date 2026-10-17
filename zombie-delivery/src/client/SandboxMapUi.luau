@@ -1,7 +1,7 @@
 --!strict
 -- 10.x THE MAP (the owner: "I need you to add a way to look at the map"; Config.SandboxMapUi): the sandbox's big map, a
--- window in the game's contract look (client/Theme.luau; the city's map window, client/MapView.luau, its model: a
--- charcoal window, the map glyph and MAP, a fine line, the square ✕). What it shows is client/SandboxMapData.luau's,
+-- window in the game's contract look (client/Theme.luau: a charcoal window, the map glyph and MAP, a fine line, the
+-- square ✕). What it shows is client/SandboxMapData.luau's,
 -- drawn by client/SandboxMapDraw.luau; where it all goes is shared/SandboxMapRules.luau's (window, fit).
 --   * In the lobby: its plan (SandboxMap.Lobby): the plaza and the hedge, the four plots (yours in gold: YOUR
 --     WAREHOUSE, its UPGRADES desk), the PAINT shop, the TOP MOVERS board, the ZDC DISPATCH, the six portals with their
@@ -68,11 +68,6 @@ local opens = 0 -- (the loop of an open stops with the next one)
 local ui: { [string]: any } = {} -- gui, shade, window, map, side, canvas, key, rows, status lines
 local chip: { [string]: any } = {} -- gui, button, label, key, scale, corner, own
 local placeNow: Data.Place? = nil
-
-local function sandboxOn(): boolean
-	local sandbox = (Config :: any).Sandbox
-	return type(sandbox) == "table" and sandbox.On == true
-end
 
 local function toast(text: string)
 	local notify = SandboxMapUi.notify
@@ -456,7 +451,7 @@ function SandboxMapUi.isOpen(): boolean
 end
 
 function SandboxMapUi.open()
-	if opened or not sandboxOn() then
+	if opened then
 		return
 	end
 	opened = true
@@ -709,7 +704,7 @@ local function carrying(): boolean
 end
 
 function SandboxMapUi.start()
-	if started or not sandboxOn() then
+	if started then
 		return
 	end
 	started = true

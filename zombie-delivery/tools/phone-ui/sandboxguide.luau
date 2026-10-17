@@ -7,8 +7,7 @@
 -- the middle, on the screen, clear of the money, the move's panel, Danny's strip, Roblox's player list and the touch
 -- buttons, readable on a phone, its ✕ a finger's size; every row of the owner's table with its words and its 3D target
 -- (9.7: the nearest portal's pad, the run house's door, the truck's back, the nearest empty stand), a straight path;
--- a step done once goes quiet; the ✕ and a held G; the 💡 chip on a phone; nothing made loop after loop; no warnings. 8.0.1: one arrow: the move's HUD (client/MovingHud.luau) sets no GPS
--- in the sandbox (no waypoint, so none of client/Hud.luau's GPS ring, beacon, label or toasts) beside the guide's.
+-- a step done once goes quiet; the ✕ and a held G; the 💡 chip on a phone; nothing made loop after loop; no warnings.
 -- 8.3 keys (shared/SandboxPad.luau, client/PadGlyph.luau): the line's words for the device used now: a computer's
 -- "E at the back", a phone's "tap at the back", a gamepad's "X at the back" (a phone's or a computer's, used last);
 -- "Guide off · hold G / tap 💡 / hold B to bring it back"; a gamepad's B held as G (not while carrying, not while a
@@ -113,27 +112,7 @@ end
 M.MUi.MinTouch = 44
 M.MTheme.PanelTransparency = 0.12
 M.MTheme.WindowTransparency = 0.02
-M.MKeys = { open = function() end, close = function() end, isOpen = function()
-	return false
-end, hint = function()
-	return "SPACE"
-end }
 M.MFade = { out = function() end, into = function() end, arrival = function() return nil end } -- (8.3: a trip's arrival)
-M.MapView.waypointAt = function()
-	return M.waypoint
-end
--- (8.0.1: every GPS the move would set, counted: none in the sandbox)
-local gpsSets, gpsTold = 0, 0
-M.MapView.onWaypoint = function()
-	gpsTold += 1
-end
-local setWaypoint = M.MapView.setWaypoint
-M.MapView.setWaypoint = function(at)
-	if at ~= nil then
-		gpsSets += 1
-	end
-	setWaypoint(at)
-end
 local camera = M.workspace.CurrentCamera
 
 -- the world: the Terrain (the path's points live in it), the cars' folder, your character's humanoid
@@ -1056,7 +1035,5 @@ M.services.Players.GetPlayers = function()
 end
 SandboxGuide.covered, SandboxGuide.windowOpen = nil, nil
 screen(false)
-check("8.0.1: one arrow: through the whole move the move's HUD set no GPS (no waypoint, no GPS toast), only the guide's chevron and path",
-	Config.Sandbox.On == true and gpsSets == 0 and gpsTold == 0 and M.waypoint == nil, `{gpsSets} {gpsTold}`)
 check("no warnings", #M.warnings == 0, M.warnings[1])
 print("ALL SANDBOX GUIDE CHECKS PASSED")

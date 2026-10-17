@@ -2,10 +2,8 @@
 -- 7.1, the move's sounds (art/audio/sfx4.ogg, shared/SoundSheet.luau Sfx4; what plays when: shared/SoundPlan.luau,
 -- Config.Soundscape.Move). Heard from what the move already sends, no hooks in its own modules:
 --   the Moving remote's "state" (server/Moving.luau's view of your move; SoundPlan.moveCues): a new move's sting, the
---             horde's siren, the truck's back opening and shutting, the house's front door (in and out), a piece into
---             the truck, a piece broken (glass, else a crash) or jolted hard in your hands (a crash)
---   its "result" (SoundPlan.resultCue): the Wall's gate opening as the load gets there (client/MovingHud.luau's card
---             plays the jingle)
+--             horde's siren, the house's front door (in and out), a piece into the truck, a piece broken (glass, else
+--             a crash) or jolted hard in your hands (a crash)
 --   your character's MoveCarry: your hands taking a piece and putting it down (a box rustles; a piece that went into
 --             the truck plays truck_load from the state instead), and a two-person piece dragged alone scraping while
 --             you move (a loop in your root, followed every Tick)
@@ -15,8 +13,8 @@
 -- and the put-down its MoveCarry clearing would play is left out, and so is the state's heavy_drop for the slip's
 -- damage (7.1 review: one thud, not two; both for Config.Soundscape.Move.SlipQuiet s).
 -- MoveSounds.inside(): 8.1, are you inside the move's house (its state's inside: the interior its door takes you to)?
--- client/SoundScape.luau's sandbox ambience asks (the chalet's quiet room). 8.1, in the sandbox the state's back plays no
--- ramp and the result no Wall's gate (shared/SoundPlan.luau moveCues, resultCue).
+-- client/SoundScape.luau's ambience asks (the farmstead's quiet room). The state's back plays no ramp (the Sprinter's
+-- back doors are heard swinging: client/SoundScape.luau) and the move's end no Wall's gate.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -148,11 +146,6 @@ function MoveSounds.start(how: Api)
 	Net.get("Moving").OnClientEvent:Connect(function(kind: any, a: any)
 		if kind == "state" then
 			onState(a)
-		elseif kind == "result" then
-			local c = SoundPlan.resultCue(a)
-			if c then
-				cue(c)
-			end
 		end
 	end)
 	if player.Character then

@@ -1,24 +1,22 @@
 --!strict
--- 7.0 planning (the owner's rework, design/rework/NAVRH.md §3: "quick messages, a wheel"): the crew's quick chat on a
--- move or in its planning lobby. Hold T (a tap of T still takes the next gun: client/WeaponWheel.luau gives way to a
--- held T while this is active, Main sets WeaponWheel.yields) or tap the 💬 button on a touch screen: six lines on a ring
--- round the middle of the screen (shared/MoveRoles.luau Chat). Point at one and let go of T, or click / tap it, to say
--- it. The server (server/MoveLobby.luau, the MoveLobby remote's "chat", Config.Robust.Limits.QuickChat) sends it to
--- your crew only; every crew mate sees a short bubble over the sender's head (Config.MoveRoles.Chat.Bubble s) and a line
--- under the move's panel (Chat.Feed s; in the planning, at the top). Active while your player attribute MoveWith (a
--- move) or MoveLobby (a planning) is set. Presentation only: the server checks who may hear what.
+-- 7.0 (the owner's rework, design/rework/NAVRH.md §3: "quick messages, a wheel"): the crew's quick chat on a move.
+-- Hold T or tap the 💬 button on a touch screen: six lines on a ring round the middle of the screen (shared/MoveRoles.luau
+-- Chat). Point at one and let go of T, or click / tap it, to say it. The server (server/MoveLobby.luau, the MoveLobby
+-- remote's "chat", Config.Robust.Limits.QuickChat) sends it to your crew only; every crew mate sees a short bubble over
+-- the sender's head (Config.MoveRoles.Chat.Bubble s) and a line under the move's panel (Chat.Feed s). Active while your
+-- player attribute MoveWith (a move) is set. Presentation only: the server checks who may hear what.
 -- 7.0 review: the lines coming in start under the lowest of the move's top-centre blocks (client/TopBlocks.luau: the
--- move's panel, Danny's strip, the planning's pill), measured; the touch button (client/MoveLayout.luau chatButton)
--- sits beside the panel clear of the touch buttons and the HUD's groups, and hides while a card or the planning covers
--- the screen (QuickChat.covered, set by Main); on a touch screen the ring's lines are a finger's size (MoveLayout.ring);
--- a ring shut while T is still held stays shut (the hold starts again on the next press).
+-- move's panel, Danny's strip), measured; the touch button (client/MoveLayout.luau chatButton) sits beside the panel
+-- clear of the touch buttons and the HUD's groups, and hides while a window or the move's list covers the screen
+-- (QuickChat.covered, set by Main); on a touch screen the ring's lines are a finger's size (MoveLayout.ring); a ring
+-- shut while T is still held stays shut (the hold starts again on the next press).
 -- 8.8 (no roles: MoveRoles.on): the chat is nobody's role, it stays as it is (its lines and numbers only live with the
 -- roles' in shared/MoveRoles.luau and Config.MoveRoles.Chat).
 --   QuickChat.start()    the key, the touch button, the lines coming in
---   QuickChat.active()   on a move or in its planning (Main: WeaponWheel.yields)
+--   QuickChat.active()   on a move
 --   QuickChat.isOpen()   the ring is open (Main: the mouse is free while it is)
 --   QuickChat.close(say) shut the ring (Main: ESC)
---   QuickChat.covered    set by Main: is a card, the move's list or the planning over the screen (the button hides)
+--   QuickChat.covered    set by Main: is a window or the move's list over the screen (the button hides)
 
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
@@ -62,7 +60,7 @@ local pressedAt: number? = nil
 local hovered: number? = nil
 
 function QuickChat.active(): boolean
-	return player:GetAttribute("MoveWith") ~= nil or player:GetAttribute("MoveLobby") ~= nil
+	return player:GetAttribute("MoveWith") ~= nil
 end
 
 function QuickChat.isOpen(): boolean
@@ -81,7 +79,7 @@ local function screen(): ScreenGui?
 		Name = "QuickChat",
 		ResetOnSpawn = false,
 		IgnoreGuiInset = false,
-		DisplayOrder = 9, -- (over the planning lobby: 6, and the move's HUD: 7)
+		DisplayOrder = 9, -- (over the move's HUD: 7)
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 	}, playerGui)
 	gui = made
@@ -281,8 +279,8 @@ end
 
 -- ── The lines coming in ────────────────────────────────────────────────────
 
--- Under the lowest of the move's top-centre blocks (the panel, Danny's strip, the planning's pill: client/TopBlocks.luau,
--- measured), else the screen's top: where the feed starts (px in this gui).
+-- Under the lowest of the move's top-centre blocks (the panel, Danny's strip: client/TopBlocks.luau, measured), else the
+-- screen's top: where the feed starts (px in this gui).
 local function feedTop(): number
 	local root = gui
 	local bottom = TopBlocks.bottom(if root then root.AbsolutePosition else nil)
@@ -510,10 +508,9 @@ function QuickChat.start()
 		end
 	end)
 	player:GetAttributeChangedSignal("MoveWith"):Connect(refreshButton)
-	player:GetAttributeChangedSignal("MoveLobby"):Connect(refreshButton)
 	refreshButton()
-	-- 7.0 review: the top-centre blocks moved (the feed and the button follow); the cards and the planning come and go
-	-- (the button hides under them): a light look four times a second while on a move or in its planning
+	-- 7.0 review: the top-centre blocks moved (the feed and the button follow); the windows come and go (the button
+	-- hides under them): a light look four times a second while on a move
 	TopBlocks.onChanged(function()
 		placeFeed()
 		if touchButton and touchButton.Visible then

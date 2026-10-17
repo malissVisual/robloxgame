@@ -2,7 +2,7 @@
 -- recorder with client/TopBlocks.luau, beside the real client/SandboxHud.luau (the money block) and
 -- client/SandboxTasksUi.luau (the TASKS chip), a stand-in move's panel (a top block where MoveLayout.panel puts it) and
 -- Hud's groups where client/Hud.luau puts them, on a phone held sideways (844 × 390: 844 × 354 under Roblox's top bar,
--- the touch layout), a computer (1280 × 800) and a big screen (1920 × 1080): nothing when Config.Sandbox.On is false;
+-- the touch layout), a computer (1280 × 800) and a big screen (1920 × 1080):
 -- the "Visitors" remote's offer opens it ("🤝 OFFER", "The collector offers", "$340", "for your Gramophone", "Market price
 -- $260 · +31%", "⏳ 30 s", a 🔥 for a hot kind); on the screen, clear of the HUD's chips and groups, the move's panel,
 -- the touch buttons, the thumbstick and the jump button; ACCEPT and DECLINE a finger's size on a phone, their words
@@ -246,12 +246,7 @@ end
 local OfferCard = require("./OfferCard")
 local remote = M.Net.get("Visitors")
 screen(true, 844, 354)
-Config.Sandbox.On = false
-OfferCard.start()
 local OFFER = { kind = "offer", id = "o1", name = "Gramophone", item = "gramophone", price = 340, base = 260, who = "Collector", seconds = 30, rarity = "rare" }
-remote.OnClientEvent:Fire(OFFER)
-check("Config.Sandbox.On false: OfferCard.start() does nothing (no card on an offer)", not OfferCard.isOpen() and M.gui:FindFirstChild("OfferCard") == nil)
-Config.Sandbox.On = true
 
 -- ── On: the HUD's chips ─────────────────────────────────────────────────────
 local SandboxHud = require("./SandboxHud")
