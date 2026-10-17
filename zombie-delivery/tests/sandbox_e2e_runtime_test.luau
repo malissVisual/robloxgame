@@ -1256,7 +1256,7 @@ do
 	local rideAt = #E.sent
 	local run = H.run({ ann }, House.id)
 	local ride = E.lastKind(ann, "Runs", "ride", rideAt)
-	check("10.3 the ride there: her client told before the jump (to the farmstead, its difficulty, nobody else, Config.Runs.Ride.To s)", ride ~= nil
+	check("10.4 the ride there: her client told before the jump (to the farmstead, its difficulty, nobody else, Config.Runs.Ride.To s)", ride ~= nil
 		and ride.to == House.name and ride.back == false and type(ride.difficulty) == "string" and #ride.party == 0 and ride.seconds == Config.Runs.Ride.To,
 		ride and ride.to)
 	annVan = Vehicles.get(ann)
@@ -1277,7 +1277,7 @@ do
 	local homeAt = #E.sent
 	H.backHome()
 	local back = E.lastKind(ann, "Runs", "ride", homeAt)
-	check("10.3 the ride back: to the depot (Config.Runs.Ride.Home), no difficulty, Config.Runs.Ride.Back s", back ~= nil and back.back == true
+	check("10.4 the ride back: to the depot (Config.Runs.Ride.Home), no difficulty, Config.Runs.Ride.Back s", back ~= nil and back.back == true
 		and back.to == Config.Runs.Ride.Home and back.difficulty == nil and back.seconds == Config.Runs.Ride.Back, back and back.to)
 end
 

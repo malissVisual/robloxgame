@@ -351,7 +351,16 @@
 > early for money). Nobody is ever lost for good; the crew is saved with its flag (`crewKept`). Previews: `design/map/`,
 > `design/crew/`.
 >
-> **10.3** (the owner: "there is no driving the car any more, so every time you go to a place, an animation of you
+> **10.3** (the owner: "it annoys me that the line on the ground is always there, I know what to do … if it shows,
+> let it show smoothly, not jump after every step"; "why does the yellow one I freed walk after me? Let him stay home,
+> not bother me"): **the guide's path** shows only while it helps (`Config.SandboxGuide.Path`: "new", a player with
+> nothing home yet this session; "always"; "never"), and always for a place picked on the big map; the chevron and the
+> hint as before. When it shows, its first point eases after your feet every frame (`PathFollow`), so it slides along as
+> you walk instead of jumping each look. **A rescued helper goes home**: after his thanks he says he'll wait at your
+> warehouse and fades away (`Config.Crew.Rescue.Leave`, `Fade`; `server/HelperCrew.luau`), never walking after the
+> party; pick him in the CREW window to bring him into runs.
+>
+> **10.4** (the owner: "there is no driving the car any more, so every time you go to a place, an animation of you
 > driving there"): **the ride.** When a run takes you to its house, and when it takes you back to the lobby, the
 > Deliveros van drives across the screen over the jump's fade (`client/RideUi.luau`; `server/Runs.luau` sends
 > `{ kind = "ride" }` just before; `Config.Runs.Ride`: 3.4 s there, 2.4 s back): the sky of the run's difficulty (a fresh

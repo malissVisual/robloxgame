@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "10.2"
+Config.Version = "10.3"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -3412,8 +3412,8 @@ Config.Shortcuts = {
 --   Rescue     a run's trapped helper: Chance (a run's odds of one, by its difficulty), Hold (s E is held to untie him),
 --              Reach (the prompt's studs), Bonus (the money each party player who has him already gets instead, by the
 --              difficulty), Away (studs from the house's way in the chair stands at least), Help (s between his
---              "Help!" while a party player is within Call studs), Follow (the freed one walks after the party: Near
---              studs he stops at, Far studs or another world and he is put by them, Every s between his looks, Speed)
+--              "Help!" while a party player is within Call studs), Leave / Fade (10.3: s after his thanks the freed one
+--              fades away home over Fade s: he waits at your warehouse, never walks after the party)
 --   Down       a helper at 0 health in a run: Seconds to revive him (hold E for Revive s within Reach studs), up again
 --              with Health × his full health; nobody did: out of the run and to hospital
 --   Hospital   Seconds out of the crew after a run's out (the save's crew.hospital: os.time() until); discharging him
@@ -3481,7 +3481,8 @@ Config.Crew = {
 		Away = 12,
 		Help = 9,
 		Call = 45,
-		Follow = { Near = 6, Far = 70, Every = 0.25, Speed = 14 },
+		Leave = 2.5, -- 10.3: s after his thanks the freed one fades away home (never after the party)
+		Fade = 1,
 	},
 	Down = { Seconds = 15, Revive = 3, Reach = 8, Health = 0.5 },
 	Hospital = { Seconds = 240, Base = 50, PerMinute = 50, Round = 10 },
@@ -7678,7 +7679,7 @@ Config.Runs = {
 	Every = 0.2,
 	Apart = 3.5,
 	Fade = { Out = 0.45, In = 0.6 },
-	-- 10.3 the ride (client/RideUi.luau): s the van drives on its way to a house (To) and back (Back), over the fade;
+	-- 10.4 the ride (client/RideUi.luau): s the van drives on its way to a house (To) and back (Back), over the fade;
 	-- Home: the lobby's name on the way back; Out: s the ride fades into the place
 	Ride = { To = 3.4, Back = 2.4, Out = 0.5, Home = "the Deliveros depot" },
 	EndHold = 3.5,
@@ -7853,6 +7854,9 @@ Config.Loot = {
 --   PathLift      studs over the ground the path glows
 --   PathWidth     studs: the path's width
 --   PathAlpha     the path's transparency (0 solid … 1 gone)
+--   Path          10.3 (the owner: "not that line all the time, I know what to do"): when the path shows: "new" (nothing of
+--                 yours home yet this session: no piece in stock or on show), "always", "never"; a place picked on the big
+--                 map always shows it. PathFollow: 1/s its first point eases after your feet every frame (no jump a look)
 --   Color         the guide's colour (the path, the chevron, the hint's edge): a warm ZDC orange
 --   HintWidth     px at scale 1: the widest the hint line gets (its words wrap beyond)
 --   TextSize      px at scale 1: the hint's words
@@ -7883,6 +7887,8 @@ Config.SandboxGuide = {
 	PathLift = 0.45,
 	PathWidth = 1.3,
 	PathAlpha = 0.45,
+	Path = "new", -- 10.3 the path on the ground: "new" (nothing of yours home yet this session), "always", "never" (a map pick always)
+	PathFollow = 12, -- 10.3: 1/s the path's first point eases after your feet (every frame)
 	Color = { 255, 168, 60 },
 	HintWidth = 460,
 	TextSize = 15,

@@ -1,5 +1,5 @@
 --!strict
--- 10.3 the ride (the owner: "there is no driving the car any more, so every time you go to a place, an animation of
+-- 10.4 the ride (the owner: "there is no driving the car any more, so every time you go to a place, an animation of
 -- you driving there"): when a run takes you to its house, and when it takes you back to the lobby, the Deliveros van
 -- drives across the screen over the jump's fade (server/Runs.luau sends { kind = "ride", to, back, difficulty?, party?,
 -- seconds } on the Runs remote just before it; Config.Runs.Ride). A short flat scene in the intro's look
