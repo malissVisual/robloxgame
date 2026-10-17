@@ -15,6 +15,10 @@
 -- 8.9: art/audio/sfx5.ogg holds the newest features' sounds (Danny's clipboard, his orders' chirp and his whistle,
 -- a trade's coins, an offer's bell, a price tag, the auction's gavel, its "sold!" bell and a bid's tick) (Sfx5);
 -- until its id is pasted, those play a stand-in or stay silent (art/audio/NAHRAT-SFX5.md says how to upload it).
+-- 10.1: art/audio/sfx6.ogg holds the start's sounds (the intro's van driving in and off, the DELIVEROS wordmark's
+-- jingle; the start screen's pick, the game's start, START OVER's question, BACK; the character creator's swoosh,
+-- a choice's tick, the dice) (Sfx6); until its id is pasted, those play a stand-in or stay silent
+-- (art/audio/NAHRAT-SFX6.md says how to upload it).
 
 local SoundSheet = {}
 
@@ -23,7 +27,8 @@ SoundSheet.MusicId = "rbxassetid://71392718953355" -- "rbxassetid://…" of art/
 SoundSheet.Sfx2Id = "rbxassetid://86322785000784" -- "rbxassetid://…" of art/audio/sfx2.ogg
 SoundSheet.Sfx3Id = "rbxassetid://86357789297571" -- "rbxassetid://…" of art/audio/sfx3.ogg (6.12)
 SoundSheet.Sfx4Id = "rbxassetid://134212774972582" -- "rbxassetid://…" of art/audio/sfx4.ogg (7.1)
-SoundSheet.Sfx5Id = "" -- "rbxassetid://…" of art/audio/sfx5.ogg (8.9)
+SoundSheet.Sfx5Id = "rbxassetid://100303087856022" -- "rbxassetid://…" of art/audio/sfx5.ogg (8.9)
+SoundSheet.Sfx6Id = "" -- "rbxassetid://…" of art/audio/sfx6.ogg (10.1)
 
 SoundSheet.Sfx = {
 	gun_light = { 0.0, 0.349977 },
@@ -164,6 +169,19 @@ SoundSheet.Sfx5 = {
 	bid_tick = { 10.73, 0.08 },
 } :: { [string]: { number } }
 
+SoundSheet.Sfx6 = {
+	intro_drive = { 0.0, 1.6 },
+	intro_logo = { 1.9, 2.4 },
+	intro_leave = { 4.6, 0.9 },
+	menu_select = { 5.8, 0.349977 },
+	menu_start = { 6.449977, 1.399977 },
+	menu_warn = { 8.149955, 0.5 },
+	menu_back = { 8.949955, 0.25 },
+	creator_open = { 9.499955, 0.5 },
+	creator_pick = { 10.299955, 0.09 },
+	creator_dice = { 10.689955, 0.8 },
+} :: { [string]: { number } }
+
 -- Sounds that loop (their region repeats seamlessly).
 SoundSheet.Looped = { amb_alpine = true, amb_day = true, amb_fountain = true, amb_night = true, amb_roof = true, amb_room = true, amb_warehouse = true, ambience = true, birds_alpine_loop = true, engine = true, freewheel = true, scooter = true, stream_loop = true, wind = true, wind_peaks_loop = true, wood_scrape_loop = true, zip = true } :: { [string]: boolean }
 
@@ -234,9 +252,17 @@ SoundSheet.Fallback = {
 	gavel_knock = "knock",
 	sold_bell = "ding",
 	bid_tick = "grip_tick",
+	intro_logo = "level_up",
+	menu_select = "ui_open",
+	menu_start = "task_done",
+	menu_warn = "notify",
+	menu_back = "ui_click",
+	creator_open = "ui_open",
+	creator_pick = "grip_tick",
+	creator_dice = "grip_tick",
 } :: { [string]: string }
 
 -- Every sheet's length in seconds (its regions lie inside).
-SoundSheet.Seconds = { sfx = 24.419955, music = 91.440975, sfx2 = 28.25, sfx3 = 62.54, sfx4 = 111.179932, sfx5 = 11.11 } :: { [string]: number }
+SoundSheet.Seconds = { sfx = 24.419955, music = 91.440975, sfx2 = 28.25, sfx3 = 62.54, sfx4 = 111.179932, sfx5 = 11.11, sfx6 = 11.789955 } :: { [string]: number }
 
 return SoundSheet

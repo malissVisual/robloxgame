@@ -7679,6 +7679,9 @@ Config.Runs = {
 	Every = 0.2,
 	Apart = 3.5,
 	Fade = { Out = 0.45, In = 0.6 },
+	-- 10.4 the ride (client/RideUi.luau): s the van drives on its way to a house (To) and back (Back), over the fade;
+	-- Home: the lobby's name on the way back; Out: s the ride fades into the place
+	Ride = { To = 3.4, Back = 2.4, Out = 0.5, Home = "the Deliveros depot" },
 	EndHold = 3.5,
 	LeaveHold = 3,
 	Truck = { Attribute = "RunParked", Reach = 9, At = { -4.6, 3.4, -1.5 } :: { number } },

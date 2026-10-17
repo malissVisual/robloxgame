@@ -48,8 +48,9 @@ end
 --                                      9.x's LootOutline and LootStars (the loot's coloured outlines, its stars and
 --                                      its toasts; the stars step aside under a window), 10.x's SandboxMapUi (the big
 --                                      map, M: a window too, its 🗺 MAP chip), SandboxMiniMap (a run's corner map: it
---                                      steps aside under a window) and 10.1's CrewUi (the CREW window: a window too; the
---                                      ring over a helper down in a run):
+--                                      steps aside under a window), 10.1's CrewUi (the CREW window: a window too; the
+--                                      ring over a helper down in a run) and 10.4's RideUi (the van's ride to a run's
+--                                      house and back, over the jump's fade: no window):
 --                                      each started only when it is there; 8.7's TradePrompts (the trade prompts on
 --                                      your own stands hidden, a big sale's chat line) next to CargoPrompts
 -- 8.5.1: Studio kept old scripts after a sync? This side's stamp (client/BuildStamp.luau) against the shared Config's
@@ -133,7 +134,7 @@ if Config.Sandbox.On then
 	-- The sandbox's own modules (other workers write them at the same time): only when they are there, and one that
 	-- fails to load is skipped with a warning.
 	local own: { { name: string, module: any } } = {}
-	for _, name in { "SandboxHud", "WarehouseUi", "SandboxGuide", "UpgradeUi", "CollectionBookUi", "SandboxTasksUi", "MoveHelperCard", "DannyOrders", "OfferCard", "VanPaintUi", "TradeUi", "AuctionUi", "VillageTraffic", "DrivePedals", "RunUi", "LootOutline", "LootStars", "RunDangerUi", "SandboxMapUi", "SandboxMiniMap", "CrewUi" } do -- (8.1: the UPGRADES desk's window; 8.2: the collection book, the TASKS panel; 8.3: Danny's command card, a visitor's offer, the PAINT shop; 8.5: Danny's clipboard, orders mode; 8.7: trading between players; 8.8: the Auction House's window, only while Config.Auction.On; 8.9: the D5's cars, Jinočany; 9.1: the drive pedals; 9.x loot: the outlines, the stars and the toasts; 10.x the map: the big map (M) and a run's minimap, after the TASKS chip its 🗺 MAP chip stands beside)
+	for _, name in { "SandboxHud", "WarehouseUi", "SandboxGuide", "UpgradeUi", "CollectionBookUi", "SandboxTasksUi", "MoveHelperCard", "DannyOrders", "OfferCard", "VanPaintUi", "TradeUi", "AuctionUi", "VillageTraffic", "DrivePedals", "RunUi", "LootOutline", "LootStars", "RunDangerUi", "SandboxMapUi", "SandboxMiniMap", "CrewUi", "RideUi" } do -- (10.4: the ride to a run's house and back, RideUi; 8.1: the UPGRADES desk's window; 8.2: the collection book, the TASKS panel; 8.3: Danny's command card, a visitor's offer, the PAINT shop; 8.5: Danny's clipboard, orders mode; 8.7: trading between players; 8.8: the Auction House's window, only while Config.Auction.On; 8.9: the D5's cars, Jinočany; 9.1: the drive pedals; 9.x loot: the outlines, the stars and the toasts; 10.x the map: the big map (M) and a run's minimap, after the TASKS chip its 🗺 MAP chip stands beside)
 		local found = Client:FindFirstChild(name)
 		if found and found:IsA("ModuleScript") then
 			local ok, module = pcall(function(): any

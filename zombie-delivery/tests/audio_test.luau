@@ -109,13 +109,38 @@ end
 check("8.9 the ticks are ticks (a pen's, a bid's: at most 0.3 s)", SoundSheet.Sfx5.pen_tick[2] <= 0.3 and SoundSheet.Sfx5.pen_untick[2] <= 0.3 and SoundSheet.Sfx5.bid_tick[2] <= 0.3)
 check("the fifth sheet's id is a string", type(SoundSheet.Sfx5Id) == "string")
 check("the fifth sheet is an asset id or empty", SoundSheet.Sfx5Id == "" or string.match(SoundSheet.Sfx5Id, "^rbxassetid://%d+$") ~= nil, SoundSheet.Sfx5Id)
+-- 10.1: the start's sounds (sfx6.ogg, a sheet of its own: sfx5 is uploaded): the intro's van and jingle (played by
+-- src/first/Loading.client.luau), the start screen's and the character creator's (client/Menu.luau,
+-- client/CharacterCreator.luau). None loops; the van driving in is longer than its trip (1.2 s), the jingle under 3 s.
+local USED6 = {
+	"intro_drive", "intro_logo", "intro_leave", "menu_select", "menu_start", "menu_warn", "menu_back",
+	"creator_open", "creator_pick", "creator_dice",
+}
+local in6 = 0
+for _ in SoundSheet.Sfx6 do
+	in6 += 1
+end
+check(`sfx6 holds the {#USED6} sounds`, in6 == #USED6, in6)
+for _, name in USED6 do
+	local r = SoundSheet.Sfx6[name]
+	check("sfx6 region " .. name, r ~= nil)
+	if r then
+		check(`10.1 {name} is short (at most 3 s) and does not loop`, r[2] > 0 and r[2] <= 3 and SoundSheet.Looped[name] == nil, r[2])
+	end
+end
+check("10.1 the van's trip is heard to its end (intro_drive longer than the intro's 1.2 s drive)", SoundSheet.Sfx6.intro_drive[2] >= 1.2)
+check("10.1 a choice's tick is a tick (at most 0.2 s)", SoundSheet.Sfx6.creator_pick[2] <= 0.2)
+check("the sixth sheet's id is a string", type(SoundSheet.Sfx6Id) == "string")
+check("the sixth sheet is an asset id or empty", SoundSheet.Sfx6Id == "" or string.match(SoundSheet.Sfx6Id, "^rbxassetid://%d+$") ~= nil, SoundSheet.Sfx6Id)
+check("10.1 sfx5 as uploaded (its length the same: the start's sounds went on a sheet of their own)", math.abs(SoundSheet.Seconds.sfx5 - 11.13) < 0.05
+	and SoundSheet.Sfx5.bid_tick ~= nil and math.abs(SoundSheet.Sfx5.bid_tick[1] - 10.73) < 1e-6)
 check("8.9 sfx4 as uploaded (its length the same: the new sounds went on a sheet of their own)", math.abs(SoundSheet.Seconds.sfx4 - 111.179932) < 1e-6 and SoundSheet.Sfx4.amb_room ~= nil
 	and math.abs(SoundSheet.Sfx4.amb_room[1] - 100.879932) < 1e-6)
 
 -- Every name in one sheet only (client/Sounds.luau looks in them in turn: a name in two would play the first one's).
 local SHEETS: { [string]: { [string]: { number } } } = {
 	sfx = SoundSheet.Sfx, music = SoundSheet.Music, sfx2 = SoundSheet.Sfx2, sfx3 = SoundSheet.Sfx3, sfx4 = SoundSheet.Sfx4,
-	sfx5 = SoundSheet.Sfx5,
+	sfx5 = SoundSheet.Sfx5, sfx6 = SoundSheet.Sfx6,
 }
 local seen: { [string]: string } = {}
 for sheetName, sheet in SHEETS do
@@ -137,7 +162,7 @@ end
 
 -- The stand-ins (SoundSheet.Fallback): each is for a sound of a later sheet, and plays (a stand-in's stand-in too, in
 -- a few steps, no circle) from older sheets only, as it must while that sheet is not uploaded; a loop's is a loop.
-local ORDER = { SoundSheet.Sfx, SoundSheet.Sfx2, SoundSheet.Sfx3, SoundSheet.Sfx4, SoundSheet.Sfx5 }
+local ORDER = { SoundSheet.Sfx, SoundSheet.Sfx2, SoundSheet.Sfx3, SoundSheet.Sfx4, SoundSheet.Sfx5, SoundSheet.Sfx6 }
 local function sheetOf(name: string): number?
 	for i, sheet in ORDER do
 		if sheet[name] then
@@ -198,7 +223,7 @@ check("8.1 the Sprinter's back doors stand in with a van's", SoundSheet.Fallback
 -- tasks' done and claimed, FILL BEST's clicks, SELL…'s till) uses the sheets there are: each sound on sfx, sfx2, sfx3
 -- or sfx4, and plays today (from the sheets whose id is in, or a stand-in from an older one; no new sheet).
 local SoundPlan = require("./SoundPlan")
-local uploaded = { true, SoundSheet.Sfx2Id ~= "", SoundSheet.Sfx3Id ~= "", SoundSheet.Sfx4Id ~= "", SoundSheet.Sfx5Id ~= "" }
+local uploaded = { true, SoundSheet.Sfx2Id ~= "", SoundSheet.Sfx3Id ~= "", SoundSheet.Sfx4Id ~= "", SoundSheet.Sfx5Id ~= "", SoundSheet.Sfx6Id ~= "" }
 local function playsToday(name: string, steps: number): boolean
 	local i = sheetOf(name)
 	if i and uploaded[i] then
@@ -231,6 +256,18 @@ for eventName, e in SoundPlan.Events do
 	check(`8.9 event {eventName}: plays today (sfx5, a stand-in) or is silent until sfx5 is up`, playsToday(e.sound, 0) or (SoundSheet.Sfx5Id == "" and SILENT5[e.sound] == true), e.sound)
 end
 check("8.9 a refusal's nope stands in with the notice's own notify (as today until sfx5 is up)", SoundSheet.Fallback.soft_nope == "notify")
+-- 10.1: until sfx6.ogg is up the start's sounds have stand-ins from the uploaded sheets (the jingle the old level-up),
+-- but the van driving in and off: silent (no van one-shot on an older sheet; the engine is a loop).
+local SILENT6 = { intro_drive = true, intro_leave = true }
+for _, name in USED6 do
+	check(`10.1 {name}: {if SILENT6[name] then "silent" else "a stand-in"} until sfx6 is up`, (SoundSheet.Fallback[name] ~= nil) ~= (SILENT6[name] == true))
+	local standIn = SoundSheet.Fallback[name]
+	if standIn then
+		check(`10.1 {name}'s stand-in {standIn} is on sfx … sfx5 (it plays before sfx6 is up)`, (sheetOf(standIn) or 99) <= 5, standIn)
+		check(`10.1 {name}'s stand-in {standIn} plays today`, playsToday(standIn, 0), standIn)
+	end
+end
+check("10.1 the wordmark's jingle stands in with the old level-up", SoundSheet.Fallback.intro_logo == "level_up")
 check("8.9 the trade's ka-ching stands in with the sandbox's till, an offer's bell with the old ding", SoundSheet.Fallback.coin_kaching == "sale_register" and SoundSheet.Fallback.offer_ding == "ding")
 for _, name in { "menu", "day", "night", "tension" } do
 	check("music loop " .. name, SoundSheet.Music[name] ~= nil and SoundSheet.Music[name][2] > 10)
@@ -248,7 +285,7 @@ for _, def in Config.CarGuns do
 end
 check("weapons listed", weapons > 0)
 -- The regions never overlap (each plays only its own sound).
-for _, sheet in { SoundSheet.Sfx, SoundSheet.Music, SoundSheet.Sfx2, SoundSheet.Sfx3, SoundSheet.Sfx4, SoundSheet.Sfx5 } do
+for _, sheet in { SoundSheet.Sfx, SoundSheet.Music, SoundSheet.Sfx2, SoundSheet.Sfx3, SoundSheet.Sfx4, SoundSheet.Sfx5, SoundSheet.Sfx6 } do
 	local list = {}
 	for name, r in sheet do
 		check(`region {name} is valid`, r[1] >= 0 and r[2] > 0)

@@ -495,6 +495,48 @@
       0.08
     ]
   },
+  "sfx6": {
+    "intro_drive": [
+      0.0,
+      1.6
+    ],
+    "intro_logo": [
+      1.9,
+      2.4
+    ],
+    "intro_leave": [
+      4.6,
+      0.9
+    ],
+    "menu_select": [
+      5.8,
+      0.349977
+    ],
+    "menu_start": [
+      6.449977,
+      1.399977
+    ],
+    "menu_warn": [
+      8.149955,
+      0.5
+    ],
+    "menu_back": [
+      8.949955,
+      0.25
+    ],
+    "creator_open": [
+      9.499955,
+      0.5
+    ],
+    "creator_pick": [
+      10.299955,
+      0.09
+    ],
+    "creator_dice": [
+      10.689955,
+      0.8
+    ]
+  },
   "looped": [
     "amb_alpine",
     "amb_day",
@@ -520,6 +562,7 @@
     "sfx2": "343535d0809e9e63ea1b48f0b914ebb29651ae4d9ae6f66b1d5a55ad8d85cb9b",
     "sfx3": "63d310abebf8b82ef8c94715657fa9c92738ea6f48cd62ae490dad840d4230b0",
     "sfx4": "94c9b8813b8aedf54b97519fa59248aebd1406f47a9a061f29873a3791f5194c",
-    "sfx5": "afaed1c03e0364c47344711b2139461e325e50a275bb17990b04776a186cc483"
+    "sfx5": "afaed1c03e0364c47344711b2139461e325e50a275bb17990b04776a186cc483",
+    "sfx6": "33dc6b43c5d6c80f45a1e35b2375160e0fa031f0959f2718695564364fd650b9"
   }
 }
