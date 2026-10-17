@@ -3,26 +3,25 @@
 -- deterministic (the same seed and kind give the same plan on every server); it makes no instances.
 -- server/HouseInterior.luau builds a plan, the moving job (server/Moving.luau) carries its pieces out of it.
 --
---   HouseLayout.plan(seed, kind)   a plan of `kind` ("house": Marge's family house in the suburbs, one storey; 7.x
---                                  "farm": Walt's alpine farm, shared/Layouts/Farm.luau, its plan adds `exits`; 8.3
---                                  "big": the sandbox's big house, a house's plan made bigger, see below; an
---                                  unknown kind is a house). Every position is LOCAL to the house's origin: the ground
+--   HouseLayout.plan(seed, kind)   a plan of `kind` ("house": a family house, one storey; 8.3 "big": the sandbox's big
+--                                  house, a house's plan made bigger, see below; 9.5 the countryside's spots, below;
+--                                  an unknown kind is a house). Every position is LOCAL to the house's origin: the ground
 --                                  (the floor's top) at the front door's middle, +Z into the house, +Y up.
 --   8.3 the big house (Config.Furniture.Big): one big floor laid out as a house (the same rooms' kinds, fixtures, rules
 --   and dice), only bigger: six rooms in the back row (the house's four, the guest room "guest" of kind bedroom and the
 --   study "study" of kind living: HouseLayout.BigRecipes), a bigger front row, more pieces (Big.Spots), more ★
 --   (Big.Stars) and collectibles (Big.Collectibles), and a second way out: the back door at the corridor's east
---   end (+X, mirrored or not; its doorway doors[n] with rooms { "corridor", "outside" }), so its plan has `exits` as a
---   farm's (exits[1] the front door, exits[2] the back door). Every piece gets out by either door (its layout checks
+--   end (+X, mirrored or not; its doorway doors[n] with rooms { "corridor", "outside" }), so its plan has `exits`
+--   (exits[1] the front door, exits[2] the back door). Every piece gets out by either door (its layout checks
 --   both). A house's plan is the same as before the big house (its dice untouched).
 --   8.3 economy: HouseLayout.plan(seed, kind, found), `found` the move owner's collection book ({ [item] = anything },
 --   optional): a house that rolls a legendary collectible tries the legendaries not in it first (the same seed, kind
---   and book give the same plan; without `found` the plan is as before). A farm ignores it. 8.7 review: a page only
+--   and book give the same plan; without `found` the plan is as before). 8.7 review: a page only
 --   bought from a player (its `bought` mark, shared/CollectionBookRules.luau) is not in it: that one is still to find.
 --   8.3: HouseLayout.Collectibles is the whole pool a house's collectibles come from: its own entries, then any other
 --   piece of FurnitureLooks.Collectibles (a new one joins on its own, at a wall in the room its catalogue entry names,
 --   when the house has that room). HouseLayout.BigRecipes: the big house's rooms' recipes (its own and the house's).
---   HouseLayout.Kinds              the kinds it lays out (a new kind ("apartment", "farm", "hotel") is a function
+--   HouseLayout.Kinds              the kinds it lays out (a new kind ("apartment", "hotel") is a function
 --                                  seed's dice → Plan added to KINDS below); 9.5 the countryside's spots: "cabin" (The
 --                                  Pond Cabin), "lodge" (The Forest Lodge), "mill" (The Old Mill) and "cottage" (The
 --                                  Orchard Cottage), shared/Layouts/Countryside.luau's plans (one way out, the front door,
@@ -34,9 +33,9 @@
 --   HouseLayout.extent(id, turn)   a piece's footprint (X, Z) turned by `turn` degrees (a multiple of 90)
 --   HouseLayout.stuck(plan)        the spots whose piece cannot be carried out of the front door (empty for every plan
 --                                  it makes: it checks this while it lays the pieces out)
---   7.x farm move (server/Moving.luau): HouseLayout.exitsOf(plan) the ways out (a farm's exits, a house's front
---   door), HouseLayout.entries(plan) where you come in by each, HouseLayout.exitsFor(plan, id) the ways out a piece
---   may take (a farm's bigDoor piece: the barn doors only)
+--   server/Moving.luau: HouseLayout.exitsOf(plan) the ways out (a big house's exits, a house's front door),
+--   HouseLayout.entries(plan) where you come in by each, HouseLayout.exitsFor(plan, id) the ways out a piece may take
+--   (every one)
 --
 -- A Plan:
 --   kind, seed, mirrored          what it is, its dice, and whether it is the left-right mirror of the template
@@ -66,7 +65,6 @@
 
 local Config = require(script.Parent.Config)
 local FurnitureLooks = require(script.Parent.FurnitureLooks)
-local Farm = require(script.Parent.Layouts.Farm) -- 7.x the farm
 local Countryside = require(script.Parent.Layouts.Countryside) -- 9.5 the countryside's spots
 
 local T = Config.Furniture
@@ -91,7 +89,7 @@ export type Plan = {
 	doors: { Door },
 	entry: CFrame,
 	exit: Vector3,
-	exits: { Vector3 }?, -- (7.x a farm's, 8.3 a big house's ways out: exits[1] == exit)
+	exits: { Vector3 }?, -- (8.3 a big house's ways out: exits[1] == exit)
 	spots: { Spot },
 	ceiling: number,
 	wall: number,
@@ -1792,14 +1790,11 @@ local KINDS: { [string]: (number, { [string]: any }?) -> Plan } = {
 	house = function(seed: number, found: { [string]: any }?): Plan
 		return planHouse(seed, live(SHAPES.house, found))
 	end,
-	farm = function(seed: number): Plan
-		return Farm.plan(seed)
-	end,
 	big = function(seed: number, found: { [string]: any }?): Plan -- 8.3: the sandbox's big house
 		return planHouse(seed, live(SHAPES.big, found))
 	end,
 }
-HouseLayout.Kinds = { "house", "farm", "big" }
+HouseLayout.Kinds = { "house", "big" }
 -- 9.5 the countryside's spots (shared/Layouts/Countryside.luau)
 for _, kind in Countryside.Kinds do
 	KINDS[kind] = function(seed: number, found: { [string]: any }?): Plan
@@ -1813,8 +1808,8 @@ function HouseLayout.plan(seed: number, kind: string, found: { [string]: any }?)
 	return make(seed, if type(found) == "table" then found else nil)
 end
 
--- 7.x farm move (server/Moving.luau): a plan's ways out, in order: its exits (a farm's: the front door, the barn doors),
--- else its one front door (exit).
+-- A plan's ways out, in order (server/Moving.luau): its exits (a big house's: the front door, the back door), else its
+-- one front door (exit).
 function HouseLayout.exitsOf(plan: Plan): { Vector3 }
 	local exits = (plan :: any).exits
 	return if type(exits) == "table" and #exits > 0 then exits else { plan.exit }
@@ -1842,13 +1837,9 @@ function HouseLayout.entries(plan: Plan): { CFrame }
 	return list
 end
 
--- The exits (indexes into exitsOf) a piece of this FurnitureLooks id can be carried out of: a farm's Farm.exitsFor (a
--- bigDoor piece only the barn doors), a house's its front door (8.3: a big house's either door: both doorways take every
--- piece of a house, and its layout checks the way to each).
-function HouseLayout.exitsFor(plan: Plan, id: string): { number }
-	if plan.kind == "farm" then
-		return Farm.exitsFor(plan :: any, id)
-	end
+-- The exits (indexes into exitsOf) a piece of this FurnitureLooks id can be carried out of: a house's its front door
+-- (8.3: a big house's either door: both doorways take every piece of a house, and its layout checks the way to each).
+function HouseLayout.exitsFor(plan: Plan, _id: string): { number }
 	local all: { number } = {}
 	for index in HouseLayout.exitsOf(plan) do
 		table.insert(all, index)
@@ -1859,9 +1850,6 @@ end
 -- The spots of a plan whose piece cannot be carried out of the front door (with every other piece in place). 8.3: a
 -- big house's, of the front door or of the back door (every doorway to the outside).
 function HouseLayout.stuck(plan: Plan): { number }
-	if plan.kind == "farm" then -- 7.x the farm: its exits (the barn doors too)
-		return Farm.stuck(plan :: any)
-	end
 	local half = plan.wall / 2
 	local walls: { Rect } = {}
 	for _, f in plan.faces do

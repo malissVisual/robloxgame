@@ -74,7 +74,7 @@ with tempfile.TemporaryDirectory() as tmp:
     # the same recorder (tests/furniture_test.luau, tests/houselayout_test.luau).
     for name in ("GunModels", "CargoLooks", "ItemLooks", "FurnitureLooks", "HouseLayout"):
         source = open(os.path.join(SHARED, name + ".luau"), encoding="utf-8").read()
-        source = re.sub(r"require\(script\.Parent\.Layouts\.(\w+)\)", r'require("./\1")', source)  # 7.x: the farm's layout
+        source = re.sub(r"require\(script\.Parent\.Layouts\.(\w+)\)", r'require("./\1")', source)  # (shared/Layouts: the countryside's)
         source = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', source)
         open(os.path.join(tmp, name + ".luau"), "w", encoding="utf-8").write(prefix + source)
     # 8.3: shared/VanLook.luau (the PAINT shop paints a van: Roblox instances) on the same recorder, with its typeof
@@ -82,7 +82,7 @@ with tempfile.TemporaryDirectory() as tmp:
     source = open(os.path.join(SHARED, "VanLook.luau"), encoding="utf-8").read()
     source = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', source)
     open(os.path.join(tmp, "VanLook.luau"), "w", encoding="utf-8").write(prefix + "local typeof = M.typeof\n" + source)
-    # 7.x: shared/Layouts (Farm.luau: Walt's farm, HouseLayout's kind "farm"; tests/farmlayout_test.luau) next to them,
+    # 7.x: shared/Layouts (9.5 Countryside.luau: the countryside's spots, HouseLayout's kinds cabin, lodge, mill, cottage) next to them,
     # on the same recorder, their script.Parent.Parent.X requires the copies above
     for path in sorted(glob.glob(os.path.join(SHARED, "Layouts", "*.luau"))):
         source = open(path, encoding="utf-8").read()

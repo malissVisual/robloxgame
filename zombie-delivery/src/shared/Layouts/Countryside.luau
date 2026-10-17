@@ -163,7 +163,7 @@ local function radiusOf(id: string): number
 	return math.min(def.size.X, def.size.Z) / 2
 end
 
--- ── Reachability (as shared/Layouts/Farm.luau's: every piece out of the front door) ─────────────────
+-- ── Reachability (every piece out of the front door) ──────────────────────────────────────
 
 local CAP = 4
 local STEP = 0.05

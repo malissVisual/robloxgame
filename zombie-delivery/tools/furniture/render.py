@@ -37,7 +37,7 @@ HERE = Path(__file__).parent
 SHARED = ROOT / "src" / "shared"
 PREFIX = ('local M = require("./ItemMock")\n'
           'local Instance, Vector3, CFrame, Color3, Enum, UDim2 = M.Instance, M.Vector3, M.CFrame, M.Color3, M.Enum, M.UDim2\n')
-MOCKED = ("FurnitureLooks", "HouseLayout", "Farm")
+MOCKED = ("FurnitureLooks", "HouseLayout")
 ROOMS = (("living", "LIVING ROOM"), ("kitchen", "KITCHEN"), ("bedroom", "BEDROOM"), ("kids", "KID'S ROOM"),
          ("bath", "BATHROOM"), ("hall", "HALL"), ("garage", "GARAGE"))
 # 7.x the farm: its pieces' rooms (on its sheet) and its plan's rooms (on its pictures)
