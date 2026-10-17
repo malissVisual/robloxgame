@@ -132,7 +132,7 @@ if Config.Sandbox.On then
 	-- The sandbox's own modules (other workers write them at the same time): only when they are there, and one that
 	-- fails to load is skipped with a warning.
 	local own: { { name: string, module: any } } = {}
-	for _, name in { "SandboxHud", "WarehouseUi", "SandboxGuide", "UpgradeUi", "CollectionBookUi", "SandboxTasksUi", "MoveHelperCard", "DannyOrders", "OfferCard", "VanPaintUi", "TradeUi", "AuctionUi", "VillageTraffic", "DrivePedals", "RunUi", "LootOutline", "LootStars", "SandboxMapUi", "SandboxMiniMap" } do -- (8.1: the UPGRADES desk's window; 8.2: the collection book, the TASKS panel; 8.3: Danny's command card, a visitor's offer, the PAINT shop; 8.5: Danny's clipboard, orders mode; 8.7: trading between players; 8.8: the Auction House's window, only while Config.Auction.On; 8.9: the D5's cars, Jinočany; 9.1: the drive pedals; 9.x loot: the outlines, the stars and the toasts; 10.x the map: the big map (M) and a run's minimap, after the TASKS chip its 🗺 MAP chip stands beside)
+	for _, name in { "SandboxHud", "WarehouseUi", "SandboxGuide", "UpgradeUi", "CollectionBookUi", "SandboxTasksUi", "MoveHelperCard", "DannyOrders", "OfferCard", "VanPaintUi", "TradeUi", "AuctionUi", "VillageTraffic", "DrivePedals", "RunUi", "LootOutline", "LootStars", "RunDangerUi", "SandboxMapUi", "SandboxMiniMap" } do -- (8.1: the UPGRADES desk's window; 8.2: the collection book, the TASKS panel; 8.3: Danny's command card, a visitor's offer, the PAINT shop; 8.5: Danny's clipboard, orders mode; 8.7: trading between players; 8.8: the Auction House's window, only while Config.Auction.On; 8.9: the D5's cars, Jinočany; 9.1: the drive pedals; 9.x loot: the outlines, the stars and the toasts; 10.x the map: the big map (M) and a run's minimap, after the TASKS chip its 🗺 MAP chip stands beside)
 		local found = Client:FindFirstChild(name)
 		if found and found:IsA("ModuleScript") then
 			local ok, module = pcall(function(): any
@@ -302,6 +302,9 @@ if Config.Sandbox.On then
 	local Mini = ownModule("SandboxMiniMap")
 	if type(Mini) == "table" then
 		Mini.covered = CameraRig.windowOpen
+	end
+	if type(ownModule("RunDangerUi")) == "table" then -- 10.x danger: the run's danger strip steps aside under a window too
+		ownModule("RunDangerUi").covered = CameraRig.windowOpen
 	end
 	KeyHints.covered = function(): boolean
 		return CameraRig.mouseNeeded() or Hud.resultOpen()

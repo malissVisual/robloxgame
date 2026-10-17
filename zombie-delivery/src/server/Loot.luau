@@ -14,6 +14,10 @@
 --                              warning and the piece stays as it was (its own rarity)
 --   Loot.rollOf(s)             the house's rolls of move `s` ({ [spot] = LootRules.Roll }), rolled now if not yet
 --   Loot.rarityOf(thing)       the rarity Loot gave a move's thing (nil: none)
+--   10.x danger: Loot.boost(s, spot, steps, floor?)   the piece at `spot` of move `s` lifted `steps` tiers and at least
+--                              to `floor` (LootRules.lift: a locked room's pieces a tier, a vault's to Epic or Legendary,
+--                              server/RunDanger.luau): its roll, its thing's value and rarity and its model's attributes
+--                              anew; the rarity it has now (nil: no such piece). Never in the run's way (a warning)
 
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -68,6 +72,35 @@ function Loot.tag(model: Model, spot: number, s: any)
 	if not ok then
 		warn(`[Loot] the piece at spot {spot} kept its own rarity: {err}`)
 	end
+end
+
+function Loot.boost(s: any, spot: number, steps: number, floor: string?): string?
+	local ok, result = pcall(function(): string?
+		local rolled = Loot.rollOf(s)
+		local roll = rolled[spot]
+		local thing = s.move.things[spot]
+		if not roll or not thing then
+			return nil
+		end
+		local lifted = LootRules.lift(roll, steps, floor)
+		rolled[spot] = lifted
+		thing.value = lifted.value
+		thing.rarity = lifted.rarity
+		local item = s.items and s.items[spot]
+		local model = item and item.model
+		if model then
+			for key, value in LootRules.attributes(lifted.rarity, lifted.value) do
+				model:SetAttribute(key, value)
+			end
+			CollectionService:AddTag(model, Config.Loot.Tag)
+		end
+		return lifted.rarity
+	end)
+	if not ok then
+		warn(`[Loot] the piece at spot {spot} kept its rarity: {result}`)
+		return nil
+	end
+	return result
 end
 
 function Loot.rarityOf(thing: any): string?

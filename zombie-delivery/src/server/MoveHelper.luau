@@ -2366,6 +2366,11 @@ local function routeNow(h: Helper): Route.Grid?
 			table.insert(parts, `{spot}:{math.floor(r.x0 * 4 + 0.5)},{math.floor(r.z0 * 4 + 0.5)},{math.floor(r.x1 * 4 + 0.5)},{math.floor(r.z1 * 4 + 0.5)}`)
 		end
 	end
+	local danger = s.danger -- 10.x danger: a run's locked doorways are walls until opened, its hazards he walks round
+	if danger then
+		Route.shut(grid, danger.route.walls, danger.route.floors, danger.route.key) -- (server/RunDanger.luau's)
+		table.insert(parts, danger.route.key) -- (shut anew: his way worked out again)
+	end
 	local key = table.concat(parts, ";")
 	if key ~= h.routeKey then
 		h.routeKey = key
@@ -3979,6 +3984,9 @@ local function reachable(h: Helper, spot: number): boolean
 	local s = h.s
 	local item = s.items[spot]
 	local thing = (s.move :: Rules.Move).things[spot]
+	if s.danger and s.danger.sealed[spot] then
+		return false -- 10.x danger: in the run's vault (server/RunDanger.luau)
+	end
 	local grid = routeNow(h)
 	if not grid or not item or not thing or not insideAt(h, item.root.Position) then
 		return true

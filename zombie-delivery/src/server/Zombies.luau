@@ -64,6 +64,13 @@
 --     depot), the player's level, the Blood Moon (Zombies.bloodMoon, set by server/LiveEvents.luau), and MaxAlive of a
 --     special kind in the server at most. A mission's plan names its own kinds (shared/MissionPlan.luau).
 --   * a kill pays ZombieDef.xp XP on top (the money stays the "KillReward").
+--
+-- 10.x danger, a run's zombies (server/RunDanger.luau sets these; nothing changes without them):
+--   * Zombies.steer(z, from, goal) -> Vector3?: where a zombie walking from `from` to `goal` steps now (a run's house:
+--     its way through the doorways, shared/HouseRoute.luau); nil: straight at the goal, as ever
+--   * Zombies.onBite(player, humanoid, z): a bite (or a runner's leap) landed on a player's or a buddy's body
+--   * Zombie.aggro: studs a calm zombie notices a player on foot at (nil: Roam.aggro)
+--   * a run's parked truck (its model's Config.Runs.Truck.Attribute) is nobody's target: never grabbed, never bitten
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -143,6 +150,7 @@ export type Zombie = {
 	clanks: number?,
 	clankShown: number?,
 	nextShove: number?,
+	aggro: number?, -- 10.x danger: studs it notices a player on foot at while calm (nil: Roam.aggro)
 }
 
 local Zombies = {}
@@ -198,6 +206,9 @@ Zombies.tierOf = function(_player: Player): number?
 	return nil
 end
 Zombies.bloodMoon = false
+-- 10.x danger (server/RunDanger.luau): a run's zombies' way inside its house, and who a bite landed on.
+Zombies.steer = nil :: ((Zombie, Vector3, Vector3) -> Vector3?)?
+Zombies.onBite = nil :: ((Player, Humanoid, Zombie) -> ())?
 -- 8.0 SANDBOX (server/SandboxBoot.luau sets it false): the world's own zombies, the residents (the camps, the base,
 -- the addresses) and the roamers round every player. Off, only who calls Zombies.spawn brings any (the moves' horde
 -- and roamers).
@@ -1253,7 +1264,7 @@ local function gatherTargets(): { Target }
 	local targets: { Target } = {}
 	for _, car in Vehicles.all() do
 		local position = car.chassis.Position
-		if not World.isSafe(position) and car.owner:GetAttribute("AdminHidden") ~= true then
+		if not World.isSafe(position) and car.owner:GetAttribute("AdminHidden") ~= true and not Special.parked(car) then
 			table.insert(targets, { position = position, velocity = car.chassis.AssemblyLinearVelocity, car = car, player = car.owner })
 		end
 	end
@@ -1293,6 +1304,36 @@ local function nearestPlayerDistance(position: Vector3): number
 end
 
 nearestPlayerDistanceFn = nearestPlayerDistance
+
+-- ── 10.x danger: a run's zombies (server/RunDanger.luau) ─────────────────────
+
+-- A run's truck parked at its house (Config.Runs.Truck.Attribute): nobody's target, never grabbed.
+function Special.parked(car: Vehicles.Car): boolean
+	return car.model:GetAttribute(Config.Runs.Truck.Attribute) == true
+end
+
+-- Where `z` steps from `from` toward `goal`: Zombies.steer's (a run's house: its way through the doorways), else `goal`.
+function Special.steer(z: Zombie, from: Vector3, goal: Vector3): Vector3
+	local steer = Zombies.steer
+	if steer then
+		local ok, to = pcall(steer, z, from, goal)
+		if ok and typeof(to) == "Vector3" then
+			return to
+		end
+	end
+	return goal
+end
+
+-- A bite (or a leap's strike) landed on `humanoid`: Zombies.onBite hears it.
+function Special.bit(z: Zombie, player: Player, humanoid: Humanoid)
+	local onBite = Zombies.onBite
+	if onBite then
+		local ok, err = pcall(onBite :: any, player, humanoid, z)
+		if not ok then
+			warn(`[Zombies] onBite: {err}`)
+		end
+	end
+end
 
 -- ── 6.24: the special zombies ──────────────────────────────────────────────
 
@@ -1351,6 +1392,7 @@ function Special.lunge(z: Zombie, best: Target, distance: number, lunge: Config.
 			z.nextAttack = now + z.def.attackEvery -- (6.24 review: the leap's strike is its bite: one hit a leap)
 			showAttack(z)
 			Armour.hurt(humanoid, lunge.damage)
+			Special.bit(z, best.player, humanoid) -- 10.x danger
 		end
 		return
 	end
@@ -1729,11 +1771,11 @@ local function nearestTarget(position: Vector3, targets: { Target }, reach: numb
 end
 
 -- A calm zombie notices a player on foot within Roam.aggro, a car further the faster (the louder) it goes.
-local function noticed(position: Vector3, targets: { Target }): (Target?, number)
+local function noticed(position: Vector3, targets: { Target }, aggro: number?): (Target?, number)
 	local best: Target? = nil
 	local bestDistance = math.huge
 	for _, t in targets do
-		local reach = if t.car then math.min(Roam.aggroCar + flatSpeed(t.velocity) * Roam.aggroPerSpeed, Roam.aggroCarMax) else Roam.aggro
+		local reach = if t.car then math.min(Roam.aggroCar + flatSpeed(t.velocity) * Roam.aggroPerSpeed, Roam.aggroCarMax) else aggro or Roam.aggro
 		local d = (t.position - position).Magnitude
 		if d < reach and d < bestDistance then
 			best, bestDistance = t, d
@@ -1755,7 +1797,7 @@ local function wander(z: Zombie, position: Vector3, now: number)
 	local angle = rng:NextNumber(0, math.pi * 2)
 	local goal = z.home + Vector3.new(math.cos(angle), 0, math.sin(angle)) * rng:NextNumber(4, Roam.wander)
 	if not World.isSafe(goal) then
-		z.humanoid:MoveTo(goal)
+		z.humanoid:MoveTo(Special.steer(z, position, goal)) -- (10.x danger: in a run's house, through its doorways)
 	end
 end
 
@@ -1896,7 +1938,7 @@ local function step()
 		if touch then
 			z.touching = false
 			for _, c in cars do
-				if not c.wrecked and c.chassis.Parent and touches(c, position, Horde.LatchReach * z.def.scale) then
+				if not c.wrecked and c.chassis.Parent and not Special.parked(c) and touches(c, position, Horde.LatchReach * z.def.scale) then
 					z.touching = true
 					hitByCar(z, c, now)
 					break
@@ -1935,7 +1977,7 @@ local function step()
 			if not z.hunting then
 				-- Calm: shamble around its spot and look around now and then.
 				z.nextPath = now + Roam.think * rng:NextNumber(0.8, 1.2)
-				best, bestDistance = noticed(position, targets)
+				best, bestDistance = noticed(position, targets, z.aggro) -- (10.x danger: a run's inside zombie's own)
 				if not best then
 					wander(z, position, now)
 					continue
@@ -1969,7 +2011,7 @@ local function step()
 					-- 6.15: an event's zombie walks to its spot (the gate, the crate) and waits round it; never into the safe zone
 					z.nextPath = now + rng:NextNumber(1, 2)
 					if not World.isSafe(march) and Vector3.new(march.X - position.X, 0, march.Z - position.Z).Magnitude > 8 then
-						z.humanoid:MoveTo(Vector3.new(march.X + rng:NextNumber(-5, 5), position.Y, march.Z + rng:NextNumber(-5, 5)))
+						z.humanoid:MoveTo(Special.steer(z, position, Vector3.new(march.X + rng:NextNumber(-5, 5), position.Y, march.Z + rng:NextNumber(-5, 5))))
 					end
 				elseif not z.guard then
 					z.nextPath = now + rng:NextNumber(2, 4) -- shamble around
@@ -2024,7 +2066,7 @@ local function step()
 		if World.isSafe(goal) then
 			continue
 		end
-		z.humanoid:MoveTo(goal)
+		z.humanoid:MoveTo(Special.steer(z, position, goal)) -- (10.x danger: in a run's house, through its doorways)
 
 		-- 6.24: a bloater next to you lights its fuse (it never bites); a runner leaps at you.
 		local blast = z.def.blast
@@ -2044,6 +2086,7 @@ local function step()
 			z.nextAttack = now + z.def.attackEvery
 			showAttack(z) -- 6.16: the clients' lunge
 			Armour.hurt(humanoid, z.def.damage)
+			Special.bit(z, best.player, humanoid) -- 10.x danger: a bite on a run drops what you carry
 			-- 6.24: a brute's blow throws you back
 			local shove = z.def.shove
 			if shove and now >= (z.nextShove or 0) then

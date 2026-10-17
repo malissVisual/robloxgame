@@ -67,6 +67,13 @@
 --                                         `clear` studs off everything (with a grid; never nearer than he is now) or cuts
 --                                         the way's corners `cut` studs at most (no grid: the street's ways); (x, z,
 --                                         the index of the next point still ahead, studs of way left from him)
+-- 10.x danger (a run's locked doorways and its hazards, server/RunDanger.luau; tests/danger_test.luau):
+--   HouseRoute.shut(grid, walls, floors, key)   what is shut on the grid now, all of it (a new call replaces the last
+--                                         one's): `walls` count as wall slabs (a locked doorway's leaf: closed cells, no
+--                                         sight through it, the slides stop at it), `floors` only close their cells (a
+--                                         hazard he walks round); `key` names the set: the same key again does nothing.
+--                                         Whatever was shut before and is not now opens again (a door unlocked). True
+--                                         when it changed anything
 
 local Config = require(script.Parent.Config)
 
@@ -831,6 +838,76 @@ function HouseRoute.reach(g: Grid, fx: number, fz: number, piece: Rect, stand: n
 	end
 	local x, z = middle(g, found)
 	return x, z, cost
+end
+
+-- ── 10.x danger: what a run shuts ────────────────────────────────────────────
+
+-- (the grid's own record of it: the rects it put into its walls and solids, the cells it closed, the set's key)
+type Shut = { key: string, walls: { Rect }, floors: { Rect }, cells: { number } }
+local shuts: { [Grid]: Shut } = setmetatable({}, { __mode = "k" }) :: any
+
+local function without(list: { Rect }, gone: { Rect })
+	for _, r in gone do
+		local at = table.find(list, r)
+		if at then
+			table.remove(list, at)
+		end
+	end
+end
+
+function HouseRoute.shut(g: Grid, walls: { Rect }, floors: { Rect }, key: string): boolean
+	local was = shuts[g]
+	if was and was.key == key then
+		return false
+	end
+	local step, nx, nz, r = g.step, g.nx, g.nz, g.radius
+	if was then
+		-- (open again what it closed, unless one of the solids that stay closes it: one added since)
+		without(g.walls, was.walls)
+		without(g.solids, was.floors)
+		for _, k in was.cells do
+			local i, j = (k - 1) % nx, (k - 1) // nx
+			local x, z = g.x0 + i * step, g.z0 + j * step
+			local free = true
+			for _, p in g.solids do
+				if toRect(x, z, p) < r then
+					free = false
+					break
+				end
+			end
+			if free then
+				g.still[k] = 1
+			end
+		end
+	end
+	local now: Shut = { key = key, walls = table.clone(walls), floors = table.clone(floors), cells = {} }
+	for _, list in { now.walls, now.floors } do
+		for _, p in list do
+			local i0 = math.max(0, math.floor((p.x0 - r - g.x0) / step))
+			local i1 = math.min(nx - 1, math.ceil((p.x1 + r - g.x0) / step))
+			local j0 = math.max(0, math.floor((p.z0 - r - g.z0) / step))
+			local j1 = math.min(nz - 1, math.ceil((p.z1 + r - g.z0) / step))
+			for j = j0, j1 do
+				local z = g.z0 + j * step
+				for i = i0, i1 do
+					local k = j * nx + i + 1
+					if g.still[k] == 1 and toRect(g.x0 + i * step, z, p) < r then
+						g.still[k] = 0
+						table.insert(now.cells, k)
+					end
+				end
+			end
+		end
+	end
+	for _, p in now.walls do
+		table.insert(g.walls, p)
+	end
+	for _, p in now.floors do
+		table.insert(g.solids, p)
+	end
+	shuts[g] = now
+	HouseRoute.block(g, g.pieces) -- (the open cells again: what is still, less the pieces standing)
+	return true
 end
 
 return HouseRoute

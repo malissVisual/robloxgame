@@ -61,6 +61,9 @@ rest, the words fitting, a finger's size, the requests.
 10.x the map: the big map in the lobby and in a run and a run's minimap (the real SandboxMapUi, SandboxMapDraw,
 SandboxMapData and SandboxMiniMap beside SandboxHud, SandboxTasksUi and RunUi: sandboxmap.luau) on phones, a computer and
 a big screen: on the screen, clear of the rest, nothing on each other, the words fitting, a finger's size, the fog.
+rest, the words fitting, a finger's size, the requests. 10.x danger: the results card's danger line and the run's
+danger strip (the real RunDangerUi under a stand-in move panel: the keys, the vault, the zombies, the events, the horde's
+banner) in the same scene.
 """
 import argparse
 from pathlib import Path

@@ -24,6 +24,9 @@
 --                                          → { [spot] = Roll }: its rarity, its stars, its value ($), its own rarity;
 --                                          then the difficulty's Floor (the best piece lifted to it when none reached it)
 --   LootRules.valueOf(base, own, rarity)   $ a piece of catalogue value `base` is worth at `rarity` (CollectionRules.lift)
+--   10.x danger: LootRules.lift(roll, steps, floor?)   a roll lifted `steps` tiers (a locked room's piece) and at least to
+--                                          `floor` (a vault's piece: "epic", "legendary"), never past Legendary: a new Roll,
+--                                          its value at the new rarity (the roll's `base`, its catalogue value)
 --   LootRules.attributes(rarity, value)    what a piece's model carries: { Rarity, Stars, Value }
 -- What the client shows (client/LootOutline.luau, client/LootStars.luau):
 --   LootRules.color(rarity)                its tier's { r, g, b } (Config.Collection.Tiers; anything else Common's)
@@ -45,7 +48,7 @@ local CollectionRules = require(script.Parent.CollectionRules)
 local LootRules = {}
 
 export type Piece = { spot: number, item: string, value: number? }
-export type Roll = { rarity: string, stars: number, value: number, own: string }
+export type Roll = { rarity: string, stars: number, value: number, own: string, base: number? } -- (10.x danger: base, its catalogue value)
 
 local function tune()
 	return Config.Loot
@@ -176,7 +179,7 @@ function LootRules.roll(pieces: { Piece }, difficulty: any, seed: number): { [nu
 		local own = LootRules.own(piece.item, base)
 		local rarity = LootRules.rollOne(own, LootRules.isCollectible(piece.item), difficulty, seed, piece.spot)
 		bases[piece.spot] = base
-		out[piece.spot] = { rarity = rarity, stars = LootRules.rank(rarity), value = LootRules.valueOf(base, own, rarity), own = own }
+		out[piece.spot] = { rarity = rarity, stars = LootRules.rank(rarity), value = LootRules.valueOf(base, own, rarity), own = own, base = base }
 		local now = out[piece.spot]
 		local was = if best then out[best.spot] else nil
 		if was == nil or now.stars > was.stars or (now.stars == was.stars and now.value > was.value) then
@@ -193,6 +196,27 @@ function LootRules.roll(pieces: { Piece }, difficulty: any, seed: number): { [nu
 		got.value = LootRules.valueOf(bases[chosen.spot], got.own, got.rarity)
 	end
 	return out
+end
+
+-- 10.x danger: a roll lifted `steps` tiers and at least to `floor`, never past Legendary (a new roll; the same one when
+-- nothing changes). Its value from its catalogue value (`base`; an older roll without one: its value back at its own).
+function LootRules.lift(roll: Roll, steps: number, floor: string?): Roll
+	local top = #tiers().Order
+	local rank = LootRules.rank(roll.rarity)
+	local want = math.min(top, rank + math.max(0, math.floor(if finite(steps) then steps else 0)))
+	if floor then
+		want = math.max(want, LootRules.rank(floor))
+	end
+	if want <= rank then
+		return roll
+	end
+	local rarity = LootRules.tierAt(want)
+	local base = roll.base
+	if base == nil then
+		local lift = CollectionRules.lift(roll.own, roll.rarity)
+		base = if lift > 0 then roll.value / lift else roll.value
+	end
+	return { rarity = rarity, stars = LootRules.rank(rarity), value = LootRules.valueOf(base :: number, roll.own, rarity), own = roll.own, base = base }
 end
 
 function LootRules.attributes(rarity: string, value: number): { [string]: any }

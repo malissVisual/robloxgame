@@ -7512,8 +7512,63 @@ Config.Collection = {
 -- The Runs remote (Config.Robust.Limits.Runs): client → server { kind = "state" } | { kind = "difficulty", id } (the
 -- host on the pad) | { kind = "vote" } (to finish) | { kind = "leave" } (out of your run alone); server → client
 -- { kind = "pad", ... } | { kind = "pad" } (off a pad), { kind = "run", ... } | { kind = "run" } (not in a run),
--- { kind = "result", ... } (the results card), { kind = "unlocked", id } (a difficulty opened).
+-- { kind = "result", ... } (the results card), { kind = "unlocked", id } (a difficulty opened). 10.x danger: server →
+-- client { kind = "danger", ... } (the run's keys, vault, zombies and its events: client/RunDangerUi.luau).
+-- 10.x DANGER (the owner: "both: on the easier difficulties only a timer and traps, on the harder ones zombies too ... it
+-- has to be designed to be fun"; the pure rules shared/DangerRules.luau, tests/danger_test.luau; the server
+-- server/RunDanger.luau, tests/danger_runtime_test.luau; the HUD client/RunDangerUi.luau):
+--   Danger         per difficulty id: Locks (inside doorways locked, each its key hidden in a searchable piece of a room
+--                  you can get to first), Vault (the vault's pieces: 0 none; its gold key hidden like the others, deeper
+--                  when it can be), Legendary (the chance a vault piece comes Legendary, else Vault.Floor), Creak /
+--                  Puddle / Plaster (the hazards of each kind at most: as many as the house has open floor for), Harm (×
+--                  a creak's knock and the plaster's damage), Inside / Yard (zombies in the house and in its yard from the
+--                  start), Wave (zombies in the yard once Zombies.WaveAt of the clock is gone, marching at the door, "A
+--                  horde is coming!"), Speed (× their speed), Boss (the boss by the vault), Weapon (every party member
+--                  gets the run's bat: Weapon), Kinds (the zombies' kinds' weights: Config.Zombies' kinds)
+--   Locks          Hold, Reach: the locked door's Unlock prompt; Lift: tiers a locked room's pieces come up (server/
+--                  Loot.luau boost); Swing s, Open degrees: the leaf swinging open; its colours (RGB)
+--   Search         a searchable piece's Search prompt (F, the gamepad's Y): Hold s, Reach studs; Items: the pieces that
+--                  are searched (things with drawers, doors, lids or cushions; never a collectible)
+--   Rooms          a room id's name (a key's: "Bedroom key")
+--   Vault          the vault: a steel and glass case round each of its pieces (Margin studs out, Lid over its top), its
+--                  Open prompt (Hold, Reach) at the case's lock; Floor: the least rarity of its pieces; Entry: × a piece's
+--                  chance of the vault in a room you come in by (the vault deeper in the house); Sink s: the case
+--                  sinking away when it opens; its colours
+--   Hazard         Every s between two looks at the party's feet; Grid, Radius: the planning grid's cells and a body's
+--                  room (shared/HouseRoute.luau); Tries per hazard; Gap studs: from a doorway, a piece, the way in, each
+--                  other, the walls, a fixture; Reach: a piece's reach kept walkable. Creak: a cracked patch of boards
+--                  (Size studs): carrying over it you stumble and drop the piece (Knock: as hp of a bite,
+--                  MovingRules.hitDamage: a fragile piece takes more); Rearm s per player. Puddle: you slide Slide studs /
+--                  s along your walk (the Knock remote); Danny walks round both. Plaster: a cracked ceiling patch over a
+--                  dusty floor (Size); a player within Trigger studs starts it: it shakes Warn s, then drops (Damage on
+--                  everybody under it, × Harm), Rearm s to the next
+--   Zombies        Aggro / YardAggro: studs a zombie in the house / in the yard notices you at while calm (Config.Horde
+--                  .Roam.aggro elsewhere: the yard's under its YardAway, so the party arrives unseen); Away / YardAway /
+--                  Truck / Edge: studs a new zombie keeps from the players (and the way in) / the yard's players and
+--                  the arrival / the truck / the zone's edge; Tries; Grid, Radius: their way inside (HouseRoute);
+--                  Steer, Again: a new way every Steer s at most or when its goal moved Again studs; Block s: the pieces
+--                  standing looked at again; WaveAt (of the clock), WaveFar (studs from the door at least); Boss: its
+--                  kind, name (over its head), Health, Scale, Guard (studs round the vault it keeps to while calm)
+--   Weapon         the run's melee weapon: Kind (Config.Melee.Kinds: server/CloseCombat.luau swings it), Name (its Tool)
+--   DangerHud      client/RunDangerUi.luau: Width px, Event s a line shows, Banner s the horde's banner, Every s, Hint
+--                  studs (⚠ a hazard near), TouchScale (the banner's least scale on a phone)
 export type RunDifficulty = { id: string, name: string, time: number, color: { number } }
+export type RunDanger = {
+	Locks: number,
+	Vault: number,
+	Legendary: number,
+	Creak: number,
+	Puddle: number,
+	Plaster: number,
+	Harm: number,
+	Inside: number,
+	Yard: number,
+	Wave: number,
+	Speed: number,
+	Boss: boolean,
+	Weapon: boolean,
+	Kinds: { [string]: number },
+}
 Config.Runs = {
 	Difficulties = {
 		{ id = "easy", name = "Easy", time = 1.3, color = { 120, 214, 120 } },
@@ -7552,6 +7607,59 @@ Config.Runs = {
 	},
 	Panel = { Width = 380, TouchScale = 0.8 },
 	Result = { Width = 420, Rows = 8, TouchScale = 0.8 },
+	-- 10.x DANGER (the block above Config.Runs): per difficulty, what a run's house holds besides the loot
+	Danger = {
+		easy = { Locks = 1, Vault = 0, Legendary = 0, Creak = 2, Puddle = 1, Plaster = 0, Harm = 1, Inside = 0, Yard = 0, Wave = 0, Speed = 1, Boss = false, Weapon = false, Kinds = {} },
+		normal = { Locks = 1, Vault = 1, Legendary = 0, Creak = 2, Puddle = 2, Plaster = 1, Harm = 1.15, Inside = 0, Yard = 0, Wave = 0, Speed = 1, Boss = false, Weapon = false, Kinds = {} },
+		hard = { Locks = 2, Vault = 1, Legendary = 0, Creak = 3, Puddle = 2, Plaster = 2, Harm = 1.3, Inside = 3, Yard = 3, Wave = 0, Speed = 1, Boss = false, Weapon = true, Kinds = { walker = 1 } },
+		insane = { Locks = 2, Vault = 2, Legendary = 0, Creak = 3, Puddle = 3, Plaster = 3, Harm = 1.45, Inside = 5, Yard = 4, Wave = 8, Speed = 1.2, Boss = false, Weapon = true,
+			Kinds = { walker = 0.65, runner = 0.25, bloater = 0.1 } },
+		nightmare = { Locks = 2, Vault = 2, Legendary = 0.35, Creak = 4, Puddle = 3, Plaster = 4, Harm = 1.6, Inside = 7, Yard = 6, Wave = 12, Speed = 1.3, Boss = true, Weapon = true,
+			Kinds = { walker = 0.5, runner = 0.25, brute = 0.15, bloater = 0.1 } },
+	} :: { [string]: RunDanger },
+	Locks = { Hold = 0.5, Reach = 8, Lift = 1, Swing = 0.7, Open = 100, Leaf = { 104, 70, 44 } :: { number }, Iron = { 58, 58, 64 } :: { number }, Brass = { 214, 170, 70 } :: { number } },
+	Search = {
+		Hold = 1,
+		Reach = 7,
+		Items = { "wardrobe", "dresser", "nightstand", "desk", "toy_box", "shoe_cabinet", "toolbox", "tool_chest", "bookshelf", "painted_cupboard", "carved_chest",
+			"tackle_box", "cool_box", "gun_cabinet", "plate_dresser", "jam_shelf", "grain_crate", "fridge", "box", "dishes_box", "laundry_basket", "coal_scuttle",
+			"log_basket", "boot_rack", "sofa", "armchair", "heart_chair", "bed", "kids_bed", "bunk_bed", "flour_sacks", "feed_sacks", "fruit_crates", "apple_crate" } :: { string },
+	},
+	Rooms = {
+		hall = "Hall", corridor = "Corridor", living = "Living Room", kitchen = "Kitchen", bedroom = "Bedroom", kids = "Kids' Room", bath = "Bathroom",
+		garage = "Garage", guest = "Guest Room", study = "Study", main = "Main Room", bunks = "Bunk Room", store = "Store", gunroom = "Gun Room",
+		workroom = "Workroom", millers = "Miller's Room",
+	} :: { [string]: string },
+	Vault = { Hold = 1, Reach = 8, Floor = "epic", Entry = 0.5, Margin = 0.4, Lid = 0.6, Sink = 0.8, Steel = { 70, 74, 82 } :: { number }, Glass = { 170, 214, 236 } :: { number }, Gold = { 255, 196, 60 } :: { number } },
+	Hazard = {
+		Every = 0.1,
+		Grid = 1,
+		Radius = 1.25,
+		Tries = 40,
+		Gap = { Door = 4, Piece = 2.5, Entry = 9, Each = 3, Wall = 1.5, Fixture = 1, Reach = 3 },
+		Creak = { Size = { 4, 4 } :: { number }, Knock = 20, Rearm = 2.5, Color = { 96, 66, 42 } :: { number }, Crack = { 34, 24, 18 } :: { number } },
+		Puddle = { Size = { 5, 3.5 } :: { number }, Slide = 24, Rearm = 1.2, Color = { 120, 172, 204 } :: { number } },
+		Plaster = { Size = { 5, 5 } :: { number }, Trigger = 5, Warn = 1.3, Damage = 12, Rearm = 10, Chunk = { 3, 0.6, 3 } :: { number }, Color = { 222, 216, 202 } :: { number } },
+	},
+	Zombies = {
+		Aggro = 30,
+		YardAggro = 32,
+		Away = 16,
+		YardAway = 36,
+		Truck = 14,
+		Edge = 8,
+		Tries = 40,
+		Grid = 1,
+		Radius = 1,
+		Steer = 0.6,
+		Again = 3,
+		Block = 2,
+		WaveAt = 0.5,
+		WaveFar = 45,
+		Boss = { Kind = "brute", Name = "THE LANDLORD", Health = 420, Scale = 1.35, Guard = 12, Color = { 220, 70, 90 } :: { number } },
+	},
+	Weapon = { Kind = "bat", Name = "Bat" },
+	DangerHud = { Width = 360, Event = 4, Banner = 3.2, Every = 0.2, Hint = 10, TouchScale = 0.8 },
 }
 
 -- 9.x LOOT (the owner: "like Dungeon Quest: you go into a house and you get loot there ... outlines with their own colour

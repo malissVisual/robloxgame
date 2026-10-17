@@ -87,6 +87,12 @@ local Plan = require("./AnalyticsPlan")
 local StockPlan = require("./StockPlan")
 local Market = require("./Market") -- (8.3: the day's hot and cold kinds)
 local SoundPlan = require("./SoundPlan") -- (8.3: "in the house" for the eyes and the sounds)
+-- 10.x danger: the runs' hazards are tests/danger_test.luau's and tests/danger_runtime_test.luau's: none on this loop's
+-- straight walks (a creaky patch under a carried piece drops it, the plaster knocks it); its locks, vault and zombies
+-- stay (H.choose leaves their pieces be)
+for _, level in Config.Runs.Danger do
+	level.Creak, level.Puddle, level.Plaster = 0, 0, 0
+end
 
 local failures = 0
 local todos: { string } = {}
@@ -158,6 +164,7 @@ local MoveHelper = E.module("MoveHelper")
 local SandboxPlots = E.module("SandboxPlots")
 local Vehicles = E.fakes.Vehicles
 H.Runs = E.module("Runs") -- 9.7: the runs (the portals' pads, the parties)
+H.Danger = E.module("RunDanger") -- 10.x: a run's danger (its vault's sealed pieces, its locked rooms: tests/danger_*_test.luau)
 MoveHelper.useMover(E.mover) -- (no pathfinding in the CLI: Danny walks straight)
 
 local queued: { any } = {}
@@ -600,13 +607,36 @@ function H.pieceOf(player: any, spot: number): any
 	end
 	return nil
 end
--- A piece at home in the player's house that `fits` (by its def): the first in the state's order → item, model, def.
+-- 10.x danger: is the piece at `spot` of the player's run in its vault (sealed) or in a room behind a door still locked?
+function H.dangerous(player: any, spot: number): boolean
+	local st = H.Danger.stateFor(player)
+	if not st then
+		return false
+	end
+	if st.sealed[spot] then
+		return true
+	end
+	local room: string? = nil
+	for _, planned in st.s.plan.spots do
+		if planned.id == spot then
+			room = planned.room
+		end
+	end
+	for _, lock in st.locks do
+		if not lock.open and table.find(lock.plan.behind, room) then
+			return true
+		end
+	end
+	return false
+end
+-- A piece at home in the player's house that `fits` (by its def): the first in the state's order → item, model, def
+-- (10.x: never one in the run's vault or behind a locked door).
 function H.choose(player: any, fits: (any, any) -> boolean): (any, any, any)
 	for _, item in H.stateOf(player).items do
 		local model = H.pieceOf(player, item.spot)
 		local id = model and model:GetAttribute("FurnitureId")
 		local def = id and FurnitureLooks.Items[id]
-		if item.state == "home" and def and fits(item, def) then
+		if item.state == "home" and def and fits(item, def) and not H.dangerous(player, item.spot) then
 			return item, model, def
 		end
 	end
@@ -1329,10 +1359,12 @@ do
 	local was = H.profileOf(ann).money
 	local weekly = H.task(ann, "w_income")
 	local weeklyWas = if weekly then weekly.progress else 0
-	E.advance(60)
+	-- (60 s, or as long as two whole dollars take: 10.x the run's vault and locked rooms leave her the plainer pieces)
+	local wait = math.max(60, math.ceil(120 / math.max(rate, 1e-3) / Config.Collection.Tick) * Config.Collection.Tick)
+	E.advance(wait)
 	local got = H.paid(ann, "CollectionIncome", incomeAt)
-	check("…60 s on the clock: paid as CollectionIncome at that rate (whole dollars; the payout every " .. Config.Collection.Tick .. " s)",
-		got > 0 and got >= math.floor(rate * 50 / 60) - 1 and got <= rate * 70 / 60 + 1 and H.profileOf(ann).money - was == got, `{got} at {rate}/min`)
+	check(`…{wait} s on the clock: paid as CollectionIncome at that rate (whole dollars; the payout every {Config.Collection.Tick} s)`,
+		got > 0 and got >= math.floor(rate * (wait - 10) / 60) - 1 and got <= rate * (wait + 10) / 60 + 1 and H.profileOf(ann).money - was == got, `{got} at {rate}/min`)
 	local only = true
 	for index = incomeAt + 1, #money do
 		if money[index].player == ann then
