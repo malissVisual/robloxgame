@@ -819,10 +819,6 @@ do
 	E.advance(1)
 	check("…a second PLAY changes nothing", Vehicles.get(ann) == nil and #E.vehicleCalls == calls)
 	check("…the analytics' funnel: PressedPlay once", H.steps(11).PressedPlay == 1)
-	local carAt = #E.sent
-	E.fire(ann, "SpawnCar")
-	E.advance(0.5)
-	check("…CAR in the lobby: no van comes, she is told why", Vehicles.get(ann) == nil and E.heard(ann, "No vans in the lobby", carAt), E.lastNotice(ann, carAt))
 end
 
 -- ── 3. The portals: a pad, the difficulty, the countdown, the run ─────────
@@ -1733,11 +1729,6 @@ do
 	check("…Van engine 1 bought (her next truck wears it as it comes: step 20)", Upgrades.levels(ann2).engine == 1)
 	H.buy(ann2, "danny", 1)
 	check("…Danny's training 1: her player's DannyTraining (MoveHelper reads it)", ann2:GetAttribute(Config.SandboxUpgrades.Danny) == 1)
-	E.advance(1)
-	local carAt = #E.sent
-	E.fire(ann2, "SpawnCar")
-	E.advance(0.5)
-	check("…CAR in the lobby: no van comes, said why", Vehicles.get(ann2) == nil and E.heard(ann2, "No vans in the lobby", carAt), E.lastNotice(ann2, carAt))
 end
 
 -- 8.3: the Logistics Center (the warehouse's top level): her plot rebuilt once more, every piece on its stand

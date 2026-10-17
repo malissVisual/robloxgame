@@ -56,21 +56,14 @@ PhysicsService:CollisionGroupSetCollidable("EnemyCar", "Corpse", false)
 
 local stateRemote = Net.get("State")
 
--- The State (the client's money line, its windows and sounds, the start screen): what the sandbox's client reads of
--- the save. 10.5: only these (the city's garage, guns, kit, jobs, licences, shift … went with it).
+-- The State: the money (the client's money line, its windows and sounds), all the client reads of the save (10.5: the
+-- start screen, the save slots and the courier you make use the Slots remote).
 local function sendState(player: Player)
 	local profile = PlayerData.get(player)
 	if not profile then
 		return
 	end
-	stateRemote:FireClient(player, {
-		money = profile.money, -- (client/SandboxHud.luau, the windows' money, client/Sounds.luau)
-		cars = profile.cars,
-		car = profile.car, -- (the van: SandboxBoot's ownVan keeps it the save's one car)
-		xp = profile.xp, -- (client/Sounds.luau's level-up)
-		deliveries = profile.deliveries, -- (the start screen's line, client/Menu.luau)
-		kills = profile.kills,
-	})
+	stateRemote:FireClient(player, { money = profile.money })
 end
 
 -- 4.2: the State goes at most every 0.15 s per player. Every kill's money fires Changed, and a horde fight sent it

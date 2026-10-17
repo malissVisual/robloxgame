@@ -522,9 +522,6 @@ Runtime.Crew = stub("Crew", {
 		end
 		return nil
 	end,
-	hasJob = function(): boolean -- (Main's: Jobs.active; 7.0 review: Moving wraps it)
-		return false
-	end,
 })
 
 Runtime.wallet = {} -- 8.3: player → their money (PlayerData.get's money, spend's)

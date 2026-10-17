@@ -54,8 +54,8 @@
 --     the clock, GIVE UP, the host leaving: everything in the truck goes home at once (SB.unloadAll), each piece into
 --     the stock of whoever loaded it last (server/Collection.luau Collection.add: item, variant, condition, name,
 --     rarity; Danny's loads his boss's), no pay, no XP (the warehouse earns); Moving.onRunEnd's facts give server/Runs.luau
---     its results card. A van lost mid-run (wrecked, gone) loses what is in it (condition 0), the run goes on: CAR brings
---     it back after VanAgain s and the run takes it over (its Load / Take out prompts made again on it). A death
+--     its results card. A van lost mid-run (wrecked, gone) loses what is in it (condition 0), the run goes on without it
+--     (a car placed for its host after VanAgain s is taken over: its Load / Take out prompts made again on it). A death
 --     mid-run stands the new body by the run's van, else outside the house (Moving.respawnAt, SandboxBoot's spawn).
 --   * The clock and the zombies: the run's clock (0:00 ends it: late, the truck's load home); the horde (Config.Moving
 --     Horde; Config.Moving.Sandbox.Horde false: none by the clock, the admin's HORDE NOW brings it) marches on the door
@@ -65,8 +65,8 @@
 --   * The edges: whoever leaves, dies, sits down or leaves the party drops what they hold where they are (inside: on
 --     the floor); somebody inside an interior that goes is brought out to the door; every prompt and request is checked
 --     here (who, how far, the state), the remote is rate limited (Config.Robust.Limits.Moving). While a run's truck is
---     out nothing of its host's takes its place (Vehicles.spawn / placeNear / placeAt / spawnAt and the CAR call
---     wrapped), a run's people count as busy (Moving.busy, Crew.hasJob for its host). A door trip whose run ends
+--     out nothing of its host's takes its place (Vehicles.spawn / placeNear / placeAt / spawnAt wrapped), a run's people
+--     count as busy (Moving.busy). A door trip whose run ends
 --     meanwhile comes out at the house's door; Load checks the carry's pace (no teleport to the truck) and that the
 --     thing still exists (a missing model never comes home); the end's facts run in a pcall (the cleanup always frees
 --     the slot).
@@ -3618,8 +3618,8 @@ function Moving.endRun(host: Player, why: string?): boolean
 end
 
 -- The van lost mid-move (wrecked, gone, not the owner's car any more): what was in it is lost (condition 0, its models
--- go), the move goes on without a van; the owner's CAR brings one again after VanAgain s (the wrappers in wireHooks)
--- and the move takes it over (an empty bed, the prompts on it).
+-- go), the run goes on without a van; one placed for its host after VanAgain s (the wrappers in wireHooks) is taken
+-- over (an empty bed, the prompts on it).
 local function keepVan(s: Session, t: number)
 	local truck = s.truck
 	if truck and truckOk(s) then
@@ -3649,7 +3649,7 @@ local function keepVan(s: Session, t: number)
 		releaseBack(truck)
 		s.truck, s.lostAt, s.dirty = nil, t, true
 		local why = if truck.wrecked then "wrecked" else "gone"
-		tellAll(s, `💥 The van is {why}{if #lost > 0 then `: the {#lost} things in it are lost` else ""}. The move goes on: CAR brings it back in {T.VanAgain} s.`)
+		tellAll(s, `💥 The van is {why}{if #lost > 0 then `: the {#lost} things in it are lost` else ""}. The run goes on without it.`)
 		return
 	end
 	local car = Vehicles.get(s.owner)
@@ -4119,7 +4119,7 @@ local function truckOut(player: Player): boolean
 	return s ~= nil and not s.ended and truckOk(s) ~= nil
 end
 
--- 7.x van moves: the van was lost on a move a moment ago: CAR brings it again after VanAgain s (the wait's words).
+-- 7.x van moves: the van was lost on a run a moment ago: no other car for its host before VanAgain s (the wait's words).
 local function vanWait(player: Player): string?
 	local s = sessions[player]
 	local lost = if s and not s.ended and s.truck == nil then s.lostAt else nil
@@ -4234,23 +4234,6 @@ local function wireHooks()
 			return nil
 		end
 		return spawnAt(player, carId, ground, seat, chauffeured, rental, keep)
-	end
-	-- a move's owner is busy for the crews (no other crew's invitation mid-move: they would be on two moves)
-	local hasJob = Crew.hasJob
-	Crew.hasJob = function(player: Player): boolean
-		local own = sessions[player]
-		return hasJob(player) or (own ~= nil and not own.ended)
-	end
-	local callCar = Vehicles.callCar
-	if callCar then
-		local call: (Player, string?) -> string? = callCar
-		Vehicles.callCar = function(player: Player, carId: string?): string?
-			local s = sessions[player]
-			if s and not s.ended and truckOk(s) then
-				return "Your van is out on a move: finish the move first (or GIVE UP in the move's list, O)."
-			end
-			return vanWait(player) or call(player, carId)
-		end
 	end
 end
 

@@ -6,8 +6,8 @@
 -- teleport with a thing, the horde, the run's end (FINISH, GIVE UP, the clock, the host leaving: what is in the truck
 -- goes home), and the edges: a stranger, the truck lost, the admin's commands.
 -- 7.0 planning: the quick chat on a run (the real server/MoveLobby.luau: the crew hears it, a stranger not).
--- 7.0 review (server): nothing replaces the truck mid-move (Vehicles' spawn / placeNear / placeAt / spawnAt), Moving.busy
--- and Crew.hasJob, a door trip whose move ends meanwhile, Load's pace check, Unload's full hands, the end's listeners
+-- 7.0 review (server): nothing replaces the truck mid-move (Vehicles' spawn / placeNear / placeAt / spawnAt), Moving.busy,
+-- a door trip whose move ends meanwhile, Load's pace check, Unload's full hands, the end's listeners
 -- failing (the cleanup still runs), the plan made once a seed.
 -- 8.8 no roles: anybody of the crew calls the van to the door, once a run (tests/noroles_runtime_test.luau has the rest).
 -- 8.1 walk-in doors (Config.Moving.Doors; the E prompts there but off): walking into the door's zone facing it goes in
@@ -166,7 +166,6 @@ do
 	check("…a crew mate's own van is theirs to call", (E.vehicleCalls or 0) == calls + 1)
 	check("the run's people are busy (Moving.busy): its owner and its crew, a stranger free", type(Moving.busy(ann)) == "string" and type(Moving.busy(bob)) == "string"
 		and Moving.busy(cid) == nil)
-	check("the crews see the move's owner busy (Crew.hasJob), not its crew", E.Crew.hasJob(ann) == true and E.Crew.hasJob(bob) == false and E.Crew.hasJob(cid) == false)
 end
 
 -- The door ---------------------------------------------------------------------------------------------------------------
@@ -539,7 +538,7 @@ E.clock += 0.2
 Moving.step()
 trigger(load, ann)
 check("the box of memories (★) in the truck", ann.Character:GetAttribute("MoveCarry") == nil and string.find(E.lastNotice(ann), "loaded", 1, true) ~= nil, E.lastNotice(ann))
-check("during the run the truck stays: CAR does not swap it", string.find(E.Vehicles.callCar(ann, nil) or "", "van is out", 1, true) ~= nil)
+check("during the run the truck stays: a car placed for her is refused", string.find(E.Vehicles.placeNear(ann, nil) or "", "van is out", 1, true) ~= nil)
 check("the crew is hunted (no ordinary roamers round them), a stranger not", E.Zombies.hunts(bob) == true and E.Zombies.hunts(ann) == true and E.Zombies.hunts(cid) == false)
 check("the crew may open the truck's back, a stranger not", E.Vehicles.backAllowed(bob, truck) == true and E.Vehicles.backAllowed(cid, truck) == false)
 E.Zombies.onCarDamaged(ann, 100)
@@ -566,8 +565,7 @@ end
 check("analytics: MoveDone", tracked)
 check("…the van's Load and Take out gone, Take out's own spot too", promptIn(truck.model, "Load") == nil and promptIn(truck.model, "Take out") == nil
 	and truck.chassis:FindFirstChild("MoveTakeOut") == nil and truck.chassis:FindFirstChild("CargoDoor") ~= nil)
-check("the session is gone: the hooks let the truck go again", ann:GetAttribute("MoveWith") == nil and E.destroyed == 2 and E.Vehicles.callCar(ann, nil) == "called"
-	and E.Zombies.hunts(bob) == false)
+check("the session is gone: the hooks let the truck go again", ann:GetAttribute("MoveWith") == nil and E.destroyed == 2 and E.Zombies.hunts(bob) == false)
 check("the horde let go", (function()
 	for _, z in E.zombies do
 		if z.march ~= nil then
@@ -609,7 +607,7 @@ E.clock += 0.3
 Moving.step()
 check("the van gone: what was in it is lost (condition 0), the run goes on", #ends == 2 and heard(ann, "The van is gone")
 	and stateOf(ann, 1).state == "lost" and stateOf(ann, 1).condition == 0)
-check("…CAR waits VanAgain s", string.find(E.Vehicles.spawn(ann, false, nil) or "", "comes back", 1, true) ~= nil
+check("…another car for her waits VanAgain s", string.find(E.Vehicles.spawn(ann, false, nil) or "", "comes back", 1, true) ~= nil
 	and string.find(E.Vehicles.placeNear(ann, nil) or "", "comes back", 1, true) ~= nil and E.cars[ann] == nil)
 do
 	local calls = E.vehicleCalls or 0
@@ -622,7 +620,7 @@ E.now += T.VanAgain
 E.Vehicles.placeNear(ann, nil)
 E.clock += 0.3
 Moving.step()
-check("…then CAR brings it and the run takes it over (its prompts on it)", E.cars[ann] ~= nil and E.cars[ann] ~= truck and promptIn(E.cars[ann].model, "Load") ~= nil
+check("…then a van placed for her: the run takes it over (its prompts on it)", E.cars[ann] ~= nil and E.cars[ann] ~= truck and promptIn(E.cars[ann].model, "Load") ~= nil
 	and heard(ann, "van is back") and E.last(ann, "Moving", "state").a.truck == true)
 Moving.endRun(ann)
 check("(ended: nothing home, called off)", lastEnd().phase == "cancelled", lastEnd().phase)
