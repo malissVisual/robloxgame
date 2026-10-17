@@ -1,4 +1,4 @@
--- 8.0 SANDBOX, moves (design/sandbox/KONTRAKT.md): the real server/Moving.luau (MoveLobby, MoveGreeters, MoveHelper,
+-- 8.0 SANDBOX, moves (design/sandbox/KONTRAKT.md): the real server/Moving.luau (MoveLobby, MoveHelper,
 -- MoveSites with it) on tests/runtime/MovingRuntime.luau's fakes with Config.Sandbox.On (tests/run_tests.py builds
 -- them; the fake art's plan records its seeds and gives each piece a colour variant).
 --   * Moving.start in the sandbox: 9.7 no kiosk on the plots (the lobby's portals start the runs: server/Runs.luau), no
@@ -19,17 +19,14 @@
 --     loader's stock (Collection.add with its item, variant, condition, name), no pay, as one trip (Moving.onTrip),
 --     Moving.onRunEnd's facts (the pieces, their values, whose stock), Moving.onFinish's; FINISH with nothing loaded:
 --     called off, the seed kept; the clock running out: the run ends late, the truck's load home.
---   * The edges (a plain sandbox move, the admin's start): a Collection.add that refuses is said, no van out: the van
---     comes to the plot's vanSpot, the admin's start / time / horde / end / refill, the horde and the roamers switched
---     on (Config.Moving.Sandbox).
+--   * The edges: a Collection.add that refuses is said at the run's end, the admin's time / horde / the run's end, the
+--     horde and the roamers switched on (Config.Moving.Sandbox).
 -- 8.0.1 (the review's moves findings; 9.7: no driving home, so no unloading at the plot, no "Back the van up"):
---   * a move without a van out parks it the sandbox's way (server/SandboxBoot.luau's parkVan through the hook
---     Moving.parkVan: at the vanSpot, not seated, the player's own van repaired), never a bare spawnAt;
 --   * a death mid-move (Moving.respawnAt, SandboxBoot's spawn): beside the van's back on the ground, the van wrecked:
 --     outside the house's front door; off a move: home;
 --   * the Sprinter bed's Center (SHOW ZONES' box) the bay's real middle from its CargoDoor;
---   * the words: GIVE UP after a trip, the owner leaving, Danny's lines; nothing a crew hears or reads at the end
---     mentions the Wall, pay or XP.
+--   * the words: GIVE UP, the host leaving, Danny's lines; nothing a crew hears or reads at the end mentions the Wall,
+--     pay or XP.
 -- 8.1 walk-in doors: the chalet's front door walked through both ways (no E: its Enter house off), out 4 studs from it
 -- facing the road, no way straight back, its doormat over the garden path while a move runs. 8.3 the big move: its plan
 -- HouseLayout's kind "big" (its contract's Kind, Config.Moving.Sandbox.Houses); its back door (House.back) a second way in, its own doormat
@@ -47,9 +44,7 @@ local E = require("./MovingRuntime")
 local Config = require("./Config")
 Config.Sandbox.On = true -- (before Moving.start: it reads the mode there)
 local Moving = require("./MovingServer")
-local Greeters = require("./MoveGreetersServer")
 local MoveHelper = require("./MoveHelperServer")
-local Lobby = require("./MoveLobbyServer")
 local SandboxMap = require("./SandboxMap")
 local SprinterLooks = require("./SprinterLooks")
 local Brain = require("./MoveHelperBrain")
@@ -93,7 +88,7 @@ local function lobbyRequest(player: any, ...: any)
 	E.Net.get("MoveLobby").OnServerEvent:Fire(player, ...)
 end
 local function heard(player: any, text: string, since: number?): boolean
-	for index = since or 1, #E.messages do
+	for index = math.max(since or 1, 1), #E.messages do
 		local m = E.messages[index]
 		if m.player == player and m.remote == "Notice" and string.find(tostring(m.kind), text, 1, true) ~= nil then
 			return true
@@ -254,7 +249,6 @@ local function howOf(entry: any): string
 	return Plan.moveHow(f.phase, f.why, f.left, f.home + f.lost >= f.total)
 end
 Moving.start()
-Greeters.step()
 
 -- The world ----------------------------------------------------------------------------------------------------------------
 
@@ -264,7 +258,6 @@ check("the sandbox: 9.7 no kiosk on the plots (the lobby's portals start the run
 	and moves:FindFirstChild("MovingDropOff") == nil and moves:FindFirstChild("MoveDressing") == nil)
 check("one contract a place: The Old Farmstead's among them (no Marge, no Walt)", moves:FindFirstChild("Move_sandbox_house") ~= nil and moves:FindFirstChild("Move_marge") == nil
 	and moves:FindFirstChild("Move_walt") == nil)
-check("no soldier at a Wall", Greeters.soldier() == nil)
 E.request(cid, "start", House.id)
 check("9.7: a START asked (no board anywhere): no planning, no move", E.last(cid, "MoveLobby", "lobby") == nil and E.built == 0)
 
@@ -507,6 +500,14 @@ local function loadOne(spot: number, action: string?)
 	step()
 	return model
 end
+-- 10.5: a run on the house of `player`'s card (Moving.houseOf: its seed kept while nothing came home; none yet: the
+-- farmstead), the van parked at its curb first, as server/Runs.luau parks it (Moving.parkVan); nil: it started.
+local function cardRun(player: any, difficulty: string?): string?
+	local h = Moving.houseOf(player) or House
+	Moving.parkVan(player, h.curb, false)
+	park(E.cars[player], h.curb)
+	return Moving.startRun(player, h.id, difficulty or "normal")
+end
 local planned = #seeds
 check("the next run on the farmstead: a new seed (the house refilled: 8.3 economy, the run brought pieces home)", Moving.startRun(ann, House.id, "easy") == nil
 	and #seeds == planned + 1 and seeds[#seeds] ~= firstSeed and built[2] == seeds[#seeds])
@@ -533,33 +534,20 @@ E.now += 61
 step()
 check("9.7 the clock runs out: the run ends, what was in the truck went home (late)", Moving.busy(ann) == nil and #E.collected == 3 and E.collected[3].entry.item == "clock"
 	and runEnds[#runEnds].facts.phase == "late" and string.find(runEnds[#runEnds].facts.why, "Time", 1, true) ~= nil, runEnds[#runEnds].facts.phase)
-check("admin: start (a plain move: the card's house) and end: called off cleanly", string.find(Moving.admin(ann, "start"), "started", 1, true) ~= nil
-	and string.find(Moving.admin(ann, "end"), "called off", 1, true) ~= nil and E.last(ann, "Moving", "result").a.how == "cancelled"
-	and Moving.busy(ann) == nil and E.destroyed == E.built)
+check("admin: the run's end (Moving.endRun, the Runs group's END RUN): nothing home, called off cleanly", cardRun(ann) == nil and Moving.endRun(ann, "Ended by the admin")
+	and runEnds[#runEnds].facts.phase == "cancelled" and Moving.busy(ann) == nil and E.destroyed == E.built)
 check("8.2: …onFinish: cancelled, nothing home, \"admin\"", (lastTold("finish")).facts.phase == "cancelled" and (lastTold("finish")).facts.home == 0
 	and howOf((lastTold("finish"))) == "admin", howOf((lastTold("finish"))))
-local cardSeed = seeds[#seeds]
-check("admin: refill: a new seed for the next move", string.find(Moving.admin(ann, "refill"), "refilled", 1, true) ~= nil and seeds[#seeds] ~= cardSeed)
 
--- No van out: it comes to the plot; a refusing collection; the horde and roamers switched on --------------------------------------
+-- A refusing collection; the horde and roamers switched on -----------------------------------------------------------------------
 
-E.cars[bob] = nil -- (wrecked before: the save keeps its damage)
-E.carHealth[bob] = 0.2
 S.Horde, S.Roam = true, 2
-local parkedBefore, callsBefore = #parked, E.vehicleCalls or 0
-local said = Moving.admin(bob, "start")
-local bobSeed = built[#built] -- (8.3 economy: Bob's house, kept while his moves bring nothing home)
+check("(Bob's run)", cardRun(bob) == nil)
+local bobSeed = built[#built] -- (8.3 economy: Bob's house, kept while his runs bring nothing home)
 local van = E.cars[bob]
-local wanted = if Economy.findCar(Config.Sandbox.Van) then Config.Sandbox.Van else T.Van
-check("no van out: the player's own comes to their plot's vanSpot (the Sprinter, else the Deliveros Van)", string.find(said, "started", 1, true) ~= nil and van ~= nil
-	and van.id == wanted and flatDistance(van.chassis.Position, V3(plot2.vanSpot.x, 0, plot2.vanSpot.z)) < 1, said)
-local how = parked[#parked]
-check("8.0.1: …the sandbox's way (SandboxBoot.parkVan, the hook Moving.parkVan): at his vanSpot, not seated, his own van, repaired (not the save's 0.2)",
-	#parked == parkedBefore + 1 and how.player == bob and how.spot == plot2.vanSpot and how.seat == false and how.carId == nil and van.health == 1, van.health)
-check("…never a bare spawnAt / placeAt / placeNear (they would skip the repair)", (E.vehicleCalls or 0) == callsBefore, E.vehicleCalls)
 step()
 check("…its clock 25 minutes, the horde switched on at HordeAt", E.last(bob, "Moving", "state").a.hordeAt == E.last(bob, "Moving", "state").a.endsAt - S.HordeAt)
-check("six houses: Bob's first card: the farmstead (free again: Ann's card has moved on)", houseNow(bob) == House, houseNow(bob).id)
+check("six houses: Bob's first card: the farmstead", houseNow(bob) == House, houseNow(bob).id)
 local zombies = #E.zombies
 E.place(bob, outside)
 step(T.Roam.Every + 0.1)
@@ -590,48 +578,47 @@ trigger(promptIn(workspace, "Leave house"), bob)
 E.place(bob, bobDoor.WorldPosition + V3(0, 0, 2))
 step()
 trigger(promptIn(bobVan.model, "Load"), bob)
-park(bobVan, plot2.vanSpot)
 step()
-check("a Collection.add that refuses (no save yet): the trip says so", heard(bob, "could not be stored") and #E.collected == 3, #E.collected)
-E.refuse = false
 
 -- 8.0.1: the words -------------------------------------------------------------------------------------------------------------
 
 E.request(bob, "giveup")
-local bobResult = E.last(bob, "Moving", "result")
--- (8.2 e2e: the refused piece never came home, it is lost: so this GIVE UP calls off a move with nothing home)
-check("8.2: the piece the warehouse refused is lost, not home (the result, the facts and the tasks never count it)", bobResult ~= nil
-	and bobResult.a.delivered == 0 and bobResult.a.how ~= "done", bobResult and `{bobResult.a.how} {bobResult.a.delivered}`)
-check("8.0.1: GIVE UP: \"You called it off\" (no Wall), no pay, no XP", bobResult ~= nil and string.find(bobResult.a.howText, "You called it off", 1, true) == 1
-	and string.find(bobResult.a.howText, "Wall", 1, true) == nil and bobResult.a.money == 0 and bobResult.a.xp == 0, bobResult and bobResult.a.howText)
+local bobEnd = runEnds[#runEnds].facts
+-- (8.2 e2e: the refused piece never came home, it is lost: so this GIVE UP calls off a run with nothing home)
+check("a Collection.add that refuses (no save yet): the run's end says so", heard(bob, "could not be stored") and #E.collected == 3, #E.collected)
+E.refuse = false
+check("8.2: the piece the warehouse refused is lost, not home (the end's facts and the tasks never count it)", #bobEnd.pieces == 0 and bobEnd.phase ~= "done",
+	bobEnd.phase)
+check("8.0.1: GIVE UP: \"You called it off\" (no Wall), no pay, no XP", string.find(bobEnd.why, "You called it off", 1, true) == 1
+	and string.find(bobEnd.why, "Wall", 1, true) == nil and #E.money == 0 and #E.xp == 0, bobEnd.why)
 check("8.2: …onFinish: Bob's, \"giveup\"", (lastTold("finish")).player == bob and howOf((lastTold("finish"))) == "giveup", howOf((lastTold("finish"))))
 local plansBefore = #seeds
 
-check("8.3 economy: no reroll: Bob's GIVE UP with nothing home kept his house: his next move is the same one (no new plan)", (function(): boolean
-	local ok = string.find(Moving.admin(bob, "start"), "started", 1, true) ~= nil and #seeds == plansBefore
-	Moving.admin(bob, "end")
+check("8.3 economy: no reroll: Bob's GIVE UP with nothing home kept his house: his next run is the same one (no new plan)", (function(): boolean
+	local ok = cardRun(bob) == nil and #seeds == plansBefore
+	Moving.endRun(bob)
 	return ok
 end)(), #seeds - plansBefore)
 
--- the owner leaves after a trip: the crew hears that what came home is in the warehouse
+-- the host leaves with a load in the truck: the crew hears that it went home
 E.crew[ann] = { cid }
-check("(Ann's move with Cid in her crew)", string.find(Moving.admin(ann, "start"), "started", 1, true) ~= nil)
+check("(Ann's run with Cid in her party)", cardRun(ann) == nil)
+truck = E.cars[ann] -- (the run's own van, parked at the curb for it)
+cargoDoor = truck.chassis:FindFirstChild("CargoDoor")
 E.place(cid, outsideOf(houseNow(ann)))
 step()
-parkAt(truck, ann)
 loadOne(1)
-park(truck, plot1.vanSpot)
-step()
-check("(a trip home)", E.last(ann, "Moving", "state").a.trips == 1, E.lastNotice(ann))
+check("(the lamp in the truck)", stateOf(ann, 1).state == "truck", E.lastNotice(ann))
 E.place(cid, truck.chassis.Position + V3(4, 1, 0))
 local leftAt = #E.messages
 E.leave(ann)
-local cidResult = E.last(cid, "Moving", "result")
-check("8.0.1: the owner left after a trip: the crew hears what came home is in the warehouse (no Wall)", heard(cid, "What came home is in their warehouse", leftAt)
-	and not heard(cid, "Wall", leftAt) and cidResult ~= nil and cidResult.a.how == "done"
-	and cidResult.a.howText == "Ann left the game: what came home is in their warehouse", cidResult and cidResult.a.howText)
+local cidEnd = runEnds[#runEnds].facts
+check("8.0.1: the host left: the crew hears what was in the truck went home (no Wall)", heard(cid, "What was in the truck went home", leftAt)
+	and not heard(cid, "Wall", leftAt) and cidEnd.phase == "done" and cidEnd.why == "Ann left the game: what was in the truck went home", cidEnd.why)
 check("8.2: …onFinish: Ann's, \"left\", the crew of two", (lastTold("finish")).player == ann and howOf((lastTold("finish"))) == "left"
 	and (lastTold("finish")).facts.crew == 2, howOf((lastTold("finish"))))
+E.clock += T.Doors.Shut + 0.1
+Moving.doors() -- (the front door's leaf Ann's trip opened: shut again once nobody wants it)
 
 -- 8.1 walk-in doors in the sandbox (the owner: "no E at the house, neither in nor out"): the chalet's front door (the map's
 -- SandboxDoor part) walked through both ways, after the dwell, facing it; out 4 studs from the door facing the road; no
@@ -642,7 +629,7 @@ check("8.2: …onFinish: Ann's, \"left\", the crew of two", (lastTold("finish"))
 do
 	local D = T.Doors
 	local THROUGH = math.max(D.Dwell, D.Open) + 0.01 -- (8.3: in the zone facing the door Dwell s, its leaf open Open s)
-	check("(Bob's move)", string.find(Moving.admin(bob, "start"), "started", 1, true) ~= nil)
+	check("(Bob's run)", cardRun(bob) == nil)
 	check("8.3 economy: …and his next move is built in that same house (its seed kept)", built[#built] == bobSeed, `{built[#built]} {bobSeed}`)
 	step()
 	local o = E.interiors[#E.interiors]
@@ -674,7 +661,7 @@ do
 		and mat.Transparency == 0 and mat.Position.Y - mat.Size.Y / 2 > 0.08 and (mat.Position - foot):Dot(facing) > 0.5 and (mat.Position - foot):Dot(facing) < D.Depth)
 	check("…Enter house on the map's door there, off", promptIn(frontDoor, "Enter house") ~= nil and not promptIn(frontDoor, "Enter house").Enabled)
 	check("8.3 the map's door is the house's leaf: tagged for the clients (DoorLeaf), shut", frontDoor:GetAttribute("Tag_DoorLeaf") == true
-		and frontDoor:GetAttribute("DoorOpen") ~= true)
+		and frontDoor:GetAttribute("DoorOpen") ~= true, `{frontDoor:GetAttribute("Tag_DoorLeaf")} {frontDoor:GetAttribute("DoorOpen")}`)
 	stand(bob, foot + up + facing * 2, -facing)
 	step(0.1)
 	check("walking up to the chalet's door: not in before the dwell, its leaf swinging open (DoorOpen)", not isIn(bob) and frontDoor:GetAttribute("DoorOpen") == true)
@@ -741,7 +728,7 @@ do
 	stand(bob, exitAt + into * 12, into)
 	step(D.Shut + 0.05)
 	check("…its leaf shut again Shut s after the trip", backLeaf:GetAttribute("DoorOpen") == false)
-	Moving.admin(bob, "end")
+	Moving.endRun(bob)
 	check("the move over: both doormats hidden again (no move at the house)", mat.Transparency == 1 and backMat.Transparency == 1)
 end
 
@@ -755,7 +742,7 @@ end
 -- swing, the fade waits until it has swung most of the way (Seen × Open s: WalkIn.swung), then in, still walking.
 do
 	local D = T.Doors
-	check("(Bob's move for walking through)", string.find(Moving.admin(bob, "start"), "started", 1, true) ~= nil)
+	check("(Bob's run for walking through)", cardRun(bob) == nil)
 	step()
 	local o = E.interiors[#E.interiors]
 	local root = E.rootOf(bob)
@@ -876,26 +863,21 @@ do
 	check("8.5.1 …in once it has swung most of the way (Seen × Open s, no dwell), still walking", isIn() and waited >= D.Open * D.Seen - 0.06
 		and waited <= D.Open * D.Seen + 0.11 and math.abs(root.AssemblyLinearVelocity:Dot(root.CFrame.LookVector) - walk) < 1e-6, waited)
 	root.AssemblyLinearVelocity = V3(0, 0, 0)
-	Moving.admin(bob, "end")
+	Moving.endRun(bob)
 end
 
--- 8.3 economy: no house reroll (server/Moving.luau SB.seeds, by user id): a move called off with nothing home (GIVE UP,
--- the admin's end, the owner leaving) keeps its house, so starting, peeking and calling off never fishes for a legendary;
--- a trip home (Ann's moves above) or the admin's REFILL gives a new one
+-- 8.3 economy: no house reroll (server/Moving.luau SB.seeds, by user id): a run called off with nothing home (GIVE UP,
+-- the admin's end, the host leaving) keeps its house, so starting, peeking and calling off never fishes for a legendary;
+-- a run that brings something home (Ann's above) gives a new one
 do
-	check("Bob's move ended by the admin with nothing home: the next one is the same house again", string.find(Moving.admin(bob, "start"), "started", 1, true) ~= nil
-		and built[#built] == bobSeed)
+	check("Bob's run ended by the admin with nothing home: the next one is the same house again", cardRun(bob) == nil and built[#built] == bobSeed)
 	E.leave(bob)
-	check("…he leaves mid-move with nothing home: called off", Moving.busy(bob) == nil)
+	check("…he leaves mid-run with nothing home: called off", Moving.busy(bob) == nil)
 	local bob2 = E.player(22, "Bob", V3(plot2.spawn.x, 3, plot2.spawn.z))
 	E.plots[bob2] = plot2
-	check("…back on this server (his user id): his move is the same house (planned again: its facts went when he left)", string.find(Moving.admin(bob2, "start"), "started", 1, true) ~= nil
+	check("…back on this server (his user id): his run is the same house (planned again: its facts went when he left)", cardRun(bob2) == nil
 		and seeds[#seeds] == bobSeed and built[#built] == bobSeed, `{seeds[#seeds]} {bobSeed}`)
-	Moving.admin(bob2, "end")
-	check("the admin's REFILL: a new house all the same", string.find(Moving.admin(bob2, "refill"), "refilled", 1, true) ~= nil and seeds[#seeds] ~= bobSeed)
-	check("…the next move built with the new one", string.find(Moving.admin(bob2, "start"), "started", 1, true) ~= nil and built[#built] == seeds[#seeds]
-		and built[#built] ~= bobSeed)
-	Moving.admin(bob2, "end")
+	Moving.endRun(bob2)
 end
 
 -- 8.4: the house kept across servers (server/Moving.luau SB.seedOf / SB.keepSeed; server/PlayerData.luau's
@@ -913,17 +895,17 @@ do
 		return player
 	end
 	local function started(player: any): boolean
-		return string.find(Moving.admin(player, "start"), "started", 1, true) ~= nil
+		return cardRun(player) == nil
 	end
 	local dee = join({ money = 5000 }) -- (a save without a house yet)
 	local save = E.profiles[dee]
-	check("8.4 Dee's move (her save read, no house in it): a house rolled, built, its seed in her save (her next save writes it)", started(dee) and (function(): boolean
+	check("8.4 Dee's run (her save read, no house in it): a house rolled, built, its seed in her save (her next save writes it)", started(dee) and (function(): boolean
 		local first = built[#built]
 		return save.sandboxHouseSeed == first and first >= 1 and first <= S.Seeds and first == math.floor(first)
 	end)())
 	local first = built[#built]
 	E.request(dee, "giveup")
-	check("…GIVE UP with nothing home: called off, the seed still in her save", Moving.busy(dee) == nil and E.last(dee, "Moving", "result").a.delivered == 0
+	check("…GIVE UP with nothing home: called off, the seed still in her save", Moving.busy(dee) == nil and #runEnds[#runEnds].facts.pieces == 0
 		and save.sandboxHouseSeed == first)
 	E.leave(dee)
 	local wrote = table.clone(save) -- (what her leave save writes)
@@ -931,13 +913,13 @@ do
 	-- another server, the same save
 	local dee2 = join(table.clone(wrote))
 	check("8.4 she joins another server with that save: the same house (the save's seed)", started(dee2) and built[#built] == first)
-	Moving.admin(dee2, "end")
+	Moving.endRun(dee2)
 	E.leave(dee2)
 	-- the save as another server left it: there she rolled a new house into it, or a trip spent hers
 	local other = if first == S.Seeds then first - 1 else first + 1
-	local dee3 = join({ money = 5000, sandboxHouseSeed = other })
+	local dee3 = join({ money = 5000, sandboxHouse = House.id, sandboxHouseSeed = other })
 	check("…a save with another house in it (rolled on another server): that house, not the one this server remembered", started(dee3) and built[#built] == other)
-	Moving.admin(dee3, "end")
+	Moving.endRun(dee3)
 	E.leave(dee3)
 	local dee4 = join({ money = 5000 })
 	local spent = E.profiles[dee4]
@@ -947,7 +929,6 @@ do
 	local spentSeed = built[#built]
 	local car = E.cars[dee4]
 	step()
-	park(car, { x = House.curb.x, z = House.curb.z, yaw = 0 })
 	E.place(dee4, outside)
 	trigger(promptIn(frontDoor, "Enter house"), dee4)
 	local piece = newItem(1)
@@ -961,24 +942,22 @@ do
 	step()
 	trigger(promptIn(car.model, "Load"), dee4)
 	step()
-	park(car, plot1.vanSpot)
-	step()
-	check("8.4 a trip home brings a piece into her warehouse: the house spent, its seed out of her save", E.last(dee4, "Moving", "state").a.trips == 1
-		and spent.sandboxHouseSeed == nil, `{E.last(dee4, "Moving", "state").a.trips} {spent.sandboxHouseSeed}`)
 	E.request(dee4, "finish")
-	check("…her next move: a new house, its seed in her save", started(dee4) and built[#built] ~= spentSeed and spent.sandboxHouseSeed == built[#built])
-	Moving.admin(dee4, "end")
+	check("8.4 FINISH brings the piece into her warehouse: the house spent, its seed out of her save", #runEnds[#runEnds].facts.pieces == 1
+		and spent.sandboxHouseSeed == nil, `{#runEnds[#runEnds].facts.pieces} {spent.sandboxHouseSeed}`)
+	check("…her next run: a new house, its seed in her save", started(dee4) and built[#built] ~= spentSeed and spent.sandboxHouseSeed == built[#built])
+	Moving.endRun(dee4)
 	E.leave(dee4)
 	-- a save not read (a fresh profile, never saved: Studio without a DataStore): this server's memory of her as before
 	local dee5 = join(nil)
 	local remembered = spent.sandboxHouseSeed
 	check("…without a save read: this server's own memory of her (8.3 economy: the same house on a rejoin here)", started(dee5) and built[#built] == remembered)
-	Moving.admin(dee5, "end")
+	Moving.endRun(dee5)
 	E.leave(dee5)
 end
 
--- Done is quiet: nothing the sandbox's players heard (their notices) or read on a result card mentions the Wall, pay or
--- XP (the contract card's note says "No pay per piece" on purpose: not checked); Danny's lines name no Wall.
+-- Done is quiet: nothing the sandbox's players heard (their notices) or read at a run's end (its words) mentions the Wall,
+-- pay or XP; Danny's lines name no Wall.
 local function noisy(text: string): boolean
 	return string.find(text, "Wall", 1, true) ~= nil or string.find(string.lower(text), "%f[%a]pa[iy][ds]?%f[%A]") ~= nil
 		or string.find(text, "%f[%a]XP%f[%A]") ~= nil
@@ -988,11 +967,12 @@ local results = 0
 for _, m in E.messages do
 	if m.remote == "Notice" and type(m.kind) == "string" and noisy(m.kind) then
 		table.insert(loud, m.kind)
-	elseif m.remote == "Moving" and m.kind == "result" and type(m.a) == "table" then
-		results += 1
-		if noisy(tostring(m.a.howText)) or m.a.pay ~= 0 or m.a.money ~= 0 or m.a.xp ~= 0 then
-			table.insert(loud, `result: {m.a.howText} {m.a.pay} {m.a.money} {m.a.xp}`)
-		end
+	end
+end
+for _, ended in runEnds do
+	results += 1
+	if noisy(tostring(ended.facts.why)) then
+		table.insert(loud, `end: {ended.facts.why}`)
 	end
 end
 for _, text in E.said do
@@ -1000,7 +980,7 @@ for _, text in E.said do
 		table.insert(loud, text)
 	end
 end
-check("8.0.1: done is quiet: no notice, result card (of " .. results .. ") or Danny's line in the sandbox mentions the Wall, pay or XP", #loud == 0 and results >= 4,
+check("8.0.1: done is quiet: no notice, run's end (of " .. results .. ") or Danny's line in the sandbox mentions the Wall, pay or XP", #loud == 0 and results >= 4,
 	table.concat(loud, " | "))
 
 if failures == 0 then

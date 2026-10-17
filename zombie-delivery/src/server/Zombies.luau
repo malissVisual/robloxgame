@@ -1,23 +1,23 @@
 --!strict
 -- The enemies: zombies and bandits, built in code (blocky bodies). Zombies chase the nearest car or player on foot;
--- bandits (Config.Zombies with ranged = true) keep their distance and shoot, often from a roadblock across the road.
+-- bandits (Config.Zombies with ranged = true) keep their distance and shoot.
 --
 --   * a car going fast (Horde.RamMinSpeed or more) runs them over: damage = speed × ramPower, a survivor slows it down
 --   * a slow or standing car gets grabbed: the zombie hangs on its side / back / roof (welded) and bites it until shot
 --   * a player on foot gets bitten
---   * the depot (the safe zone) is never entered, zombies hanging on a car die when it drives in
+--   * the safe zone (isSafe: the old city's middle, SAFE_HALF) is never entered, zombies hanging on a car die when it
+--     drives in
 --
--- Who goes after whom:
---   * roamers (Config.Horde.Roam, zombie kinds only) appear around every player without a job and shamble around
---     their spot; the world's own zombies (residents) do the same. They hunt a player who comes close, shoots nearby
---     or hits them, and calm down when they lose them. Wave zombies (server/Jobs.luau) hunt from the start. At night
---     there are more roamers (Config.DayNight.NightRoam, scaled by DayNight.nightFactor).
+-- Who goes after whom (10.5: only who calls Zombies.spawn brings any: a run's horde and its danger; the city's
+-- residents, roamers round every player and roadblocks are gone):
+--   * a roamer (Config.Horde.Roam's walk) shambles around its spot; it hunts a player who comes close, shoots nearby
+--     or hits it, and calms down when it loses them. A march's zombie (Zombies.march: a run's horde) goes at its spot.
 --   * people (ZombieDef.jobOnly: bandits, gunners, the base's soldiers) only go after players on a job
 --     (Zombies.hunts, set by Main): without one they stand guard, never shoot, chase, grab or steal.
 --   * 6.15, a mission's enemies (server/MissionEnemies.luau: Zombie.leash, the model's MissionRun attribute) guard
 --     their spot: they go after somebody close (Config.Missions.Fixed Aggro) who stays within their leash of it, and
 --     walk back to it when there is nobody. A kill sets Zombie.killed (the mission counts it); Zombies.despawn takes
---     one away without a kill; Zombies.barricade is a roadblock's bandit car on its own. 6.15 review: they never
+--     one away without a kill. 6.15 review: they never
 --     despawn here for distance (MissionEnemies parks them when their crew is far); Zombies.missionReserve keeps room
 --     for them under Horde.MaxTotal (Zombies.spawn's `reserved`); the world's own people (resident bandits, the base's
 --     soldiers) leave a mission's crew alone (Zombies.spares).
@@ -35,14 +35,12 @@
 --     are unchanged.
 --
 -- 6.15, the live events (server/LiveEvents.luau sets these; shared/LiveEvents.luau has the numbers' rules):
---   * Zombies.roamBoost: × the roamers wanted around every player (the Blood Moon's, on top of the night's).
 --   * Zombies.setFrenzy(speedOf, spared): every zombie's full speed through speedOf (the Blood Moon's, capped), but the
 --     people's and the ones `spared` says (a mission's); nil: back to their own speed (Zombie.baseSpeed).
 --   * Zombies.march(z, at): an event's zombie (the horde at the gates, a supply drop's guards): it never despawns, goes
 --     after a player within Config.LiveEvents.Reach, else walks to `at` (never into the safe zone) and waits there;
 --     nil lets it go (it roams on and despawns as a roamer does). Zombie.event says whose it is ("horde", "supply").
---   * 6.15 review: Zombies.eventReserve (what the event still wants: the roamers stop that much lower),
---     Zombies.trimRoamers(n) (calm roamers far from everybody go, to make room for the event's), Zombies.eventSpared
+--   * 6.15 review: Zombies.trimRoamers(n) (calm roamers far from everybody go, to make room for the event's), Zombies.eventSpared
 --     (players an event's zombie leaves alone: on a mission) and Zombies.retreat(z, at) (an ended event's zombie walks
 --     away after nobody; server/LiveEvents.luau takes it away).
 --
@@ -59,10 +57,9 @@
 --     blast (an Explosion for the looks, the sound and the camera's shake) hurts every zombie round it (a chain: another
 --     bloater goes off too; the kills are its killer's), the players on foot (through the vest, thrown away) and the
 --     cars. The Fuse attribute (the server time it goes off) shows the warning on the clients;
---   * every random pick of a kind (the roamers, the residents, a job's waves and stops, a live event's) goes through
---     Zombies.pickKind: the night, the danger (a job's tier from Zombies.tierOf, set by Main; else how far from the
---     depot), the player's level, the Blood Moon (Zombies.bloodMoon, set by server/LiveEvents.luau), and MaxAlive of a
---     special kind in the server at most. A mission's plan names its own kinds (shared/MissionPlan.luau).
+--   * every random pick of a kind (a run's horde and its danger's) goes through Zombies.pickKind: the night (10.5:
+--     never: DayNight.nightFactor 0), the danger (a job's tier from Zombies.tierOf; else how far from the old city's
+--     depot, DEPOT), the player's level, and MaxAlive of a special kind in the server at most.
 --   * a kill pays ZombieDef.xp XP on top (the money stays the "KillReward").
 --
 -- 10.x danger, a run's zombies (server/RunDanger.luau sets these; nothing changes without them):
@@ -79,17 +76,27 @@ local RunService = game:GetService("RunService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Economy = require(Shared.Economy)
-local Map = require(Shared.Map)
 local Net = require(Shared.Net)
 local Joints = require(Shared.Joints)
 local GunModels = require(Shared.GunModels)
-local World = require(script.Parent.World)
 local Vehicles = require(script.Parent.Vehicles)
 local PlayerData = require(script.Parent.PlayerData)
-local DayNight = require(script.Parent.DayNight)
+local DayNight = require(script.Parent.DayNight) -- (10.5: nightFactor 0, the sandbox's day)
 local Armour = require(script.Parent.Armour) -- 6.0: every bite and bullet on a player goes through the vest
 local ZombieStyle = require(Shared.ZombieStyle) -- 6.16: the looks, the falls, the Hit attribute
 local Kinds = require(Shared.ZombieKinds) -- 6.24: the special zombies' rules
+
+-- 10.5 (the city's server/World.luau and shared/Map.luau went): the old road level (World.RoadTop: a road spot's
+-- height), the old safe zone round the middle (Config.City.SafeHalf: |x|, |z| below it; nothing of the sandbox's
+-- world is in it, it matters only if a horde ever gets there) and the old depot (Map.Depot: the special kinds' danger
+-- grows with the distance from it, ZombieKinds.danger).
+local ROAD_TOP = 0.4
+local SAFE_HALF = 235
+local DEPOT = Vector3.new(144, 0, -144)
+
+local function isSafe(position: Vector3): boolean
+	return math.abs(position.X) < SAFE_HALF and math.abs(position.Z) < SAFE_HALF
+end
 
 local Horde = Config.Horde
 local Roam = Horde.Roam
@@ -194,25 +201,16 @@ Zombies.extraTargets = nil :: (() -> { ExtraTarget })?
 -- 4.5, the admin tools (server/Admin.luau): FREEZE stops every enemy where it stands (no steps, no bites, no shots).
 -- A player with the attribute AdminHidden is no target for anybody (on foot or in their car).
 Zombies.frozen = false
--- 6.15, a live event (server/LiveEvents.luau): × the roamers wanted around every player (the Blood Moon's).
-Zombies.roamBoost = 1
--- 6.15 review (server/LiveEvents.luau): the zombies a live event still wants to place (the roamers stop that much
--- lower under the cap), and the players its zombies leave alone (on a mission: missions are never touched).
-Zombies.eventReserve = 0
+-- 6.15 review (server/LiveEvents.luau): the players a live event's zombies leave alone (on a mission: missions are
+-- never touched).
 Zombies.eventSpared = {} :: { [Player]: boolean }
--- 6.24: the danger of a player's job (its tier, 1 … 4; nil: none) for the special zombies' weights (Main: Jobs), and
--- the Blood Moon (server/LiveEvents.luau): more runners and bloaters.
+-- 6.24: the danger of a player's job (its tier, 1 … 4; nil: none) for the special zombies' weights.
 Zombies.tierOf = function(_player: Player): number?
 	return nil
 end
-Zombies.bloodMoon = false
 -- 10.x danger (server/RunDanger.luau): a run's zombies' way inside its house, and who a bite landed on.
 Zombies.steer = nil :: ((Zombie, Vector3, Vector3) -> Vector3?)?
 Zombies.onBite = nil :: ((Player, Humanoid, Zombie) -> ())?
--- 8.0 SANDBOX (server/SandboxBoot.luau sets it false): the world's own zombies, the residents (the camps, the base,
--- the addresses) and the roamers round every player. Off, only who calls Zombies.spawn brings any (the moves' horde
--- and roamers).
-Zombies.ambient = true
 
 -- ── The body ───────────────────────────────────────────────────────────────
 
@@ -1020,7 +1018,8 @@ function Zombies.spawn(kind: string, at: Vector3, owner: Player?, guard: boolean
 	return z
 end
 
--- A free spot on a road somewhere around `center`, out of the safe zone and not right next to a player.
+-- A free spot somewhere around `center` (10.5: on the ground at its distance; the city's snapped it to its nearest
+-- road), out of the safe zone and not right next to a player.
 function Zombies.findSpot(center: Vector3, heading: Vector3?, minDistance: number?, maxDistance: number?): Vector3?
 	local low = minDistance or Horde.SpawnMin
 	local high = maxDistance or Horde.SpawnMax
@@ -1032,10 +1031,8 @@ function Zombies.findSpot(center: Vector3, heading: Vector3?, minDistance: numbe
 		local distance = rng:NextNumber(low, high)
 		local px = center.X + math.cos(angle) * distance
 		local pz = center.Z + math.sin(angle) * distance
-		local x, z, dx, dz, width = Map.nearestRoad(px, pz)
-		local lateral = rng:NextNumber(-1, 1) * (width / 2 - 4)
-		local spot = Vector3.new(x - dz * lateral, World.RoadTop, z + dx * lateral)
-		if World.isSafe(spot) or (spot - center).Magnitude < low * 0.6 then
+		local spot = Vector3.new(px, ROAD_TOP, pz)
+		if isSafe(spot) or (spot - center).Magnitude < low * 0.6 then
 			continue
 		end
 		local tooClose = false
@@ -1103,7 +1100,6 @@ function Zombies.releaseCar(car: Vehicles.Car)
 	end
 end
 
-local roamWant: { [Player]: { n: number, at: number } } = {}
 local noiseAt: { [Player]: number } = {}
 
 -- 6.15: one of them gone without dying (a mission's enemy nobody is near, or its mission over: server/MissionEnemies.luau).
@@ -1123,7 +1119,6 @@ function Zombies.clearOwner(owner: Player)
 			z.model:Destroy()
 		end
 	end
-	roamWant[owner] = nil
 	noiseAt[owner] = nil
 	Special.knockedAt[owner] = nil -- 6.24
 end
@@ -1162,7 +1157,7 @@ function Zombies.noise(player: Player, at: Vector3)
 		return
 	end
 	noiseAt[player] = now
-	local safe = World.isSafe(at)
+	local safe = isSafe(at)
 	for _, z in zombies do
 		if not z.dead and not z.hunting and not z.car and roams(z) and (z.root.Position - at).Magnitude < Roam.gunHearing then
 			wake(z)
@@ -1177,7 +1172,6 @@ end
 -- ── Behaviour ──────────────────────────────────────────────────────────────
 
 local shoot: (Zombie, any) -> ()
-local nearestPlayerDistanceFn: (Vector3) -> number
 
 local LATCH_SLOTS = 4
 
@@ -1264,7 +1258,7 @@ local function gatherTargets(): { Target }
 	local targets: { Target } = {}
 	for _, car in Vehicles.all() do
 		local position = car.chassis.Position
-		if not World.isSafe(position) and car.owner:GetAttribute("AdminHidden") ~= true and not Special.parked(car) then
+		if not isSafe(position) and car.owner:GetAttribute("AdminHidden") ~= true and not Special.parked(car) then
 			table.insert(targets, { position = position, velocity = car.chassis.AssemblyLinearVelocity, car = car, player = car.owner })
 		end
 	end
@@ -1272,7 +1266,7 @@ local function gatherTargets(): { Target }
 		local character = player.Character
 		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 		local rootPart = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
-		if humanoid and rootPart and humanoid.Health > 0 and not humanoid.SeatPart and not World.isSafe(rootPart.Position) and player:GetAttribute("AdminHidden") ~= true then
+		if humanoid and rootPart and humanoid.Health > 0 and not humanoid.SeatPart and not isSafe(rootPart.Position) and player:GetAttribute("AdminHidden") ~= true then
 			table.insert(targets, { position = rootPart.Position, velocity = rootPart.AssemblyLinearVelocity, humanoid = humanoid, player = player })
 		end
 	end
@@ -1282,7 +1276,7 @@ local function gatherTargets(): { Target }
 		local ok, list = pcall(extra)
 		if ok then
 			for _, t in list do
-				if not World.isSafe(t.position) then
+				if not isSafe(t.position) then
 					table.insert(targets, { position = t.position, velocity = t.velocity, humanoid = t.humanoid, player = t.player })
 				end
 			end
@@ -1302,8 +1296,6 @@ local function nearestPlayerDistance(position: Vector3): number
 	end
 	return best
 end
-
-nearestPlayerDistanceFn = nearestPlayerDistance
 
 -- ── 10.x danger: a run's zombies (server/RunDanger.luau) ─────────────────────
 
@@ -1469,7 +1461,7 @@ function Special.detonate(z: Zombie)
 	if not z.dead then
 		kill(z, nil, nil, "blast")
 	end
-	if World.isSafe(at) then
+	if isSafe(at) then
 		z.model:SetAttribute("Fuse", nil)
 		return
 	end
@@ -1539,13 +1531,12 @@ function Zombies.pickKind(kinds: { [string]: number }, at: Vector3?, owner: Play
 			level = if level then math.min(level :: number, each) else each
 		end
 	end
-	local depot = Map.Depot
-	local distance = if at then Vector3.new(at.X - depot.x, 0, at.Z - depot.z).Magnitude else nil
+	local distance = if at then Vector3.new(at.X - DEPOT.X, 0, at.Z - DEPOT.Z).Magnitude else nil
 	local weights = Kinds.weights(kinds, {
 		night = DayNight.nightFactor(),
 		danger = Kinds.danger(tier, distance),
 		level = level,
-		bloodMoon = Zombies.bloodMoon,
+		bloodMoon = false, -- (the city's live events' Blood Moon went)
 	})
 	local kind = Economy.pickKind(weights, rng:NextNumber())
 	if Types.MaxAlive[kind] then
@@ -1669,67 +1660,6 @@ function shoot(z: Zombie, target: Target)
 	end
 end
 
--- ── Roadblocks ─────────────────────────────────────────────────────────────
-
-type Roadblock = { model: Model, owner: Player, born: number }
-local roadblocks: { Roadblock } = {}
-
--- A bandit car across one lane (`lane` -1 | 1: which side of the road's middle) and two barrels. at = on the road,
--- along = the road's direction. Returns the model (in the Effects folder; the caller keeps or cleans it), its middle
--- (y 0) and the way across the road. 6.15: a mission's roadblock (server/MissionEnemies.luau) is one of these too.
-function Zombies.barricade(at: Vector3, along: Vector3, lane: number): (Model, Vector3, Vector3)
-	local model = Instance.new("Model")
-	model.Name = "Roadblock"
-	local side = Vector3.new(-along.Z, 0, along.X)
-	-- (6.10: the frame on the ground, y 0: the pieces add World.RoadTop themselves; `at` comes at road height and
-	-- the car and the barrels floated RoadTop over the road)
-	local center = Vector3.new(at.X, 0, at.Z) + side * lane * 7
-	local frame = CFrame.lookAt(center, center + side) -- across the road
-	local function piece(name: string, size: Vector3, offset: CFrame, color: Color3, material: Enum.Material)
-		local p = Instance.new("Part")
-		p.Name = name
-		p.Anchored = true
-		p.Size = size
-		p.CFrame = frame * offset
-		p.Color = color
-		p.Material = material
-		p.TopSurface = Enum.SurfaceType.Smooth
-		p.BottomSurface = Enum.SurfaceType.Smooth
-		p.Parent = model
-	end
-	piece("Body", Vector3.new(6.4, 2.6, 13), CFrame.new(0, World.RoadTop + 2, 0), Color3.fromRGB(28, 28, 32), Enum.Material.Metal)
-	piece("Cabin", Vector3.new(5.6, 2, 6), CFrame.new(0, World.RoadTop + 4.2, 0.5), Color3.fromRGB(28, 28, 32), Enum.Material.Metal)
-	piece("Stripe", Vector3.new(6.5, 0.6, 13.1), CFrame.new(0, World.RoadTop + 2.4, 0), Color3.fromRGB(170, 30, 30), Enum.Material.SmoothPlastic)
-	for _, x in { -6, 6 } do
-		piece("Barrel", Vector3.new(3, 3.6, 3), CFrame.new(x, World.RoadTop + 1.8, -9), Color3.fromRGB(120, 60, 30), Enum.Material.CorrodedMetal)
-	end
-	model.Parent = workspace:FindFirstChild("Effects") or workspace
-	return model, center, side
-end
-
--- A bandit car across one lane and bandits behind it. at = on the road, along = the road's direction.
-function Zombies.roadblock(owner: Player, at: Vector3, along: Vector3, count: number)
-	local model, center, side = Zombies.barricade(at, along, if rng:NextNumber() < 0.5 then -1 else 1)
-	table.insert(roadblocks, { model = model, owner = owner, born = os.clock() })
-	for _ = 1, count do
-		local spot = center - along * rng:NextNumber(4, 16) + side * rng:NextNumber(-10, 10)
-		local kind = if rng:NextNumber() < 0.25 then "gunner" else "bandit"
-		Zombies.spawn(kind, Vector3.new(spot.X, World.RoadTop, spot.Z), owner, true)
-	end
-end
-
-local function cleanRoadblocks()
-	local now = os.clock()
-	for n = #roadblocks, 1, -1 do
-		local r = roadblocks[n]
-		local pivot = r.model:GetPivot().Position
-		if now - r.born > 150 or not r.owner.Parent or nearestPlayerDistanceFn(pivot) > 400 then
-			r.model:Destroy()
-			table.remove(roadblocks, n)
-		end
-	end
-end
-
 -- ── Who notices whom ───────────────────────────────────────────────────────
 
 local function flatSpeed(v: Vector3): number
@@ -1796,7 +1726,7 @@ local function wander(z: Zombie, position: Vector3, now: number)
 	end
 	local angle = rng:NextNumber(0, math.pi * 2)
 	local goal = z.home + Vector3.new(math.cos(angle), 0, math.sin(angle)) * rng:NextNumber(4, Roam.wander)
-	if not World.isSafe(goal) then
+	if not isSafe(goal) then
 		z.humanoid:MoveTo(Special.steer(z, position, goal)) -- (10.x danger: in a run's house, through its doorways)
 	end
 end
@@ -1906,7 +1836,7 @@ local function step()
 			if car.wrecked then
 				unlatch(z)
 				z.humanoid.PlatformStand = false
-			elseif World.isSafe(car.chassis.Position) then
+			elseif isSafe(car.chassis.Position) then
 				kill(z, nil, car.chassis.AssemblyLinearVelocity + Vector3.new(0, 20, 0))
 			elseif (z.def.jobOnly and not huntedBy(z, car.owner)) or car.owner:GetAttribute("AdminHidden") == true then
 				-- The job is over: a soldier lets go (4.5: everybody lets go of an admin's HIDDEN car).
@@ -1928,7 +1858,7 @@ local function step()
 			z.model:Destroy()
 			continue
 		end
-		if World.isSafe(position) then
+		if isSafe(position) then
 			-- Wandered into the depot (pushed in by a car): it burns.
 			kill(z, nil, nil)
 			continue
@@ -2010,7 +1940,7 @@ local function step()
 				elseif march then
 					-- 6.15: an event's zombie walks to its spot (the gate, the crate) and waits round it; never into the safe zone
 					z.nextPath = now + rng:NextNumber(1, 2)
-					if not World.isSafe(march) and Vector3.new(march.X - position.X, 0, march.Z - position.Z).Magnitude > 8 then
+					if not isSafe(march) and Vector3.new(march.X - position.X, 0, march.Z - position.Z).Magnitude > 8 then
 						z.humanoid:MoveTo(Special.steer(z, position, Vector3.new(march.X + rng:NextNumber(-5, 5), position.Y, march.Z + rng:NextNumber(-5, 5))))
 					end
 				elseif not z.guard then
@@ -2029,7 +1959,7 @@ local function step()
 			if bestDistance > range * 0.85 then
 				z.seenSince = nil
 				local goal = position + (best.position - position).Unit * (bestDistance - range * 0.6)
-				if not World.isSafe(goal) then
+				if not isSafe(goal) then
 					z.humanoid:MoveTo(goal)
 				end
 			elseif seesTarget(z, best) then
@@ -2054,7 +1984,7 @@ local function step()
 					local dir = flatToward.Unit
 					local side = Vector3.new(-dir.Z, 0, dir.X) * (if z.id % 2 == 0 then 1 else -1)
 					local goal = position + dir * math.min(12, flatToward.Magnitude * 0.5) + side * 10
-					if not World.isSafe(goal) then
+					if not isSafe(goal) then
 						z.humanoid:MoveTo(goal)
 					end
 				end
@@ -2063,7 +1993,7 @@ local function step()
 		end
 		local lead = Vector3.new(best.velocity.X, 0, best.velocity.Z) * math.clamp(bestDistance / 60, 0, 0.8)
 		local goal = best.position + lead
-		if World.isSafe(goal) then
+		if isSafe(goal) then
 			continue
 		end
 		z.humanoid:MoveTo(Special.steer(z, position, goal)) -- (10.x danger: in a run's house, through its doorways)
@@ -2118,102 +2048,6 @@ function Zombies.damageArea(center: Vector3, radius: number, damage: number, by:
 	return killed
 end
 
--- ── Residents: the zombies that live in the world ──────────────────────────
-
-local function residentSpot(): (Vector3?, string)
-	if rng:NextNumber() < 0.15 then
-		-- A bandit camp at one of the far places.
-		local camps = { "gas", "farm", "radio", "lodge" }
-		local id = camps[rng:NextInteger(1, #camps)]
-		for _, yard in Map.Yards do
-			if yard.id == id then
-				return Vector3.new(rng:NextNumber(yard.x0 + 15, yard.x1 - 15), World.RoadTop, rng:NextNumber(yard.z0 + 15, yard.z1 - 15)), if rng:NextNumber() < 0.3 then "gunner" else "bandit"
-			end
-		end
-	end
-	if rng:NextNumber() < 0.2 then
-		for _, yard in Map.Yards do
-			if yard.id == "base" then
-				return Vector3.new(rng:NextNumber(yard.x0 + 30, yard.x1 - 30), World.RoadTop, rng:NextNumber(yard.z0 + 30, yard.z1 - 30)), "soldier"
-			end
-		end
-	end
-	local addresses = Map.addresses()
-	local a = addresses[rng:NextInteger(1, #addresses)]
-	local spot = Vector3.new(a.x + rng:NextNumber(-8, 8), World.RoadTop, a.z + rng:NextNumber(-8, 8))
-	return spot, Zombies.pickKind(Horde.Residents.kinds, spot, nil) -- (6.24: Config, through the special zombies' rules)
-end
-
-local function keepResidents()
-	if not Zombies.ambient then
-		return -- (8.0: none in the sandbox)
-	end
-	local alive = 0
-	for _, z in zombies do
-		if z.resident then
-			alive += 1
-		end
-	end
-	local missing = Horde.Residents.count - alive
-	-- Everybody at once when the server starts, then a couple at a time.
-	local batch = if alive == 0 then missing else math.min(missing, 2)
-	for _ = 1, batch do
-		local spot, kind = residentSpot()
-		if spot and nearestPlayerDistance(spot) > 90 then
-			Zombies.spawn(kind, spot, nil, false, true)
-		end
-	end
-end
-
--- ── Roamers: zombies around every player without a job ────────────────────
-
-local function keepRoamers()
-	if not Zombies.ambient then
-		return -- (8.0: none in the sandbox)
-	end
-	local now = os.clock()
-	local radius = Roam.far + 40
-	-- More of them at night (smoothly at dusk and dawn).
-	local night = Economy.nightScale(Config.DayNight.NightRoam, DayNight.nightFactor())
-	for _, player in Players:GetPlayers() do
-		if #zombies >= Horde.MaxTotal - Roam.reserve - Zombies.eventReserve then
-			return -- the rest is for the jobs' waves (6.15 review: and what a live event still wants)
-		end
-		if Zombies.hunts(player) then
-			continue -- on a job: the waves come instead
-		end
-		local character = player.Character
-		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-		local rootPart = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
-		if not humanoid or not rootPart or humanoid.Health <= 0 or World.isSafe(rootPart.Position) then
-			continue
-		end
-		local center = rootPart.Position
-		local entry = roamWant[player]
-		local base: number
-		if entry and now < entry.at then
-			base = entry.n
-		else
-			base = rng:NextInteger(Roam.min, Roam.max)
-			roamWant[player] = { n = base, at = now + Roam.rethink }
-		end
-		local want = math.floor(base * night * Zombies.roamBoost + 0.5) -- (6.15: a Blood Moon's more)
-		-- Anybody's roamers count (two friends together share them).
-		local around = 0
-		for _, z in zombies do
-			if not z.dead and roams(z) and (z.root.Position - center).Magnitude < radius then
-				around += 1
-			end
-		end
-		for _ = 1, math.min(want - around, Roam.batch) do
-			local spot = Zombies.findSpot(center, nil, Roam.near, Roam.far)
-			if spot then
-				Zombies.spawn(Zombies.pickKind(Roam.kinds, spot, player), spot, player, false, false, true)
-			end
-		end
-	end
-end
-
 function Zombies.all(): { Zombie }
 	return zombies
 end
@@ -2229,24 +2063,6 @@ function Zombies.start()
 		end
 	end)
 	RunService.Heartbeat:Connect(step)
-	task.spawn(function()
-		while true do
-			keepResidents()
-			cleanRoadblocks()
-			task.wait(Horde.Residents.respawn / 5)
-		end
-	end)
-	task.spawn(function()
-		while true do
-			task.wait(Roam.every)
-			local ok, err = pcall(function()
-				keepRoamers()
-			end)
-			if not ok then
-				warn(`[Zombies] roamers: {err}`)
-			end
-		end
-	end)
 end
 
 return Zombies

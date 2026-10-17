@@ -21,8 +21,8 @@
 -- part holds the "Muzzle" attachment (client/Shooting.luau draws the tracers from there), and the car model carries
 -- the attribute CarGun = the gun's id (the clients read it).
 --
--- Lights: every car (the players', the bandits', the traffic's) has headlights and tail lights that glow at night
--- (registered with server/DayNight.luau, which switches them with the workspace attribute "Night"); the headlights
+-- Lights: every car (the players', the bandits', the traffic's) has headlights and tail lights (server/DayNight.luau:
+-- 10.5 their day look, the sandbox's day never turns); the headlights
 -- carry SpotLights (two on a player's car, one on an NPC car: cheap). The ambulance has a roof light bar: its lenses
 -- are tagged "SirenLight" and flash on every client (client/Weather.luau) while the car's attribute Siren is true
 -- (a company ambulance lent for a job, or Vehicles.setSiren).
@@ -186,11 +186,9 @@ local RunService = game:GetService("RunService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Economy = require(Shared.Economy)
-local Map = require(Shared.Map)
 local Net = require(Shared.Net)
-local World = require(script.Parent.World)
 local PlayerData = require(script.Parent.PlayerData)
-local DayNight = require(script.Parent.DayNight)
+local DayNight = require(script.Parent.DayNight) -- (10.5: only the lamps' day look: the sandbox's day never turns)
 local Boarding = require(Shared.Boarding)
 local SpawnSpot = require(Shared.SpawnSpot) -- 6.26: a vehicle never comes out into something (findRoom)
 local VehicleArt = require(script.Parent.VehicleArt.Builder)
@@ -198,6 +196,13 @@ local VanMesh = require(script.Parent.VanMesh) -- 6.25: the ZDC Van in the owner
 VanMesh.ready("zdcvan") -- (at the start: the imported model leaves the world before anybody sees it)
 local BikeArt = require(script.Parent.BikeArt.Geometry) -- 5.1: Codex's bikes and bike gear (pure geometry)
 local ScooterArt = require(script.Parent.ScooterArt.Geometry) -- 5.1.1: the E-Scooter (pure geometry, the same convention)
+
+-- 10.5 (the city's server/World.luau and shared/Map.luau went): the old road level (World.RoadTop: the ground's
+-- fallback where a ray finds nothing), the water's level (Map.WaterLevel: a ground ray looks 6 below it) and a garage's
+-- apron (Map.GarageApron: how far a long car stands out of a door, driveOut).
+local ROAD_TOP = 0.4
+local WATER_LEVEL = -3
+local GARAGE_APRON = 8
 local ModelArt = require(script.Parent.ModelArt.Builder) -- 5.1: welds that geometry to our hidden roots
 local Sprinter = require(Shared.SprinterLooks) -- 8.0 SANDBOX: the ZDC Sprinter's parts look and walk-in bay (STYLES.sprinter)
 
@@ -1709,7 +1714,7 @@ end
 
 -- 8.0 SANDBOX: pieces of the ZDC Sprinter's look (shared/SprinterLooks.luau, the van's frame) as parts under `parent`:
 -- no mass, no collisions, not hit by rays, welded to `to` (nil: not welded). A "paint" piece is the car's colour (it
--- joins paintParts); a lamp glows at night (DayNight; the bay's own lamps follow its light, SprinterBuild.wire); a
+-- joins paintParts); a lamp shows its day look (server/DayNight.luau; the bay's own lamps follow its light, SprinterBuild.wire); a
 -- label on its front face. FleetFinish as on the fleet's skin (the audits and tools/vehicle-preview read it);
 -- SprinterVisual: only looks (server/SprinterMesh.luau hides these when the owner's Blender model dresses the van).
 function SprinterBuild.emit(parent: Instance, to: BasePart?, top: CFrame, pieces: { Sprinter.Piece }, color: Color3, paintParts: { BasePart }): { BasePart }
@@ -3111,7 +3116,7 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 		wheel(Vector3.new(inner, wheelY, wz), false)
 	end
 
-	-- Lights: they glow at night (DayNight switches them); the headlights throw a beam.
+	-- Lights: their day look (server/DayNight.luau); the headlights throw a beam.
 	local front = -style.length / 2
 	local headY = if style.head then style.head.X else 1.2
 	local headZ = if style.head then style.head.Y else front - 0.05
@@ -4515,33 +4520,29 @@ local function groundIgnore(): { Instance }
 end
 
 -- The top of the ground at (x, z): a road, a bridge, a hill road, a driveway (looking down from well above refY).
--- Under the mountain (the tunnel) and where nothing is found: the road level.
+-- Where nothing is found: the road level.
 function Vehicles.groundY(x: number, z: number, refY: number?): number
-	local mountain = Map.Mountain
-	if (x - mountain.x) ^ 2 + (z - mountain.z) ^ 2 < (mountain.radius + 30) ^ 2 then
-		return World.RoadTop
-	end
 	local params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Exclude
 	params.FilterDescendantsInstances = groundIgnore()
 	params.IgnoreWater = true
 	params.RespectCanCollide = true
-	local top = math.max(refY or World.RoadTop, World.RoadTop) + 90
+	local top = math.max(refY or ROAD_TOP, ROAD_TOP) + 90
 	local origin = Vector3.new(x, top, z)
 	-- Look past what nothing drives on: a sign board, a beam, a steep face (a few tries down through them).
 	for _ = 1, 5 do
-		local hit = workspace:Raycast(origin, Vector3.new(0, Map.WaterLevel - 6 - origin.Y, 0), params)
+		local hit = workspace:Raycast(origin, Vector3.new(0, WATER_LEVEL - 6 - origin.Y, 0), params)
 		if not hit then
 			break
 		end
 		local part = hit.Instance
 		local broad = not part:IsA("BasePart") or part:IsA("Terrain") or math.min(part.Size.X, part.Size.Z) >= 3
 		if hit.Normal.Y > 0.6 and broad then
-			return if hit.Position.Y > Map.WaterLevel - 2 then hit.Position.Y else World.RoadTop
+			return if hit.Position.Y > WATER_LEVEL - 2 then hit.Position.Y else ROAD_TOP
 		end
 		origin = hit.Position - Vector3.new(0, 0.05, 0)
 	end
-	return World.RoadTop
+	return ROAD_TOP
 end
 
 -- 6.26, a vehicle never comes out into something (Config.SpawnSpot, shared/SpawnSpot.luau): `ground` (on the ground
@@ -4934,8 +4935,9 @@ function Vehicles.handOver(car: Car)
 	Vehicles.claim(car) -- (6.13.1: the server keeps it parked until the owner sits in the driver's seat)
 end
 
--- The car right next to the player on the nearest road, and they get in: the old instant way (a force spawn away
--- from home, the chauffeur's fallback). Returns an error text when it cannot.
+-- The car right next to the player, and they get in: the old instant way (a forced spawn). server/SandboxBoot.luau
+-- replaces it with its own (the parking spot nearest you, seated); this is the fallback before it. Returns an error
+-- text when it cannot.
 function Vehicles.placeNear(player: Player, carId: string?): string?
 	local profile = PlayerData.get(player)
 	if not profile then
@@ -4946,68 +4948,15 @@ function Vehicles.placeNear(player: Player, carId: string?): string?
 	end
 	local character = player.Character
 	local rootPart = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
-	local from = if rootPart then rootPart.Position else World.DepotSpawn
-	local look = if rootPart then rootPart.CFrame.LookVector else Vector3.new(0, 0, 1)
+	if not rootPart then
+		return "Still loading..."
+	end
+	local from = rootPart.Position
+	local flat = Vector3.new(rootPart.CFrame.LookVector.X, 0, rootPart.CFrame.LookVector.Z)
+	local direction = if flat.Magnitude > 0.01 then flat.Unit else Vector3.new(0, 0, 1)
 	Vehicles.remove(player) -- the old car is not in the way of the new one
-
-	local x, z, dx, dz, width = Map.nearestRoad(from.X, from.Z)
-	local direction = Vector3.new(dx, 0, dz)
-	if direction:Dot(look) < 0 then
-		direction = -direction
-	end
-	local wanted = Economy.findCar(carId or profile.car or "")
-	if wanted and wanted.bike then
-		-- 5.1: a bike stands by the kerb next to you (the road's edge on your side when a road is near; else right
-		-- beside you, facing where you look) and you get on at once.
-		local across = Vector3.new(-dz, 0, dx)
-		local away = Vector3.new(from.X - x, 0, from.Z - z)
-		local spot: Vector3
-		if away.Magnitude < width / 2 + 24 then
-			local side = if away:Dot(across) >= 0 then 1 else -1
-			-- (6.10: clear of the kerb's slope, Map.CurbRun out onto the road, so it stands level)
-			spot = Vector3.new(x, 0, z) + across * side * math.max(0, math.min(width / 2 - Map.CurbRun - 1.5, away.Magnitude))
-			spot += direction * direction:Dot(Vector3.new(from.X - spot.X, 0, from.Z - spot.Z)) -- level with you
-		else
-			local flat = Vector3.new(look.X, 0, look.Z)
-			direction = if flat.Magnitude > 0.01 then flat.Unit else Vector3.new(0, 0, 1)
-			spot = Vector3.new(from.X, 0, from.Z) + Vector3.new(-direction.Z, 0, direction.X) * 3
-		end
-		local ground: number? = nil
-		if wanted.stand and character and rootPart then
-			-- 6.10: the E-Scooter stands right beside you (your right, else your left: where there is room on the same
-			-- ground) facing where you look, and you hop on (spawnAt); with no room on either side, by the kerb as a bike.
-			local flat = Vector3.new(look.X, 0, look.Z)
-			local facing = if flat.Magnitude > 0.01 then flat.Unit else Vector3.new(0, 0, -1)
-			local right = Vector3.new(-facing.Z, 0, facing.X)
-			local overlap = OverlapParams.new()
-			overlap.FilterType = Enum.RaycastFilterType.Exclude
-			overlap.FilterDescendantsInstances = { character }
-			overlap.RespectCanCollide = true
-			local ray = RaycastParams.new()
-			ray.FilterType = Enum.RaycastFilterType.Exclude
-			ray.FilterDescendantsInstances = { character }
-			ray.RespectCanCollide = true
-			local humanoid = character:FindFirstChildOfClass("Humanoid")
-			local feet = from.Y - rootPart.Size.Y / 2 - (if humanoid then humanoid.HipHeight else 2)
-			for _, side in { 1, -1 } do
-				-- the ground there, looked for from your own height (not a roof over you: a bus shelter, a canopy)
-				local at = from + right * side * Config.Interact.ScooterCallSide
-				local hit = workspace:Raycast(Vector3.new(at.X, from.Y + 1, at.Z), Vector3.new(0, -8, 0), ray)
-				local y = if hit then hit.Position.Y else math.huge
-				local room = math.abs(y - feet) < 1.5 and #workspace:GetPartBoundsInBox(CFrame.lookAt(Vector3.new(at.X, y + 1.8, at.Z),
-					Vector3.new(at.X + facing.X, y + 1.8, at.Z + facing.Z)), Vector3.new(2.2, 2.4, 5.2), overlap) == 0
-				if room then
-					spot, direction, ground = Vector3.new(at.X, 0, at.Z), facing, y
-					break
-				end
-			end
-		end
-		local position = Vector3.new(spot.X, (ground or Vehicles.groundY(spot.X, spot.Z, from.Y)) + 0.5, spot.Z)
-		local bike = Vehicles.spawnAt(player, carId, CFrame.lookAt(position, position + direction), true)
-		return if bike then nil else "Still loading..."
-	end
-	-- Step along the road if another car stands there.
-	local spot = freeSpot(Vector3.new(x, World.RoadTop, z), direction, 28)
+	-- beside you (on your right), stepped along if another car stands there
+	local spot = freeSpot(Vector3.new(from.X, ROAD_TOP, from.Z) + Vector3.new(-direction.Z, 0, direction.X) * 8, direction, 28)
 	local position = Vector3.new(spot.X, Vehicles.groundY(spot.X, spot.Z, from.Y) + 0.5, spot.Z)
 	local car = Vehicles.spawnAt(player, carId, CFrame.lookAt(position, position + direction), true)
 	return if car then nil else "Still loading..."
@@ -5070,7 +5019,7 @@ end
 -- would reach into the door's lintel), studs along the spot's look; 0 for an ordinary car. Also its length.
 function Vehicles.driveOut(player: Player, carId: string?): (number, number)
 	local length = lengthFor(player, carId)
-	return if length > 17 then length / 2 - (Map.GarageApron - 1) else 0, length
+	return if length > 17 then length / 2 - (GARAGE_APRON - 1) else 0, length
 end
 
 function Vehicles.placeAt(player: Player, carId: string?, spot: CFrame, seat: boolean?): Car?
@@ -5227,7 +5176,6 @@ local function wreck(car: Car, reason: string)
 	for _, d in car.model:GetDescendants() do
 		if d:IsA("BasePart") then
 			-- Burnt out: the lights stay dark through the night.
-			CollectionService:RemoveTag(d, DayNight.Tag)
 			CollectionService:RemoveTag(d, Vehicles.SirenTag)
 			if d.Material == Enum.Material.Neon then
 				d.Material = Enum.Material.SmoothPlastic
@@ -5268,18 +5216,11 @@ local function wreck(car: Car, reason: string)
 	end)
 end
 
--- 6.20: `cause` what hit it ("ram": a zombie run over, "crash": a bandit car's ram; nil anything else): the driver's
--- skills take their share off (Tough Body, ★ Stuntman: server/Skills.luau carDamage; the car's owner's, a lent car's
--- too). Returns the damage it took.
+-- `cause` what hit it ("ram": a zombie run over, "crash": a bandit car's ram; nil anything else; 10.5: no skills take
+-- a share off any more, the city's server/Skills.luau went). Returns the damage it took.
 function Vehicles.damage(car: Car, amount: number, reason: string?, cause: string?): number
 	if car.wrecked or amount <= 0 then
 		return 0
-	end
-	if amount < math.huge then
-		amount *= require(script.Parent.Skills).carDamage(car.owner, cause)
-		if amount <= 0 then
-			return 0
-		end
 	end
 	car.health = math.max(0, car.health - amount)
 	car.model:SetAttribute("Health", math.ceil(car.health))
@@ -5347,8 +5288,8 @@ function Vehicles.start()
 			end
 			local position = car.chassis.Position
 			-- (3.4: no free repairs any more: the repair bays, server/Repair.luau.)
-			-- Drove into the water (or off the world; 6.11 review: or into the park's pond, Map.inPond).
-			if position.Y < -7 or Map.inPond(position.X, position.Y, position.Z) then
+			-- Drove into the water (or off the world).
+			if position.Y < -7 then
 				Vehicles.damage(car, math.huge, "Your car sank!")
 			end
 		end

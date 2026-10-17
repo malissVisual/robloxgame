@@ -237,9 +237,8 @@ end
 
 -- ── A solo move into the real big plan ───────────────────────────────────────
 
-local started = Moving.admin(ann, "start")
-check("a solo move into the big house starts (the real big house's plan)", string.find(started, "started", 1, true) ~= nil and #built == 1
-	and built[1].plan.kind == "big", started)
+local started = E.startRun(ann, House.id)
+check("a solo run into the big house starts (the real big house's plan)", started == nil and #built == 1 and built[1].plan.kind == "big", started)
 Moving.step()
 danny = MoveHelper.find(ann)
 local truck = E.cars[ann]
@@ -513,7 +512,7 @@ if pick and backDoor then
 		and danny.s.move.things[light.id].state == "truck", E.lastNotice(ann))
 end
 
-Moving.admin(ann, "end")
+Moving.endRun(ann)
 run(0.2)
 check("the move ends: he goes, the big house's inside taken down", MoveHelper.find(ann) == nil and E.destroyed == 1)
 

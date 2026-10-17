@@ -5,7 +5,7 @@ Simulates the Roblox import of design/blender-fixtures/roblox/ZDCFixtureArt.fbx 
 every piece's box in its kind's frame, written by fixtures.py; design/blender-fixtures/KONTRAKT.md): the importer turns
 the model a quarter round, makes it 3 times bigger and moves it; FixtureMesh must find the markers, undo that and dress
 every fixture server/HouseInterior.luau builds (shared/HouseLayout.luau plans of a few seeds of the kinds "house" and
-"big", and a farm). Checks:
+"big"; 10.5: the farm went with the city). Checks:
   - the manifest: every kind of the contract's table at its size, every piece "<kind>_<finish>" a finish of
     FixtureMesh.Looks (and the manifest's "finishes", when it has them, FixtureMesh.Looks exactly: the colours,
     materials, palette, shine and see-through; tools/fixtures-art/looks.py --write copies them), at most 10,000 triangles a
@@ -20,10 +20,9 @@ every fixture server/HouseInterior.luau builds (shared/HouseLayout.luau plans of
     burners, the workbench's pegboard and vise) and the contract's (the basin's mirror to 6.9, the hood's flue to the
     ceiling, the corner shelf's candle and flowers up to the wall decor), never into the room in front of the box nor
     into the wall behind it (0.05), nothing through the ceiling;
-  - the interiors within their part budgets (Config.Furniture.InteriorMaxParts, Big.InteriorMaxParts, Farm's) with the
+  - the interiors within their part budgets (Config.Furniture.InteriorMaxParts, Big.InteriorMaxParts) with the
     dress; a Neon piece (the fire's glow) at most Config.SandboxLight.Caps.NeonArea on its biggest face;
-  - the rest of the interior unchanged by the dress; the farm's counters (another size) and its own Kachelofen as they
-    were;
+  - the rest of the interior unchanged by the dress;
   - no import, an import physics threw about (one piece turned), a mirrored one: every interior exactly as without it;
     a fixture of another size (the import's counter box 0.2 off, a direct dress of a wrong size): its parts as they
     were, the other kinds dressed.
@@ -45,7 +44,7 @@ SHARED = ROOT / "src" / "shared"
 MANIFEST = ROOT / "design/blender-fixtures/roblox/ZDCFixtureArt.json"
 PREFIX = ('local M = require("./ItemMock")\n'
           'local Instance, Vector3, CFrame, Color3, Enum, UDim2 = M.Instance, M.Vector3, M.CFrame, M.Color3, M.Enum, M.UDim2\n')
-MOCKED = ("FurnitureLooks", "HouseLayout", "Farm")
+MOCKED = ("FurnitureLooks", "HouseLayout")
 # The contract's table: kind → its box (along the wall, height, depth).
 KINDS = {
     "counter": (4.5, 3, 2.6), "stove": (3, 3, 2.6), "sink": (9, 3, 2.6), "cabinets": (4.5, 3, 1.4), "hood": (3, 2.2, 1.8),
@@ -58,8 +57,8 @@ TRIANGLES = {"kind": 3000, "kachelofen": 4000, "piece": 10000}  # (8.9.1: the le
 BASIN_MIRROR = 6.9  # the contract: the basin's mirror up to y 6.9 in its frame
 TOL = 0.05  # the contract's: into the wall behind (and here: into the room in front) at most this
 RUNS = {  # mode → the interiors it builds (kind, seed)
-    "none": [("house", s) for s in (1, 2, 3, 4, 5)] + [("big", s) for s in (1, 2, 3)] + [("farm", 1)],
-    "art": [("house", s) for s in (1, 2, 3, 4, 5)] + [("big", s) for s in (1, 2, 3)] + [("farm", 1)],
+    "none": [("house", s) for s in (1, 2, 3, 4, 5)] + [("big", s) for s in (1, 2, 3)],
+    "art": [("house", s) for s in (1, 2, 3, 4, 5)] + [("big", s) for s in (1, 2, 3)],
     "scattered": [("house", 1), ("big", 1)],
     "mirrored": [("house", 2), ("big", 2)],
     "wrongbox": [("house", 3), ("big", 3)],
@@ -225,7 +224,7 @@ for spec in string.gmatch(SPEC, "[^;]+") do
 	seed = tonumber(seed)
 	local run = kind .. ":" .. seed
 	local plan = HouseLayout.plan(seed, kind)
-	local origin = HouseInterior.slot(({ house = 0, big = 10, farm = 20 })[kind] + seed) -- (the same place in every run)
+	local origin = HouseInterior.slot(({ house = 0, big = 10 })[kind] + seed) -- (the same place in every run)
 	local interior = HouseInterior.build(plan, origin)
 	local decor = interior:FindFirstChild("Decor")
 	local byKind, extra = {}, 0
@@ -290,8 +289,8 @@ local wrong = FixtureMesh.dress(probe, "counter", M.CFrame.new(1, 2, 3), M.Vecto
 local unknown = FixtureMesh.dress(probe, "rug", M.CFrame.new(1, 2, 3), M.Vector3.new(3, 0.08, 2))
 print(string.format('PROBE {"wrong":%s,"unknown":%s,"children":%d,"t":%g,"has":%s}', b(wrong), b(unknown), #probe:GetChildren(), solid.Transparency, b(FixtureMesh.has("counter"))))
 local F_ = Config.Furniture
-print(string.format('META {"moved":%s,"house":%d,"big":%d,"farm":%d,"neonArea":%g,"ceiling":%g,"decor":%g,"shelf":%g}', b(art.Parent == storage and MODE ~= "none"),
-	F_.InteriorMaxParts, F_.Big.InteriorMaxParts, F_.Farm.InteriorMaxParts, Config.SandboxLight.Caps.NeonArea, F_.Ceiling, F_.Alpine.Decor, F_.Alpine.Shelf[2]))
+print(string.format('META {"moved":%s,"house":%d,"big":%d,"neonArea":%g,"ceiling":%g,"decor":%g,"shelf":%g}', b(art.Parent == storage and MODE ~= "none"),
+	F_.InteriorMaxParts, F_.Big.InteriorMaxParts, Config.SandboxLight.Caps.NeonArea, F_.Ceiling, F_.Alpine.Decor, F_.Alpine.Shelf[2]))
 print("ALL DONE")
 '''
 
@@ -457,21 +456,16 @@ def main():
     parts_none = {}
     for p in none["PART"]:
         parts_none.setdefault((p["run"], p["fid"]), []).append(p)
-    houses = [f for f in none["FIX"] if not f["run"].startswith("farm")]
+    houses = none["FIX"]
     missing_model = [f"{f['run']} {f['kind']}" for f in houses if not f["has"] or f["parent"] != "Decor" or f["name"] != "Fixture_" + f["kind"] or f["attr"] != f["kind"]]
     check(houses and not missing_model and all(r["extra"] == 0 for r in none["RUN"]),
-          f"no import: every fixture of the {len([r for r in none['RUN'] if not r['run'].startswith('farm')])} houses in its Model Fixture_<kind> in Decor (attribute Fixture), {len(houses)} fixtures",
+          f"no import: every fixture of the {len(none['RUN'])} houses in its Model Fixture_<kind> in Decor (attribute Fixture), {len(houses)} fixtures",
           missing_model[:6])
     sized = [f"{f['run']} {f['kind']} {f['size']}" for f in houses if not made_for(f)]
     check(not sized, "every fixture of the houses at its kind's size (the contract's table)", sized[:6])
-    farm_fix = [f for f in none["FIX"] if f["run"].startswith("farm")]
-    check(any(f["kind"] == "kachelofen" and not f["has"] for f in farm_fix) and all(f["has"] for f in farm_fix if f["kind"] != "kachelofen")
-          and {f["kind"] for f in farm_fix if not made_for(f)} == {"kachelofen", "counter", "sink"},
-          "the farm: its own Kachelofen loose in Decor (FARM_LOOKS), its counter and sink (another size) and its workshop's workbench in their models",
-          [(f["kind"], f["has"], f["size"]) for f in farm_fix])
     check(not any(a[2] == "MeshPart" for a in none["ALL"]) and not any(f["dressed"] for f in none["FIX"]) and not none["PROBE"]["has"],
           "no import: no mesh, nothing dressed")
-    budgets = {"house": meta["house"], "big": meta["big"], "farm": meta["farm"]}
+    budgets = {"house": meta["house"], "big": meta["big"]}
     counts = {r["run"]: r["parts"] for r in none["RUN"]}
     over = [(r["run"], r["parts"], budgets[r["kind"]]) for r in none["RUN"] if r["parts"] > budgets[r["kind"]]]
     check(not over, f"no import: every interior within its budget ({', '.join(f'{k} {v}' for k, v in sorted(counts.items()))})", over)
@@ -479,7 +473,7 @@ def main():
     today = {}
     frame_y = {}
     for key, fx in fix_none.items():
-        if not fx["has"] or fx["run"].startswith("farm"):
+        if not fx["has"]:
             continue
         frame_y[fx["kind"]] = fx["at"][1] - fx["origin"][1]
         for p in parts_none.get(key, []):
@@ -576,10 +570,9 @@ def main():
         left = sorted((q["name"], tuple(round(x, 4) for x in q["cf"]), tuple(round(x, 4) for x in q["size"])) for q in others)
         if kept != left or any(q["t"] != 1 or q["shadow"] or not q["collide"] or not q["query"] for q in others):
             solid_bad.append(f"{fx['run']} {fx['kind']}: kept {[k[0] for k in left]}, solid {[k[0] for k in kept]}")
-    runs = [r for r in art["RUN"] if not r["run"].startswith("farm")]
-    farm_dressed = [f["kind"] for f in art["FIX"] if f["run"].startswith("farm") and f["dressed"]]
-    check(not undressed and dressed == len(houses) + len(farm_dressed), f"the import: every fixture of the {len(runs)} houses dressed ({len(houses)} fixtures of "
-          f"{len(set(f['kind'] for f in houses))} kinds), the farm's of a house's size too ({', '.join(farm_dressed) or 'none'})", undressed[:6])
+    runs = art["RUN"]
+    check(not undressed and dressed == len(houses), f"the import: every fixture of the {len(runs)} houses dressed ({len(houses)} fixtures of "
+          f"{len(set(f['kind'] for f in houses))} kinds)", undressed[:6])
     check(not misplaced, "every piece of its kind once, where the manifest has it in the fixture's frame (the import's turn and scale undone)", misplaced[:6])
     check(not solid_bad, "the solid parts kept where they were, hidden and shadowless, still colliding and queried; the others gone", solid_bad[:4])
     check(not physical, "no mesh physical (anchored; no collision, query or touch) nor wearing the importer's SurfaceAppearance", physical[:6])
@@ -587,12 +580,12 @@ def main():
     check(not ceiling_bad, "nothing of the model through the ceiling", ceiling_bad[:6])
     over = [(r["run"], r["parts"], budgets[r["kind"]]) for r in art["RUN"] if r["parts"] > budgets[r["kind"]]]
     dressed_counts = ", ".join(f"{r['run']} {r['parts']} (was {counts.get(r['run'])})" for r in art["RUN"])
-    check(not over, f"dressed: every interior within its budget ({dressed_counts}; house {budgets['house']}, big {budgets['big']}, farm {budgets['farm']})", over)
-    # the rest of the interior unchanged; the farm's counter and sink (another size) and Kachelofen as they were
+    check(not over, f"dressed: every interior within its budget ({dressed_counts}; house {budgets['house']}, big {budgets['big']})", over)
+    # the rest of the interior unchanged; a fixture of another size as it was
     same_rest = all(rest(art["ALL"], lambda r, run=r_["run"]: r[0] == run and r[1] == "0") == rest(none["ALL"], lambda r, run=r_["run"]: r[0] == run and r[1] == "0")
                     for r_ in art["RUN"])
     check(same_rest, "dressed: the rest of every interior exactly as without the import")
-    check(not kept_others, "a fixture of another size (the farm's counter and sink) exactly as without the import", kept_others[:6])
+    check(not kept_others, "a fixture of another size exactly as without the import", kept_others[:6])
 
     # ── refused imports and sizes: as today ──
     for mode, what in (("scattered", "an import physics threw about (one piece turned)"), ("mirrored", "a mirrored import")):

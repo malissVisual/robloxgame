@@ -18,6 +18,8 @@
 --     stored one); the money never goes negative or NaN through the API.
 --   * Unknown keys: a newer server's top-level keys are written back as they were (the leave save, a rejoin, again);
 --     the keys this version knows are its own (an old optional value is never brought back); RESET MY SAVE drops them.
+--     10.5: the city's fields of a save (its tutorial, phone, guns …) are unknown keys now: written back as they were;
+--     the city's boolean flags are written on every save (an older server never runs their migrations again).
 --   * 8.4: the house the moving card shows (sandboxHouseSeed): written with its flag, read back on another server's
 --     join (the same house), dropped once a trip spent it; only a whole number in Config.Moving.Sandbox.Seeds' range,
 --     only from a real save written with its flag (junk, an older save, a lock-only record, a new player: none).
@@ -516,8 +518,9 @@ local future = save83(5000)
 future.dannyHire = { hired = true, at = 77 } -- (fields a newer server writes)
 future.dannyHireKept = true
 future.badges = { first = 3 }
-future.bike = "old-bike" -- (keys this version knows: its own value, never the old one)
-future.title = "Boss"
+future.character = "junk" -- (keys this version knows: its own value, never the old one)
+future.sandboxHouse = "sandbox_house" -- (without its flag: none)
+future.weapons = { pistol = true } -- (10.5: a city field, unknown now: kept as it was)
 future.rewards = { ["visit:sofa"] = true, ["warehouse:1"] = true }
 future.sandboxMoves, future.sandboxMovesKept = 4, true -- (a field this version knows: the badges' moves)
 E.saves.Player_212 = future
@@ -527,8 +530,12 @@ PlayerData.addMoney(M, 1, "Admin")
 PlayerData.save(M)
 local m1 = E.saves.Player_212
 check("a newer server's keys: written back as they were", same(m1.dannyHire, future.dannyHire) and m1.dannyHireKept == true and same(m1.badges, future.badges))
-check("… the keys this version knows are its own (bike, title: the profile's nil, not the old save's; the badges' moves read and written)", m1.bike == nil and m1.title == nil
-	and m1.money == 5001 and m1.sandboxMoves == 4 and m1.sandboxMovesKept == true)
+check("… the keys this version knows are its own (character, sandboxHouse: the profile's nil, not the old save's; the badges' moves read and written)", m1.character == nil
+	and m1.sandboxHouse == nil and m1.money == 5001 and m1.sandboxMoves == 4 and m1.sandboxMovesKept == true)
+check("10.5: … the city's fields of the save written back as they were (tutorial, phone, the guns)", m1.tutorial == true and m1.phone == true and same(m1.weapons, { pistol = true }))
+check("10.5: … the city's flags on it (xpCurve, carStages, vanStages, vestKit, starterKit, noPacks, noJacket, noShoes, perGameBags, vanOnly)",
+	m1.xpCurve == Config.Levels.Curve and m1.carStages == true and m1.vanStages == true and m1.vestKit == true and m1.starterKit == true and m1.noPacks == true
+	and m1.noJacket == true and m1.noShoes == true and m1.perGameBags == true and m1.vanOnly == true)
 check("… the newer server's `rewards` keys kept too, the level's \"warehouse:\" key this one's", m1.rewards["visit:sofa"] == true and m1.rewards["warehouse:1"] == true)
 PlayerData.addMoney(M, Config.SandboxUpgrades.List.warehouse.prices[2], "Admin") -- (8.3 economy: the Storehouse's price)
 from = #E.storeCalls
@@ -556,6 +563,9 @@ E.saves.Player_213 = { lock = { job = "another-server", at = 0 } } -- (a lock-on
 local N = E.join(213, "Ned")
 E.leave(N)
 check("a lock-only record: no key kept from it but its own (a new player's save)", E.saves.Player_213.money == Config.Sandbox.StartMoney and E.saves.Player_213.lock == nil)
+local ned = E.saves.Player_213
+check("10.5: a new player's save: the city's flags on it, no city field (no guns, no kit, no tutorial)", ned.vanOnly == true and ned.starterKit == true and ned.vestKit == true
+	and ned.perGameBags == true and ned.xpCurve == Config.Levels.Curve and ned.weapons == nil and ned.kit == nil and ned.tutorial == nil and ned.collectionKept == true)
 
 -- ── 8.4 review: through an older (8.2) server, the paint and the moves come back from `rewards` ───────────
 local paintSave = save83(2000)

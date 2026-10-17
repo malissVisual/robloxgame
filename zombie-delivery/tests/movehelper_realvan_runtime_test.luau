@@ -159,8 +159,8 @@ end
 
 -- ── The move, Danny with Ann (10.1 free) ──────────────────────────────────────────────────
 
-local started = Moving.admin(ann, "start")
-check("a solo move in the sandbox starts, Ann's van the real Sprinter (the game's factory)", string.find(started, "started", 1, true) ~= nil
+local started = E.startRun(ann, House.id)
+check("a solo run starts, Ann's van the real Sprinter (the game's factory)", started == nil
 	and E.cars[ann] ~= nil and E.cars[ann].model:GetAttribute("Sprinter") == true, started)
 Moving.step()
 local danny = MoveHelper.find(ann)

@@ -31,7 +31,7 @@ local function check(name: string, ok: boolean, detail: any?)
 end
 
 -- What the sandbox starts (SandboxWorld: its start or build) and what it never touches.
-local SANDBOX = { "SandboxWorld", "SaveSlots", "PlayerData", "Analytics", "SandboxAnalytics", "Vehicles", "CarRighting", "Zombies", "Npcs", "Admin", "Crew", "Transport", "KitWear", "Horn", "Clipboard", "SandboxPlots", "Collection", "CollectionBook", "Warehouse", "Upgrades", "VanPaint", "SandboxTasks", "SandboxLeaders", "Visitors", "SandboxBadges", "PlayerTrade", "SprinterMesh", "FurnitureMesh", "FixtureMesh", "Moving", "HelperCrew", "Runs" } -- (10.2: HelperCrew, the helpers' crew)
+local SANDBOX = { "SandboxWorld", "SaveSlots", "PlayerData", "Analytics", "SandboxAnalytics", "Vehicles", "CarRighting", "Zombies", "Npcs", "Admin", "Clipboard", "SandboxPlots", "Collection", "CollectionBook", "Warehouse", "Upgrades", "VanPaint", "SandboxTasks", "SandboxLeaders", "Visitors", "SandboxBadges", "PlayerTrade", "SprinterMesh", "FurnitureMesh", "FixtureMesh", "Moving", "HelperCrew", "Runs" } -- (10.2: HelperCrew, the helpers' crew)
 local PARALLEL = { "SandboxWorld", "Collection", "CollectionBook", "Warehouse", "Upgrades", "VanPaint", "SandboxTasks", "SandboxLeaders", "Visitors", "SprinterMesh", "SandboxAnalytics", "SandboxBadges", "PlayerTrade", "HelperCrew", "Runs" }
 local NEVER = { "World", "MapStyle", "Alpine", "Jobs", "JobQueue", "SpecialOrders", "LiveEvents", "Shops", "ShopClerks", "BanditCars", "Animals", "Traffic", "Buses", "Rental", "ZipLines", "Estate", "Business", "Missions", "Challenges", "Tasks", "Shift", "Garages", "Repair", "Explore", "Tutorial", "VanQuest", "Fuel", "Buddy", "DayNight", "Gun", "Items", "Cargo", "Ranking", "CarCall", "StyleWear", "Skills", "Hand", "CloseCombat" }
 
@@ -127,9 +127,7 @@ local function newPlayer(name: string, plot: number?): any
 	profiles[player] = {
 		money = Config.Sandbox.StartMoney,
 		car = Config.CompanyVan.Car,
-		cars = { [Config.CompanyVan.Car] = true, citybike = true },
-		bike = "citybike",
-		lastCar = nil,
+		cars = { [Config.CompanyVan.Car] = true, citybike = true }, -- (an old save's bike: ownVan drops it)
 		carHealth = {},
 	}
 	E.fire("Players.PlayerAdded", player)
@@ -198,7 +196,6 @@ check("sandbox: no World.buildLate deferred", #E.deferred == 0, #E.deferred)
 check("sandbox: the map before the services", started.SandboxWorld < started.PlayerData)
 check("sandbox: 10.1's save slots before PlayerData (a join's load waits for the pick)", started.SaveSlots ~= nil and started.SaveSlots < started.PlayerData)
 check("sandbox: the State hooked before PlayerData starts", (E.find("PlayerData.Changed.Connect") or math.huge) < started.PlayerData)
-check("sandbox: Zombies without its own zombies (ambient off before it starts)", E.module("Zombies").ambient == false and (E.find("set Zombies.ambient") or math.huge) < started.Zombies)
 check("sandbox: the map is SandboxWorld.build, the others' start()", E.called("SandboxWorld.build") and E.called("Collection.start") and E.called("Warehouse.start") and E.called("SprinterMesh.start"))
 check("sandbox: the collection after PlayerData (it reads the saves)", started.PlayerData < started.Collection)
 check("sandbox: the plots, the Blender furniture and the collection before the warehouses", started.SandboxPlots < started.Warehouse and started.FurnitureMesh < started.Warehouse and started.Collection < started.Warehouse)
@@ -228,11 +225,11 @@ check("sandbox: Moving, then 9.7 the runs last (Runs.start: it wraps the crews, 
 check("10.1: the helpers' crew (HelperCrew.start: the Crew remote, your helper at your warehouse) after Moving, before the runs", E.called("HelperCrew.start")
 	and started.Moving < started.HelperCrew and started.HelperCrew < started.Runs)
 local hooksSet = true
-for _, hook in { "callCar", "homeGarage", "placeNear", "onWrecked" } do
+for _, hook in { "homeGarage", "placeNear", "onWrecked" } do
 	local at = E.find("set Vehicles." .. hook)
 	hooksSet = hooksSet and at ~= nil and at < started.Moving and type(E.module("Vehicles")[hook]) == "function"
 end
-check("sandbox: the van's hooks set before Moving wraps them (CAR, a forced spawn, placeNear, a wreck)", hooksSet)
+check("sandbox: the van's hooks set before Moving wraps them (a forced spawn, placeNear, a wreck)", hooksSet)
 local parkHook = E.find("set Moving.parkVan")
 check("8.0.1: Moving's hook parkVan is SandboxBoot.parkVan, set before Moving starts (a move's START parks the van the sandbox's way)",
 	parkHook ~= nil and parkHook < started.Moving and E.module("Moving").parkVan == Boot.parkVan and type(Boot.parkVan) == "function")
@@ -244,10 +241,11 @@ for _, made in E.made do
 end
 check("sandbox: the folders World's build made (Cars, Zombies, Effects)", folders.Cars and folders.Zombies and folders.Effects or false)
 check("sandbox: the place's baseplate goes (the map has its own ground)", E.called("Baseplate.Destroy"))
-for _, remote in { "Play", "SpawnCar", "RequestState" } do
+for _, remote in { "Play", "RequestState" } do
 	check(`sandbox: the {remote} remote answered`, E.handlers[`Net.get({remote}).OnServerEvent`] ~= nil and #E.handlers[`Net.get({remote}).OnServerEvent`] == 1)
 end
-check("sandbox: no Aiming listener (no weapons)", E.handlers["Net.get(Aiming).OnServerEvent"] == nil)
+check("sandbox: no Aiming listener (no weapons), 10.5 no SpawnCar (nobody calls a car)", E.handlers["Net.get(Aiming).OnServerEvent"] == nil
+	and E.handlers["Net.get(SpawnCar).OnServerEvent"] == nil)
 check("sandbox: it says it runs", contains(E.printed, "SANDBOX is running"))
 check("sandbox: no warnings", #E.warnings == 0, table.concat(E.warnings, " | "))
 
@@ -284,7 +282,7 @@ local owned = 0
 for _ in profile.cars do
 	owned += 1
 end
-check("the only vehicle: profile.car the van, no other car, no bike", profile.car == vanId and profile.cars[vanId] == true and owned == 1 and profile.bike == nil)
+check("the only vehicle: profile.car the van, no other car (the old bike gone)", profile.car == vanId and profile.cars[vanId] == true and owned == 1)
 check("Marge's tutorial is never asked (Tutorial.ahead)", touched("Tutorial") == nil)
 E.fire("Net.get(Play).OnServerEvent", ann)
 check("a second PLAY changes nothing", #placed == 0)
@@ -303,23 +301,10 @@ at = pivotOf(body)
 check("8.0.1: a respawn on a move (a run): where Moving.respawnAt says (by the move's van), not in the lobby", at ~= nil and near(at.Position.X, curb.x + 7)
 	and near(at.Position.Z, curb.z + 10) and #placed == 0, at and `{at.Position.X}, {at.Position.Z}`)
 respawn[ann] = nil
-local _, root = spawnBody(ann, 0, 0)
-root.Position = E.Vector3.new(curb.x + 6, 3, curb.z + 20)
-check("CAR answered", E.fire("Net.get(SpawnCar).OnServerEvent", ann) == 1)
-local van = placed[#placed]
-check("CAR in a run (its truck lost): the van back at the house's curb (nose north, back to the door), not seated", #placed == 1 and near(van.frame.Position.X, curb.x)
-	and near(van.frame.Position.Z - 3, curb.z) and van.seat == false)
-check("CAR: the notice names the house", string.find(lastNotice(), Map.House.name, 1, true) ~= nil, lastNotice())
 moving[ann] = nil
 body = spawnBody(ann, 0, 0)
 at = pivotOf(body)
 check("…off a move again: in the plaza", at ~= nil and near(at.Position.X, mine.x) and near(at.Position.Z, mine.z))
-_, root = spawnBody(ann, 0, 0)
-root.Position = E.Vector3.new(mine.x, 3, mine.z)
-E.fire("Net.get(SpawnCar).OnServerEvent", ann)
-check("9.7 CAR in the lobby: no van, the notice says why (a run's truck waits at its house)", #placed == 1 and string.find(lastNotice(), "No vans in the lobby", 1, true) ~= nil,
-	lastNotice())
-
 local deferred = #E.deferred
 E.fire("Net.get(RequestState).OnServerEvent", ann)
 check("RequestState: Main's queueState sends the State", #E.deferred == deferred + 1)
@@ -330,13 +315,13 @@ at = pivotOf(bobBody)
 check("no plot (the server full): in the plaza's middle (Lobby.spawn)", at ~= nil and near(at.Position.X, L.spawn.x) and near(at.Position.Z, L.spawn.z),
 	at and `{at.Position.X}, {at.Position.Z}`)
 E.fire("Net.get(Play).OnServerEvent", bob)
-check("no plot: PLAY parks no van either", #placed == 1 and profiles[bob].car == vanId)
+check("no plot: PLAY parks no van either", #placed == 0 and profiles[bob].car == vanId)
 
 -- 8.0.1: SandboxBoot.parkVan (Moving's hook: a move's START without a van out) parks it the sandbox's way
 profiles[ann].carHealth = { [vanId] = 0.2 } -- (wrecked before: the save keeps the damage)
 local repairsBefore = #repaired
 local parkErr, parkedVan = Boot.parkVan(ann, plot.vanSpot, false)
-van = placed[#placed]
+local van = placed[#placed]
 check("8.0.1: SandboxBoot.parkVan: the player's own van at the spot (placeAt's 3 studs taken back), not seated", parkErr == nil and parkedVan ~= nil
 	and van.player == ann and van.carId == nil and van.seat == false and near(van.frame.Position.X, plot.vanSpot.x) and near(van.frame.Position.Z + 3, plot.vanSpot.z))
 check("…repaired whole (never the save's 0.2: a 144/720 hp Sprinter)", #repaired == repairsBefore + 1 and repaired[#repaired].car == parkedVan and repaired[#repaired].share == 1)

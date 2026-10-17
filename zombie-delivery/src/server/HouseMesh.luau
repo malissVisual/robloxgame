@@ -1,21 +1,19 @@
 --!strict
--- 7.2, Marge's house in the owner's own Blender model (the owner: "a 3D model of that house, so it looks like a classic
+-- 7.2, a house in the owner's own Blender model (the owner: "a 3D model of that house, so it looks like a classic
 -- European house"; design/blender-house/house.py → roblox/ZDCHouseArt.fbx). The owner imports ZDCHouseArt.fbx once in
--- Roblox Studio (File → Import 3D, the defaults) and publishes. server/World.luau's buildHouse puts each Suburbs
--- house's own parts in a Model (House, Roof, Door, Window) and hands it here: a house of HouseMesh.Homes whose box is
--- the model's wears the model's MeshParts (anchored, not colliding, not queried, not touched). Its own parts stay where
--- they are, invisible: the House box and the Roof wedges are still what collides (the model's walls stand on the box's
--- faces, its roof over the wedges). No import, a house not listed or of another size: the house as World builds it.
--- 8.1 SANDBOX: the sandbox's one house wears it too (The Old Farmstead: server/SandboxWorld.luau puts its chalet's parts
--- in a Model "House_sandbox_house" on a box of the model's size, shared/SandboxMap.luau House, and hands it here; the
--- import is in ServerStorage from the server's first line, server/Main.server.luau, and dress loads it). 8.2.1: the
--- import is the owner's big house for it (house.py TARGET "sandbox", 44 × 14.5 × 34); Marge's is then another size and
--- keeps its chalet (house.py TARGET "city" exports one for her). Only the farmstead (SandboxMap.Houses[1], the big
--- house) wears it; the countryside's five other places to empty are never handed here (their own looks).
+-- Roblox Studio (File → Import 3D, the defaults) and publishes. 8.1 SANDBOX: The Old Farmstead wears it
+-- (server/SandboxWorld.luau puts its chalet's parts in a Model "House_sandbox_house" on a box of the model's size,
+-- shared/SandboxMap.luau House, and hands it here; the import is in ServerStorage from the server's first line,
+-- server/Main.server.luau, and dress loads it): a house of HouseMesh.Homes whose box is the model's wears the model's
+-- MeshParts (anchored, not colliding, not queried, not touched); its own parts stay where they are, invisible, still
+-- what collides. No import, a house not listed or of another size: the house as it was built. 8.2.1: the import is the
+-- owner's big house (house.py TARGET "sandbox", 44 × 14.5 × 34). Only the farmstead (SandboxMap.Houses[1], the big
+-- house) wears it; the countryside's other places to empty are never handed here (their own looks). (10.5: Marge's
+-- house in the city went with it.)
 --
 --   HouseMesh.start()               at the server's start: finds the import and takes it out of the world
---   HouseMesh.dress(model, homeId)  dresses one house (World's buildHouse, SandboxWorld's house); false: left as it was
---   HouseMesh.Homes                 the homes that wear it (Map.Homes ids, the sandbox's SandboxMap.House.id)
+--   HouseMesh.dress(model, homeId)  dresses one house (SandboxWorld's house); false: left as it was
+--   HouseMesh.Homes                 the homes that wear it (the sandbox's SandboxMap.House.id)
 --   HouseMesh.Looks                 each finish's colour and material
 --
 -- The pieces are named "house_<finish>" ("house2_<finish>" ... where a finish has more than 10,000 triangles;
@@ -30,7 +28,6 @@ local HouseMesh = {}
 local NAME = "ZDCHouseArt"
 
 HouseMesh.Homes = {
-	home_suburbs_2_0_00 = true, -- 155 Willow Ln, Marge's (the moves' prologue, Config.Moving)
 	sandbox_house = true, -- 8.1 SANDBOX: The Old Farmstead (shared/SandboxMap.luau House, server/SandboxWorld.luau)
 } :: { [string]: boolean }
 

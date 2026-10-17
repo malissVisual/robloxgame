@@ -1,15 +1,15 @@
--- 7.0 planning × the real house art: a whole move end to end with the real shared/FurnitureLooks.luau,
+-- The real house art × a whole run end to end (10.5: every move a run): the real shared/FurnitureLooks.luau,
 -- shared/HouseLayout.luau and server/HouseInterior.luau (tests/run_tests.py builds them on tools/fixtures/item-mock.luau,
--- the recorder tests/runtime/MovingRuntime.luau's fakes stand on) and the real server/Moving.luau and MoveLobby.luau:
--- the board's card, START, the planning lobby (Ann, and Bob the Guard READY), LAUNCH, the real interior built and in
--- the world, in through the front door (open from the start: the owner took the Technician out), the house lit (the real
--- ceiling lights on, the porch's daylight on, no fuse box); a real one-hand piece picked up, carried out, loaded, driven
--- to the Wall: the pay, and the interior taken down. 8.1 walk-in doors with the real house: in clear of the doorway's
--- zone facing the hall, the ▲ OUT doormat, out by walking into the real 7-wide front doorway, in by walking up to the door.
+-- the recorder tests/runtime/MovingRuntime.luau's fakes stand on) and the real server/Moving.luau: a run of Ann and Bob
+-- on the lone house (a family house's plan, seed 1955: Ann's card), the real interior built and in the world, in through
+-- the front door (open from the start), the house lit (the real ceiling lights on, the porch's daylight on, no fuse box);
+-- a real one-hand piece picked up, carried out, loaded, and FINISH: it goes home (the one whose model went never counts),
+-- the interior taken down. 8.1 walk-in doors with the real house: in clear of the doorway's zone facing the hall, the
+-- ▲ OUT doormat, out by walking into the real 7-wide front doorway, in by walking up to the door.
 local E = require("./MovingRuntime")
 local Moving = require("./MovingServer")
 local Config = require("./Config")
-local Map = require("./Map")
+local SandboxMap = require("./SandboxMap")
 local FurnitureLooks = require("./FurnitureLooks")
 local HouseLayout = require("./HouseLayout")
 local HouseInterior = require("./HouseInterior")
@@ -39,9 +39,6 @@ local function promptIn(model: any, action: string): any
 end
 local function trigger(prompt: any, player: any)
 	prompt.Triggered:Fire(player)
-end
-local function lobbyRequest(player: any, ...: any)
-	E.Net.get("MoveLobby").OnServerEvent:Fire(player, ...)
 end
 local function lights(model: any): (number, number)
 	local on, off = 0, 0
@@ -78,42 +75,36 @@ Moving.useArt({
 	},
 })
 
-local home = Map.home(T.Contracts[1].home) :: any
-local door = V3(home.door.x, 3, home.door.z)
-local facing = V3(home.facing.x, 0, home.facing.z)
-local outside = door + facing * 3
-E.truckAt = V3(home.park.x, 2, home.park.z)
+local HOUSE = "lone_house"
+local door, facing, outside = E.doorOf(SandboxMap.house(HOUSE))
 local ann = E.player(11, "Ann", outside)
 local bob = E.player(22, "Bob", outside + V3(2, 0, 0))
 E.crew[ann] = { bob }
+E.profiles[ann] = { sandboxHouse = HOUSE, sandboxHouseSeed = 1955 } -- (her card's house and seed: the plan this test knows)
+Moving.parkVan = E.parkVan
 Moving.start()
+local ends: { any } = {}
+Moving.onRunEnd(function(_host: any, facts: any)
+	table.insert(ends, facts)
+end)
 
--- the card, the lobby, LAUNCH ---------------------------------------------------------------------------------------------
+-- the run -----------------------------------------------------------------------------------------------------------------
 
 local moves = workspace:FindFirstChild("Moves")
-local boardPrompt = promptIn(moves:FindFirstChild("MovingBoard"), "Moving contracts")
-E.place(ann, boardPrompt.Parent.Position + V3(-3, 0, 0))
-trigger(boardPrompt, ann)
-local card = E.last(ann, "Moving", "contract")
-local plan = HouseLayout.plan(T.Contracts[1].seed, T.Contracts[1].kind)
-check("the card: the real plan's pieces and ★ must-haves", card ~= nil and card.a.items == #plan.spots and #card.a.stars == Config.Furniture.Stars and card.a.estimate > 0,
-	card and card.a.items)
-E.request(ann, "start", "marge")
-check("START: the planning lobby", E.last(ann, "MoveLobby", "lobby") ~= nil and E.last(ann, "MoveLobby", "lobby").a ~= nil and E.built == 0)
-lobbyRequest(bob, "role", "guard")
-lobbyRequest(bob, "ready", true)
-lobbyRequest(ann, "launch")
+local plan = HouseLayout.plan(1955, "house")
+check("the run: Ann's van at the curb, the real interior built at its slot", E.startRun(ann, HOUSE) == nil and E.cars[ann] ~= nil and built[1] ~= nil and E.built == 1
+	and built[1].origin.Position.Y == Config.Furniture.Slot.Origin[2])
 local truck = E.cars[ann]
 local interior = built[1] and built[1].model
 local origin = built[1] and built[1].origin
-check("LAUNCH: the truck, the real interior built at its slot", truck ~= nil and interior ~= nil and E.built == 1 and origin.Position.Y == Config.Furniture.Slot.Origin[2])
-check("…and in the world (server/HouseInterior.luau builds it unparented)", interior:IsDescendantOf(workspace))
+check("…the plan the card's seed's (the real plan's pieces), and the interior in the world (server/HouseInterior.luau builds it unparented)",
+	#built[1].plan.spots == #plan.spots and interior:IsDescendantOf(workspace))
 Moving.step()
-check("the roles: Ann the Driver, Bob the Guard", ann:GetAttribute("MoveRole") == "driver" and bob:GetAttribute("MoveRole") == "guard" and ann:GetAttribute("MoveWith") == 11)
+check("Ann and Bob on the run (MoveWith)", ann:GetAttribute("MoveWith") == 11 and bob:GetAttribute("MoveWith") == 11)
 
 -- the door (open), the house (lit) -------------------------------------------------------------------------------------------
 
-local site = moves:FindFirstChild("Move_marge")
+local site = moves:FindFirstChild(`Move_{HOUSE}`)
 check("the front door open from the start: no Pick lock, no Kick door", promptIn(site, "Pick lock") == nil and promptIn(site, "Kick door") == nil
 	and promptIn(site, "Enter house") ~= nil and not promptIn(site, "Enter house").Enabled) -- (8.1 walk-in doors: walked through, the prompt off)
 E.place(ann, outside)
@@ -217,17 +208,13 @@ Moving.step()
 trigger(promptIn(truck.model, "Load"), ann)
 check(`the {second.item} loaded too`, ann.Character:GetAttribute("MoveCarry") == nil and string.find(E.lastNotice(ann), "2 in the van", 1, true) ~= nil, E.lastNotice(ann))
 piece2:Destroy()
-local wall = V3(Map.Depot.x + T.DropOff[1], 2, Map.Depot.z + T.DropOff[2])
-truck.chassis.CFrame = M.CFrame.new(wall.X + 4, wall.Y, wall.Z)
-E.place(ann, wall + V3(0, 1, 0))
-E.place(bob, wall + V3(3, 1, 0))
 E.clock += 0.3
 Moving.step()
-E.request(ann, "finish") -- (7.x van moves: the Wall unloaded it, a trip; the owner's FINISH ends the move)
-local result = E.last(ann, "Moving", "result")
-check("delivered at the Wall: the pay for the real piece (7.0 review: the one whose model went never counts)", result ~= nil and result.a.how == "done" and result.a.delivered == 1 and result.a.pay > 0 and result.a.money > 0,
-	result and result.a.how)
-check("the interior taken down, nobody on the move any more", E.destroyed == 1 and interior.Parent == nil and ann:GetAttribute("MoveRole") == nil and ann:GetAttribute("MoveWith") == nil)
+E.request(ann, "finish") -- (the host's FINISH: what is in the truck goes home)
+local over = ends[#ends]
+check("FINISH: the real piece home in Ann's stock (7.0 review: the one whose model went never counts)", over ~= nil and over.phase == "done" and #over.pieces == 1
+	and over.pieces[1].item == spot.item and #E.collected == 1 and E.collected[1].player == ann, over and over.phase)
+check("the interior taken down, nobody on the run any more", E.destroyed == 1 and interior.Parent == nil and ann:GetAttribute("MoveWith") == nil)
 
 if failures == 0 then
 	print("ALL CHECKS PASSED")

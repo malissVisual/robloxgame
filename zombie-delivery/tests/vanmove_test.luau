@@ -1,7 +1,7 @@
 -- 7.x van moves and the farm move's pure parts: shared/MovingRules.luau's trips (deliver: everything in the van and on its
 -- hitch, late after the clock; lose: a lost van's load; setBed), the hitch (a piece too big for the bed that may be
 -- towed: one at a time, Unload takes it off last), the pay over the trips (late ones at LateShare, the contract's pay);
--- shared/HouseLayout.luau's ways (exitsOf, entries, exitsFor: the farm's hay wagon by the barn doors only);
+-- shared/HouseLayout.luau's ways (exitsOf, entries, exitsFor: 10.5 the big house's two doors; the farm went);
 -- shared/MoveHelperBrain.luau routeVia (Danny's nearest way he may take); shared/NpcLooks.luau's Walt; MoveStory's ★
 -- lines. Run with tests/run_tests.py.
 local Rules = require("./MovingRules")
@@ -111,22 +111,20 @@ check("only what reached the Wall pays: the van's load at the end does not", (fu
 end)())
 check("the card's estimate × the contract's pay", Rules.estimate(spots, defs, 1.25) == math.floor((40 + 400 * P.Star + 650 + 100 + 40) * P.Scale * 1.25 + 0.5))
 
--- The farm's ways (shared/HouseLayout.luau) ------------------------------------------------------------------------------------
+-- The big house's ways (shared/HouseLayout.luau) ---------------------------------------------------------------------------
 
-local farm = HouseLayout.plan(1921, "farm")
+local big = HouseLayout.plan(3, "big")
 local house = HouseLayout.plan(1955, "house")
-local exits = HouseLayout.exitsOf(farm)
-local entries = HouseLayout.entries(farm)
-check("the farm's ways: the front door and the barn doors; a house's: its front door", #exits == 2 and #entries == 2 and #HouseLayout.exitsOf(house) == 1
+local exits = HouseLayout.exitsOf(big)
+local entries = HouseLayout.entries(big)
+check("the big house's ways: the front door and the back door; a house's: its front door", #exits == 2 and #entries == 2 and #HouseLayout.exitsOf(house) == 1
 	and #HouseLayout.entries(house) == 1 and HouseLayout.entries(house)[1] == house.entry)
-local barnIn = entries[2].Position
-check("in by the barn doors: EntryIn in from its doorway, facing into the barn, at EntryUp", entries[1] == farm.entry
-	and math.abs((barnIn - exits[2]).Magnitude - Config.Furniture.EntryIn) < 1e-6 and math.abs(barnIn.Y - Config.Furniture.EntryUp) < 1e-6
-	and barnIn.Z < exits[2].Z)
-local wagonExits = HouseLayout.exitsFor(farm, "hay_wagon")
-local saddleExits = HouseLayout.exitsFor(farm, "thunders_saddle")
-check("the hay wagon (bigDoor) by the barn doors only, the saddle by either, a house's piece by its front door", #wagonExits == 1 and wagonExits[1] == 2
-	and #saddleExits == 2 and #HouseLayout.exitsFor(house, "sofa") == 1)
+local backIn = entries[2].Position
+check("in by the back door: EntryIn in from its doorway, at EntryUp", entries[1] == big.entry
+	and math.abs(math.sqrt((backIn.X - exits[2].X) ^ 2 + (backIn.Z - exits[2].Z) ^ 2) - Config.Furniture.EntryIn) < 1e-6
+	and math.abs(backIn.Y - Config.Furniture.EntryUp) < 1e-6)
+check("every piece of the big house by either door, a house's piece by its front door", #HouseLayout.exitsFor(big, "sofa") == 2
+	and #HouseLayout.exitsFor(house, "sofa") == 1)
 
 -- Danny's way (MoveHelperBrain.routeVia) ----------------------------------------------------------------------------------------
 

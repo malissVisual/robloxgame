@@ -428,7 +428,7 @@ for index, house in SandboxMap.Houses do
 	local p = E.player(300 + index, `Crew{index}`, V3(plot.spawn.x, 3, plot.spawn.z))
 	E.plots[p] = plot
 	E.profiles[p] = { money = 5000, sandboxHouse = house.id, sandboxHouseSeed = seed }
-	Moving.admin(p, "start")
+	E.startRun(p, house.id)
 	local b = built[#built]
 	Moving.step()
 	local danny = MoveHelper.find(p)
@@ -649,7 +649,7 @@ for index, house in SandboxMap.Houses do
 	check(`{house.name}: …each door walked into fading out and out of it fading in (the players' walk-in doors; out with a piece: it fades with him), every trip a "[Danny] teleport door" line`,
 		trips == 8 and doors == trips and fadesOut - out0 == trips and fadesIn - in0 == trips and fadesWith - with0 == given and doorLines == trips and stuckLines == 0,
 		`{trips} {doors} {fadesOut - out0} {fadesIn - in0} {fadesWith - with0} {doorLines} {stuckLines}`)
-	Moving.admin(p, "end")
+	Moving.endRun(p)
 	Moving.step()
 end
 

@@ -1,25 +1,14 @@
 --!strict
--- 3.9: the gun away and the hands on foot. The server keeps the holster and checks every swing:
---   Holster (B)  the client says holstered or not; the character's Holstered attribute says it to everybody (the clients
---                hide the gun in the hand, client/ArmPose.luau) and server/Gun.luau fires no hand-gun shot while it is
---                set. Every spawn starts holstered. In a car seat it changes nothing (window shots, the car gun).
---                6.0: without a gun (a new courier: fists only) a draw is refused, the hands stay empty.
---                6.1: B goes through what you hold (server/Hand.luau): a draw makes the gun the hand (a loaded bag in
---                your hand is set down first, server/Cargo.luau), a holster goes back to the bag or the fists.
---   Melee (V)    alive, on foot, the hands free (no cargo) and the cooldown over (Config.Melee): a punch when
---                holstered, a strike with the gun when it is out. It hits the nearest living zombie or bandit in a short
---                cone in front of you (shared/Melee.luau), pushes it back, and the kill counts like any other (the
---                money, the challenges: cause "melee"). The character's MeleeAt (server time) and MeleeKind attributes
---                make every client swing your arm (client/ArmPose.luau).
---                6.7: with the Baseball Bat owned (profile.kit, Config.Melee.BatKit) the punch is a bat swing
---                (Melee.kindOf: its damage, cooldown, push and longer reach); MeleeKind says the gun's strike (Melee.pose)
---                and a bat is welded into the right hand for that swing only (showBat, Config.Melee.BatLook).
---   10.x danger: CloseCombat.swing(player, kind, direction?, held?)   one swing of `kind` (Config.Melee.Kinds) with
---                the same checks (alive, on foot, the hands free, the cooldown) and the same hit: a run's bat
---                (server/RunDanger.luau: its Tool's click; `held`: the bat is in the hand already, none welded for the
---                swing). True when it swung.
+-- 10.x danger: a run's bat (server/RunDanger.luau: its Tool's click). 10.5: only this is left of the city's close
+-- combat (its holster, B, and its fists and gun strikes, V, went with the guns): CloseCombat.swing checks every swing
+-- as they did.
+--   CloseCombat.swing(player, kind, direction?, held?)   one swing of `kind` (Config.Melee.Kinds: the run's "bat"):
+--                alive, on foot, the hands free (no piece carried) and the cooldown over (Config.Melee). It hits the
+--                nearest living zombie in a short cone in front of you (shared/Melee.luau), not through a wall, pushes it
+--                back, and the kill counts like any other (cause "melee"). The character's MeleeAt (server time) and
+--                MeleeKind attributes make every client swing your arm (client/ArmPose.luau); a bat not `held` already is
+--                welded into the right hand for that swing only (showBat, Config.Melee.BatLook). True when it swung.
 
-local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -27,12 +16,10 @@ local Config = require(Shared.Config)
 local Melee = require(Shared.Melee)
 local Net = require(Shared.Net)
 local Zombies = require(script.Parent.Zombies)
-local Hand = require(script.Parent.Hand) -- 6.1: what you hold
-local PlayerData = require(script.Parent.PlayerData) -- 6.7: the bat is kit
 
 local CloseCombat = {}
 
-local lastSwing: { [Player]: number } = {}
+local lastSwing: { [Player]: number } = setmetatable({}, { __mode = "k" }) :: any -- (a player who left goes with them)
 
 -- 6.7: the bat in the right hand (R15 RightHand, R6 Right Arm) for one swing: a taped handle and a wooden barrel out of
 -- the fist along the hand's forward axis (a hammer's grip), welded, massless and touching nothing; gone after the swing.
@@ -74,21 +61,6 @@ local function showBat(character: Model)
 	end)
 end
 
--- The holster of a character (true: the gun is away). A new character starts holstered.
-local function setHolstered(character: Model, holstered: boolean)
-	character:SetAttribute("Holstered", holstered)
-	if holstered then
-		character:SetAttribute("Aiming", false) -- no empty hands held up
-	end
-end
-
-local function onHolster(player: Player, holstered: any)
-	if type(holstered) ~= "boolean" or not player.Character then
-		return
-	end
-	Hand.holster(player, holstered) -- 6.1 (6.0: no gun to draw, fists only: Hand refuses the draw)
-end
-
 -- The direction of the swing along the ground: the client's (a unit vector, checked), else where the body faces.
 local function swingDirection(direction: any, root: BasePart): Vector3
 	local facing = root.CFrame.LookVector
@@ -102,7 +74,7 @@ local function swingDirection(direction: any, root: BasePart): Vector3
 	return if flat.Magnitude > 1e-3 then flat.Unit else Vector3.new(0, 0, -1)
 end
 
-function CloseCombat.swing(player: Player, kind: string?, direction: any, held: boolean?): boolean
+function CloseCombat.swing(player: Player, kind: string, direction: any, held: boolean?): boolean
 	local character = player.Character
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 	local root = character and character:FindFirstChild("HumanoidRootPart")
@@ -115,11 +87,7 @@ function CloseCombat.swing(player: Player, kind: string?, direction: any, held: 
 	if character:GetAttribute("Carrying") ~= nil then
 		return false -- the hands are full
 	end
-	if not kind then
-		local profile = PlayerData.get(player)
-		kind = Melee.kindOf(character:GetAttribute("Holstered") == true, profile ~= nil and Melee.hasBat(profile.kit)) -- 6.7: the bat
-	end
-	local def = Melee.def(kind :: string)
+	local def = Melee.def(kind)
 	local now = os.clock()
 	if lastSwing[player] and now - lastSwing[player] < def.cooldown * 0.8 then
 		return false -- faster than the swing allows (a little slack for the network)
@@ -127,12 +95,12 @@ function CloseCombat.swing(player: Player, kind: string?, direction: any, held: 
 	lastSwing[player] = now
 	-- Everybody sees the arm swing (the kind first: the clients read it when MeleeAt changes). 6.7: the bat swings like
 	-- the gun's strike (Melee.pose), with the bat in the hand.
-	character:SetAttribute("MeleeKind", Melee.pose(kind :: string))
+	character:SetAttribute("MeleeKind", Melee.pose(kind))
 	character:SetAttribute("MeleeAt", workspace:GetServerTimeNow())
 	if kind == "bat" and not held then
 		showBat(character)
 	end
-	local range = Melee.reachOf(kind :: string) -- 6.7: the bat reaches further
+	local range = Melee.reachOf(kind) -- 6.7: the bat reaches further
 
 	local dir = swingDirection(direction, root)
 	local from = root.Position
@@ -158,8 +126,7 @@ function CloseCombat.swing(player: Player, kind: string?, direction: any, held: 
 		return true
 	end
 	local push = dir * def.push + Vector3.new(0, def.push * 0.4, 0)
-	-- 6.20: Hard Fist (Config.Skills) adds to the fist's punch (not the gun's strike nor the bat)
-	local damage = def.damage + (if kind == "punch" then require(script.Parent.Skills).effect(player, "punch") else 0)
+	local damage = def.damage
 	local killed = Zombies.damage(best, damage, player, { push = push, cause = "melee" })
 	if not killed and not best.car and not best.root.Anchored then
 		-- A stagger: a short shove back (a brute barely moves).
@@ -168,32 +135,6 @@ function CloseCombat.swing(player: Player, kind: string?, direction: any, held: 
 	end
 	Net.get("Hit"):FireClient(player, best.torso.Position, damage, false, killed)
 	return true
-end
-
-local function onMelee(player: Player, direction: any)
-	CloseCombat.swing(player, nil, direction)
-end
-
-local function watch(player: Player)
-	player.CharacterAdded:Connect(function(character)
-		setHolstered(character, true)
-	end)
-	local character = player.Character
-	if character and character:GetAttribute("Holstered") == nil then
-		setHolstered(character, true)
-	end
-end
-
-function CloseCombat.start()
-	Net.get("Holster").OnServerEvent:Connect(onHolster)
-	Net.get("Melee").OnServerEvent:Connect(onMelee)
-	Players.PlayerAdded:Connect(watch)
-	for _, player in Players:GetPlayers() do
-		watch(player)
-	end
-	Players.PlayerRemoving:Connect(function(player)
-		lastSwing[player] = nil
-	end)
 end
 
 return CloseCombat

@@ -1,6 +1,6 @@
 -- 8.0 SANDBOX: the real server/Admin.luau's "sandbox" command (the admin panel's SANDBOX tab), built by
 -- tests/run_tests.py as AdminServer.luau on tests/runtime/AdminRuntime.luau's fakes: a non-admin is refused (nothing
--- happens, nothing is said), outside the sandbox world it is refused and says why, anything but a button's id is refused,
+-- happens, nothing is said), anything but a button's id is refused,
 -- the clicks go through Net.limit (Config.Robust.Limits.AdminSandbox), every button's server side (the money, 9.7 the
 -- runs through server/Runs.luau's admin and the clock and horde through Moving.admin, the stock through the Collection
 -- API, the teleports to shared/SandboxMap.luau's spots: the lobby, the house, the warehouse) and the TARGET (another
@@ -75,11 +75,6 @@ E.clock += 1
 E.fire(owner, "sandbox", "money")
 E.fire(owner, "sandbox", "money") -- the same moment: a double click
 check("a double click runs once", #E.money == 2)
-
-Config.Sandbox.On = false
-mark = click(owner, "money")
-check("outside the sandbox world: refused, the owner told why", #E.money == 2 and string.find(E.said(owner, mark), "Config.Sandbox.On", 1, true) ~= nil, E.said(owner, mark))
-Config.Sandbox.On = true
 
 local junk: { any } = { "nuke", 5, true, {}, 0 / 0, string.rep("x", 200), "MONEY" }
 local before = #E.money
@@ -289,9 +284,6 @@ check("8.3: a non-admin's UNLOCK PAINTS does nothing", #E.paints == 2)
 -- ── Travel ───────────────────────────────────────────────────────────────────
 
 local plot = SandboxMap.Plots[1]
-local spot = plot.vanSpot
-local van = E.newCar(owner, "sprinter", E.Mock.CFrame.new(300, 0, 300))
-E.cars[owner] = van
 click(owner, "lobby")
 local lobbySpawn = SandboxMap.Lobby.spawn
 check("📍 TO LOBBY (9.7): on foot at the lobby's plaza (its spawn)", near(owner.Character:FindFirstChild("HumanoidRootPart").Position, E.Mock.Vector3.new(lobbySpawn.x, lobbySpawn.y + 0.5, lobbySpawn.z)),
@@ -303,13 +295,6 @@ check("📍 TO HOUSE on foot: at the front door, out in front of it, facing it",
 click(owner, "warehouse")
 local spawn = plot.spawn
 check("📍 TO WAREHOUSE on foot: at the plot's spawn", near(root.Position, E.Mock.Vector3.new(spawn.x, spawn.y + 0.5, spawn.z)), root.Position)
-E.seated[owner] = van
-click(owner, "house")
-local curb = SandboxMap.House.curb
-check("📍 TO HOUSE driving the van: the van to the house's curb, nose north", near(van.chassis.Position, E.Mock.Vector3.new(curb.x, curb.y + 3.5, curb.z), 0.1) and near(van.chassis.CFrame.LookVector, E.Mock.Vector3.new(0, 0, -1)), van.chassis.Position)
-click(owner, "warehouse")
-check("📍 TO WAREHOUSE driving the van: the van to the vanSpot", near(van.chassis.Position, E.Mock.Vector3.new(spot.x, spot.y + 3.5, spot.z), 0.1))
-E.seated[owner] = nil
 
 -- ── The TARGET ───────────────────────────────────────────────────────────────
 

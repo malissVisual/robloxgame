@@ -6,8 +6,6 @@
 --     ground-floor windows lit by the world's two window dice; the only solid pieces the body, the gable and the door
 --   * nothing in the door's swing or on the path from the door to the kerb (couriers, receivers, movers), nothing over
 --     the lot's edges, nothing under the walk
---   * clear of a moving day's dress (shared/MoveSiteLooks.luau house: the boxes by the door, the MOVING DAY banner
---     over it, the yard and realtor signs), on every house: any of them can be a move's
 --   * within the part budget (ChaletLooks.Budget a chalet; the whole Suburbs' houses under the 7.1 budget; 7.1 review:
 --     about 32 parts a chalet, it was 45), the three looks all used, the roof steep with wide eaves, the balcony under
 --     the roof's verge
@@ -15,7 +13,6 @@
 local Config = require("./Config")
 local Map = require("./Map")
 local ChaletLooks = require("./ChaletLooks")
-local MoveSiteLooks = require("./MoveSiteLooks")
 
 local failures = 0
 local function check(name: string, ok: boolean, detail: any?)
@@ -51,7 +48,7 @@ local function boxOf(piece: ChaletLooks.Piece): { number }
 	return { x0, x1, y0, y1, z0, z1 }
 end
 
-local bodyOk, doorOk, windowsOk, solidOk, pathOk, lotOk, moveOk, budgetOk = true, true, true, true, true, true, true, true
+local bodyOk, doorOk, windowsOk, solidOk, pathOk, lotOk, budgetOk = true, true, true, true, true, true, true
 local used: { [number]: number } = {}
 local most, total = 0, 0
 local notes: { string } = {}
@@ -127,20 +124,6 @@ for n, lot in houses do
 			budgetOk = budgetOk and count == 1
 		end
 	end
-	-- a moving day's dress on this house (any house can be a move's): none of its pieces in a chalet's piece
-	local park = MoveSiteLooks.parkDepth(home)
-	local origin: MoveSiteLooks.Place = { x = 0, y = 0, z = 0, yaw = 0 }
-	for _, m in MoveSiteLooks.house("Test", park) do
-		local x0, x1, y0, y1, z0, z1 = MoveSiteLooks.box(origin, m)
-		if z1 > -15 and y0 > -0.1 then -- (the cones are on the road)
-			for _, p in pieces do
-				if p.name ~= "House" and overlaps({ x0, x1, y0, y1, z0, z1 }, boxOf(p)) then
-					moveOk = false
-					note(`{home.id} {p.name} in the moving day's {m.name}`)
-				end
-			end
-		end
-	end
 end
 for _, text in notes do
 	print("  " .. text)
@@ -152,7 +135,6 @@ check("two ground-floor windows, lit at night by the world's two window dice", w
 check("solid: the body, the gable and the door only (everything else decoration: nothing to bump into)", solidOk)
 check("nothing in the door's swing or on the path from the door to the kerb", pathOk)
 check("everything on its own lot, nothing under the walk", lotOk)
-check("clear of a moving day's dress (the boxes, the banner over the door, the yard and realtor signs) on every house", moveOk)
 check(`within the budget: {ChaletLooks.Budget} pieces a chalet at most, one body and one door each`, budgetOk and most <= ChaletLooks.Budget, most)
 -- (7.1's budget: the Suburbs' houses were about 11 parts each with the path, the mailbox and the tree; the whole city
 -- 22,851 parts in 7.0: the chalets and the square stay within 15 % of it, tools/perf/world_count.py)

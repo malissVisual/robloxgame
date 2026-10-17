@@ -30,11 +30,6 @@
 -- in the living room, the kitchen's corner bench under the Herrgottswinkel's shelf, rag rugs, lace in the windows,
 -- antlers and alpine pictures on the walls, the front door's leaves painted with flowers, warm lamps; the bathroom and
 -- the garage stay practical (tiles, concrete). Config.Furniture.Alpine has its numbers.
--- 7.x the farm: a plan of kind "farm" (shared/Layouts/Farm.luau) builds its farmhouse like a house and its barn and
--- yard in the farm block below (farmShell and the farm's fixtures' looks): two roofs, the yard open to the sky, the
--- barn doors a second way out with their own daylight. The farmhouse is a chalet inside like a house (its planks,
--- panelling, beams, lace, the front door's leaves); the barn and the yard keep their own (no chalet beams there), and a
--- fixture kind both have (the Stube's kachelofen) takes the farm's own look (FARM_LOOKS).
 -- 8.3 the big house: a plan of kind "big" (shared/HouseLayout.luau: the sandbox's big house, a house's plan made
 -- bigger, its guest room a bedroom's kind, its study a living room's) builds as a house, its lights and Neon as every
 -- house's (Config.SandboxLight.House), its front door's two leaves as every house's (frontLeaves), and its back door (a
@@ -49,8 +44,8 @@
 -- 8.9.1 the house's fixtures in the owner's Blender model (design/blender-fixtures/KONTRAKT.md): each fixture of
 -- FixtureMesh.Kinds (the kitchen's, the bathroom's, the Kachelofen, the garage's) is built in its own Model
 -- "Fixture_<kind>" (attribute Fixture) in Decor, and once ZDCFixtureArt is imported server/FixtureMesh.luau dresses it
--- (its solid parts stay, hidden; without the import, or a fixture of another size, its parts as before). The farm's own
--- looks (FARM_LOOKS), the rugs, mats, stains, antlers and pictures stay loose in Decor.
+-- (its solid parts stay, hidden; without the import, or a fixture of another size, its parts as before). The rugs,
+-- mats, stains, antlers and pictures stay loose in Decor.
 -- 9.5 the countryside's spots: a plan of kind "cabin", "lodge", "mill" or "cottage" (shared/Layouts/Countryside.luau)
 -- builds as a house in its own style (SPOTS: the walls, the wainscot, the floors, the ceiling and its beams, the lace;
 -- its dice after a house's, so a house looks as it did): the Pond Cabin's dark stained boards, the Forest Lodge's
@@ -626,37 +621,12 @@ local SPOTS: { [string]: SpotStyle } = {
 	},
 }
 
--- ── 7.x the farm ──────────────────────────────────────────────────────────────
--- Walt's farm (shared/Layouts/Farm.luau, a plan of kind "farm"). Its farmhouse's rooms are a house's kinds (hall,
--- living: the Stube, kitchen, bedroom; the pantry looks like a hall) and are built above like a house's. Its barn's rooms
--- (stable, barn: the threshing floor, workshop) and the yard are FARM_OWN: the build leaves their floors, walls and
--- lights to farmShell (called where a house gets its ceiling), which builds the two roofs (the yard is open to the
--- sky), the barn in weathered timber, the yard's whitewashed farmhouse wall with its stone plinth and its windows'
--- outsides (shutters, geraniums), the fences with an invisible wall over them, the cobbled path, the barn's door frames
--- and the ranch's name over its yard door. The fixtures' looks below draw the stoves, the larder, the stalls, the hay
--- loft, the beams and their lanterns (the barn's lights), the forge, the trough, the woodpile and the barn doors (the
--- second exit: the doors swung open onto an apron, the daylight beyond, EXIT over them).
-local FARM_OWN: { [string]: boolean } = { stable = true, barn = true, workshop = true, yard = true }
-local FARM = Config.Furniture.Farm
-local TIMBERS = { rgb(122, 86, 58), rgb(106, 76, 54), rgb(138, 98, 64) } -- the barn's boards (weathered larch)
-local FARM_TILES = { rgb(70, 120, 90), rgb(206, 196, 170), rgb(160, 76, 56), rgb(84, 112, 150) } -- the stoves' tiles
-local WHITEWASH = rgb(242, 238, 228)
-local FENCE = rgb(150, 112, 74)
-local STONE = rgb(128, 124, 118)
-local DARKWOOD = rgb(84, 58, 40)
-local FARM_FLOORS: { [string]: Floor } = {
-	barn = { color = rgb(152, 114, 76), material = Enum.Material.WoodPlanks },
-	stable = { color = rgb(132, 126, 114), material = Enum.Material.Cobblestone },
-	workshop = { color = rgb(118, 94, 70), material = Enum.Material.WoodPlanks },
-	yard = { color = rgb(126, 118, 96), material = Enum.Material.Pebble },
-}
-local HORSES = { "THUNDER", "DUSTY", "PEPPER", "BISCUIT" } -- the stalls' name boards, in order (Thunder's first)
-local stalls = 0
-local FARM_LOOKS: { [string]: FixtureLook } = {} -- the farm's own looks of a house's fixture kinds
+-- ── The stoves and the larder (the countryside's spots': shared/Layouts/Countryside.luau) ─────────────────────────────
+local STOVE_TILES = { rgb(70, 120, 90), rgb(206, 196, 170), rgb(160, 76, 56), rgb(84, 112, 150) } -- the stoves' tiles
 
 -- a kitchen range clad in tiles, its iron hob, the oven door, a brass rail, the flue up to the ceiling
 LOOKS.tiled_stove = function(parent, at, s, roll)
-	part(parent, "Range", Vector3.new(s.X, s.Y - 0.2, s.Z), at * CFrame.new(0, (s.Y - 0.2) / 2, 0), FARM_TILES[roll(#FARM_TILES)], Enum.Material.CeramicTiles, true)
+	part(parent, "Range", Vector3.new(s.X, s.Y - 0.2, s.Z), at * CFrame.new(0, (s.Y - 0.2) / 2, 0), STOVE_TILES[roll(#STOVE_TILES)], Enum.Material.CeramicTiles, true)
 	part(parent, "Hob", Vector3.new(s.X + 0.1, 0.2, s.Z + 0.1), at * CFrame.new(0, s.Y - 0.1, 0), rgb(40, 40, 44), Enum.Material.Metal, true)
 	part(parent, "OvenDoor", Vector3.new(1.3, 1.1, 0.08), at * CFrame.new(-0.6, 1.3, -s.Z / 2 - 0.04), rgb(30, 30, 34), Enum.Material.Metal)
 	part(parent, "Rail", Vector3.new(s.X, 0.1, 0.1), at * CFrame.new(0, s.Y - 0.45, -s.Z / 2 - 0.15), rgb(204, 164, 72), Enum.Material.Metal)
@@ -664,21 +634,7 @@ LOOKS.tiled_stove = function(parent, at, s, roll)
 	cylinder(part(parent, "Flue", Vector3.new(flue, 0.6, 0.6), at * CFrame.new(0.9, s.Y + flue / 2, s.Z / 2 - 0.5) * CFrame.Angles(0, 0, math.pi / 2), rgb(50, 50, 54), Enum.Material.Metal))
 end
 
--- the Stube's tiled stove (a Kachelofen): a stone base, the tiled body and its crown, a cornice, the bench in front of
--- it (the farm's own look of the fixture kind a chalet's living room has too: FARM_LOOKS goes before LOOKS in a farm)
-FARM_LOOKS.kachelofen = function(parent, at, s, roll)
-	local tile = FARM_TILES[roll(#FARM_TILES)]
-	local body = s.Z - 1.2
-	local back = s.Z / 2 - body / 2
-	part(parent, "Base", Vector3.new(s.X, 0.5, body), at * CFrame.new(0, 0.25, back), STONE, Enum.Material.Slate, true)
-	part(parent, "Stove", Vector3.new(s.X - 0.4, 3.8, body - 0.2), at * CFrame.new(0, 2.4, back + 0.1), tile, Enum.Material.CeramicTiles, true)
-	part(parent, "Cornice", Vector3.new(s.X, 0.25, body), at * CFrame.new(0, 4.42, back), DARKWOOD, Enum.Material.Wood, true)
-	part(parent, "Crown", Vector3.new(s.X - 0.9, 1.3, body - 0.6), at * CFrame.new(0, 5.2, back + 0.3), tile:Lerp(Color3.new(1, 1, 1), 0.15), Enum.Material.CeramicTiles, true)
-	part(parent, "Bench", Vector3.new(s.X, 0.25, 1.2), at * CFrame.new(0, 1.6, -s.Z / 2 + 0.6), rgb(170, 128, 82), Enum.Material.Wood, true)
-	part(parent, "BenchFront", Vector3.new(s.X, 1.5, 0.15), at * CFrame.new(0, 0.75, -s.Z / 2 + 0.1), rgb(150, 110, 70), Enum.Material.Wood, true)
-end
-
--- the pantry's larder: wooden shelves, rows of preserving jars, a ham hung from the top
+-- a larder: wooden shelves, rows of preserving jars, a ham hung from the top
 LOOKS.larder = function(parent, at, s)
 	local wood = rgb(160, 118, 76)
 	for _, x in { -1, 1 } do
@@ -692,111 +648,6 @@ LOOKS.larder = function(parent, at, s)
 		end
 	end
 	part(parent, "Ham", Vector3.new(0.7, 1.1, 0.6), at * CFrame.new(s.X / 4, 6.0, -0.1), rgb(150, 70, 56), Enum.Material.SmoothPlastic)
-end
-
--- a stall: its straw and the horse's name board on the back wall (the first stall is Thunder's)
-LOOKS.stall = function(parent, at, s)
-	stalls += 1
-	part(parent, "Straw", Vector3.new(s.X - 0.6, 0.1, s.Z - 0.4), at * CFrame.new(0, 0.05, 0), rgb(214, 186, 106), Enum.Material.Grass)
-	local board = part(parent, "NameBoard", Vector3.new(2.4, 0.7, 0.12), at * CFrame.new(0, 6.4, s.Z / 2 - 0.06), DARKWOOD, Enum.Material.Wood)
-	sign(board, HORSES[(stalls - 1) % #HORSES + 1], Enum.NormalId.Front, rgb(240, 226, 190))
-end
-
--- a partition between two stalls: the boards, a rail on top, the post at its front
-LOOKS.stall_wall = function(parent, at, s)
-	local wood = rgb(130, 94, 62)
-	part(parent, "Boards", Vector3.new(0.4, s.Y - 1.2, s.Z), at * CFrame.new(0, (s.Y - 1.2) / 2, 0), wood, Enum.Material.WoodPlanks, true)
-	part(parent, "Rail", Vector3.new(0.5, 0.3, s.Z), at * CFrame.new(0, s.Y - 0.15, 0), DARKWOOD, Enum.Material.Wood, true)
-	part(parent, "Post", Vector3.new(0.5, s.Y, 0.5), at * CFrame.new(0, s.Y / 2, -s.Z / 2 + 0.25), DARKWOOD, Enum.Material.Wood, true)
-end
-
--- a manger: a wooden trough on its front board, hay in it
-LOOKS.manger = function(parent, at, s)
-	part(parent, "Front", Vector3.new(s.X, 1.75, 0.2), at * CFrame.new(0, 0.875, -s.Z / 2 + 0.1), rgb(130, 94, 62), Enum.Material.WoodPlanks, true)
-	part(parent, "Trough", Vector3.new(s.X, 0.9, s.Z), at * CFrame.new(0, 2.2, 0), rgb(120, 86, 56), Enum.Material.Wood, true)
-	part(parent, "Hay", Vector3.new(s.X - 0.3, 0.5, s.Z - 0.3), at * CFrame.new(0, 2.75, 0), rgb(214, 186, 106), Enum.Material.Grass)
-end
-
--- the hay loft over the stalls: its boards (`at` is their floor), the beam along its edge, the hay piled on it and a
--- fringe of hay hanging over the edge
-LOOKS.hay_loft = function(parent, at, s)
-	local straw = rgb(214, 186, 106)
-	part(parent, "Loft", Vector3.new(s.X, 0.4, s.Z), at * CFrame.new(0, 0.2, 0), rgb(130, 96, 64), Enum.Material.WoodPlanks, true)
-	part(parent, "LoftBeam", Vector3.new(s.X, 0.7, 0.7), at * CFrame.new(0, -0.15, -s.Z / 2 + 0.35), DARKWOOD, Enum.Material.Wood)
-	part(parent, "HayPile", Vector3.new(s.X * 0.7, 2.6, s.Z * 0.55), at * CFrame.new(-s.X * 0.1, 1.7, s.Z * 0.15), straw, Enum.Material.Grass)
-	part(parent, "HayPile", Vector3.new(s.X * 0.35, 1.6, s.Z * 0.3), at * CFrame.new(s.X * 0.25, 1.2, -s.Z * 0.2), straw:Lerp(Color3.new(1, 1, 1), 0.08), Enum.Material.Grass)
-	part(parent, "HayFringe", Vector3.new(s.X - 3, 0.9, 0.4), at * CFrame.new(0, -0.6, -s.Z / 2 - 0.1), straw, Enum.Material.Grass)
-end
-
--- a tie beam across a barn room (`at` its underside)
-LOOKS.beam = function(parent, at, s)
-	part(parent, "Beam", s, at * CFrame.new(0, s.Y / 2, 0), DARKWOOD, Enum.Material.Wood)
-end
-
--- a lantern hung from a beam (`at` its bottom, size.Y up to the beam): the chain, the cap, the glow and its light
-LOOKS.lantern = function(parent, at, s)
-	local metal = rgb(44, 42, 40)
-	part(parent, "Chain", Vector3.new(0.08, s.Y - 1.2, 0.08), at * CFrame.new(0, 1.2 + (s.Y - 1.2) / 2, 0), metal, Enum.Material.Metal)
-	part(parent, "LanternCap", Vector3.new(s.X, 0.25, s.Z), at * CFrame.new(0, 1.075, 0), metal, Enum.Material.Metal)
-	local glow = part(parent, "Lantern", Vector3.new(s.X - 0.3, 0.95, s.Z - 0.3), at * CFrame.new(0, 0.475, 0), color(FARM.Lantern.Color), Enum.Material.Neon)
-	glow.CastShadow = false
-	local light = Instance.new("PointLight")
-	light.Brightness = FARM.Lantern.Brightness
-	light.Range = FARM.Lantern.Range
-	light.Color = color(FARM.Lantern.Color)
-	light.Shadows = false
-	light.Parent = glow
-end
-
--- the smith's forge: a stone hearth, its embers, the iron hood and the flue up to the roof
-LOOKS.forge = function(parent, at, s)
-	part(parent, "Hearth", Vector3.new(s.X, 2.4, s.Z), at * CFrame.new(0, 1.2, 0), STONE, Enum.Material.Brick, true)
-	part(parent, "Embers", Vector3.new(s.X - 1.2, 0.2, s.Z - 1.2), at * CFrame.new(0, 2.5, 0), rgb(255, 110, 40), Enum.Material.Neon)
-	part(parent, "Hood", Vector3.new(s.X, 1.4, s.Z - 0.4), at * CFrame.new(0, 5.5, 0.2), rgb(54, 54, 58), Enum.Material.Metal)
-	local flue = FARM.BarnCeiling - 6.2
-	part(parent, "Flue", Vector3.new(1.2, flue, 1.2), at * CFrame.new(0, 6.2 + flue / 2, s.Z / 2 - 0.7), rgb(54, 54, 58), Enum.Material.Metal)
-end
-
--- the yard's stone water trough and its pump
-LOOKS.trough = function(parent, at, s)
-	part(parent, "Trough", Vector3.new(s.X, 1.8, s.Z), at * CFrame.new(0, 0.9, 0), STONE, Enum.Material.Slate, true)
-	local water = part(parent, "Water", Vector3.new(s.X - 0.5, 0.06, s.Z - 0.5), at * CFrame.new(0, 1.75, 0), rgb(110, 160, 190), Enum.Material.Glass)
-	water.Transparency = 0.3
-	part(parent, "Pump", Vector3.new(0.45, s.Y + 1.2, 0.45), at * CFrame.new(s.X / 2 - 0.5, (s.Y + 1.2) / 2, s.Z / 2 - 0.3), rgb(60, 92, 70), Enum.Material.Metal, true)
-end
-
--- firewood stacked along the farmhouse's wall under a little roof
-LOOKS.woodpile = function(parent, at, s)
-	part(parent, "Woodpile", Vector3.new(s.X, s.Y - 0.8, s.Z - 0.2), at * CFrame.new(0, (s.Y - 0.8) / 2, 0.1), rgb(176, 136, 92), Enum.Material.Wood, true)
-	part(parent, "WoodRoof", Vector3.new(s.X + 0.6, 0.2, s.Z + 0.4), at * CFrame.new(0, s.Y - 0.3, 0) * CFrame.Angles(-0.15, 0, 0), DARKWOOD, Enum.Material.WoodPlanks)
-end
-
--- the barn doors (`at` the doorway's middle on the wall's line, its front into the barn, +Z outside): the posts and
--- the lintel, the two doors swung wide open against the apron's sides (they keep you on it), the apron, the daylight
--- beyond it (dark at night) and the EXIT sign over them inside
-LOOKS.barn_doors = function(parent, at, s)
-	local w, h, wall = s.X, s.Y, s.Z
-	local apron = FARM.Apron
-	for _, x in { -1, 1 } do
-		part(parent, "Jamb", Vector3.new(0.8, h + 0.6, wall + 0.4), at * CFrame.new(x * (w / 2 + 0.4), (h + 0.6) / 2, 0), DARKWOOD, Enum.Material.Wood)
-		part(parent, "BarnDoor", Vector3.new(0.35, h - 0.6, apron), at * CFrame.new(x * (w / 2 + 0.3), (h - 0.6) / 2 + 0.1, wall / 2 + apron / 2), rgb(150, 56, 44), Enum.Material.WoodPlanks, true)
-		local brace = math.sqrt(apron * apron + (h - 1.6) * (h - 1.6))
-		part(parent, "Brace", Vector3.new(0.4, brace, 0.4), at * CFrame.new(x * (w / 2 + 0.05), h / 2, wall / 2 + apron / 2) * CFrame.Angles(math.atan2(apron, h - 1.6), 0, 0), rgb(236, 230, 214), Enum.Material.Wood)
-	end
-	part(parent, "Lintel", Vector3.new(w + 2.4, 0.8, wall + 0.4), at * CFrame.new(0, h + 0.4, 0), DARKWOOD, Enum.Material.Wood)
-	part(parent, "Apron", Vector3.new(w + 1, 0.2, apron), at * CFrame.new(0, -0.1, wall / 2 + apron / 2), rgb(118, 108, 90), Enum.Material.Ground, true)
-	local glow = part(parent, "BarnDaylight", Vector3.new(w + 1, h + 1, 0.4), at * CFrame.new(0, (h + 1) / 2, wall / 2 + apron + 0.2), rgb(236, 240, 228), Enum.Material.Neon, true)
-	glow.CastShadow = false
-	local light = Instance.new("SurfaceLight")
-	light.Face = Enum.NormalId.Front -- (-Z: into the barn)
-	light.Brightness = FARM.BarnLight.Brightness
-	light.Range = FARM.BarnLight.Range
-	light.Angle = 70
-	light.Color = color(FARM.BarnLight.Color)
-	light.Parent = glow
-	daylight(glow, NIGHT.porch, light)
-	local exit = part(parent, "ExitSign", Vector3.new(2.6, 0.9, 0.3), at * CFrame.new(0, h + 1.35, -wall / 2 - 0.15), rgb(250, 250, 248), SMOOTH)
-	sign(exit, "EXIT", Enum.NormalId.Front, rgb(255, 255, 255), rgb(30, 160, 80))
 end
 
 -- 8.3 walk-in doors: a door's leaf (`leaf`: its part `body`, or the model that part is the PrimaryPart of; no
@@ -865,151 +716,6 @@ local function sidePorch(shell: Instance, decor: Instance, plan: HouseLayout.Pla
 	sign(exit, "EXIT", Enum.NormalId.Back, rgb(255, 255, 255), rgb(30, 160, 80))
 end
 
--- The farm's own shell (see the block's header): the roofs, the barn's and the yard's floors and walls, the yard's
--- dressing.
-local function farmShell(shell: Instance, decor: Instance, plan: HouseLayout.Plan, origin: CFrame, roll: (number) -> number)
-	stalls = 0
-	local half = plan.wall / 2
-	local function at(x: number, y: number, z: number): CFrame
-		return origin * CFrame.new(x, y, z)
-	end
-	local timber = TIMBERS[roll(#TIMBERS)]
-	local shutters = ({ rgb(60, 110, 70), rgb(150, 50, 40), rgb(70, 96, 140) })[roll(3)]
-	local kindOf: { [string]: string } = {}
-	-- the two buildings' boxes (to their walls' outer faces) and their tops; the yard
-	type Box = { x0: number, z0: number, x1: number, z1: number, top: number }
-	local house: Box? = nil
-	local barn: Box? = nil
-	local yard: HouseLayout.Room? = nil
-	for _, room in plan.rooms do
-		kindOf[room.id] = room.kind
-		if room.kind == "yard" then
-			yard = room
-			continue
-		end
-		local b: Box = { x0 = room.min.X - half, z0 = room.min.Z - half, x1 = room.max.X + half, z1 = room.max.Z + half, top = room.max.Y }
-		local into = if FARM_OWN[room.kind] then barn else house
-		if into then
-			b = { x0 = math.min(b.x0, into.x0), z0 = math.min(b.z0, into.z0), x1 = math.max(b.x1, into.x1), z1 = math.max(b.z1, into.z1), top = math.max(b.top, into.top) }
-		end
-		if FARM_OWN[room.kind] then
-			barn = b
-		else
-			house = b
-		end
-	end
-	-- the roofs: the farmhouse's ceiling (a house's), the barn's dark boards
-	local function roof(b: Box, name: string, c: Color3, material: Enum.Material)
-		part(shell, name, Vector3.new(b.x1 - b.x0, 1, b.z1 - b.z0), at((b.x0 + b.x1) / 2, b.top + 0.5, (b.z0 + b.z1) / 2), c, material, true)
-	end
-	if house then
-		roof(house, "Ceiling", CEILING, Enum.Material.WoodPlanks) -- (a chalet's pine ceiling, as a house's)
-	end
-	if barn then
-		roof(barn, "BarnRoof", timber:Lerp(Color3.new(0, 0, 0), 0.35), Enum.Material.WoodPlanks)
-	end
-	-- the barn's and the yard's floors (to their walls' middles)
-	for _, room in plan.rooms do
-		local look = FARM_FLOORS[room.kind]
-		if look then
-			local w, d = room.max.X - room.min.X + plan.wall, room.max.Z - room.min.Z + plan.wall
-			part(shell, "Floor", Vector3.new(w, 0.2, d), at((room.min.X + room.max.X) / 2, -0.1, (room.min.Z + room.max.Z) / 2), look.color, look.material, true)
-		end
-	end
-	-- their walls: the barn's timber, the yard's whitewashed farmhouse wall (a stone plinth at its foot), the barn's
-	-- front, the fences (an invisible wall over them up to Farm.Barrier)
-	for _, face in plan.faces do
-		local kind = kindOf[face.room]
-		if not kind or not FARM_OWN[kind] then
-			continue
-		end
-		local size = face.max - face.min
-		local centre = (face.min + face.max) / 2
-		local c, material = timber, Enum.Material.WoodPlanks
-		local houseSide = kind == "yard" and not face.outer and face.normal.Z > 0.5
-		if kind == "yard" and face.outer then
-			c = FENCE
-		elseif houseSide then
-			c, material = WHITEWASH, Enum.Material.Plaster
-		elseif face.outer then
-			c = timber:Lerp(Color3.new(0, 0, 0), 0.08)
-		end
-		part(shell, if face.header then "Header" else "Wall", size, at(centre.X, centre.Y, centre.Z), c, material, true)
-		if face.header then
-			continue
-		end
-		if kind == "yard" and face.outer then
-			local high = FARM.Barrier - size.Y
-			local barrier = part(shell, "Barrier", Vector3.new(size.X, high, size.Z), at(centre.X, face.max.Y + high / 2, centre.Z), FENCE, SMOOTH, true)
-			barrier.Transparency = 1
-			barrier.CastShadow = false
-		elseif houseSide then
-			part(decor, "Plinth", Vector3.new(size.X, 1.4, 0.2), at(centre.X, 0.7, face.max.Z + 0.1), STONE, Enum.Material.Slate)
-		end
-	end
-	if not yard then
-		return
-	end
-	local y = yard :: HouseLayout.Room
-	-- the eaves over the yard: the farmhouse's and the barn's
-	local width = y.max.X - y.min.X + plan.wall
-	local cx = (y.min.X + y.max.X) / 2
-	if house then
-		part(decor, "Eave", Vector3.new(width + 2, 0.4, 2.6), at(cx, house.top + 0.8, y.min.Z + 1.3), DARKWOOD, Enum.Material.WoodPlanks)
-	end
-	if barn then
-		part(decor, "Eave", Vector3.new(width + 2, 0.4, 2.6), at(cx, barn.top + 0.8, y.max.Z - 1.3), DARKWOOD, Enum.Material.WoodPlanks)
-	end
-	-- the windows' outsides on the farmhouse's yard wall: a frame, the dark pane, shutters, a box of geraniums
-	for _, w in plan.windows do
-		local kind = kindOf[w.room]
-		if kind and not FARM_OWN[kind] and w.normal.Z < -0.5 and math.abs(w.at.Z + plan.wall - y.min.Z) < 0.01 then
-			local z = y.min.Z
-			part(decor, "WindowFrame", Vector3.new(w.width + 0.5, w.height + 0.5, 0.16), at(w.at.X, w.at.Y, z + 0.08), DARKWOOD, SMOOTH)
-			local pane = part(decor, "Pane", Vector3.new(w.width, w.height, 0.06), at(w.at.X, w.at.Y, z + 0.19), rgb(40, 52, 62), Enum.Material.Glass)
-			pane.Reflectance = 0.2
-			for _, s in { -1, 1 } do
-				part(decor, "Shutter", Vector3.new(w.width / 2, w.height + 0.3, 0.12), at(w.at.X + s * (w.width * 0.75 + 0.35), w.at.Y, z + 0.1), shutters, Enum.Material.WoodPlanks)
-			end
-			local sill = w.at.Y - w.height / 2
-			part(decor, "FlowerBox", Vector3.new(w.width + 0.6, 0.6, 0.7), at(w.at.X, sill - 0.3, z + 0.35), DARKWOOD, Enum.Material.Wood)
-			part(decor, "Geraniums", Vector3.new(w.width + 0.3, 0.6, 0.55), at(w.at.X, sill + 0.25, z + 0.35), rgb(214, 40, 52), Enum.Material.Fabric)
-		end
-	end
-	-- the frame of the barn's door from the yard (a house's skips doorways this wide); the cobbled path from the back
-	-- door to it; the ranch's name over it
-	local back: HouseLayout.Door? = nil
-	local barnDoor: HouseLayout.Door? = nil
-	for _, d in plan.doors do
-		local a, b = kindOf[d.rooms[1]], kindOf[d.rooms[2]]
-		if d.rooms[1] == "mudroom" and d.rooms[2] == y.id then
-			back = d
-		end
-		if not (a and FARM_OWN[a] and b and FARM_OWN[b]) then
-			continue
-		end
-		if d.rooms[1] == y.id or d.rooms[2] == y.id then
-			barnDoor = d
-		else
-			continue -- (the openings inside the barn go without)
-		end
-		for _, s in { -1, 1 } do
-			local dx = s * (d.width / 2 + 0.3)
-			local size = if d.axis == "X" then Vector3.new(0.6, plan.doorHeight, plan.wall + 0.3) else Vector3.new(plan.wall + 0.3, plan.doorHeight, 0.6)
-			part(decor, "Jamb", size, at(d.at.X + (if d.axis == "X" then dx else 0), plan.doorHeight / 2, d.at.Z + (if d.axis == "X" then 0 else dx)), DARKWOOD, Enum.Material.Wood)
-		end
-	end
-	if back and barnDoor then
-		local a = Vector3.new(back.at.X, 0.03, back.at.Z + half)
-		local b = Vector3.new(barnDoor.at.X, 0.03, barnDoor.at.Z - half)
-		part(decor, "Path", Vector3.new(4.5, 0.06, (b - a).Magnitude), origin * CFrame.lookAt((a + b) / 2, b), rgb(150, 146, 138), Enum.Material.Cobblestone)
-	end
-	if barnDoor then
-		local board = part(decor, "RanchSign", Vector3.new(9, 1.6, 0.3), at(barnDoor.at.X, plan.doorHeight + 2.2, barnDoor.at.Z - half - 0.15), DARKWOOD, Enum.Material.Wood)
-		sign(board, "SILVER SPUR RANCH", Enum.NormalId.Front, rgb(240, 226, 190))
-	end
-end
-
 -- The front door's two leaves (7.x alpine: painted, a flower on each) in the doorway, its middle at `x`, the wall's
 -- outer face at `z` (the house's frame: `at`), each `leaf` wide and `tall` high, on the porch's side of the wall. 8.3
 -- walk-in doors (Config.Moving.Doors Swing; shared/DoorSwing.luau's attributes): in the sandbox each a model
@@ -1061,7 +767,6 @@ function HouseInterior.build(plan: HouseLayout.Plan, origin: CFrame): (Model, { 
 			panelling[kind] = panels[roll(#panels)]
 		end
 	end
-	plaster.pantry, panelling.pantry = plaster.hall, panelling.hall -- (7.x the farm's pantry looks like its hall)
 	local planks = PLANKS[roll(#PLANKS)]
 	-- 9.5 the countryside's spots: their own walls, wainscot and floor (SPOTS; the dice after a house's)
 	local style = SPOTS[plan.kind]
@@ -1098,9 +803,6 @@ function HouseInterior.build(plan: HouseLayout.Plan, origin: CFrame): (Model, { 
 	ground.CastShadow = false
 	local lo, hi = Vector3.new(math.huge, 0, math.huge), Vector3.new(-math.huge, 0, -math.huge)
 	for _, room in plan.rooms do
-		if FARM_OWN[room.kind] then
-			continue -- 7.x the farm's barn and yard: farmShell
-		end
 		local floor = (if style then style.floors[room.kind] else nil) or FLOOR_OF[room.kind]
 		local w, d = room.max.X - room.min.X + plan.wall, room.max.Z - room.min.Z + plan.wall
 		local cx, cz = (room.min.X + room.max.X) / 2, (room.min.Z + room.max.Z) / 2
@@ -1114,11 +816,7 @@ function HouseInterior.build(plan: HouseLayout.Plan, origin: CFrame): (Model, { 
 	if hi.X > lo.X then
 		part(shell, "Floor", Vector3.new(hi.X - lo.X, 0.2, hi.Z - lo.Z), at((lo.X + hi.X) / 2, -0.1, (lo.Z + hi.Z) / 2), planks.color, planks.material, true)
 	end
-	if plan.kind == "farm" then
-		farmShell(shell, decor, plan, origin, roll) -- 7.x the farm: its two roofs, the barn and the yard
-	else
-		part(shell, "Ceiling", Vector3.new(plan.size.X, 1, plan.size.Z), at(mid.X, ceiling + 0.5, mid.Z), if style then style.ceiling else CEILING, Enum.Material.WoodPlanks, true)
-	end
+	part(shell, "Ceiling", Vector3.new(plan.size.X, 1, plan.size.Z), at(mid.X, ceiling + 0.5, mid.Z), if style then style.ceiling else CEILING, Enum.Material.WoodPlanks, true)
 
 	-- the beams under the ceiling: BeamRows across every row of rooms (rooms side by side, the same depth), a beam
 	-- through the walls of the rooms next to each other, none over the bathroom, the garage or a narrow row (the
@@ -1134,8 +832,8 @@ function HouseInterior.build(plan: HouseLayout.Plan, origin: CFrame): (Model, { 
 			return a.min.X < b.min.X
 		end)
 		for _, room in sorted do
-			if room.kind == "bath" or room.kind == "garage" or FARM_OWN[room.kind] or room.max.Z - room.min.Z < 10 then
-				continue -- (7.x the farm: none in its barn, it has its own tie beams, nor over the open yard)
+			if room.kind == "bath" or room.kind == "garage" or room.max.Z - room.min.Z < 10 then
+				continue
 			end
 			local last = rows[#rows]
 			if last and math.abs(last[1].Z - room.min.Z) < 1e-6 and math.abs(last[2].Z - room.max.Z) < 1e-6 and room.min.X - last[2].X <= plan.wall + 1e-3 then
@@ -1157,9 +855,6 @@ function HouseInterior.build(plan: HouseLayout.Plan, origin: CFrame): (Model, { 
 	-- ceiling, the garage bare concrete)
 	for _, face in plan.faces do
 		local kind = kindOf[face.room] or "hall"
-		if FARM_OWN[kind] then
-			continue -- 7.x the farm's barn and yard: farmShell
-		end
 		local size = face.max - face.min
 		local centre = (face.min + face.max) / 2
 		local material = if style then style.material[kind] or style.material.any
@@ -1237,12 +932,10 @@ function HouseInterior.build(plan: HouseLayout.Plan, origin: CFrame): (Model, { 
 		local exit = part(decor, "ExitSign", Vector3.new(2.6, 0.9, 0.3), at(x, plan.doorHeight + 1.05, front.at.Z + half + 0.15), rgb(250, 250, 248), SMOOTH)
 		sign(exit, "EXIT", Enum.NormalId.Back, rgb(255, 255, 255), rgb(30, 160, 80))
 	end
-	-- 8.3 the big house: its other way out (the back door) gets its own porch of daylight (a farm's barn doors have theirs)
-	if plan.kind ~= "farm" then
-		for index, door in plan.doors do
-			if index > 1 and door.rooms[2] == "outside" then
-				sidePorch(shell, decor, plan, origin, door)
-			end
+	-- 8.3 the big house: its other way out (the back door) gets its own porch of daylight
+	for index, door in plan.doors do
+		if index > 1 and door.rooms[2] == "outside" then
+			sidePorch(shell, decor, plan, origin, door)
 		end
 	end
 
@@ -1268,9 +961,6 @@ function HouseInterior.build(plan: HouseLayout.Plan, origin: CFrame): (Model, { 
 	-- the ceiling lights: one in the middle of every room, two in a long one, a warm glow (7.x alpine); a tube in the
 	-- garage
 	for _, room in plan.rooms do
-		if FARM_OWN[room.kind] then
-			continue -- 7.x the farm's barn: its lanterns are fixtures; the yard is open to the sky
-		end
 		-- (8.5.2: a lamp over each cell of the room's floor, the cells at most Lamp.Long on a side: one in a room, two
 		-- along a long one, a row down a long corridor, a grid in a big room; shared/SandboxLightRules.luau lamps)
 		local spots = LightRules.lamps(room.min.X, room.max.X, room.min.Z, room.max.Z)
@@ -1291,13 +981,11 @@ function HouseInterior.build(plan: HouseLayout.Plan, origin: CFrame): (Model, { 
 		end
 	end
 
-	-- the fixtures (a farm's own looks first: 7.x the farm); 8.9.1: one of the owner's Blender model's kinds in its
-	-- own Model, dressed by server/FixtureMesh.luau once the model is imported
-	local farm = plan.kind == "farm"
+	-- the fixtures; 8.9.1: one of the owner's Blender model's kinds in its own Model, dressed by server/FixtureMesh.luau
+	-- once the model is imported
 	for _, f in plan.fixtures do
-		local own: FixtureLook? = if farm then FARM_LOOKS[f.kind] else nil
-		local look = own or LOOKS[f.kind]
-		if look and not own and FixtureMesh.Kinds[f.kind] then
+		local look = LOOKS[f.kind]
+		if look and FixtureMesh.Kinds[f.kind] then
 			local fixture = Instance.new("Model")
 			fixture.Name = "Fixture_" .. f.kind
 			fixture:SetAttribute("Fixture", f.kind)

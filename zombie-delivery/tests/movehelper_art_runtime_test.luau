@@ -3,7 +3,7 @@
 -- tests/runtime/MovingRuntime.luau's fakes stand on) with the real server/Moving.luau and server/MoveHelper.luau. No
 -- physics: his walk is a straight step (useMover, no `keep`: carrying together his root is put at the piece's far end
 -- each step, as the constraints hold him in Roblox), a carried piece goes where its carrier is (the test moves it).
--- A solo move into Marge's real house: Ann lifts the real sofa, Danny takes the far end within 2 s; they carry it out
+-- A solo run into a real family house (the lone house's plan, seed 1955): Ann lifts the real sofa, Danny takes the far end within 2 s; they carry it out
 -- of the living room through its doorway ("Watch the doorframe!"), out of the front door and across the yard to the van
 -- without a drop, he opens the van's back for the two of them, Ann loads it (10.1: Danny with her from the start); Danny carries a real
 -- two-hands piece Ann gave him (a click: his list) to the van at his slower walk; a real two-person piece on his list:
@@ -16,7 +16,7 @@ local E = require("./MovingRuntime")
 local Moving = require("./MovingServer")
 local MoveHelper = require("./MoveHelperServer")
 local Config = require("./Config")
-local Map = require("./Map")
+local SandboxMap = require("./SandboxMap")
 local Rules = require("./MovingRules")
 local FurnitureLooks = require("./FurnitureLooks")
 local HouseLayout = require("./HouseLayout")
@@ -82,15 +82,14 @@ MoveHelper.useMover({
 	end,
 })
 
-local home = Map.home(T.Contracts[1].home) :: any
-local door = V3(home.door.x, 3, home.door.z)
-local facing = V3(home.facing.x, 0, home.facing.z)
-local outside = door + facing * 3
-E.truckAt = V3(home.park.x, 2, home.park.z)
+local HOUSE = "lone_house" -- (10.5: a run on the lone house, a family house's plan; the van at its curb)
+local door, facing, outside = E.doorOf(SandboxMap.house(HOUSE))
 E.Zombies.findSpot = function(center: any): any
 	return center + V3(900, 0, 0) -- (the roamers far off)
 end
 local ann = E.player(11, "Ann", outside)
+E.profiles[ann] = { sandboxHouse = HOUSE, sandboxHouseSeed = 1955 } -- (her card's house and seed: the plan this test knows)
+Moving.parkVan = E.parkVan
 Moving.start()
 
 local function promptIn(model: any, action: string): any
@@ -199,8 +198,8 @@ end
 
 -- A solo move into the real house: Danny comes ------------------------------------------------------------------------------
 
-local started = Moving.admin(ann, "start")
-check("a solo move into Marge's real house starts", string.find(started, "started", 1, true) ~= nil and #built == 1, started)
+local started = E.startRun(ann, HOUSE)
+check("a solo run into the real house starts", started == nil and #built == 1, started)
 Moving.step()
 danny = MoveHelper.find(ann)
 local truck = E.cars[ann]
@@ -238,7 +237,7 @@ end
 check("the real sofa stands in the living room", sofaSpot ~= nil and FurnitureLooks.Items.sofa.class == "pair")
 local sofa = pieceOf(sofaSpot.id)
 carried = sofa
-local site = workspace:FindFirstChild("Moves"):FindFirstChild("Move_marge")
+local site = workspace:FindFirstChild("Moves"):FindFirstChild(`Move_{HOUSE}`)
 E.place(ann, outside)
 trigger(promptIn(site, "Enter house"), ann)
 local front = sofa.PrimaryPart.CFrame * M.CFrame.new(0, 0, -(FurnitureLooks.Items.sofa.size.Z / 2 + 2)) -- (its front: its -Z)
@@ -329,7 +328,7 @@ local ownArms: any = nil
 local delivered = run(200, function()
 	local spot, role = Rules.holding(danny.s.move, danny.id)
 	if spot == own and role == "carrier" and danny.action == "deliver" then
-		ownSpeed = lastSpeed
+		ownSpeed = math.max(ownSpeed, lastSpeed) -- (his walk there: the most of it; he slows into his goal at the van)
 		ownArms = ownArms or { danny.body.model:GetAttribute("Carrying"), danny.body.model:GetAttribute("CarryHands") }
 	end
 	return danny.s.move.things[own].state == "truck"
@@ -364,7 +363,7 @@ end
 check("8.3 he goes to it and waits at it for Ann (\"🙋 Danny needs you\"), out of every doorway", waiting and danny.action == "needs" and not inDoor
 	and pieceOf(pairSpot.id):GetAttribute("DannyNeeds") == true, `{at.X}, {at.Z}`)
 
-Moving.admin(ann, "end")
+Moving.endRun(ann)
 run(0.2)
 check("the move ends: he goes, the interior is taken down", MoveHelper.find(ann) == nil and E.destroyed == 1)
 

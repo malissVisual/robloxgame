@@ -1,37 +1,23 @@
 --!strict
 -- 6.13, analytics: Roblox's AnalyticsService (Creator Dashboard → the experience → Analytics) with what the owner wants
--- to see now that the game is public: where new couriers drop off, what the economy does, and the errors. Every call
+-- to see now that the game is public: where new players drop off, what the economy does, and the errors. Every call
 -- runs in a pcall (analytics never breaks the game); in Studio nothing is sent (one line in the Output says so, and the
--- admin panel's WORLD tab counts what would have gone: Analytics.summary). The plan (the steps, the names, the money's
--- reasons) is shared/AnalyticsPlan.luau, the numbers Config.Analytics, the owner's guide design/analytics/NAVOD.md.
+-- admin panel counts what would have gone: Analytics.summary). The plan (the steps, the names, the money's reasons) is
+-- shared/AnalyticsPlan.luau, the numbers Config.Analytics, the owner's guide design/analytics/NAVOD.md.
 -- The game never requires this module where it plays: Analytics.start puts its hooks in PlayerData.analytics (called
 -- through PlayerData.track) and PlayerData.onMoney, so a module that failed to load or start only means no analytics.
---   onboarding   AnalyticsPlan.Steps, each once for life: Joined (the save loaded), PressedPlay (Main.server's Play),
---                WelcomeSeen (server/Tutorial.luau), FirstJob and FirstDelivery (server/Jobs.luau: the "order" hook),
---                Level2 and FirstVehicle (seen on PlayerData.Changed), FirstMission and FirstChapter
---                (server/Missions.luau). A step goes into the save (profile.onboarding, server/PlayerData.luau) only
---                once Roblox took it: in Studio, switched off or over the budget it is not marked and goes later.
---                8.2 SANDBOX (Config.Sandbox.On): Roblox keeps one onboarding funnel an experience, so a sandbox
---                server walks AnalyticsPlan.SandboxSteps instead, the same way (Joined and PressedPlay as here, the
---                rest through the "step" hook from server/SandboxAnalytics.luau) in profile.sandboxOnboarding, and
---                SessionLength's New / Veteran is by those steps.
---   funnels      "Delivery", one session an order: Taken (Jobs' newOrder), PickedUp (a pick-up stop of it done: the
---                "stopDone" hook; an order loaded from the start at once), Delivered (Jobs' payOrder). A failed order
---                (failOrder, Jobs.fail) is a custom event instead: JobFailedTime / JobFailedCargo / JobGaveUp /
---                JobFailedOther, with how far it got. "Mission", one session a start: Started, Completed.
+--   onboarding   8.2: AnalyticsPlan.SandboxSteps (Roblox keeps one onboarding funnel an experience; 10.5: the city's
+--                Steps went with it), each once for life: Joined (the save loaded), PressedPlay (SandboxBoot's Play),
+--                the rest through the "step" hook from server/SandboxAnalytics.luau. A step goes into the save
+--                (profile.sandboxOnboarding, server/PlayerData.luau) only once Roblox took it: in Studio, switched off
+--                or over the budget it is not marked and goes later. SessionLength's New / Veteran is by those steps.
 --   economy      "Cash": every PlayerData.addMoney / spend with its reason (PlayerData.onMoney; the SKU is the item's
---                id), and the money that moves past them (a property sold, a tow paid back: the "money" hook). Kill
---                rewards, fuel and tips are summed a player and sent every BatchSeconds and when they leave.
---   progression  "DriverLevel": every level completed (a level-up from 3 to 4 completes 3). "Missions": the mission's
---                place in the story is the level, its id the name: Start and Fail for the owner who started it,
---                Complete for the owner at the finish.
---   custom       AnalyticsPlan.Events: DeathOnJob (Main.server: the "died" hook), the failed orders, QueueAddAll
---                (server/JobQueue.luau), ZipRide (server/ZipLines.luau), BusRide (server/Buses.luau), ScooterRental
---                (server/Rental.luau), StylePurchase (server/StyleWear.luau), SessionLength (on leave), ServerError
---                and ClientError. 6.14: GoldenOffered and GoldenExpired (server/SpecialOrders.luau, server/JobQueue.luau),
---                GoldenTaken and GoldenDone (a golden order's funnel steps, here), RegularTierUp (server/Regulars.luau).
---                8.2 SANDBOX: the moves, the grip checks and the collectibles (server/SandboxAnalytics.luau: the
---                "event" hook, now with up to three fields).
+--                id), and the money that moves past them (the "money" hook). Kill rewards and the like are summed a
+--                player and sent every BatchSeconds and when they leave.
+--   progression  "DriverLevel": every level completed (a level-up from 3 to 4 completes 3; a kill's XP).
+--   custom       AnalyticsPlan.Events: DeathOnJob (SandboxBoot: the "died" hook, on a run), SessionLength (on leave),
+--                ServerError and ClientError; 8.2: the moves, the grip checks and the collectibles
+--                (server/SandboxAnalytics.luau: the "event" hook, with up to three fields).
 --   errors       ScriptContext.Error on the server, and the ClientError remote (client/Unstuck.luau sends a script
 --                error's script name and line, one every 1 / Config.Robust.Limits.ClientError s at most, which the
 --                server's Net.limit checks again): a warning with the context and a count by script, ErrorsPerMinute
@@ -40,7 +26,6 @@
 -- dropped and counted. Nothing is kept for a player who left.
 
 local AnalyticsService = game:GetService("AnalyticsService")
-local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -49,9 +34,7 @@ local StarterPlayer = game:GetService("StarterPlayer")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
-local Economy = require(Shared.Economy)
 local Levels = require(Shared.Levels)
-local MissionData = require(Shared.Missions)
 local Net = require(Shared.Net)
 local Plan = require(Shared.AnalyticsPlan)
 local PlayerData = require(script.Parent.PlayerData)
@@ -69,8 +52,6 @@ local errorWindows: { [string]: Window } = {} -- ServerError / ClientError: this
 local started = false
 local warned = 0
 
-type OrderState = { player: Player, session: string, step: number, mode: string, stars: string, kind: string }
-type MissionState = { id: string, session: string, campaign: string }
 -- This session's onboarding: the steps reached (with the ones waiting for an earlier one) and the ones done (sent, or
 -- counted where nothing is sent; one Roblox refused is done for this session and tried again in the next).
 type Onboarding = { reached: number, done: number }
@@ -81,24 +62,12 @@ local levels: { [Player]: number } = {} -- the driver level last seen (nil until
 local onboarding: { [Player]: Onboarding } = {}
 local early: { [Player]: { number } } = {} -- onboarding steps reached before the save loaded
 local batches: { [Player]: { [string]: number } } = {} -- reason → the money summed (signed) since the last flush
-local missions: { [Player]: MissionState } = {} -- the mission a player started, until it ends
 local clientErrors: { [Player]: number } = {} -- ClientError reports this session
-local orders: { [any]: OrderState } = setmetatable({}, { __mode = "k" }) :: any -- Jobs' Order → its funnel
-local LEVEL2 = Plan.stepOf("Level2") or 0
-local VEHICLE = Plan.stepOf("FirstVehicle") or 0
--- 8.2 SANDBOX: a sandbox server's onboarding funnel is the sandbox's (AnalyticsPlan.SandboxSteps, in its own save field)
-local SANDBOX = Config.Sandbox.On
-local Steps = if SANDBOX then Plan.SandboxSteps else Plan.Steps
+local Steps = Plan.SandboxSteps -- (8.2: the sandbox's funnel, in its own save field)
 
--- The funnel's steps reached as the save holds them (8.2: the sandbox's in profile.sandboxOnboarding).
+-- The funnel's steps reached as the save holds them (profile.sandboxOnboarding).
 local function savedSteps(profile: PlayerData.Profile): number
-	return if SANDBOX then profile.sandboxOnboarding else profile.onboarding
-end
-
--- A mission's place in the story (the Missions path's level).
-local storyIndex: { [string]: number } = {}
-for index, def in MissionData.List do
-	storyIndex[def.id] = index
+	return profile.sandboxOnboarding
 end
 
 -- Is the player still in the game (not left: their tables are gone)?
@@ -184,16 +153,13 @@ local function logSteps(player: Player, profile: PlayerData.Profile, state: Onbo
 			return
 		end
 		state.done = Plan.mark(state.done, n, Steps)
-		if result == "sent" and SANDBOX then
+		if result == "sent" then
 			profile.sandboxOnboarding = Plan.mark(profile.sandboxOnboarding, n, Steps) -- (8.2)
-		elseif result == "sent" then
-			profile.onboarding = Plan.mark(profile.onboarding, n)
 		end
 	end
 end
 
--- A step reached (by its name in AnalyticsPlan.Steps; 8.2: SandboxSteps on a sandbox server): logged with the ones that
--- waited for it, once for life.
+-- A step reached (by its name in AnalyticsPlan.SandboxSteps): logged with the ones that waited for it, once for life.
 local function onboard(player: Player, name: string)
 	local step = Plan.stepOf(name, Steps)
 	if not step or not live(player) then
@@ -211,19 +177,8 @@ local function onboard(player: Player, name: string)
 	logSteps(player, profile, state)
 end
 
--- A bike or a car of your own (an employer's lent vehicle is not).
-local function ownsVehicle(profile: PlayerData.Profile): boolean
-	for id, owned in profile.cars do
-		local def = if owned then Economy.findCar(id) else nil
-		if def and not def.company then
-			return true
-		end
-	end
-	return false
-end
-
--- PlayerData.Changed: the save loaded (Joined, and the steps that waited), a level-up (DriverLevel), level 2 and the
--- first vehicle, and a step that was over the budget before.
+-- PlayerData.Changed: the save loaded (Joined, and the steps that waited), a level-up (DriverLevel), and a step that
+-- was over the budget before.
 local function onChanged(player: Player)
 	local profile = PlayerData.get(player)
 	if not profile or not live(player) then
@@ -252,24 +207,18 @@ local function onChanged(player: Player)
 		end
 	end
 	local state = onboardingOf(player, profile)
-	if not SANDBOX and level >= 2 and not Plan.has(state.reached, LEVEL2) then -- (8.2: the city's steps only)
-		onboard(player, "Level2")
-	end
-	if not SANDBOX and not Plan.has(state.reached, VEHICLE) and ownsVehicle(profile) then
-		onboard(player, "FirstVehicle")
-	end
 	local logged = Plan.logged(state.reached, Steps)
 	if logged > 0 and not Plan.has(state.done, logged, Steps) then
 		logSteps(player, profile, state) -- (a step over the budget earlier)
 	end
 end
 
--- Main.server's Play (a step of PLAY).
+-- SandboxBoot's Play (a step of PLAY).
 Analytics.onPlay = guard("onPlay", function(player: Player)
 	onboard(player, "PressedPlay")
 end)
 
--- A step reached elsewhere (server/Tutorial.luau: "WelcomeSeen").
+-- A step reached elsewhere (server/SandboxAnalytics.luau's).
 Analytics.step = guard("step", function(player: Player, name: string)
 	onboard(player, name)
 end)
@@ -285,7 +234,8 @@ local function economy(player: Player, rule: Plan.MoneyRule, amount: number, sku
 	end)
 end
 
--- Money that moved (PlayerData.onMoney, or a module that changed profile.money itself): `delta` > 0 in, < 0 out,
+-- Money that moved (PlayerData.onMoney, or the "money" hook of a module that changed profile.money itself): `delta`
+-- > 0 in, < 0 out,
 -- the reason (AnalyticsPlan.Sources / Sinks) and the item's id. The batched reasons wait for the flush. Only for a
 -- player in the game (joined, not left).
 Analytics.money = guard("money", function(player: Player, delta: number, reason: string?, sku: string?)
@@ -323,164 +273,12 @@ local function flush(player: Player)
 	end
 end
 
--- ── The Delivery funnel (server/Jobs.luau) ─────────────────────────────────
-
-local function orderStep(state: OrderState, step: number)
-	local steps = Plan.Funnels.Delivery
-	local fields = Plan.fields(state.mode, state.stars, state.kind)
-	for _, n in Plan.funnelSteps(state.step, step, #steps) do
-		state.step = n
-		local player, session, name = state.player, state.session, steps[n]
-		send("funnel", `Delivery {n} {name}`, function()
-			AnalyticsService:LogFunnelStepEvent(player, "Delivery", session, n, name, fields)
-		end)
-	end
-end
-
--- An order's kind (a field): the tutorial's, an employer's, a special job, an ordinary one from the board.
-local function kindOf(offer: any): string
-	local jobType = offer.jobType
-	return if offer.tutorial then "Tutorial"
-		elseif jobType and jobType.employer and not jobType.board then "Employer"
-		elseif jobType then "Special"
-		else "Board"
-end
-
--- An order of `player`'s job (Jobs' Order: its offer, stops, state): "taken" (newOrder), "delivered" (payOrder) or
--- "failed" (failOrder; why: "time" | "cargo" | "gaveup" | nil). A mission's order has the Mission funnel instead.
-Analytics.order = guard("order", function(player: Player, order: any, what: string, why: string?)
-	if not live(player) then
-		return
-	end
-	local offer = order.offer
-	-- 6.14: a golden order's own events (its danger level, its transport)
-	local special = offer.specialOrder
-	if type(special) == "table" and special.kind == "golden" then
-		if what == "taken" then
-			custom(player, "GoldenTaken", tonumber(offer.tier), Plan.fields(tostring(offer.mode)))
-		elseif what == "delivered" then
-			custom(player, "GoldenDone", tonumber(offer.tier), Plan.fields(tostring(offer.mode)))
-		end
-	end
-	if what == "taken" then
-		onboard(player, "FirstJob")
-		if offer.mission then
-			return
-		end
-		local state: OrderState = {
-			player = player,
-			session = HttpService:GenerateGUID(false),
-			step = 0,
-			mode = tostring(offer.mode),
-			stars = tostring(offer.tier),
-			kind = kindOf(offer),
-		}
-		orders[order] = state
-		orderStep(state, 1)
-		local first = offer.stops[1]
-		if first and first.kind ~= "pickup" then
-			orderStep(state, 2) -- (no pick-up: the vehicle starts loaded)
-		end
-		return
-	end
-	local state = orders[order]
-	if what == "delivered" then
-		onboard(player, "FirstDelivery")
-		if state then
-			orders[order] = nil
-			orderStep(state, 3)
-		end
-	elseif what == "failed" and state then
-		orders[order] = nil
-		custom(player, Plan.failEvent(why), 1, Plan.fields(state.mode, state.stars, Plan.Funnels.Delivery[math.max(1, state.step)]))
-	end
-end)
-
--- A stop of the job done (Jobs' advance / freeStep: `index` into `stops`): a pick-up's orders are picked up.
-Analytics.stopDone = guard("stopDone", function(_player: Player, list: { any }, stops: { any }, index: number)
-	local stop = stops[index]
-	if not stop or stop.kind ~= "pickup" then
-		return
-	end
-	for _, order in list do
-		local state = orders[order]
-		if state and state.step < 2 and table.find(order.stops, index) then
-			orderStep(state, 2)
-		end
-	end
-end)
-
--- ── The missions (server/Missions.luau, server/Jobs.luau) ──────────────────
-
-local function missionProgress(player: Player, status: Enum.AnalyticsProgressionType, label: string, id: string)
-	local level = storyIndex[id]
-	if level then
-		send("progression", `Missions {level} {label}`, function()
-			AnalyticsService:LogProgressionEvent(player, Plan.Paths.Missions, status, level, id)
-		end)
-	end
-end
-
--- A mission started by `player` (its owner).
-Analytics.missionStarted = guard("missionStarted", function(player: Player, id: string)
-	local def = MissionData.find(id)
-	if not def or not live(player) then
-		return
-	end
-	onboard(player, "FirstMission")
-	local profile = PlayerData.get(player)
-	local replay = profile ~= nil and MissionData.cleared(profile.missions, id)
-	local state: MissionState = { id = id, session = HttpService:GenerateGUID(false), campaign = def.campaign }
-	missions[player] = state
-	local fields = Plan.fields(def.campaign, if replay then "Replay" else "First")
-	send("funnel", "Mission 1 Started", function()
-		AnalyticsService:LogFunnelStepEvent(player, "Mission", state.session, 1, "Started", fields)
-	end)
-	missionProgress(player, Enum.AnalyticsProgressionType.Start, "Start", id)
-end)
-
--- A mission done, for every player credited with it (`owner`: the one who started it; `chapterDone`: its finale
--- finished the chapter for this player).
-Analytics.missionDone = guard("missionDone", function(player: Player, id: string, owner: boolean, chapterDone: boolean)
-	if chapterDone then
-		onboard(player, "FirstChapter")
-	end
-	if not owner then
-		return
-	end
-	local state = missions[player]
-	missions[player] = nil
-	if state and state.id == id then
-		local fields = Plan.fields(state.campaign)
-		send("funnel", "Mission 2 Completed", function()
-			AnalyticsService:LogFunnelStepEvent(player, "Mission", state.session, 2, "Completed", fields)
-		end)
-	end
-	missionProgress(player, Enum.AnalyticsProgressionType.Complete, "Complete", id)
-end)
-
--- Jobs.fail: every order still open fails with the job (a mission's: the progression's Fail).
-Analytics.jobFailed = guard("jobFailed", function(player: Player, list: { any }, why: string?)
-	for _, order in list do
-		if order.state ~= "open" then
-			continue
-		end
-		local id = order.offer.mission
-		if type(id) == "string" then
-			missions[player] = nil
-			missionProgress(player, Enum.AnalyticsProgressionType.Fail, "Fail", id)
-		else
-			Analytics.order(player, order, "failed", why)
-		end
-	end
-end)
-
 -- ── Custom events ──────────────────────────────────────────────────────────
 
--- Main.server: a player died (`involved`: on a job or a mission, or in its crew).
+-- SandboxBoot: a player died (`involved`: on a run, its host or its party; the event's field "Job", as ever).
 Analytics.died = guard("died", function(player: Player, involved: boolean)
 	if involved then
-		custom(player, "DeathOnJob", 1, Plan.fields(if missions[player] then "Mission" else "Job"))
+		custom(player, "DeathOnJob", 1, Plan.fields("Job"))
 	end
 end)
 
@@ -565,7 +363,6 @@ local function forget(player: Player)
 	onboarding[player] = nil
 	early[player] = nil
 	batches[player] = nil
-	missions[player] = nil
 	clientErrors[player] = nil
 end
 
@@ -582,11 +379,6 @@ function Analytics.start()
 	-- The hooks the game calls (PlayerData.track by name; the money's own hook): nothing else reaches this module.
 	PlayerData.onMoney = Analytics.money
 	PlayerData.analytics = {
-		order = Analytics.order,
-		stopDone = Analytics.stopDone,
-		jobFailed = Analytics.jobFailed,
-		missionStarted = Analytics.missionStarted,
-		missionDone = Analytics.missionDone,
 		onPlay = Analytics.onPlay,
 		step = Analytics.step,
 		died = Analytics.died,

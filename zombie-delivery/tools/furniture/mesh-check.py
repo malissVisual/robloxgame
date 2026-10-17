@@ -29,7 +29,7 @@ SHARED = ROOT / "src" / "shared"
 MANIFEST = ROOT / "design/blender-furniture/roblox/ZDCFurnitureArt.json"
 PREFIX = ('local M = require("./ItemMock")\n'
           'local Instance, Vector3, CFrame, Color3, Enum, UDim2 = M.Instance, M.Vector3, M.CFrame, M.Color3, M.Enum, M.UDim2\n')
-MOCKED = ("FurnitureLooks", "HouseLayout", "Farm")
+MOCKED = ("FurnitureLooks", "HouseLayout")
 FACES = {"Front": (2, -1), "Back": (2, 1), "Left": (0, -1), "Right": (0, 1), "Top": (1, 1), "Bottom": (1, -1)}
 
 # What the recorder lacks for FurnitureMesh: CFrame ± Vector3, CFrame.fromMatrix, MeshPart as a BasePart, a

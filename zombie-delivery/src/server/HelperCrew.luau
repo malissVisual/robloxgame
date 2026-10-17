@@ -35,8 +35,8 @@
 --     CrewDownUntil (the server time: client/CrewUi.luau's ring and countdown over him). Revived: up where he lies
 --     with half his health (Down.Health), on with his work. Nobody did: he is out of the run (fades away, his body gone, no comeback this run) and in
 --     hospital (CrewRules.toHospital: the host's crew, saved soon) for Hospital.Seconds; the CREW window shows the time
---     left and can discharge him early for money (CrewDischarge). Danny too: nobody is ever lost for good. Outside a
---     run (the city's moves) a fall is as before (back at the van Respawn s later); in the lobby nothing hurts them.
+--     left and can discharge him early for money (CrewDischarge). Danny too: nobody is ever lost for good. In the
+--     lobby nothing hurts them.
 --   * The Crew remote (Config.Robust.Limits.Crew): { kind = "state" } (the window's rows), { kind = "pick", id } (who
 --     comes into your runs; saved), { kind = "discharge", id } (out of hospital now, paid); the server sends the state
 --     after every change and { kind = "open" } from his prompt.
@@ -298,14 +298,14 @@ end
 -- What the crew is told when he comes with a move.
 function HelperCrew.helloText(h: any): string
 	local def = defOf(h.kind)
-	local how = if Config.Sandbox.On then `give {CrewRules.him(h.kind)} pieces with your clipboard ({H.Clipboard.Key})` else `pick a piece for {CrewRules.him(h.kind)}`
+	local how = `give {CrewRules.him(h.kind)} pieces with your clipboard ({H.Clipboard.Key})`
 	if not CrewRules.mayCarry(h.kind, "hand", 1) then
 		return `{def.Icon} {def.Name} is with you: {string.lower(string.sub(def.Ability, 1, 1)) .. string.sub(def.Ability, 2)}.`
 	end
 	return `{def.Icon} {def.Name} is with you: {how}. {def.Ability}.`
 end
 
--- His fall in a run (nil: the city's words: back at the van soon).
+-- His fall in a run (nil: not a run's).
 function HelperCrew.fallText(h: any): string?
 	if not isRun(h.s) then
 		return nil
@@ -386,7 +386,7 @@ function HelperCrew.revive(h: any, player: Player): boolean
 	return true
 end
 
--- MoveHelper's step while he is down: nil (not a run: the city's rules, back at the van soon), "down" (lying there,
+-- MoveHelper's step while he is down: nil (not a run's, or it ended), "down" (lying there,
 -- the revive prompt on him) or "out" (out of the run: no comeback).
 function HelperCrew.downed(h: any, body: any, clock: number): string?
 	local s = h.s

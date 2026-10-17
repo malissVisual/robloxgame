@@ -1,18 +1,18 @@
 --!strict
--- 7.0: the few services and server modules the real server/Moving.luau needs in the Luau CLI (7.0 planning: and the
--- real server/MoveLobby.luau, MoveLobbyServer.luau; the driver's seat, the truck's and the zombies' damage, a garage)
+-- 7.0: the few services and server modules the real server/Moving.luau needs in the Luau CLI (and the real
+-- server/MoveLobby.luau, MoveLobbyServer.luau: the quick chat on a move; the truck's and the zombies' damage)
 -- (tests/moving_runtime_test.luau through tests/run_tests.py, which builds MovingServer.luau from src/server/Moving.luau
--- with these in place of its requires; Config, Economy, Map and MovingRules are the real ones). The instances are
+-- with these in place of its requires; Config, Economy, SandboxMap and MovingRules are the real ones). The instances are
 -- tools/fixtures/item-mock.luau's recorder with signals a test fires (Triggered, Died, HealthChanged …), players and
 -- their bodies, a truck, zombies and the house art (fake FurnitureLooks / HouseLayout / HouseInterior shaped like the
 -- art branch's interface). No physics: a weld is a record, a teleport sets the root's CFrame. os.clock and the server
 -- time are the test's (Runtime.clock, Runtime.now); task.delay runs at once.
 -- 7.0, the depot's helper: the real server/MoveHelper.luau (MoveHelperServer.luau, tests/movehelper_runtime_test.luau)
 -- runs on these too: its body from the fake Npcs (Runtime.said: what he says), the zombies' roots and Zombies.all.
--- 8.0 SANDBOX: the city's game by default (Config.Sandbox.On false: Moving.start reads it); a sandbox test sets it true
--- before Moving.start (tests/sandboxmove_runtime_test.luau). Its fakes: SandboxPlots (Runtime.plots: player → a
--- SandboxMap plot) and Collection (Runtime.collected: every Collection.add, its uid back unless Runtime.refuse); the
--- test sets server/SandboxBoot.luau's hook Moving.parkVan itself (Runtime.makeCar: a fake car).
+-- 10.5 (only the sandbox is the game): Config.Sandbox.On, every move a run (Moving.startRun, as server/Runs.luau starts
+-- one: Runtime.startRun). Its fakes: SandboxPlots (Runtime.plots: player → a SandboxMap plot) and Collection
+-- (Runtime.collected: every Collection.add, its uid back unless Runtime.refuse); server/SandboxBoot.luau's hook
+-- Moving.parkVan is the test's own or Runtime.parkVan (a fake car, Runtime.makeCar, of Runtime.carId: the Sprinter).
 -- 8.3: PlayerData.spend takes from Runtime.wallet (player → money; Runtime.startMoney when not set) and records it
 -- (Runtime.spent; 10.1 the crew's discharge, no hire any more), saveSoon records the player (Runtime.savedSoon); a car (not a bike) has its driver's seat and one passenger seat (Seat:Sit puts a humanoid
 -- in it: its Occupant, SeatPart, Sit and a SeatWeld), its doors (the driver's on the left, the passenger's on the
@@ -24,17 +24,18 @@
 -- player's own client/PairLead.luau (PairLeadClient.luau) on this world's workspace, recorder and clock: a test plays the
 -- leader's client with it (tests/movehelper_backwards_runtime_test.luau).
 local Mock = require("./ItemMock") :: any
-local CityConfig = require("./Config") :: any
-CityConfig.Sandbox.On = false
+local Config = require("./Config") :: any
+Config.Sandbox.On = true -- (10.5: the game; Moving.start reads it)
+local SandboxMap = require("./SandboxMap") :: any
 -- 8.1 grip: no timing checks by default (a pick lifts at once, no wobbles: the moves' other tests carry as before);
 -- tests/carrygrip_runtime_test.luau turns them on (the server reads Config.CarryGrip.On at every lift and carry).
-CityConfig.CarryGrip.On = false
+Config.CarryGrip.On = false
 -- 8.3 keeping up: Danny not aimed ahead of his place by default (the moves' tests check him right at the far end: this
 -- runtime has no network delay to make up for); tests/movehelper_keepup_runtime_test.luau turns HoldLead on again
 -- (Runtime.gameLead: the game's numbers).
-local gameLead = table.clone(CityConfig.MoveHelper.HoldLead)
-CityConfig.MoveHelper.HoldLead.Base = 0
-CityConfig.MoveHelper.HoldLead.Ping = 0
+local gameLead = table.clone(Config.MoveHelper.HoldLead)
+Config.MoveHelper.HoldLead.Base = 0
+Config.MoveHelper.HoldLead.Ping = 0
 local Runtime: any = {
 	now = 1000, -- workspace:GetServerTimeNow()
 	clock = 50, -- os.clock()
@@ -47,7 +48,6 @@ local Runtime: any = {
 	zombies = {}, -- every zombie spawned
 	marched = 0,
 	tags = {},
-	holstered = 0,
 	floor = 0, -- the floor's height the rays find (the interiors' own: Runtime.interiorFloor near them)
 	-- 7.0 planning
 	seated = {}, -- player → the car they drive (Vehicles.seatedIn)
@@ -522,9 +522,6 @@ Runtime.Crew = stub("Crew", {
 		end
 		return nil
 	end,
-	hasJob = function(): boolean -- (Main's: Jobs.active; 7.0 review: Moving wraps it)
-		return false
-	end,
 })
 
 Runtime.wallet = {} -- 8.3: player → their money (PlayerData.get's money, spend's)
@@ -558,31 +555,22 @@ Runtime.PlayerData = stub("PlayerData", {
 	track = function(name: string, ...: any)
 		table.insert(Runtime.tracked, { name = name, args = { ... } })
 	end,
-	-- 7.x farm move: a player's profile (its story flags: Runtime.story[player], its car) and a flag kept in it
-	-- (7.2 review: a test's own Runtime.profiles[player] when it set one: its car, bike and lastCar kept)
+	-- a player's profile: a test's own Runtime.profiles[player] when it set one (its card's house and seed kept), else
+	-- a fresh one with the van
 	get = function(player: any): any
-		Runtime.story[player] = Runtime.story[player] or {}
 		local own = Runtime.profiles[player]
 		if own then
-			own.story = Runtime.story[player]
 			own.money = moneyOf(player)
 			return own
 		end
-		return { story = Runtime.story[player], car = Runtime.carId, money = moneyOf(player) }
+		return { car = Runtime.carId, money = moneyOf(player) }
 	end,
 	-- 8.4: was the player's save read? A test's own Runtime.profiles[player] stands for one (its sandboxHouseSeed the
 	-- save's, kept there as Moving sets it); without one: a fresh profile, never saved (Moving's own memory counts)
 	loaded = function(player: any): boolean
 		return Runtime.profiles[player] ~= nil
 	end,
-	notify = noop, -- (7.2 review: the profile's car changed)
-	markStory = function(player: any, key: string): boolean
-		Runtime.story[player] = Runtime.story[player] or {}
-		local new = Runtime.story[player][key] ~= true
-		Runtime.story[player][key] = true
-		table.insert(Runtime.marked, { player = player, key = key })
-		return new
-	end,
+	notify = noop,
 })
 
 -- The truck: a chassis at `at`, its back door attachment 9 studs behind it, a BackPrompt. (7.2 review: a bike,
@@ -601,6 +589,7 @@ local function makeCar(owner: any, id: string, at: any): any
 		local door = Mock.Instance.new("Attachment")
 		door.Name = "CargoDoor"
 		door.Position = Mock.Vector3.new(0, 3, 9)
+		door.CFrame = Mock.CFrame.new(0, 3, 9) -- (10.5: the recorder reads an attachment's Position off its CFrame: the bay's middle from it)
 		door.Parent = chassis
 		local back = Mock.Instance.new("ProximityPrompt")
 		back.Name = "BackPrompt"
@@ -652,11 +641,8 @@ end
 Runtime.sat = {} -- 8.3: { { seat, humanoid } } every Seat:Sit
 Runtime.makeCar = makeCar -- (8.0 SANDBOX: the test's own Moving.parkVan parks one)
 Runtime.truckAt = Mock.Vector3.new(0, 2, 0) -- where placeNear puts the truck (the test sets it)
--- 7.x van moves: a move goes with its owner's own car: the one placeNear makes when it is given no id (the old tests'
--- big Moving Truck bed: Config.Moving.Beds.movingtruck; the van tests set "zdcvan")
-Runtime.carId = "movingtruck"
-Runtime.story = {} -- 7.x farm move: player → their story flags (PlayerData.get(player).story)
-Runtime.marked = {} -- { { player, key } } every PlayerData.markStory
+-- a move goes with its owner's own van (10.5: the Sprinter, Config.Sandbox.Van, its walk-in bay Config.Moving.Beds.sprinter)
+Runtime.carId = Config.Sandbox.Van
 Runtime.profiles = {} -- 7.2 review: player → a profile of the test's own (PlayerData.get returns it)
 
 Runtime.Vehicles = stub("Vehicles", {
@@ -767,6 +753,56 @@ Runtime.Vehicles = stub("Vehicles", {
 })
 Runtime.doorSwings = {} -- 8.5 { { car, door, openAt, closeAt, now, clock } } every Vehicles.swingDoor
 
+-- 10.5: server/SandboxBoot.luau's parkVan as the tests stand it in (Moving.parkVan): the player's van (no carId: their own,
+-- Runtime.carId) at the spot, its nose the spot's way, the old one gone; every call kept (Runtime.parked).
+Runtime.parked = {} -- { { player, spot, seat, carId } }
+function Runtime.parkVan(player: any, spot: any, seat: boolean, carId: string?): (string?, any)
+	table.insert(Runtime.parked, { player = player, spot = spot, seat = seat, carId = carId })
+	local old = Runtime.cars[player]
+	if old then
+		old.model:Destroy()
+	end
+	local car = makeCar(player, carId or Runtime.carId, Mock.Vector3.new(spot.x, 2, spot.z))
+	car.chassis.CFrame = Mock.CFrame.new(spot.x, 2, spot.z) * Mock.CFrame.Angles(0, math.rad(spot.yaw or 0), 0)
+	Runtime.cars[player] = car
+	return nil, car
+end
+-- 10.5: a run on the house `house` (a SandboxMap.Houses id; nil: The Old Farmstead) at `difficulty` (nil: Normal) for
+-- `owner` and their crew (Runtime.crew), as server/Runs.luau begins one: the owner a plot when they have none (the
+-- first free one of SandboxMap.Plots: Runtime.plots), their van parked at the house's curb (Moving.parkVan: the test's,
+-- else Runtime.parkVan), then Moving.startRun. Returns its refusal (nil: the run started).
+function Runtime.startRun(owner: any, house: string?, difficulty: string?): string?
+	local Moving = require("./MovingServer") :: any
+	if not Runtime.plots[owner] then
+		for _, plot in SandboxMap.Plots do
+			local used = false
+			for _, other in Runtime.plots do
+				used = used or other.id == plot.id
+			end
+			if not used then
+				Runtime.plots[owner] = plot
+				break
+			end
+		end
+	end
+	local h = SandboxMap.house(house or SandboxMap.House.id) or SandboxMap.House
+	local park = Moving.parkVan or Runtime.parkVan
+	park(owner, h.curb, false)
+	return Moving.startRun(owner, h.id, difficulty or "normal")
+end
+-- 10.5: the house of `player`'s run (its state's contract; nil: The Old Farmstead), its door's foot, out of it (its
+-- look), and where you stand in front of it (3 studs out).
+function Runtime.houseOf(player: any): any
+	local view = Runtime.last(player, "Moving", "state")
+	return SandboxMap.house(view and view.a and view.a.contract) or SandboxMap.House
+end
+function Runtime.doorOf(h: any): (any, any, any)
+	local r = math.rad(h.door.yaw)
+	local facing = Mock.Vector3.new(-math.sin(r), 0, -math.cos(r))
+	local door = Mock.Vector3.new(h.door.x, 3, h.door.z)
+	return door, facing, door + facing * 3
+end
+
 Runtime.Zombies = stub("Zombies", {
 	hunts = function()
 		return false
@@ -814,7 +850,7 @@ Runtime.Zombies = stub("Zombies", {
 })
 
 -- 7.0, the depot's helper's body (server/Npcs.luau): a model with a root and a humanoid where it is put; what he says.
--- 7.0 greeters (server/MoveGreeters.luau): who said what (and seen from how far), the gestures, the glances.
+-- Who said what (and seen from how far), the gestures, the glances.
 Runtime.said = {} -- { text } every Npcs.say
 Runtime.saidBy = {} -- { { npc, text, range } } every Npcs.say
 Runtime.acts = {} -- { { npc, kind } } every Npcs.act
@@ -920,15 +956,6 @@ function Runtime.saidSince(text: string, from: number?): boolean
 	return false
 end
 
-Runtime.Jobs = stub("Jobs", {
-	active = function(player: any): boolean
-		return Runtime.jobOf == player
-	end,
-	returnLent = function()
-		return true
-	end,
-})
-Runtime.BanditCars = stub("BanditCars", { onCarDamaged = noop })
 -- 8.0 SANDBOX: the plots (server/SandboxPlots.luau) and the collection (server/Collection.luau)
 Runtime.plots = {} -- player → their SandboxMap plot
 Runtime.collected = {} -- { { player, entry, uid } } every Collection.add
@@ -957,12 +984,6 @@ Runtime.Collection = stub("Collection", {
 		return uid
 	end,
 })
-Runtime.Hand = stub("Hand", {
-	holster = function()
-		Runtime.holstered += 1
-	end,
-})
-
 local services: { [string]: any } = {
 	Players = Players,
 	ReplicatedStorage = { WaitForChild = function()

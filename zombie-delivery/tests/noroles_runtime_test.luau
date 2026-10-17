@@ -1,6 +1,6 @@
 -- 8.8 no roles (the owner: "I don't want roles in the game. Everyone is simply the same."; shared/MoveRoles.luau
 -- MoveRoles.on: Config.MoveRoles.On, the city's only): the real server/Moving.luau and server/MoveLobby.luau (MoveHelper,
--- MoveGreeters, MoveSites with them) on tests/runtime/MovingRuntime.luau's fakes in the sandbox (Config.Sandbox.On), a
+-- MoveSites with them) on tests/runtime/MovingRuntime.luau's fakes in the sandbox (Config.Sandbox.On), a
 -- crew of two: Ann, the move's owner, and Bob, her crew mate (then Cid joins mid-move).
 --   * 9.7 runs: no contract kiosk on the plots and no planning (the lobby's portals start a run: server/Runs.luau);
 --     a START asked opens nothing; the run (Moving.startRun) takes Ann's party as it is, nobody asked for a role.
@@ -61,7 +61,7 @@ local function lobbyRequest(player: any, ...: any)
 	E.Net.get("MoveLobby").OnServerEvent:Fire(player, ...)
 end
 local function heard(player: any, text: string, since: number?): boolean
-	for index = since or 1, #E.messages do
+	for index = math.max(since or 1, 1), #E.messages do
 		local m = E.messages[index]
 		if m.player == player and m.remote == "Notice" and string.find(tostring(m.kind), text, 1, true) ~= nil then
 			return true
@@ -279,7 +279,7 @@ check("the van takes a hit whole with Ann at its wheel (no Driver's cut)", E.car
 
 -- The end ------------------------------------------------------------------------------------------------------------------
 
-check("the admin's end", string.find(Moving.admin(ann, "end"), "called off", 1, true) ~= nil)
+check("the run's end (the admin's END RUN: Moving.endRun)", Moving.endRun(ann, "Ended by the admin") == true and Moving.busy(ann) == nil)
 check("…nobody holds a role", ann:GetAttribute("MoveRole") == nil and bob:GetAttribute("MoveRole") == nil and moves:FindFirstChild("MoveBarricade") == nil)
 
 if failures == 0 then
