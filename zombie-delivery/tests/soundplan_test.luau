@@ -464,13 +464,14 @@ local function area(name: string): { x0: number, x1: number, z0: number, z1: num
 	return nil
 end
 local M = SB.Motorway
-local d5 = area("d5")
-check("the D5's hum on plan.json's motorway: its middle line, end to end", d5 ~= nil and M.X > d5.x0 and M.X < d5.x1 and M.Z0 == d5.z0 and M.Z1 == d5.z1, d5 and `{d5.x0} … {d5.x1}`)
+-- (9.7 runs: the D5 itself is off the map, nobody in a run zone would see it; its hum stays where it ran, x 330 … 390)
+check("9.7: the D5 off plan.json; its hum where it ran (its middle line x 330 … 390), the map's length end to end", area("d5") == nil and M.X > 330 and M.X < 390
+	and M.Z0 == Plan.bounds.z0 and M.Z1 == Plan.bounds.z1)
 local eastmost = h.lot.x1
-for _, p in SandboxMap.Plots do
-	eastmost = math.max(eastmost, p.rect.x1)
+for _, place in SandboxMap.Houses do
+	eastmost = math.max(eastmost, place.lot.x1)
 end
-check("… east of every plot and the farmstead, and no nearer than Near to them (a far hum)", M.X - eastmost > M.Near, `{M.X - eastmost} studs`)
+check("… east of every place to empty, and no nearer than Near to them (a far hum)", M.X - eastmost > M.Near, `{M.X - eastmost} studs`)
 check("… heard faintly over the whole map (Range past the plan's west edge)", M.Range > M.X - Plan.bounds.x0 and M.Near > 0 and M.Y > 0)
 for _, z in { -9999, -100, 0, 300, 9999 } do
 	local x, at = SoundPlan.motorwaySpot(z)

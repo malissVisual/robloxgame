@@ -8,19 +8,19 @@
 --     its look's: shared/VillageLooks.luau's door spot, Config.Village.Front less the door's 0.3 in from its box's
 --     front edge); the back door only the farmstead's; each place's walls' box on its box, its lot round it up to its
 --     yard, clear of every road, plot, other lot, landmark, field and the stream; the world's Bounds and roads the plan's
---     (Pražská from Depot Row's far edge, 8.0's), every place's yard at its lane's end, big enough to turn the van round
+--     (9.7 runs: the roads only the places' front yards, one a place, its curb in it; no lane, no Depot Row, no
+--     turnaround: nobody drives)
 --   * every curb on asphalt with the van's back to the door (the Sprinter in its yard, its back and nose and its four
---     corners on it, the back nearer the door: plan.py's check), every door on its box's face looking at its road (its
---     yard: its curb in it), every place reachable by road from Depot Row (the rects that meet) and the guide's path to
---     every curb along them (SandboxSteps.route)
+--     corners on it, the back nearer the door: plan.py's check), every door on its box's face looking at its yard (its
+--     curb in it); 9.7 the guide's path straight (SandboxSteps.route: the lobby and the zones are small)
 --   * the contracts: one per place and no other, a made-up Czech family each, a short place, its plan's kind the
 --     place's own on the map (big the farmstead, house the lone house, the countryside's cabin, lodge, mill and cottage:
 --     HouseLayout's kinds), its clock past the horde's; the economy sane: a house
 --     holds fewer pieces than the big house (Config.Furniture's Spots and collectibles, and the plans themselves:
 --     HouseLayout.plan), gets less time, about the same minutes a piece
---   * the guide's words and places per house: "Drive to The Pond Cabin on Pond Lane", at the place by its own lot
---   * the places spread apart (each its own spot, 250 studs and more) and a drive of a few hundred studs to over a
---     thousand from the plots
+--   * the guide's words and places per house: its name ("The Pond Cabin"), at the place by its own lot
+--   * the places spread apart (each its own spot, 250 studs and more); 9.7 the lobby's portals a short walk from its
+--     spawn
 -- Run with tests/run_tests.py.
 local Config = require("./Config")
 local SandboxMap = require("./SandboxMap")
@@ -61,15 +61,14 @@ local function look(yaw: number): (number, number)
 	local r = math.rad(yaw)
 	return -math.sin(r), -math.cos(r)
 end
--- On asphalt: SandboxMap's roads (`roads`: a list of rects with names) or the turnaround.
+-- On asphalt: SandboxMap's roads (`roads`: a list of rects with names; 9.7 the places' yards).
 local function onAsphalt(roads: { any }, x: number, z: number): boolean
 	for _, r in roads do
 		if inRect(r.rect or r, x, z) then
 			return true
 		end
 	end
-	local t = SandboxMap.Turnaround
-	return (x - t.x) ^ 2 + (z - t.z) ^ 2 <= t.r * t.r + EPS
+	return false
 end
 -- The rects of a road (a lane's: its rects and its yard; none: an empty list).
 local function rectsOf(name: string): { SandboxMap.Road }
@@ -215,55 +214,40 @@ do
 	check("each place's walls on its box (its middle, its size; walls 9 high at least), its lot round it and its door, clear of every road, plot, other lot, landmark, field and the stream",
 		bad == nil, bad)
 end
-check("the world's Bounds the plan's (1 600 × 1 440)", same(SandboxMap.Bounds, Plan.bounds))
-check("the roads the plan's, Pražská and Depot Row first (Pražská from Depot Row's far edge, as 8.0 laid it), each lane's rects and yard", (function(): boolean
-	if #Roads ~= #Plan.roads or Roads[1].name ~= "Pražská" or Roads[2].name ~= "Depot Row" then
+check("the world's Bounds the plan's (3 260 × 1 440: 9.7 the lobby east of the countryside)", same(SandboxMap.Bounds, Plan.bounds))
+check("9.7: the roads the plan's, each a place's front yard (Pražská the farmstead's)", (function(): boolean
+	if #Roads ~= #Plan.roads or #Roads ~= #Houses then
 		return false
 	end
-	local used: { [number]: boolean } = {}
-	for _, p in Plan.roads do
-		local found = false
-		for n, r in Roads do
-			if not used[n] and r.name == p.name and same(r :: any, p.rect) and r.yard == p.yard then
-				used[n], found = true, true
-				break
-			end
-		end
-		if not found then
+	for n, p in Plan.roads do
+		local r = Roads[n]
+		if r.name ~= p.name or not same(r :: any, p.rect) or r.yard ~= true or p.yard ~= true then
 			return false
 		end
 	end
-	return same(Roads[1] :: any, { x0 = -14, x1 = 14, z0 = -74, z1 = 470 })
+	return Roads[1].name == "Pražská"
 end)())
 do
 	local bad: string? = nil
-	for index, h in Houses do
-		if index > 1 then
-			local yard: SandboxMap.Road? = nil
-			for _, r in rectsOf(h.street) do
-				if r.yard then
-					yard = if yard then nil else r -- (one yard a lane)
-				end
-			end
-			if not yard then
-				bad = `{h.id}: no yard (or two) on {h.street}`
-			elseif not inRect(yard :: any, h.curb.x, h.curb.z) or math.min(yard.x1 - yard.x0, yard.z1 - yard.z0) < 48 or not yard.lane then
-				bad = `{h.id}: its yard ({yard.x1 - yard.x0} × {yard.z1 - yard.z0}) too small for the van to turn round, or its curb not in it`
-			end
+	for _, h in Houses do
+		local yards = rectsOf(h.street)
+		local yard = yards[1]
+		if #yards ~= 1 or not yard.yard then
+			bad = `{h.id}: not one yard on {h.street}`
+		elseif not inRect(yard :: any, h.curb.x, h.curb.z) or math.min(yard.x1 - yard.x0, yard.z1 - yard.z0) < 48 then
+			bad = `{h.id}: its yard ({yard.x1 - yard.x0} × {yard.z1 - yard.z0}) too small for the truck, or its curb not in it`
 		end
-		for _, r in rectsOf(h.street) do
-			if not r.lane and index > 1 then
-				bad = `{h.id}: {h.street} not a lane`
-			elseif r.lane and math.min(r.x1 - r.x0, r.z1 - r.z0) >= 28 and not r.yard then
-				bad = `{h.id}: {h.street} as wide as Pražská`
+		for _, other in Roads do
+			if other.name ~= h.street and yard and overlap(yard :: any, other :: any) then
+				bad = `{h.id}: its yard on {other.name}`
 			end
 		end
 	end
-	check("every place but the farmstead at the end of its own lane (narrower than Pražská, 22 wide: the van drives it), its curb in its yard there, 48 × 48 at least: the van turns round",
+	check("9.7: every place its own yard (one, on no other), its curb in it, 48 × 48 at least: room for the truck",
 		bad == nil, bad)
 end
-check("SandboxMap.houseAt: a place by its lot (its curb within a margin), none on Depot Row", SandboxMap.houseAt(Houses[2].door.x, Houses[2].door.z, 0) == Houses[2]
-	and SandboxMap.houseAt(Houses[6].curb.x, Houses[6].curb.z, 15) == Houses[6] and SandboxMap.houseAt(0, -60, 0) == nil and SandboxMap.house("nowhere") == nil
+check("SandboxMap.houseAt: a place by its lot (its curb within a margin), none in the lobby", SandboxMap.houseAt(Houses[2].door.x, Houses[2].door.z, 0) == Houses[2]
+	and SandboxMap.houseAt(Houses[6].curb.x, Houses[6].curb.z, 15) == Houses[6] and SandboxMap.houseAt(SandboxMap.Lobby.spawn.x, SandboxMap.Lobby.spawn.z, 0) == nil and SandboxMap.house("nowhere") == nil
 	and SandboxMap.house(nil) == nil)
 do
 	-- each its own spot: no two places' lots within 250 studs of each other
@@ -334,118 +318,35 @@ do
 		for _, r in rectsOf(h.street) do
 			curbOn = curbOn or inRect(r :: any, h.curb.x, h.curb.z)
 		end
-		if h.id == SandboxMap.House.id then
-			-- (the farmstead looks out over the turnaround to Pražská's end)
-			local t = SandboxMap.Turnaround
-			if not onFace or d.yaw ~= 0 or (h.curb.x - t.x) ^ 2 + (h.curb.z - t.z) ^ 2 > t.r * t.r or #rectsOf(h.street) == 0 or math.abs(d.x - t.x) > EPS then
-				bad = `{h.id}: its door`
-			end
-		elseif not onFace or met ~= h.street or not curbOn then
+		if not onFace or met ~= h.street or not curbOn or (h.id == SandboxMap.House.id and d.yaw ~= 0) then
 			bad = `{h.id}: its door looks at {met}, not {h.street}`
 		end
 	end
-	check("every door on its box's face (a place's 1.2 behind it), looking out to its own road's yard (the farmstead's over the turnaround), its curb there", bad == nil, bad)
+	check("every door on its box's face (a place's 1.2 behind it), looking out to its own yard (9.7 the farmstead's too: no turnaround), its curb there", bad == nil, bad)
 end
--- The roads reachable from Depot Row (rects that meet, by their index).
-local function reach(roads: { any }): { [string]: boolean }
-	local function rect(r: any): Rect
-		return r.rect or r
-	end
-	local seen: { [number]: boolean } = {}
-	for n, r in roads do
-		seen[n] = r.name == "Depot Row" or nil
-	end
-	local grown = true
-	while grown do
-		grown = false
-		for i, a in roads do
-			if seen[i] then
-				for j, b in roads do
-					local ra, rb = rect(a), rect(b)
-					if not seen[j] and ra.x0 <= rb.x1 + EPS and rb.x0 <= ra.x1 + EPS and ra.z0 <= rb.z1 + EPS and rb.z0 <= ra.z1 + EPS then
-						seen[j] = true
-						grown = true
-					end
-				end
-			end
-		end
-	end
-	local names: { [string]: boolean } = {}
-	for n, r in roads do
-		if seen[n] then
-			names[r.name] = true
-		else
-			names["unreached " .. r.name] = true
-		end
-	end
-	return names
-end
-check("every place reachable by road from Depot Row (the rects that meet: SandboxMap's and the plan's), no road on its own", (function(): boolean
-	local mine, theirs = reach(Roads), reach(Plan.roads)
-	for _, h in Houses do
-		if not mine[h.street] or not theirs[h.street] then
-			return false
-		end
-	end
-	for name in mine do
-		if string.sub(name, 1, 10) == "unreached " then
-			return false
-		end
-	end
-	return true
-end)())
+-- 9.7 runs: nobody drives; the guide's path is straight (in the lobby to a portal, in a zone to the door or the truck)
 do
 	local out: { number } = {}
 	local bad: string? = nil
-	local most = 0
-	local longest = 0
-	local shortest = math.huge
-	for _, plot in SandboxMap.Plots do
-		for _, h in Houses do
-			for leg, way in { { plot.spawn.x, plot.spawn.z, h.curb.x, h.curb.z }, { h.curb.x, h.curb.z, plot.unload.x, plot.unload.z } } do
-				local n = SandboxSteps.route(way[1], way[2], way[3], way[4], out, Config.SandboxGuide.Direct)
-				most = math.max(most, n)
-				-- (its last point the target, or within 3 studs of it: a point that close to the one before is left out)
-				if n > SandboxSteps.MaxPoints or (out[n * 2 - 1] - way[3]) ^ 2 + (out[n * 2] - way[4]) ^ 2 > 9 then
-					bad = `{h.id} from plot {plot.id}: {n} points`
-				end
-				local length = 0
-				for i = 2, n do
-					length += math.abs(out[i * 2 - 1] - out[i * 2 - 3]) + math.abs(out[i * 2] - out[i * 2 - 2])
-				end
-				if leg == 1 then
-					longest, shortest = math.max(longest, length), math.min(shortest, length)
-				end
-				for i = 2, n - 1 do
-					if not onAsphalt(Roads, out[i * 2 - 1], out[i * 2]) then
-						bad = `{h.id} from plot {plot.id}: a turn off the road at {out[i * 2 - 1]}, {out[i * 2]}`
-					end
-					if i > 2 then -- (the legs between two road points: along a road's middle line, never slanting)
-						local dx, dz = out[i * 2 - 1] - out[i * 2 - 3], out[i * 2] - out[i * 2 - 2]
-						if math.abs(dx) > 1e-6 and math.abs(dz) > 1e-6 then
-							local pts = {}
-							for k = 1, n do
-								table.insert(pts, `({out[k * 2 - 1]}, {out[k * 2]})`)
-							end
-							bad = `{h.id} from plot {plot.id}: a slanting leg along the roads: {table.concat(pts, " ")}`
-						end
-					end
-				end
-			end
+	local spawn = SandboxMap.Lobby.spawn
+	local farthest = 0
+	for _, portal in SandboxMap.Lobby.portals do
+		local px, pz = (portal.pad.x0 + portal.pad.x1) / 2, (portal.pad.z0 + portal.pad.z1) / 2
+		local n = SandboxSteps.route(spawn.x, spawn.z, px, pz, out, Config.SandboxGuide.Direct)
+		if n ~= 2 or out[3] ~= px or out[4] ~= pz then
+			bad = `to {portal.house}'s pad: {n} points`
+		end
+		farthest = math.max(farthest, math.sqrt((px - spawn.x) ^ 2 + (pz - spawn.z) ^ 2))
+	end
+	for _, z in SandboxMap.Zones do
+		local h = SandboxMap.house(z.id) :: SandboxMap.House
+		local n = SandboxSteps.route(z.arrive.x, z.arrive.z, h.curb.x, h.curb.z, out, Config.SandboxGuide.Direct)
+		if n > 2 or out[n * 2 - 1] ~= h.curb.x or out[n * 2] ~= h.curb.z then
+			bad = `{z.id}: from its arrival to its curb {n} points`
 		end
 	end
-	check(`the guide's path to every place's curb and back home along the roads: every turn on the asphalt, straight legs, {SandboxSteps.MaxPoints} points at most ({most} here)`,
-		bad == nil, bad)
-	check(`…a drive of {math.floor(shortest)} to {math.floor(longest)} studs from a plot to a place (about 15 to 45 s in the Sprinter)`, shortest >= 500 and longest <= 2200, `{shortest} {longest}`)
-	local lone = SandboxMap.house("lone_house") :: SandboxMap.House
-	local n = SandboxSteps.route(SandboxMap.Plots[1].spawn.x, SandboxMap.Plots[1].spawn.z, lone.curb.x, lone.curb.z, out, Config.SandboxGuide.Direct)
-	local pts = {}
-	for k = 1, n do
-		table.insert(pts, `({out[k * 2 - 1]}, {out[k * 2]})`)
-	end
-	check("…to The Lone House: out to Depot Row, along it and Mill Lane to Hill Road, up Hill Road to its yard, across it to the curb", n == 5
-		and out[4] == -60 and out[5] == -520 and out[6] == -60 and out[7] == -520 and out[8] == lone.curb.z and out[9] == lone.curb.x and out[10] == lone.curb.z,
-		table.concat(pts, " "))
+	check("9.7: the guide's path straight (no road to follow): from the lobby's spawn to every portal's pad, from a zone's arrival to its truck", bad == nil, bad)
+	check(`…every portal a short walk from the spawn (the farthest {math.floor(farthest)} studs: under 15 s on foot)`, farthest < 15 * 16, farthest)
 end
 
 -- ── The contracts and the economy ──────────────────────────────────────────
@@ -523,12 +424,10 @@ do
 	local steps = SandboxSteps.Steps
 	local bad: string? = nil
 	for _, h in Houses do
-		local state: any = { house = h.id }
-		local drive, back = SandboxSteps.words(steps.drive, state), SandboxSteps.words(steps.back, state)
-		if drive ~= `Drive to {h.name} on {h.street}` or back ~= `Drive back to {h.name} on {h.street} for more, or FINISH` then
-			bad = drive
-		elseif SandboxSteps.detail(steps.drive, state) ~= h.id then
-			bad = `{h.id}: detail`
+		if SandboxSteps.houseWords(h.id) ~= h.name then
+			bad = SandboxSteps.houseWords(h.id)
+		elseif steps.drive ~= nil or steps.back ~= nil or steps.home ~= nil then
+			bad = "a drive step"
 		elseif not SandboxSteps.atHouse(h.curb.x, h.curb.z, Config.SandboxGuide.HouseMargin, h.id) or not SandboxSteps.atHouse(h.door.x, h.door.z, 0, h.id) then
 			bad = `{h.id}: not at its own house`
 		end
@@ -538,11 +437,10 @@ do
 			end
 		end
 	end
-	check("the guide's drive steps name the move's place on its road (\"Drive to The Pond Cabin on Pond Lane\"), at the place by its own lot only", bad == nil, bad)
-	check("…no house known (or an old save's village house): the farmstead's words, as before", SandboxSteps.words(steps.drive, {} :: any) == "Drive to The Old Farmstead on Pražská"
-		and SandboxSteps.houseWords("nowhere") == "The Old Farmstead on Pražská" and SandboxSteps.houseWords("Hlavní_n_5") == "The Old Farmstead on Pražská"
-		and SandboxSteps.atHouse(0, 523, 0))
-end
+	check("the guide names the move's place (SandboxSteps.houseWords: \"The Pond Cabin\"; 9.7 no road to drive along), at the place by its own lot only", bad == nil, bad)
+	check("…no house known (or an old save's village house): the farmstead's words, as before", SandboxSteps.houseWords(nil) == "The Old Farmstead"
+		and SandboxSteps.houseWords("nowhere") == "The Old Farmstead" and SandboxSteps.houseWords("Hlavní_n_5") == "The Old Farmstead"
+		and SandboxSteps.atHouse(0, 523, 0))end
 
 if failures == 0 then
 	print("ALL CHECKS PASSED")

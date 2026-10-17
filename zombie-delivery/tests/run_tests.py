@@ -33,6 +33,7 @@ PURE += ("VillageScenery",)  # 8.9 sandbox on the map, 9.4 the countryside: wher
 PURE += ("CountryLooks",)  # 9.4 sandbox, the countryside's art kit (tests/countrylooks_test.luau)
 PURE += ("HouseRoute",)  # 9.0 Danny's way inside a house, on its plan's grid (tests/houseroute_test.luau, tests/dannynav_runtime_test.luau; 9.3 his walk along it, audited against the built parts: tests/movehelper_stuck_runtime_test.luau)
 PURE += ("PedalRules",)  # 9.1 the drive pedals: the input, the press, where they go (tests/drivepedals_test.luau)
+PURE += ("RunRules",)  # 9.7 runs: the difficulties and their unlocks, the pads, the votes, whose stock (tests/runrules_test.luau)
 luau = sys.argv[1] if len(sys.argv) > 1 else shutil.which("luau") or "luau"
 
 ok = True
@@ -306,7 +307,8 @@ with tempfile.TemporaryDirectory() as tmp:
     assert "script.Parent" not in source, "server/VanPaint.luau requires a module tests/run_tests.py does not give it"
     paint_head = ('local P = require("./VanPaintRuntime")\nlocal E, M = P.E, P.Mock\n'
                   'local game, task, os, warn, Instance = P.game, E.task, E.os, E.warn, P.Instance\n'
-                  'local Vector3, CFrame, Color3, Enum, typeof = M.Vector3, M.CFrame, M.Color3, M.Enum, M.typeof\n')
+                  'local Vector3, CFrame, Color3, Enum, typeof = M.Vector3, M.CFrame, M.Color3, M.Enum, M.typeof\n'
+                  'local workspace = E.workspace -- (9.7: the lobby\'s PAINT shop booth is looked for in workspace.Sandbox)\n')
     open(os.path.join(tmp, "VanPaintServer.luau"), "w", encoding="utf-8").write(paint_head + source)
     # 8.2 SANDBOX, analytics: the real server/Analytics.luau and server/SandboxAnalytics.luau as AnalyticsServer.luau and
     # SandboxAnalyticsServer.luau for tests/sandboxanalytics_runtime_test.luau on the same runtime: PlayerData and
@@ -382,7 +384,21 @@ with tempfile.TemporaryDirectory() as tmp:
     source = re.sub(r"require\(Shared\.(\w+)\)", r'require("./\1")', source)
     source = source.replace("require(script.Parent.HouseMesh)", 'require("./HouseMeshServer")')
     source = source.replace("require(script.Parent.VillageWorld)", 'require("./VillageWorldServer")')
+    source = source.replace("require(script.Parent.LobbyWorld)", 'require("./LobbyWorldServer")')  # 9.7: the lobby
     open(os.path.join(tmp, "SandboxWorldServer.luau"), "w", encoding="utf-8").write('setfenv(1, require("./WorldMock").env)\n' + source)
+    # 9.7 runs: its server/LobbyWorld.luau (the lobby: the plaza, the portals, the dispatch, the PAINT shop) on the same
+    # mock as LobbyWorldServer.luau, its server/MoveSites.luau (the dispatch kiosk's art) as MoveSitesWorld.luau there
+    # (DayNight a stand-in), its shared modules the copies above.
+    source = open(os.path.join(os.path.dirname(SHARED), "server", "MoveSites.luau"), encoding="utf-8").read()
+    source = re.sub(r"require\(Shared\.(\w+)\)", r'require("./\1")', source)
+    source = source.replace("require(script.Parent.DayNight)", "{ nightLight = function() end }")
+    open(os.path.join(tmp, "MoveSitesWorld.luau"), "w", encoding="utf-8").write('setfenv(1, require("./WorldMock").env)\n' + source)
+    source = open(os.path.join(os.path.dirname(SHARED), "server", "LobbyWorld.luau"), encoding="utf-8").read()
+    source = re.sub(r"require\(Shared\.(\w+)\)", r'require("./\1")', source)
+    source = source.replace("require(script.Parent.MoveSites)", 'require("./MoveSitesWorld")')
+    source = source.replace("require(script.Parent.VillageWorld)", 'require("./VillageWorldServer")')
+    assert "script.Parent" not in source, "server/LobbyWorld.luau requires a module tests/run_tests.py does not give it"
+    open(os.path.join(tmp, "LobbyWorldServer.luau"), "w", encoding="utf-8").write('setfenv(1, require("./WorldMock").env)\n' + source)
     # 8.9 Jinočany: its server/VillageWorld.luau (the village, the D5, the far view) on the same mock as
     # VillageWorldServer.luau (tests/villageworld_test.luau), its shared modules the copies above.
     source = open(os.path.join(os.path.dirname(SHARED), "server", "VillageWorld.luau"), encoding="utf-8").read()
@@ -468,12 +484,23 @@ with tempfile.TemporaryDirectory() as tmp:
     c_streams = ["\t{ id = %s, width = %r, points = %s }," % (q(st["id"]), st["width"], points_text(st["points"])) for st in country["streams"]]
     c_lines = ["\t{ kind = %s, points = %s }," % (q(t["kind"]), points_text(t["points"])) for t in country["treeLines"]]
     c_area_lines = ["\t{ name = %s, rect = %s }," % (q(name), rect(r)) for name, r in c_areas]
+    # 9.7 runs: the run zones (each spot's zone and its party's arrival spot); no turnaround any more
+    c_zones = ["\t{ id = %s, rect = %s, arrive = { x = %r, y = %r, z = %r, yaw = %r } }," % (q(z["id"]), rect(z["rect"]), z["arrive"]["x"], z["arrive"]["y"],
+               z["arrive"]["z"], z["arrive"]["yaw"]) for z in country["zones"]]
     open(os.path.join(tmp, "CountryPlan.luau"), "w", encoding="utf-8").write(
-        "return {\nbounds = %s,\nturnaround = { x = %r, z = %r, r = %r },\nroads = {\n%s\n},\nspots = {\n%s\n},\nlandmarks = {\n%s\n},\n"
-        "fields = {\n%s\n},\nlawns = {\n%s\n},\nwoods = {\n%s\n},\norchard = %s,\nstreams = {\n%s\n},\nlines = {\n%s\n},\nareas = {\n%s\n},\n}\n"
-        % (rect(country["bounds"]), country["turnaround"]["x"], country["turnaround"]["z"], country["turnaround"]["r"], "\n".join(c_roads),
+        "return {\nbounds = %s,\nroads = {\n%s\n},\nspots = {\n%s\n},\nlandmarks = {\n%s\n},\n"
+        "fields = {\n%s\n},\nlawns = {\n%s\n},\nwoods = {\n%s\n},\norchard = %s,\nstreams = {\n%s\n},\nlines = {\n%s\n},\nareas = {\n%s\n},\nzones = {\n%s\n},\n}\n"
+        % (rect(country["bounds"]), "\n".join(c_roads),
            "\n".join(c_spots), "\n".join(c_marks), "\n".join(c_fields), "\n".join(c_lawns), "\n".join(c_woods), rect(country["orchard"]),
-           "\n".join(c_streams), "\n".join(c_lines), "\n".join(c_area_lines)))
+           "\n".join(c_streams), "\n".join(c_lines), "\n".join(c_area_lines), "\n".join(c_zones)))
+    # 9.7 runs: the lobby's plan (design/lobby/plan.json, design/lobby/plan.py writes it) as LobbyPlan.luau for
+    # tests/lobby_test.luau (SandboxMap.Lobby against it, the Auction House and the TOP MOVERS board in it)
+    lobby_plan = json.load(open(os.path.join(os.path.dirname(HERE), "design", "lobby", "plan.json"), encoding="utf-8"))
+    open(os.path.join(tmp, "LobbyPlan.luau"), "w", encoding="utf-8").write(
+        "return {\nbounds = %s,\nfar = %r,\nportals = {\n%s\n},\nauction = %s,\nleaders = %s,\npaint = %s,\n}\n"
+        % (rect(lobby_plan["bounds"]), lobby_plan["far"],
+           "\n".join("\t{ house = %s, x = %r, z = %r, yaw = %r, pad = %s }," % (q(p["house"]), p["x"], p["z"], p["yaw"], rect(p["pad"])) for p in lobby_plan["portals"]),
+           spot_text(lobby_plan["shops"]["auction"]["spot"]), spot_text(lobby_plan["shops"]["leaders"]["spot"]), rect(lobby_plan["shops"]["paint"]["rect"])))
     # 8.0.1 review: the real server/SandboxPlots.luau as SandboxPlotsServer.luau for tests/sandboxplots_runtime_test.luau:
     # a function of the globals it reads (the test's own Players, ReplicatedStorage and task, and a `require` that gives
     # the real SandboxMap copy above).
@@ -951,6 +978,11 @@ if not audio_length_check():
 village = subprocess.run([sys.executable, os.path.join(os.path.dirname(HERE), "tools", "countryside", "sandboxmap.py"), "--check"], capture_output=True, text=True)
 print("== map data: " + (village.stdout.strip() or village.stderr.strip())[:200])
 if village.returncode != 0:
+    ok = False
+# 9.7 runs: shared/SandboxMap.luau's lobby section is design/lobby/plan.json's (tools/lobby/sandboxmap.py --check)
+lobby = subprocess.run([sys.executable, os.path.join(os.path.dirname(HERE), "tools", "lobby", "sandboxmap.py"), "--check"], capture_output=True, text=True)
+print("== lobby data: " + (lobby.stdout.strip() or lobby.stderr.strip())[:200])
+if lobby.returncode != 0:
     ok = False
 
 # 6.24: every require in src resolves to a ModuleScript where Rojo puts it (tools/check-requires.py: a module that

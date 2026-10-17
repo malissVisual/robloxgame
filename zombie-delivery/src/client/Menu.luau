@@ -62,30 +62,25 @@ local function warehouseLevel(id: number, mine: boolean): number
 	return if type(level) == "number" then level else 4
 end
 
--- 8.0 SANDBOX: the slow drift over the sandbox (shared/SandboxMap.luau), looped: the chalet from the turnaround, then
--- from its other side, up Pražská toward the plots, your plot's warehouse (the player's Plot attribute; the first
--- plot before the server gave you one; 8.3: the building of its level), your van's spot at its roller door, back down
--- the street. 8.3: every level's front wall is on the door's line; the shot at it pulls back with the building's
--- footprint (far 1: the Big Warehouse's 80 × 60, the 8.0 shot: 60 east, 40 up, 87 in front of the door; the Garage
--- close, the Logistics Center from further off).
+-- 8.0 SANDBOX: the slow drift over the sandbox (shared/SandboxMap.luau), looped. 9.7 runs: over the lobby (its
+-- plaza from the south, its portals from the west, your plot's warehouse (the player's Plot attribute; the first plot
+-- before the server gave you one; 8.3: the building of its level, the shot pulling back with its footprint), its bay
+-- and the plaza from high up).
 local function sandboxShots(): { { Vector3 } }
-	local house = SandboxMap.House.house
-	local door = SandboxMap.House.door
-	local turn = SandboxMap.Turnaround
+	local L = SandboxMap.Lobby
+	local b = L.bounds
+	local cx, cz = (b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2
+	local plaza = Vector3.new(cx, 3, (L.plaza.z0 + L.plaza.z1) / 2)
 	local mine = SandboxMap.Plots[tonumber(player:GetAttribute("Plot")) or 0]
 	local plot = mine or SandboxMap.Plots[1]
-	local w, van = (WarehouseLayout.site(plot, warehouseLevel(plot.id, mine ~= nil)) or plot).warehouse, plot.vanSpot
+	local w = (WarehouseLayout.site(plot, warehouseLevel(plot.id, mine ~= nil)) or plot).warehouse
 	local front, far = w.z + w.sz / 2, math.sqrt(w.sx * w.sx + w.sz * w.sz) / 100
-	-- (8.1: the house is the owner's Blender house's box, its roof over house.sy; 8.2.1: the big one again, 44 wide:
-	-- the two shots as far out as before 8.1)
-	local chalet = Vector3.new(house.x, house.y + house.sy * 0.8, house.z)
 	return {
-		{ Vector3.new(house.x + 64, 30, door.z - 70), chalet },
-		{ Vector3.new(house.x - 70, 44, door.z - 110), chalet },
-		{ Vector3.new(turn.x + 40, 70, turn.z - 30), Vector3.new(turn.x, 0, (turn.z + van.z) / 2) },
+		{ Vector3.new(cx + 150, 60, b.z1 + 40), plaza },
+		{ Vector3.new(b.x0 - 30, 45, cz + 60), Vector3.new(b.x0 + 60, 6, cz + 40) },
 		{ Vector3.new(w.x + 60 * far, 40 * far, front + 87 * far), Vector3.new(w.x, w.sy * 0.4, front) },
-		{ Vector3.new(w.x - 50, 26, van.z + 40), Vector3.new(van.x, van.y + 4, van.z) },
-		{ Vector3.new(turn.x - 30, 60, van.z + 90), Vector3.new(turn.x, 0, (turn.z + van.z) / 2) },
+		{ Vector3.new(w.x - 50, 26, front + 50), Vector3.new(w.x, 6, front + 10) },
+		{ Vector3.new(cx - 40, 110, b.z1 + 110), Vector3.new(cx, 0, cz) },
 	}
 end
 

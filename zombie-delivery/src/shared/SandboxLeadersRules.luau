@@ -21,10 +21,9 @@
 --   SandboxLeadersRules.columns(allTime)  the board's columns, left to right: key, title, x and width (shares of the
 --                                         board's width), align ("left" | "center" | "right"); the ALL-TIME one only
 --                                         with allTime
---   SandboxLeadersRules.spot()            where the board stands (a SandboxMap Spot): Config.SandboxLeaders.Board.Corner
---                                         studs off the crossroads' south-east corner (east of Pražská, south of
---                                         Depot Row; the signpost stands at the south-west one), on the ground there,
---                                         its face to Yaw (to the crossroads)
+--   SandboxLeadersRules.spot()            where the board stands (a SandboxMap Spot): 9.7 the lobby's
+--                                         (SandboxMap.Lobby.shops.leaders: design/lobby/plan.py, by the plaza's west
+--                                         edge, its face to the plaza), on the ground there
 --   SandboxLeadersRules.footprint()       { width, depth }: the ground the board covers (its roof is the widest part)
 --   SandboxLeadersRules.corners(spot?)    the footprint's four corners on the ground ({ x, z }, round it)
 --   SandboxLeadersRules.look(spot?)       the way the board's face looks on the ground (x, z: a unit vector)
@@ -186,20 +185,9 @@ end
 
 -- ── Where it stands ────────────────────────────────────────────────────────
 
-local function road(name: string, index: number): { name: string, x0: number, x1: number, z0: number, z1: number }
-	for _, r in SandboxMap.Roads do
-		if r.name == name then
-			return r
-		end
-	end
-	return SandboxMap.Roads[index]
-end
-
 function SandboxLeadersRules.spot(): SandboxMap.Spot
-	local B = Config.SandboxLeaders.Board
-	local main, depot = road("Pražská", 1), road("Depot Row", 2)
-	local x, z = main.x1 + B.Corner[1], depot.z1 + B.Corner[2]
-	return { x = x, y = SandboxScenery.groundAt(x, z), z = z, yaw = B.Yaw }
+	local at = SandboxMap.Lobby.shops.leaders.spot -- (9.7: the lobby's; Pražská and Depot Row are gone)
+	return { x = at.x, y = SandboxScenery.groundAt(at.x, at.z), z = at.z, yaw = at.yaw }
 end
 
 function SandboxLeadersRules.footprint(): { width: number, depth: number }

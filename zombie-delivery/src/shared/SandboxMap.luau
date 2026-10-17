@@ -1,54 +1,59 @@
 --!strict
--- 8.0 SANDBOX (design/sandbox/KONTRAKT.md): the owner's small test world in place of the city. Houses to empty, the
--- roads, four player plots, each with a ZDC warehouse (its display plots), a van spot at its roller door and a Moving
--- contracts board. Plain data (numbers only: the pure tests run it outside Roblox); the builders read it. 9.4 the
--- countryside (design/countryside/plan.py, plan.json; the owner: "all the family houses are gone; instead six different
--- spots, no towns, no villages"): open country with six separate places to empty (Houses), each with its own
--- surroundings, joined to the depot by country lanes; its map section below, the six spots by hand under it.
+-- 8.0 SANDBOX (design/sandbox/KONTRAKT.md): the owner's small test world in place of the city. 9.7 runs (the owner:
+-- "shrink the map ... one little lobby, like Dungeon Quest: there you go into a dungeon, here you go into a house"):
+-- the LOBBY (design/lobby/plan.py, plan.json; its section below) is the whole visible world, a compact square with the
+-- plaza, the spawn, the ZDC dispatch, the four player plots (each with a ZDC warehouse, its display stands), the
+-- shops and six house portals; the six places to empty (Houses) each stand in a RUN ZONE of their own far off
+-- (design/countryside/plan.py, plan.json; its section below: Zones), fenced, out of sight of the lobby and of each
+-- other, their truck parked at the curb by the door (no driving any more: no lanes, no Depot Row, no Pražská). Plain
+-- data (numbers only: the pure tests run it outside Roblox); the builders read it.
 --
--- Coordinates: studs, y up, the ground's top at GroundTop, the asphalt's at RoadTop. A spot is { x, y, z, yaw }: yaw
--- in degrees about Y, the way its front looks: 0 looks north (-z), 90 west (-x), 180 south (+z), 270 east (+x);
--- in Roblox: CFrame.new(x, y, z) * CFrame.Angles(0, math.rad(yaw), 0) (SandboxMap.cframe).
+-- Coordinates: studs, y up, the ground's top at GroundTop, the asphalt's (the yards') at RoadTop. A spot is { x, y, z,
+-- yaw }: yaw in degrees about Y, the way its front looks: 0 looks north (-z), 90 west (-x), 180 south (+z), 270 east
+-- (+x); in Roblox: CFrame.new(x, y, z) * CFrame.Angles(0, math.rad(yaw), 0) (SandboxMap.cframe).
 --
---   Bounds           the world's edge (the scenery fills it; nothing you play with is outside)
---   Roads            the asphalt rects: Pražská (north-south, the plots to the farmstead) and Depot Row (the plots')
---                    first, always these two (Roads[1], Roads[2]); then the country lanes, each one rect or a few that
---                    meet end to end (they share its name; none over another): Mill Lane (west from Depot Row to the
---                    mill), Wood Lane (north off it into the forest), Hill Road (north off it to the lone house), Orchard
---                    Lane (north from Depot Row's east end to the orchard), Pond Lane (west off Pražská, then south to
---                    the pond). lane: a lane (narrower than Pražská; no centre line), else a main road; yard: a spot's
---                    turning yard at its lane's end (its lane's name: the van turns round there, its curb in it)
+--   9.7 the lobby (design/lobby/plan.json; tools/lobby/sandboxmap.py writes Lobby between the BEGIN LOBBY and END
+--   LOBBY lines: change the plan, run it again):
+--   Lobby            bounds (the square: a hedge `hedge` in from it, invisible walls on it), far (studs to every run
+--                    zone at least), plaza, spawn (a Spot; spawnApart: the players' spawns apart), dispatch (the ZDC
+--                    dispatch kiosk), fountain, plots ({ id, x, wall, rect }: Plots below), portals ({ house, name, x, z,
+--                    yaw, pad, foot, back }: a gate per place to empty, its glowing pad in front of it, its footprint,
+--                    where its party comes back), shops (paint, leaders, auction: their spots and rects; paint's stand
+--                    at its counter), lamps, trees
 --   9.4 the countryside (design/countryside/plan.json; tools/countryside/sandboxmap.py writes Bounds, Roads and these
 --   between the BEGIN COUNTRYSIDE and END COUNTRYSIDE lines: change the plan, run it again):
---   Landmarks        each spot's surroundings and the map's own (id, name, kind, rect, yaw: the way its front looks):
---                    the farm's barn, old tractor and trailer, stackyard of bales, paddock and muck heap; the fish pond
---                    with its jetty and boat; the lone house's garden; the lodge's woodpile; the millrace's weir and
---                    footbridge; the orchard's beehives; the D5 at the east edge; the railway under it and its lone
---                    halt (shared/CountryLooks.luau draws them, the D5 shared/VillageLooks.luau)
---   Fields           the fields between the lanes (a crop's kind and its rect; none over another, a plot, a lot, a road)
+--   Bounds           the world's edge round the run zones and the lobby (the meadow under all of it; nothing you play
+--                    with is outside a zone or the lobby)
+--   Roads            9.7 the yards: each place's yard where its truck stands (name: the road its place stood on, its
+--                    words' "on Pond Lane"; lane, yard: true)
+--   Landmarks        each place's surroundings (id, name, kind, rect, yaw: the way its front looks): the farm's barn, old
+--                    tractor and trailer, stackyard of bales, paddock and muck heap; the fish pond with its jetty and
+--                    boat; the lone house's garden; the lodge's woodpile; the millrace's weir and footbridge; the
+--                    orchard's beehives (shared/CountryLooks.luau draws them)
+--   Fields           (9.7: none)
 --   Lawns            ground tiles of their own (kind, rect): the forest's floor
---   TreeLines        windbreaks and fruit alleys (trees), hedges and fences (kind, points)
+--   TreeLines        the orchard's fence, 9.7 the zones' screen hedges (kind, points)
 --   Woods            the forest: its rect (its trees on a jittered grid) and its clearings (the lodge's: no tree)
 --   Orchard          the orchard's rect (its fruit trees in rows; the cottage on its east edge)
 --   Streams          the millrace from the forest past the mill into the pond (id, width, its middle line's points)
---   Turnaround       the circle at Pražská's south end, before the farmstead
---   Plots            four players' plots along Depot Row's north side (SandboxPlots claims one per player):
+--   Zones            9.7 the run zones: id (its place's), rect (the fenced area round it: a screen hedge and invisible
+--                    walls on its edge), arrive (where a run's party arrives: its front yard, facing the door)
+--   Plots            four players' plots in the lobby's north row (SandboxPlots claims one per player), from Lobby.plots:
 --                      rect        the plot's ground (x0, x1, z0, z1)
 --                      warehouse   the building: its middle at the ground and its size (x across, y up, z deep);
 --                                  its roller door in the south wall, DoorWidth wide, in the middle
 --                      door        outside the roller door's middle, looking out (south)
---                      vanSpot     the van's pivot: its nose to the street (south), its back doors to the roller
---                                  door, VanGap studs from the wall
---                      unload      the circle the van's back must be in to unload into the warehouse
---                      spawn       where the player appears (beside the van, inside the plot)
---                      board       the Moving contracts board (by the roller door, on the wall's outside)
+--                      vanSpot     where the van stood before 9.7 (the UNLOAD HERE bay's middle; no van parks there now)
+--                      unload      the bay's circle (shared/WarehouseLayout.luau's paint)
+--                      spawn       a spot in front of the warehouse (the admin's TO WAREHOUSE)
+--                      board       (8.0's Moving contracts board's spot: none is built since 9.7)
 --   Houses           the six places to empty (design/countryside/plan.json `spots`; tests/sandboxhouses_test.luau holds
---                    them to it), each a Moving contract of its own (Config.Moving.Sandbox.Houses, by id; server/
---                    Moving.luau offers one at a time). In this order: the farmstead, the pond cabin, the lone house,
---                    the forest lodge, the old mill, the orchard cottage. Each:
+--                    them to it), each a run's house (Config.Moving.Sandbox.Houses, by id; server/Runs.luau: a portal
+--                    each in the lobby). In this order: the farmstead, the pond cabin, the lone house, the forest
+--                    lodge, the old mill, the orchard cottage. Each:
 --                      id          the spot's (the farmstead's sandbox_house as ever)
---                      name        what the card, the guide and its signs call it (made up, in English words)
---                      street      the road it stands on, one of Roads (the contract's address, the guide's words)
+--                      name        what the portal, the guide and its signs call it (made up, in English words)
+--                      street      the road it stood on (its yard's name: the contract's address, the guide's words)
 --                      number      none (a spot of its own has no house number)
 --                      kind        its inside's plan's kind (shared/HouseLayout.luau; its contract's, Config.Moving
 --                                  .Sandbox.Houses): "big" the farmstead, "house" the lone house, the other four
@@ -64,19 +69,21 @@
 --                      yaw         the way its front looks (its front door's)
 --                      door        outside its front door, looking out to its yard (DOOR_IN in from its box's front
 --                                  edge: the look's front wall 1.5 in, its door 0.3 out of it)
---                      curb        the van's pivot in its yard (the Sprinter, 21.8 long: its back 2 studs in from the
---                                  yard's edge nearest the door, its nose away from the door: "Call the van to the door")
+--                      curb        the truck's pivot in its yard (the Sprinter, 21.8 long: its back 2 studs in from the
+--                                  yard's edge nearest the door, its nose away from the door): a run parks it there
 --                      back        only where the house has a back door (the farmstead's): outside it, looking out
---   House            Houses[1], The Old Farmstead on Pražská: what only the farmstead has reads it (server/HouseMesh
---                    .luau dresses only it, the menu's drift shows it). 8.1: the box is the owner's Blender house's
---                    (server/HouseMesh.luau dresses only a box of its size), its front wall where the chalet's always
---                    was (the door, the path and the curb unmoved). 8.2.1: the owner's big European house
---                    (design/blender-house/house.py TARGET "sandbox": 44 × 14.5 × 34, the chalet's old footprint). 8.3
---                    the big move: back, its back door (the model's, in the middle of its back wall; outside it,
---                    looking out: south), a second way in and out of a move (server/Moving.luau SB.site)
+--   House            Houses[1], The Old Farmstead: what only the farmstead has reads it (server/HouseMesh.luau dresses
+--                    only it, the menu's drift shows it). 8.1: the box is the owner's Blender house's (server/HouseMesh
+--                    .luau dresses only a box of its size). 8.2.1: the owner's big European house (design/blender-house/
+--                    house.py TARGET "sandbox": 44 × 14.5 × 34). 8.3 the big move: back, its back door (the model's, in
+--                    the middle of its back wall; outside it, looking out: south), a second way in and out of a run
 --   SandboxMap.plotAt(x, z)   the plot whose rect holds the point (nil: none)
 --   SandboxMap.house(id)      the house of that id (nil: none, an id of an older map's too)
 --   SandboxMap.houseAt(x, z, margin)   the first house whose lot holds the point or lies within `margin` of it (nil: none)
+--   SandboxMap.zone(id)       9.7: the run zone of that house id (nil: none)
+--   SandboxMap.zoneAt(x, z, margin?)   9.7: the run zone whose rect (grown by `margin`) holds the point (nil: none)
+--   SandboxMap.portal(id)     9.7: the lobby's portal of that house id (nil: none)
+--   SandboxMap.inLobby(x, z, margin?)  9.7: is the point in the lobby's bounds (grown by `margin`)?
 --   SandboxMap.cframe(spot)   (Roblox only) a spot's CFrame
 
 local SandboxMap = {}
@@ -119,25 +126,80 @@ export type Lawn = { kind: string, x0: number, x1: number, z0: number, z1: numbe
 export type TreeLine = { kind: string, points: { { x: number, z: number } } }
 export type Wood = { id: string, x0: number, x1: number, z0: number, z1: number, clearings: { Rect } }
 export type Stream = { id: string, width: number, points: { { x: number, z: number } } }
+-- 9.7: a run zone, the lobby's plot, portal and shops, the lobby
+export type Zone = { id: string, rect: Rect, arrive: Spot }
+export type LobbyPlot = { id: number, x: number, wall: number, rect: Rect }
+export type Portal = { house: string, name: string, x: number, z: number, yaw: number, pad: Rect, foot: Rect, back: Spot }
+export type Lobby = {
+	bounds: Rect,
+	hedge: number,
+	far: number,
+	plaza: Rect,
+	spawn: Spot,
+	spawnApart: number,
+	dispatch: Spot,
+	fountain: { x: number, z: number, r: number },
+	plots: { LobbyPlot },
+	portals: { Portal },
+	shops: { paint: { spot: Spot, rect: Rect, stand: Spot }, leaders: { spot: Spot, rect: Rect }, auction: { spot: Spot, rect: Rect } },
+	lamps: { { x: number, z: number } },
+	trees: { { kind: string, x: number, z: number } },
+}
 
 SandboxMap.GroundTop = 0
 SandboxMap.RoadTop = 0.4
 
+-- BEGIN LOBBY (tools/lobby/sandboxmap.py writes these lines from design/lobby/plan.json: do not edit them)
+SandboxMap.Lobby = {
+	bounds = { x0 = 1560, x1 = 2040, z0 = -200, z1 = 200 },
+	hedge = 2,
+	far = 1000,
+	plaza = { x0 = 1635, x1 = 1965, z0 = -54, z1 = 150 },
+	spawn = { x = 1800, y = 3, z = 10, yaw = 180 },
+	spawnApart = 6,
+	dispatch = { x = 1800, y = 0, z = -44, yaw = 180 },
+	fountain = { x = 1800, z = 70, r = 9 },
+	plots = {
+		{ id = 1, x = 1626, wall = -100, rect = { x0 = 1570, x1 = 1682, z0 = -190, z1 = -60 } },
+		{ id = 2, x = 1742, wall = -100, rect = { x0 = 1686, x1 = 1798, z0 = -190, z1 = -60 } },
+		{ id = 3, x = 1858, wall = -100, rect = { x0 = 1802, x1 = 1914, z0 = -190, z1 = -60 } },
+		{ id = 4, x = 1974, wall = -100, rect = { x0 = 1918, x1 = 2030, z0 = -190, z1 = -60 } },
+	},
+	portals = {
+		{ house = "pond_cabin", name = "The Pond Cabin", x = 1595, z = 0, yaw = 270, pad = { x0 = 1600, x1 = 1614, z0 = -7, z1 = 7 }, foot = { x0 = 1582, x1 = 1597, z0 = -10, z1 = 10 }, back = { x = 1618, y = 3, z = 0, yaw = 270 } },
+		{ house = "old_mill", name = "The Old Mill", x = 1595, z = 96, yaw = 270, pad = { x0 = 1600, x1 = 1614, z0 = 89, z1 = 103 }, foot = { x0 = 1582, x1 = 1597, z0 = 86, z1 = 106 }, back = { x = 1618, y = 3, z = 96, yaw = 270 } },
+		{ house = "sandbox_house", name = "The Old Farmstead", x = 1692, z = 176, yaw = 0, pad = { x0 = 1685, x1 = 1699, z0 = 157, z1 = 171 }, foot = { x0 = 1682, x1 = 1702, z0 = 174, z1 = 189 }, back = { x = 1692, y = 3, z = 153, yaw = 0 } },
+		{ house = "lone_house", name = "The Lone House", x = 1908, z = 176, yaw = 0, pad = { x0 = 1901, x1 = 1915, z0 = 157, z1 = 171 }, foot = { x0 = 1898, x1 = 1918, z0 = 174, z1 = 189 }, back = { x = 1908, y = 3, z = 153, yaw = 0 } },
+		{ house = "forest_lodge", name = "The Forest Lodge", x = 2005, z = 96, yaw = 90, pad = { x0 = 1986, x1 = 2000, z0 = 89, z1 = 103 }, foot = { x0 = 2003, x1 = 2018, z0 = 86, z1 = 106 }, back = { x = 1982, y = 3, z = 96, yaw = 90 } },
+		{ house = "orchard_cottage", name = "The Orchard Cottage", x = 2005, z = 0, yaw = 90, pad = { x0 = 1986, x1 = 2000, z0 = -7, z1 = 7 }, foot = { x0 = 2003, x1 = 2018, z0 = -10, z1 = 10 }, back = { x = 1982, y = 3, z = 0, yaw = 90 } },
+	},
+	shops = {
+		paint = { spot = { x = 2006, y = 0, z = -40, yaw = 90 }, rect = { x0 = 2006, x1 = 2018, z0 = -51, z1 = -29 }, stand = { x = 2002, y = 3, z = -40, yaw = 270 } },
+		leaders = { spot = { x = 1594, y = 0, z = -40, yaw = 270 }, rect = { x0 = 1591.5, x1 = 1596.5, z0 = -52, z1 = -28 } },
+		auction = { spot = { x = 1800, y = 0, z = 156, yaw = 0 }, rect = { x0 = 1774, x1 = 1826, z0 = 152, z1 = 190 } },
+	},
+	lamps = { { x = 1635, z = -54 }, { x = 1965, z = -54 }, { x = 1635, z = 150 }, { x = 1965, z = 150 }, { x = 1740, z = -54 }, { x = 1860, z = -54 }, { x = 1635, z = 48 }, { x = 1965, z = 48 } },
+	trees = {
+		{ kind = "linden", x = 1575, z = 180 },
+		{ kind = "oak", x = 2025, z = 180 },
+		{ kind = "birch", x = 1640, z = 186 },
+		{ kind = "birch", x = 1960, z = 186 },
+		{ kind = "linden", x = 1572, z = 140 },
+		{ kind = "oak", x = 2028, z = 140 },
+		{ kind = "birch", x = 1574, z = -30 },
+		{ kind = "birch", x = 2026, z = -30 },
+	},
+} :: Lobby
+-- END LOBBY
+
 -- BEGIN COUNTRYSIDE (tools/countryside/sandboxmap.py writes these lines from design/countryside/plan.json: do not edit them)
-SandboxMap.Bounds = { x0 = -1180, x1 = 420, z0 = -680, z1 = 760 } :: Rect
+SandboxMap.Bounds = { x0 = -1180, x1 = 2080, z0 = -680, z1 = 760 } :: Rect
 SandboxMap.Roads = {
-	{ name = "Pražská", x0 = -14, x1 = 14, z0 = -74, z1 = 470, lane = false, yard = false },
-	{ name = "Depot Row", x0 = -270, x1 = 270, z0 = -74, z1 = -46, lane = false, yard = false },
-	{ name = "Mill Lane", x0 = -1012, x1 = -270, z0 = -71, z1 = -49, lane = true, yard = false },
+	{ name = "Pražská", x0 = -30, x1 = 30, z0 = 452, z1 = 504, lane = true, yard = true },
 	{ name = "Mill Lane", x0 = -1066, x1 = -1012, z0 = -84, z1 = -36, lane = true, yard = true },
-	{ name = "Wood Lane", x0 = -951, x1 = -929, z0 = -404, z1 = -71, lane = true, yard = false },
 	{ name = "Wood Lane", x0 = -967, x1 = -913, z0 = -452, z1 = -404, lane = true, yard = true },
-	{ name = "Hill Road", x0 = -531, x1 = -509, z0 = -440, z1 = -71, lane = true, yard = false },
 	{ name = "Hill Road", x0 = -583, x1 = -531, z0 = -460, z1 = -412, lane = true, yard = true },
-	{ name = "Orchard Lane", x0 = 270, x1 = 292, z0 = -494, z1 = -46, lane = true, yard = false },
 	{ name = "Orchard Lane", x0 = 222, x1 = 270, z0 = -494, z1 = -446, lane = true, yard = true },
-	{ name = "Pond Lane", x0 = -896, x1 = -14, z0 = 320, z1 = 342, lane = true, yard = false },
-	{ name = "Pond Lane", x0 = -896, x1 = -874, z0 = 342, z1 = 446, lane = true, yard = false },
 	{ name = "Pond Lane", x0 = -922, x1 = -874, z0 = 446, z1 = 494, lane = true, yard = true },
 } :: { Road }
 SandboxMap.Landmarks = {
@@ -152,30 +214,8 @@ SandboxMap.Landmarks = {
 	{ id = "weir", name = "The Weir", kind = "weir", x0 = -1088, x1 = -1068, z0 = -134, z1 = -122, yaw = 0 },
 	{ id = "footbridge", name = "The Footbridge", kind = "footbridge", x0 = -1090, x1 = -1066, z0 = 12, z1 = 20, yaw = 0 },
 	{ id = "apiary", name = "The Beehives", kind = "apiary", x0 = 150, x1 = 186, z0 = -432, z1 = -414, yaw = 270 },
-	{ id = "d5", name = "D5 Motorway", kind = "motorway", x0 = 330, x1 = 390, z0 = -680, z1 = 760, yaw = 90 },
-	{ id = "railway", name = "Railway", kind = "railway", x0 = -1180, x1 = 330, z0 = 716, z1 = 728, yaw = 90 },
-	{ id = "railway_east", name = "Railway", kind = "railway", x0 = 390, x1 = 420, z0 = 716, z1 = 728, yaw = 270 },
-	{ id = "halt", name = "Meadow Halt", kind = "halt", x0 = 140, x1 = 220, z0 = 700, z1 = 716, yaw = 0 },
 } :: { Landmark }
 SandboxMap.Fields = {
-	{ kind = "rapeseed", x0 = -750, x1 = 20, z0 = -680, z1 = -520 },
-	{ kind = "wheat", x0 = -750, x1 = -635, z0 = -510, z1 = -250 },
-	{ kind = "young", x0 = -625, x1 = -541, z0 = -402, z1 = -250 },
-	{ kind = "wheat", x0 = -499, x1 = 20, z0 = -510, z1 = -240 },
-	{ kind = "ploughed", x0 = -499, x1 = -280, z0 = -230, z1 = -81 },
-	{ kind = "young", x0 = -1060, x1 = -961, z0 = -240, z1 = -94 },
-	{ kind = "rapeseed", x0 = -919, x1 = -541, z0 = -240, z1 = -81 },
-	{ kind = "wheat", x0 = -1002, x1 = -660, z0 = -39, z1 = 310 },
-	{ kind = "ploughed", x0 = -640, x1 = -300, z0 = -39, z1 = 310 },
-	{ kind = "rapeseed", x0 = -280, x1 = -36, z0 = -36, z1 = 310 },
-	{ kind = "young", x0 = -1150, x1 = -884, z0 = 570, z1 = 706 },
-	{ kind = "ploughed", x0 = -864, x1 = -520, z0 = 352, z1 = 706 },
-	{ kind = "wheat", x0 = -500, x1 = -180, z0 = 352, z1 = 706 },
-	{ kind = "rapeseed", x0 = -170, x1 = -48, z0 = 352, z1 = 450 },
-	{ kind = "young", x0 = -170, x1 = -66, z0 = 600, z1 = 706 },
-	{ kind = "young", x0 = 24, x1 = 296, z0 = 28, z1 = 300 },
-	{ kind = "rapeseed", x0 = 48, x1 = 296, z0 = 310, z1 = 496 },
-	{ kind = "wheat", x0 = 160, x1 = 296, z0 = 506, z1 = 690 },
 } :: { Field }
 SandboxMap.Lawns = {
 	{ kind = "forest", x0 = -1160, x1 = -760, z0 = -672, z1 = -500 },
@@ -184,17 +224,13 @@ SandboxMap.Lawns = {
 	{ kind = "forest", x0 = -895, x1 = -760, z0 = -500, z1 = -392 },
 } :: { Lawn }
 SandboxMap.TreeLines = {
-	{ kind = "windbreak", points = { { x = 312, z = -20 }, { x = 312, z = 700 } } },
-	{ kind = "windbreak", points = { { x = -650, z = -27 }, { x = -650, z = 300 } } },
-	{ kind = "windbreak", points = { { x = -290, z = -27 }, { x = -290, z = 300 } } },
-	{ kind = "windbreak", points = { { x = -510, z = 362 }, { x = -510, z = 700 } } },
-	{ kind = "windbreak", points = { { x = -480, z = -515 }, { x = 10, z = -515 } } },
-	{ kind = "alley", points = { { x = -497, z = -430 }, { x = -497, z = -92 } } },
-	{ kind = "alley", points = { { x = -860, z = 306 }, { x = -40, z = 306 } } },
-	{ kind = "hedge", points = { { x = -905, z = -79 }, { x = -560, z = -79 } } },
-	{ kind = "hedge", points = { { x = -860, z = 349 }, { x = -180, z = 349 } } },
-	{ kind = "hedge", points = { { x = -170, z = 596 }, { x = -170, z = 700 } } },
 	{ kind = "fence", points = { { x = 217, z = -495 }, { x = 217, z = -650 }, { x = 30, z = -650 }, { x = 30, z = -300 }, { x = 217, z = -300 }, { x = 217, z = -445 } } },
+	{ kind = "screen", points = { { x = -190, z = 440 }, { x = 170, z = 440 }, { x = 170, z = 712 }, { x = -190, z = 712 }, { x = -190, z = 440 } } },
+	{ kind = "screen", points = { { x = -1170, z = 368 }, { x = -860, z = 368 }, { x = -860, z = 580 }, { x = -1170, z = 580 }, { x = -1170, z = 368 } } },
+	{ kind = "screen", points = { { x = -650, z = -525 }, { x = -515, z = -525 }, { x = -515, z = -395 }, { x = -650, z = -395 }, { x = -650, z = -525 } } },
+	{ kind = "screen", points = { { x = -1015, z = -512 }, { x = -885, z = -512 }, { x = -885, z = -386 }, { x = -1015, z = -386 }, { x = -1015, z = -512 } } },
+	{ kind = "screen", points = { { x = -1112, z = -150 }, { x = -995, z = -150 }, { x = -995, z = 46 }, { x = -1112, z = 46 }, { x = -1112, z = -150 } } },
+	{ kind = "screen", points = { { x = 108, z = -548 }, { x = 292, z = -548 }, { x = 292, z = -384 }, { x = 108, z = -384 }, { x = 108, z = -548 } } },
 } :: { TreeLine }
 SandboxMap.Woods = {
 	{ id = "forest", x0 = -1160, x1 = -760, z0 = -672, z1 = -250, clearings = { { x0 = -1005, x1 = -895, z0 = -500, z1 = -392 } } },
@@ -203,27 +239,33 @@ SandboxMap.Orchard = { x0 = 30, x1 = 216, z0 = -650, z1 = -300 } :: Rect
 SandboxMap.Streams = {
 	{ id = "millrace", width = 8, points = { { x = -1110, z = -676 }, { x = -1096, z = -560 }, { x = -1104, z = -440 }, { x = -1090, z = -320 }, { x = -1092, z = -200 }, { x = -1078, z = -134 }, { x = -1078, z = 10 }, { x = -1082, z = 120 }, { x = -1070, z = 250 }, { x = -1060, z = 386 } } },
 } :: { Stream }
+SandboxMap.Zones = {
+	{ id = "sandbox_house", rect = { x0 = -190, x1 = 170, z0 = 440, z1 = 712 }, arrive = { x = 0, y = 3, z = 513, yaw = 180 } },
+	{ id = "pond_cabin", rect = { x0 = -1170, x1 = -860, z0 = 368, z1 = 580 }, arrive = { x = -923.2, y = 3, z = 470, yaw = 90 } },
+	{ id = "lone_house", rect = { x0 = -650, x1 = -515, z0 = -525, z1 = -395 }, arrive = { x = -584.2, y = 3, z = -436, yaw = 90 } },
+	{ id = "forest_lodge", rect = { x0 = -1015, x1 = -885, z0 = -512, z1 = -386 }, arrive = { x = -940, y = 3, z = -453.2, yaw = 0 } },
+	{ id = "old_mill", rect = { x0 = -1112, x1 = -995, z0 = -150, z1 = 46 }, arrive = { x = -1060, y = 3, z = -34.8, yaw = 180 } },
+	{ id = "orchard_cottage", rect = { x0 = 108, x1 = 292, z0 = -548, z1 = -384 }, arrive = { x = 220.8, y = 3, z = -470, yaw = 90 } },
+} :: { Zone }
 -- END COUNTRYSIDE
 
-SandboxMap.Turnaround = { x = 0, z = 470, r = 34 }
-
 SandboxMap.DoorWidth = 26 -- the warehouse's roller door
-SandboxMap.VanGap = 6 -- studs from the warehouse's front wall to the van's back
+SandboxMap.VanGap = 6 -- studs from the warehouse's front wall to where the van's back stood (the bay's middle)
 
-local PLOT_X = { -195, -65, 65, 195 }
-local WALL_Z = -130 -- the warehouses' front (south) wall
-
+-- 9.7: the plots are the lobby's (Lobby.plots: their middles across, their warehouses' front walls), each warehouse
+-- looking south onto the plaza as ever (its frame only moved: shared/WarehouseLayout.luau)
 local plots: { Plot } = {}
-for id, x in PLOT_X do
-	plots[id] = {
-		id = id,
-		rect = { x0 = x - 60, x1 = x + 60, z0 = -230, z1 = -78 },
-		warehouse = { x = x, y = 0, z = WALL_Z - 30, sx = 80, sy = 24, sz = 60 },
-		door = { x = x, y = 0, z = WALL_Z, yaw = 180 },
-		vanSpot = { x = x, y = SandboxMap.RoadTop, z = WALL_Z + 6 + 11, yaw = 180 }, -- (the Sprinter 22 long: its back 6 off the wall)
-		unload = { x = x, z = WALL_Z + 8, r = 16 },
-		spawn = { x = x + 22, y = 3, z = WALL_Z + 18, yaw = 180 },
-		board = { x = x - 24, y = 0, z = WALL_Z + 1, yaw = 180 },
+for _, p in SandboxMap.Lobby.plots do
+	local x, wall = p.x, p.wall
+	plots[p.id] = {
+		id = p.id,
+		rect = { x0 = p.rect.x0, x1 = p.rect.x1, z0 = p.rect.z0, z1 = p.rect.z1 },
+		warehouse = { x = x, y = 0, z = wall - 30, sx = 80, sy = 24, sz = 60 },
+		door = { x = x, y = 0, z = wall, yaw = 180 },
+		vanSpot = { x = x, y = SandboxMap.RoadTop, z = wall + SandboxMap.VanGap + 11, yaw = 180 }, -- (the Sprinter 22 long: its back 6 off the wall)
+		unload = { x = x, z = wall + 8, r = 16 },
+		spawn = { x = x + 22, y = 3, z = wall + 18, yaw = 180 },
+		board = { x = x - 24, y = 0, z = wall + 1, yaw = 180 },
 	}
 end
 SandboxMap.Plots = plots
@@ -330,6 +372,40 @@ function SandboxMap.houseAt(x: number, z: number, margin: number): House?
 		end
 	end
 	return nil
+end
+
+local zoneOf: { [string]: Zone } = {}
+for _, z in SandboxMap.Zones do
+	zoneOf[z.id] = z
+end
+local portalOf: { [string]: Portal } = {}
+for _, p in SandboxMap.Lobby.portals do
+	portalOf[p.house] = p
+end
+
+function SandboxMap.zone(id: any): Zone?
+	return if type(id) == "string" then zoneOf[id] else nil
+end
+
+function SandboxMap.zoneAt(x: number, z: number, margin: number?): Zone?
+	local m = margin or 0
+	for _, zone in SandboxMap.Zones do
+		local r = zone.rect
+		if x >= r.x0 - m and x <= r.x1 + m and z >= r.z0 - m and z <= r.z1 + m then
+			return zone
+		end
+	end
+	return nil
+end
+
+function SandboxMap.portal(id: any): Portal?
+	return if type(id) == "string" then portalOf[id] else nil
+end
+
+function SandboxMap.inLobby(x: number, z: number, margin: number?): boolean
+	local m = margin or 0
+	local b = SandboxMap.Lobby.bounds
+	return x >= b.x0 - m and x <= b.x1 + m and z >= b.z0 - m and z <= b.z1 + m
 end
 
 function SandboxMap.cframe(spot: Spot): any

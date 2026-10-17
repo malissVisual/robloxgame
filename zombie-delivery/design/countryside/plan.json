@@ -1,143 +1,21 @@
 {
- "about": "The countryside instead of the village: the sandbox map (design/countryside/plan.py). Studs; x east, z south; yaw as SandboxMap (0 north, 90 west, 180 south, 270 east). Fixed entries are today's SandboxMap data.",
+ "about": "The countryside's six run zones (9.7): the sandbox map's places to empty (design/countryside/plan.py). Studs; x east, z south; yaw as SandboxMap (0 north, 90 west, 180 south, 270 east). The lobby: design/lobby/plan.json.",
  "bounds": {
   "x0": -1180,
-  "x1": 420,
+  "x1": 2080,
   "z0": -680,
   "z1": 760
  },
- "plots": [
-  {
-   "id": 1,
-   "rect": {
-    "x0": -255,
-    "x1": -135,
-    "z0": -230,
-    "z1": -78
-   },
-   "warehouse": {
-    "x": -195,
-    "z": -160,
-    "sx": 80,
-    "sz": 60
-   }
-  },
-  {
-   "id": 2,
-   "rect": {
-    "x0": -125,
-    "x1": -5,
-    "z0": -230,
-    "z1": -78
-   },
-   "warehouse": {
-    "x": -65,
-    "z": -160,
-    "sx": 80,
-    "sz": 60
-   }
-  },
-  {
-   "id": 3,
-   "rect": {
-    "x0": 5,
-    "x1": 125,
-    "z0": -230,
-    "z1": -78
-   },
-   "warehouse": {
-    "x": 65,
-    "z": -160,
-    "sx": 80,
-    "sz": 60
-   }
-  },
-  {
-   "id": 4,
-   "rect": {
-    "x0": 135,
-    "x1": 255,
-    "z0": -230,
-    "z1": -78
-   },
-   "warehouse": {
-    "x": 195,
-    "z": -160,
-    "sx": 80,
-    "sz": 60
-   }
-  }
- ],
- "turnaround": {
-  "x": 0,
-  "z": 470,
-  "r": 34
- },
- "fixed": [
-  {
-   "id": "auction",
-   "name": "Auction House",
-   "rect": {
-    "x0": 132,
-    "x1": 184,
-    "z0": -26,
-    "z1": 12
-   }
-  },
-  {
-   "id": "leaders",
-   "name": "TOP MOVERS board",
-   "rect": {
-    "x0": 26,
-    "x1": 54,
-    "z0": -36,
-    "z1": -8
-   }
-  },
-  {
-   "id": "signpost",
-   "name": "Signpost",
-   "rect": {
-    "x0": -34,
-    "x1": -18,
-    "z0": -42,
-    "z1": -26
-   }
-  }
- ],
  "roads": [
   {
    "name": "Pražská",
    "rect": {
-    "x0": -14,
-    "x1": 14,
-    "z0": -74,
-    "z1": 470
+    "x0": -30,
+    "x1": 30,
+    "z0": 452,
+    "z1": 504
    },
-   "yard": false,
-   "fixed": true
-  },
-  {
-   "name": "Depot Row",
-   "rect": {
-    "x0": -270,
-    "x1": 270,
-    "z0": -74,
-    "z1": -46
-   },
-   "yard": false,
-   "fixed": true
-  },
-  {
-   "name": "Mill Lane",
-   "rect": {
-    "x0": -1012,
-    "x1": -270,
-    "z0": -71,
-    "z1": -49
-   },
-   "yard": false,
-   "fixed": false
+   "yard": true
   },
   {
    "name": "Mill Lane",
@@ -147,19 +25,7 @@
     "z0": -84,
     "z1": -36
    },
-   "yard": true,
-   "fixed": false
-  },
-  {
-   "name": "Wood Lane",
-   "rect": {
-    "x0": -951,
-    "x1": -929,
-    "z0": -404,
-    "z1": -71
-   },
-   "yard": false,
-   "fixed": false
+   "yard": true
   },
   {
    "name": "Wood Lane",
@@ -169,19 +35,7 @@
     "z0": -452,
     "z1": -404
    },
-   "yard": true,
-   "fixed": false
-  },
-  {
-   "name": "Hill Road",
-   "rect": {
-    "x0": -531,
-    "x1": -509,
-    "z0": -440,
-    "z1": -71
-   },
-   "yard": false,
-   "fixed": false
+   "yard": true
   },
   {
    "name": "Hill Road",
@@ -191,19 +45,7 @@
     "z0": -460,
     "z1": -412
    },
-   "yard": true,
-   "fixed": false
-  },
-  {
-   "name": "Orchard Lane",
-   "rect": {
-    "x0": 270,
-    "x1": 292,
-    "z0": -494,
-    "z1": -46
-   },
-   "yard": false,
-   "fixed": false
+   "yard": true
   },
   {
    "name": "Orchard Lane",
@@ -213,30 +55,7 @@
     "z0": -494,
     "z1": -446
    },
-   "yard": true,
-   "fixed": false
-  },
-  {
-   "name": "Pond Lane",
-   "rect": {
-    "x0": -896,
-    "x1": -14,
-    "z0": 320,
-    "z1": 342
-   },
-   "yard": false,
-   "fixed": false
-  },
-  {
-   "name": "Pond Lane",
-   "rect": {
-    "x0": -896,
-    "x1": -874,
-    "z0": 342,
-    "z1": 446
-   },
-   "yard": false,
-   "fixed": false
+   "yard": true
   },
   {
    "name": "Pond Lane",
@@ -246,8 +65,7 @@
     "z0": 446,
     "z1": 494
    },
-   "yard": true,
-   "fixed": false
+   "yard": true
   }
  ],
  "spots": [
@@ -449,6 +267,98 @@
    "fixed": false
   }
  ],
+ "zones": [
+  {
+   "id": "sandbox_house",
+   "rect": {
+    "x0": -190,
+    "x1": 170,
+    "z0": 440,
+    "z1": 712
+   },
+   "arrive": {
+    "x": 0,
+    "y": 3,
+    "z": 513,
+    "yaw": 180
+   }
+  },
+  {
+   "id": "pond_cabin",
+   "rect": {
+    "x0": -1170,
+    "x1": -860,
+    "z0": 368,
+    "z1": 580
+   },
+   "arrive": {
+    "x": -923.2,
+    "y": 3,
+    "z": 470.0,
+    "yaw": 90
+   }
+  },
+  {
+   "id": "lone_house",
+   "rect": {
+    "x0": -650,
+    "x1": -515,
+    "z0": -525,
+    "z1": -395
+   },
+   "arrive": {
+    "x": -584.2,
+    "y": 3,
+    "z": -436.0,
+    "yaw": 90
+   }
+  },
+  {
+   "id": "forest_lodge",
+   "rect": {
+    "x0": -1015,
+    "x1": -885,
+    "z0": -512,
+    "z1": -386
+   },
+   "arrive": {
+    "x": -940.0,
+    "y": 3,
+    "z": -453.2,
+    "yaw": 0
+   }
+  },
+  {
+   "id": "old_mill",
+   "rect": {
+    "x0": -1112,
+    "x1": -995,
+    "z0": -150,
+    "z1": 46
+   },
+   "arrive": {
+    "x": -1060.0,
+    "y": 3,
+    "z": -34.8,
+    "yaw": 180
+   }
+  },
+  {
+   "id": "orchard_cottage",
+   "rect": {
+    "x0": 108,
+    "x1": 292,
+    "z0": -548,
+    "z1": -384
+   },
+   "arrive": {
+    "x": 220.8,
+    "y": 3,
+    "z": -470.0,
+    "yaw": 90
+   }
+  }
+ ],
  "landmarks": [
   {
    "id": "barn",
@@ -592,58 +502,6 @@
    },
    "yaw": 270,
    "spot": "orchard_cottage"
-  },
-  {
-   "id": "d5",
-   "name": "D5 Motorway",
-   "kind": "motorway",
-   "rect": {
-    "x0": 330,
-    "x1": 390,
-    "z0": -680,
-    "z1": 760
-   },
-   "yaw": 90,
-   "spot": null
-  },
-  {
-   "id": "railway",
-   "name": "Railway",
-   "kind": "railway",
-   "rect": {
-    "x0": -1180,
-    "x1": 330,
-    "z0": 716,
-    "z1": 728
-   },
-   "yaw": 90,
-   "spot": null
-  },
-  {
-   "id": "railway_east",
-   "name": "Railway",
-   "kind": "railway",
-   "rect": {
-    "x0": 390,
-    "x1": 420,
-    "z0": 716,
-    "z1": 728
-   },
-   "yaw": 270,
-   "spot": null
-  },
-  {
-   "id": "halt",
-   "name": "Meadow Halt",
-   "kind": "halt",
-   "rect": {
-    "x0": 140,
-    "x1": 220,
-    "z0": 700,
-    "z1": 716
-   },
-   "yaw": 0,
-   "spot": null
   }
  ],
  "streams": [
@@ -719,170 +577,7 @@
   "z0": -650,
   "z1": -300
  },
- "fields": [
-  {
-   "rect": {
-    "x0": -750,
-    "x1": 20,
-    "z0": -680,
-    "z1": -520
-   },
-   "kind": "rapeseed"
-  },
-  {
-   "rect": {
-    "x0": -750,
-    "x1": -635,
-    "z0": -510,
-    "z1": -250
-   },
-   "kind": "wheat"
-  },
-  {
-   "rect": {
-    "x0": -625,
-    "x1": -541,
-    "z0": -402,
-    "z1": -250
-   },
-   "kind": "young"
-  },
-  {
-   "rect": {
-    "x0": -499,
-    "x1": 20,
-    "z0": -510,
-    "z1": -240
-   },
-   "kind": "wheat"
-  },
-  {
-   "rect": {
-    "x0": -499,
-    "x1": -280,
-    "z0": -230,
-    "z1": -81
-   },
-   "kind": "ploughed"
-  },
-  {
-   "rect": {
-    "x0": -1060,
-    "x1": -961,
-    "z0": -240,
-    "z1": -94
-   },
-   "kind": "young"
-  },
-  {
-   "rect": {
-    "x0": -919,
-    "x1": -541,
-    "z0": -240,
-    "z1": -81
-   },
-   "kind": "rapeseed"
-  },
-  {
-   "rect": {
-    "x0": -1002,
-    "x1": -660,
-    "z0": -39,
-    "z1": 310
-   },
-   "kind": "wheat"
-  },
-  {
-   "rect": {
-    "x0": -640,
-    "x1": -300,
-    "z0": -39,
-    "z1": 310
-   },
-   "kind": "ploughed"
-  },
-  {
-   "rect": {
-    "x0": -280,
-    "x1": -36,
-    "z0": -36,
-    "z1": 310
-   },
-   "kind": "rapeseed"
-  },
-  {
-   "rect": {
-    "x0": -1150,
-    "x1": -884,
-    "z0": 570,
-    "z1": 706
-   },
-   "kind": "young"
-  },
-  {
-   "rect": {
-    "x0": -864,
-    "x1": -520,
-    "z0": 352,
-    "z1": 706
-   },
-   "kind": "ploughed"
-  },
-  {
-   "rect": {
-    "x0": -500,
-    "x1": -180,
-    "z0": 352,
-    "z1": 706
-   },
-   "kind": "wheat"
-  },
-  {
-   "rect": {
-    "x0": -170,
-    "x1": -48,
-    "z0": 352,
-    "z1": 450
-   },
-   "kind": "rapeseed"
-  },
-  {
-   "rect": {
-    "x0": -170,
-    "x1": -66,
-    "z0": 600,
-    "z1": 706
-   },
-   "kind": "young"
-  },
-  {
-   "rect": {
-    "x0": 24,
-    "x1": 296,
-    "z0": 28,
-    "z1": 300
-   },
-   "kind": "young"
-  },
-  {
-   "rect": {
-    "x0": 48,
-    "x1": 296,
-    "z0": 310,
-    "z1": 496
-   },
-   "kind": "rapeseed"
-  },
-  {
-   "rect": {
-    "x0": 160,
-    "x1": 296,
-    "z0": 506,
-    "z1": 690
-   },
-   "kind": "wheat"
-  }
- ],
+ "fields": [],
  "lawns": [
   {
    "kind": "forest",
@@ -925,136 +620,6 @@
   {
    "points": [
     {
-     "x": 312,
-     "z": -20
-    },
-    {
-     "x": 312,
-     "z": 700
-    }
-   ],
-   "kind": "windbreak"
-  },
-  {
-   "points": [
-    {
-     "x": -650,
-     "z": -27
-    },
-    {
-     "x": -650,
-     "z": 300
-    }
-   ],
-   "kind": "windbreak"
-  },
-  {
-   "points": [
-    {
-     "x": -290,
-     "z": -27
-    },
-    {
-     "x": -290,
-     "z": 300
-    }
-   ],
-   "kind": "windbreak"
-  },
-  {
-   "points": [
-    {
-     "x": -510,
-     "z": 362
-    },
-    {
-     "x": -510,
-     "z": 700
-    }
-   ],
-   "kind": "windbreak"
-  },
-  {
-   "points": [
-    {
-     "x": -480,
-     "z": -515
-    },
-    {
-     "x": 10,
-     "z": -515
-    }
-   ],
-   "kind": "windbreak"
-  },
-  {
-   "points": [
-    {
-     "x": -497,
-     "z": -430
-    },
-    {
-     "x": -497,
-     "z": -92
-    }
-   ],
-   "kind": "alley"
-  },
-  {
-   "points": [
-    {
-     "x": -860,
-     "z": 306
-    },
-    {
-     "x": -40,
-     "z": 306
-    }
-   ],
-   "kind": "alley"
-  },
-  {
-   "points": [
-    {
-     "x": -905,
-     "z": -79
-    },
-    {
-     "x": -560,
-     "z": -79
-    }
-   ],
-   "kind": "hedge"
-  },
-  {
-   "points": [
-    {
-     "x": -860,
-     "z": 349
-    },
-    {
-     "x": -180,
-     "z": 349
-    }
-   ],
-   "kind": "hedge"
-  },
-  {
-   "points": [
-    {
-     "x": -170,
-     "z": 596
-    },
-    {
-     "x": -170,
-     "z": 700
-    }
-   ],
-   "kind": "hedge"
-  },
-  {
-   "points": [
-    {
      "x": 217,
      "z": -495
     },
@@ -1080,6 +645,156 @@
     }
    ],
    "kind": "fence"
+  },
+  {
+   "points": [
+    {
+     "x": -190,
+     "z": 440
+    },
+    {
+     "x": 170,
+     "z": 440
+    },
+    {
+     "x": 170,
+     "z": 712
+    },
+    {
+     "x": -190,
+     "z": 712
+    },
+    {
+     "x": -190,
+     "z": 440
+    }
+   ],
+   "kind": "screen"
+  },
+  {
+   "points": [
+    {
+     "x": -1170,
+     "z": 368
+    },
+    {
+     "x": -860,
+     "z": 368
+    },
+    {
+     "x": -860,
+     "z": 580
+    },
+    {
+     "x": -1170,
+     "z": 580
+    },
+    {
+     "x": -1170,
+     "z": 368
+    }
+   ],
+   "kind": "screen"
+  },
+  {
+   "points": [
+    {
+     "x": -650,
+     "z": -525
+    },
+    {
+     "x": -515,
+     "z": -525
+    },
+    {
+     "x": -515,
+     "z": -395
+    },
+    {
+     "x": -650,
+     "z": -395
+    },
+    {
+     "x": -650,
+     "z": -525
+    }
+   ],
+   "kind": "screen"
+  },
+  {
+   "points": [
+    {
+     "x": -1015,
+     "z": -512
+    },
+    {
+     "x": -885,
+     "z": -512
+    },
+    {
+     "x": -885,
+     "z": -386
+    },
+    {
+     "x": -1015,
+     "z": -386
+    },
+    {
+     "x": -1015,
+     "z": -512
+    }
+   ],
+   "kind": "screen"
+  },
+  {
+   "points": [
+    {
+     "x": -1112,
+     "z": -150
+    },
+    {
+     "x": -995,
+     "z": -150
+    },
+    {
+     "x": -995,
+     "z": 46
+    },
+    {
+     "x": -1112,
+     "z": 46
+    },
+    {
+     "x": -1112,
+     "z": -150
+    }
+   ],
+   "kind": "screen"
+  },
+  {
+   "points": [
+    {
+     "x": 108,
+     "z": -548
+    },
+    {
+     "x": 292,
+     "z": -548
+    },
+    {
+     "x": 292,
+     "z": -384
+    },
+    {
+     "x": 108,
+     "z": -384
+    },
+    {
+     "x": 108,
+     "z": -548
+    }
+   ],
+   "kind": "screen"
   }
  ]
 }

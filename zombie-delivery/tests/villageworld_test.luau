@@ -3,22 +3,23 @@
 -- (tools/countryside/sandboxmap.py writes it from the plan: CountryPlan.luau, tests/run_tests.py's), shared/VillageScenery
 -- .luau's layout and the world the real server/SandboxWorld.luau and server/VillageWorld.luau build (as SandboxWorldServer
 -- .luau and VillageWorldServer.luau on tools/perf/world-mock.luau), the Auction House on:
---   * the fixed things exactly where they were: the plots, Depot Row, Pražská, the turnaround, the farmstead, the
---     Auction House's spot; the plan's roads, landmarks, fields, lawns, tree lines, woods, orchard and stream;
---   * every road joined to Depot Row (a van drives from the plots to every place), every curb in its yard;
---   * nothing over anything else: no road on another (they only meet), no road (its shoulder) on a place, a lot, a
---     landmark, a field, the stream, the D5 or a plot; no field on another, a lot, a landmark, a lawn or the stream; the
---     stream only through its weir, under its footbridge and into the pond; the places' lots apart;
+--   * the fixed things exactly where they were: the farmstead; 9.7 the plots and the Auction House's spot in the lobby
+--     (SandboxMap.Lobby); the plan's yards, zones, landmarks, lawns, tree lines, woods, orchard and stream;
+--   * 9.7 runs: no roads but each place's front yard (no lane, no Depot Row, no turnaround: nobody drives), every
+--     curb in its yard, every yard and its place in its run zone, the zones apart and far from the lobby;
+--   * nothing over anything else: no yard on another, no yard (its shoulder) on a place, a lot, a landmark, the
+--     stream or a plot; no lawn on a lot or a landmark; the stream only through its weir, under its footbridge and
+--     into the pond; the places' lots apart;
 --   * each place its own spot with its own surroundings: the farm's barn, tractor, bales, paddock and muck heap round
 --     the farmstead; the fish pond by the cabin (its jetty); the lone house's garden and no neighbour within 300 studs;
 --     the forest lodge in the forest's clearing, its woodpile; the old mill on its millrace (past its right-hand side as
 --     you face its door), the weir and the footbridge; the orchard cottage in the orchard, its beehives, its fence;
 --   * the trees where the rules let them stand (off the roads, lots, van ways, places, landmarks, the stream, the
 --     clearing), the forest dense round the clearing, the orchard in rows; the hedges and fences, the stream's pieces;
---   * the world: the five places built once each, rich, in their own models; the countryside's pieces in Atomic chunks,
---     the D5 and the railway on every client, the far view outside the Bounds (no village on its horizon either);
---     nothing of it on a road, its shoulder, the turnaround, a plot, the farmstead's lot and path, a van's way, a place's
---     box or the Auction House; the words (MEADOW HALT; no village's: no CORNER DRUGSTORE, ROAD CLOSED, noticeboard);
+--   * the world: the five places built once each, rich, in their own models; the countryside's pieces in Atomic chunks
+--     (9.7: only what a run zone sees: no D5, no railway, no far view); nothing of it on a yard, its shoulder, a plot,
+--     the farmstead's lot and path, a van's way, a place's box or the Auction House; the words (no village's: no
+--     CORNER DRUGSTORE, ROAD CLOSED, noticeboard; 9.7 no MEADOW HALT either);
 --   * nothing of a village (no street of houses, no chapel, green, school, pitch, shop, hardware store, building site)
 --     and nothing alpine in the sandbox's world; the part budget (SandboxScenery.Budget) with the Auction House.
 -- Run with tests/run_tests.py.
@@ -49,7 +50,6 @@ type Rect = { x0: number, x1: number, z0: number, z1: number }
 local EPS = 1e-6
 local MAP = SandboxMap
 local B = MAP.Bounds
-local TURN = MAP.Turnaround
 local RUN = SandboxScenery.Run
 
 local function same(a: Rect, b: Rect): boolean
@@ -73,7 +73,7 @@ local function onAsphalt(x: number, z: number): boolean
 			return true
 		end
 	end
-	return SandboxScenery.circleOut(x, z) <= 0
+	return false
 end
 local function mark(id: string): SandboxMap.Landmark?
 	for _, l in MAP.Landmarks do
@@ -108,38 +108,47 @@ end
 -- ── The data: the plan's, the fixed things unchanged ───────────────────────
 
 do
-	check("the Bounds are the plan's (x -1180 … 420, z -680 … 760)", same(B, Plan.bounds) and B.x0 == -1180 and B.z1 == 760)
-	local main, depot = MAP.Roads[1], MAP.Roads[2]
-	check("Pražská and Depot Row first and where they always were (Pražská from z -74, through the junction, to the turnaround)",
-		main.name == "Pražská" and same(rectOf(main), { x0 = -14, x1 = 14, z0 = -74, z1 = 470 }) and depot.name == "Depot Row"
-			and same(rectOf(depot), { x0 = -270, x1 = 270, z0 = -74, z1 = -46 }) and not main.lane and not depot.lane and not main.yard)
-	check("the turnaround, the ground's and the asphalt's tops, the doors' and the vans' gaps as they were",
-		TURN.x == 0 and TURN.z == 470 and TURN.r == 34 and MAP.GroundTop == 0 and MAP.RoadTop == 0.4 and MAP.DoorWidth == 26 and MAP.VanGap == 6)
-	local plotsOk = #MAP.Plots == 4
-	for id, x in { -195, -65, 65, 195 } do
+	check("the Bounds are the plan's (x -1180 … 2080: 9.7 the lobby east of the countryside, z -680 … 760)", same(B, Plan.bounds) and B.x0 == -1180 and B.x1 == 2080
+		and B.z1 == 760 and B.x1 >= MAP.Lobby.bounds.x1)
+	check("9.7: no turnaround; the ground's and the asphalt's tops, the doors' and the vans' gaps as they were",
+		(MAP :: any).Turnaround == nil and MAP.GroundTop == 0 and MAP.RoadTop == 0.4 and MAP.DoorWidth == 26 and MAP.VanGap == 6)
+	-- 9.7: the four plots in the lobby, each its warehouse and what goes with it in its rect as they were round theirs
+	local plotsOk = #MAP.Plots == 4 and #MAP.Lobby.plots == 4
+	for id, l in MAP.Lobby.plots do
 		local p = MAP.Plots[id]
-		plotsOk = plotsOk and p.id == id and same(p.rect, { x0 = x - 60, x1 = x + 60, z0 = -230, z1 = -78 }) and p.warehouse.x == x and p.warehouse.z == -160
-			and p.warehouse.sx == 80 and p.warehouse.sz == 60 and p.door.x == x and p.door.z == -130 and p.door.yaw == 180 and p.vanSpot.x == x
-			and p.vanSpot.z == -113 and p.vanSpot.yaw == 180 and p.unload.z == -122 and p.spawn.x == x + 22 and p.board.x == x - 24
+		local x, wall = l.x, l.wall
+		plotsOk = plotsOk and p.id == id and same(p.rect, l.rect) and p.warehouse.x == x and p.warehouse.z == wall - 30
+			and p.warehouse.sx == 80 and p.warehouse.sz == 60 and p.door.x == x and p.door.z == wall and p.door.yaw == 180 and p.vanSpot.x == x
+			and p.vanSpot.z == wall + MAP.VanGap + 11 and p.vanSpot.yaw == 180 and p.unload.z == wall + 8 and p.spawn.x == x + 22 and p.board.x == x - 24
+			and MAP.inLobby(p.rect.x0, p.rect.z0) and MAP.inLobby(p.rect.x1, p.rect.z1)
 	end
-	check("the four plots unchanged (rects, warehouses, doors, van spots, unload circles, spawns, boards)", plotsOk)
+	check("9.7: the four plots in the lobby (rects, warehouses, doors, van spots, unload circles, spawns, boards as round their old ones)", plotsOk)
 	local H = MAP.House
 	check("the farmstead unchanged: its id, lot, box, door, curb and back door",
 		H.id == "sandbox_house" and same(H.lot, { x0 = -60, x1 = 60, z0 = 504, z1 = 600 }) and H.house.x == 0 and H.house.z == 540 and H.house.sx == 44
 			and H.house.sz == 34 and H.door.z == 523 and H.door.yaw == 0 and H.curb.z == 492 and H.back.z == 557)
 	local spot = Config.Auction.House.Spot
-	check("the Auction House's spot unchanged (158, -22, looking north; 48 × 32)", spot.x == 158 and spot.z == -22 and spot.yaw == 0 and Config.Auction.House.Width == 48 and Config.Auction.House.Depth == 32)
+	local lobbySpot = MAP.Lobby.shops.auction.spot
+	check("9.7: the Auction House's spot the lobby's (looking north at its plaza; 48 × 32)", spot.x == lobbySpot.x and spot.z == lobbySpot.z and spot.yaw == lobbySpot.yaw
+		and MAP.inLobby(spot.x, spot.z) and Config.Auction.House.Width == 48 and Config.Auction.House.Depth == 32)
 
 	-- the plan's roads, landmarks, fields, lawns, tree lines, woods, orchard and stream
 	local roadsOk = #MAP.Roads == #Plan.roads
 	for _, p in Plan.roads do
 		local found = false
 		for _, r in MAP.Roads do
-			found = found or (r.name == p.name and same(rectOf(r), p.rect) and r.yard == p.yard and r.lane == (p.yard or math.min(r.x1 - r.x0, r.z1 - r.z0) < 28))
+			found = found or (r.name == p.name and same(rectOf(r), p.rect) and r.yard == true and p.yard == true)
 		end
 		roadsOk = roadsOk and found
 	end
-	check(`the plan's {#Plan.roads} roads: Pražská, Depot Row and five lanes in their rects and yards (a lane narrower than Pražská)`, roadsOk)
+	check(`9.7: the plan's {#Plan.roads} roads, each a place's front yard (no lane, no Depot Row)`, roadsOk and #MAP.Roads == #MAP.Houses)
+	local zonesOk = #MAP.Zones == #Plan.zones and #MAP.Zones == #MAP.Houses
+	for n, p in Plan.zones do
+		local z = MAP.Zones[n]
+		zonesOk = zonesOk and z ~= nil and z.id == p.id and same(z.rect, p.rect) and z.arrive.x == p.arrive.x and z.arrive.z == p.arrive.z and z.arrive.yaw == p.arrive.yaw
+			and MAP.zone(p.id) == z
+	end
+	check(`9.7: the plan's {#Plan.zones} run zones (rects, arrival spots), one a place`, zonesOk)
 	local marksOk = #MAP.Landmarks == #Plan.landmarks
 	for n, p in Plan.landmarks do
 		local m = MAP.Landmarks[n]
@@ -156,7 +165,7 @@ do
 		local l = MAP.Lawns[n]
 		lawnsOk = lawnsOk and l ~= nil and l.kind == p.kind and same(rectOf(l), p.rect)
 	end
-	check("the plan's fields and lawns (the forest's floor)", fieldsOk and lawnsOk and #MAP.Fields >= 12)
+	check("the plan's fields and lawns (the forest's floor; 9.7 no field: nobody sees one)", fieldsOk and lawnsOk and #MAP.Fields == 0)
 	local linesOk = #MAP.TreeLines == #Plan.lines
 	for n, line in Plan.lines do
 		local mine = MAP.TreeLines[n]
@@ -201,52 +210,19 @@ do
 		streets = streets or (if known then nil else r.name)
 	end
 	check("…no village's streets (Hlavní, Školní, Lidická …): country lanes only", streets == nil, streets)
-	local railway, halt = mark("railway"), mark("halt")
-	check("…the railway along the south edge, a lone halt by it (no village's station)", railway ~= nil and halt ~= nil and railway.x0 == B.x0 and railway.z0 > 700
-		and halt.z1 == railway.z0 and halt.x1 - halt.x0 <= 100)
+	check("…9.7: no D5, no railway, no halt (nobody in a run zone sees them)", mark("motorway") == nil and mark("railway") == nil and mark("halt") == nil)
 end
 
--- ── The roads: all joined to Depot Row; every curb in its yard ─────────────
+-- ── 9.7 The yards and the zones: every curb in its yard, every yard in its zone ─
 
 do
-	-- two rects join where their asphalt meets along at least a van's width (a T, or one going on from the other)
-	local function joins(a: Rect, b: Rect): boolean
-		local x = math.min(a.x1, b.x1) - math.max(a.x0, b.x0)
-		local z = math.min(a.z1, b.z1) - math.max(a.z0, b.z0)
-		return (x >= -EPS and z >= 20) or (z >= -EPS and x >= 20)
-	end
-	local reached: { [number]: boolean } = { [2] = true }
-	local grew = true
-	while grew do
-		grew = false
-		for i, a in MAP.Roads do
-			if not reached[i] then
-				for j, b in MAP.Roads do
-					if reached[j] and joins(rectOf(a), rectOf(b)) then
-						reached[i] = true
-						grew = true
-					end
-				end
-			end
-		end
-	end
-	local alone: { string } = {}
-	for i, r in MAP.Roads do
-		if not reached[i] then
-			table.insert(alone, r.name)
-		end
-	end
-	check(`every road's rect joined to Depot Row ({#MAP.Roads} rects: Mill Lane on from it, Wood Lane and Hill Road off it, Orchard Lane from its east end, Pond Lane off Pražská)`,
-		#alone == 0, table.concat(alone, ", "))
-	local main = MAP.Roads[1]
-	check("the turnaround on Pražská's south end", TURN.z == main.z1 and TURN.r > (main.x1 - main.x0) / 2)
-	-- the van at a curb: its back and nose on the asphalt
+	-- the van at a curb: its back and nose on the asphalt (its yard's)
 	local half = SprinterLooks.Length / 2
 	local curbBad: string? = nil
-	for index, h in MAP.Houses do
+	for _, h in MAP.Houses do
 		local a = math.rad(h.curb.yaw)
 		local lx, lz = -math.sin(a), -math.cos(a)
-		local inYard = index == 1
+		local inYard = false
 		for _, r in MAP.Roads do
 			inYard = inYard or (r.yard and r.name == h.street and inRect(rectOf(r), h.curb.x, h.curb.z))
 		end
@@ -254,7 +230,42 @@ do
 			curbBad = h.id
 		end
 	end
-	check("every place's curb in its yard (the farmstead's on the turnaround), the van's back and nose on the asphalt", curbBad == nil, curbBad)
+	check("every place's curb in its yard (9.7 the farmstead's too: no turnaround), the van's back and nose on the asphalt", curbBad == nil, curbBad)
+	-- each zone holds its place's lot, its yard, its arrival spot, its landmarks; the zones apart, every one far from the lobby
+	local zoneBad: string? = nil
+	for _, z in MAP.Zones do
+		local h = SandboxMap.house(z.id)
+		if not h then
+			zoneBad = `{z.id}: no place`
+			continue
+		end
+		local r = z.rect
+		local function holds(o: Rect): boolean
+			return o.x0 >= r.x0 - EPS and o.x1 <= r.x1 + EPS and o.z0 >= r.z0 - EPS and o.z1 <= r.z1 + EPS
+		end
+		if not holds(h.lot) or not holds(h.box) or not inRect(r, z.arrive.x, z.arrive.z) or not inRect(r, h.curb.x, h.curb.z) then
+			zoneBad = `{z.id}: its lot, box, arrival or curb out of it`
+		end
+		for _, road in MAP.Roads do
+			if road.name == h.street and not holds(rectOf(road)) then
+				zoneBad = `{z.id}: its yard out of it`
+			end
+		end
+		if MAP.zoneAt(z.arrive.x, z.arrive.z) ~= z or MAP.inLobby(z.arrive.x, z.arrive.z) then
+			zoneBad = `{z.id}: zoneAt misses its arrival`
+		end
+		local L = MAP.Lobby.bounds
+		if distance(r, L) < MAP.Lobby.far then
+			zoneBad = `{z.id}: {math.floor(distance(r, L))} studs from the lobby`
+		end
+		for _, o in MAP.Zones do
+			if o ~= z and overlaps(o.rect, r) then
+				zoneBad = `{z.id} on {o.id}`
+			end
+		end
+	end
+	check(`9.7: each run zone holds its place's lot, box, yard, curb and arrival spot; none on another; each at least {MAP.Lobby.far} studs from the lobby`,
+		zoneBad == nil, zoneBad)
 end
 
 -- ── Nothing over anything else ─────────────────────────────────────────────
@@ -282,11 +293,9 @@ do
 	for n, w in water do
 		table.insert(areas, { name = `the stream ({math.floor(w.x0)}, {math.floor(w.z0)})`, kind = "stream", rect = w })
 	end
-	local t = TURN
-	table.insert(areas, { name = "the turnaround", kind = "turnaround", rect = { x0 = t.x - t.r - RUN, x1 = t.x + t.r + RUN, z0 = t.z - t.r - RUN, z1 = t.z + t.r + RUN } })
 	-- what may meet: the roads one another (they meet, their shoulders over each other), a lot its yard's shoulder and
 	-- its box, the stream its own squares, its weir, its footbridge, the pond it runs into and the mill on it
-	local ALLOWED = { road_road = true, road_turnaround = true, lot_road = true, lot_turnaround = true, box_lot = true, stream_stream = true }
+	local ALLOWED = { road_road = true, lot_road = true, box_lot = true, stream_stream = true }
 	local WET = { weir = true, footbridge = true, pond = true, old_mill = true }
 	local bad: string? = nil
 	for i, a in areas do
@@ -308,18 +317,18 @@ do
 			end
 		end
 	end
-	check("nothing over anything else: no road (its shoulder) on another's asphalt but where they meet, on a place, a lot, a landmark, a field, the stream, the D5 or a plot; no field on another, a lot, a landmark or the stream (the stream only through its weir, under its footbridge, past the mill, into the pond)",
+	check("nothing over anything else: no yard (its shoulder) on a place, a lot, a landmark, the stream or a plot; no field (9.7 none) (the stream only through its weir, under its footbridge, past the mill, into the pond)",
 		bad == nil, bad)
 	-- the roads' asphalt: none over another (Pražská's from Depot Row's far edge: its slab from Depot Row's south edge)
 	local roadBad: string? = nil
 	for i, a in MAP.Roads do
 		for j, b in MAP.Roads do
-			if j > i and not (i == 1 and j == 2) and overlaps(rectOf(a), rectOf(b)) then
+			if j > i and overlaps(rectOf(a), rectOf(b)) then
 				roadBad = `{a.name} {i} on {b.name} {j}`
 			end
 		end
 	end
-	check("no road's asphalt over another's (they only meet)", roadBad == nil, roadBad)
+	check("no yard's asphalt over another's", roadBad == nil, roadBad)
 	-- no lawn on a field or a lot: no two ground tiles on one plane
 	local lawnBad: string? = nil
 	for n, l in MAP.Lawns do
@@ -343,16 +352,9 @@ do
 	end
 	local H = MAP.Houses
 	local farm = MAP.House
-	check("the farm: a barn, the old tractor and trailer, round bales and a haystack, a fenced paddock, a muck heap and woodpile round the farmstead's lot, fields beside it",
+	check("the farm: a barn, the old tractor and trailer, round bales and a haystack, a fenced paddock, a muck heap and woodpile round the farmstead's lot (9.7: no fields beyond its zone's screen)",
 		near("barn", farm.lot, 60) and near("tractor", farm.lot, 120) and near("bales", farm.lot, 40) and near("paddock", farm.lot, 30) and near("muckheap", farm.lot, 60)
-			and mark("barn").kind == "barn" and mark("paddock").kind == "paddock" and (function(): boolean
-				for _, f in MAP.Fields do
-					if distance(rectOf(f), farm.lot) < 120 then
-						return true
-					end
-				end
-				return false
-			end)())
+			and mark("barn").kind == "barn" and mark("paddock").kind == "paddock")
 	local cabin = SandboxMap.house("pond_cabin") :: SandboxMap.House
 	local pond = mark("pond")
 	check("the Pond Cabin on the shore of the fish pond (its lot by the pond's rect)", pond ~= nil and pond.kind == "fishpond" and distance(rectOf(pond), cabin.lot) <= 2
@@ -431,7 +433,7 @@ do
 	local far = 0
 	for _, m in marks do
 		local l = mark(m.id)
-		if not l or m.yaw ~= l.yaw or m.far ~= (m.kind == "motorway" or m.kind == "railway") then
+		if not l or m.yaw ~= l.yaw or m.far then
 			markBad = m.id
 		end
 		far += if m.far then 1 else 0
@@ -444,7 +446,7 @@ do
 			markBad = `{m.id}: no pieces`
 		end
 	end
-	check(`the landmarks ({#marks}): each its own yaw, none on a road or its shoulder; the D5 and the railway kept on every client`, markBad == nil and far == 3 and #marks == #MAP.Landmarks, markBad)
+	check(`the landmarks ({#marks}): each its own yaw, none on a yard or its shoulder; 9.7 none kept on every client (no D5, no railway)`, markBad == nil and far == 0 and #marks == #MAP.Landmarks, markBad)
 
 	-- the trees: where the rules let them; the forest dense round its clearing, none in it, none on the stream
 	local treeBad: string? = nil
@@ -464,13 +466,27 @@ do
 		if VillageScenery.streamDistance(t.x, t.z) < 0 then
 			treeBad = `a tree in the stream at {math.floor(t.x)}, {math.floor(t.z)}`
 		end
+		if not VillageScenery.inView(t.x, t.z, t.radius) then
+			treeBad = `a tree no run zone sees at {math.floor(t.x)}, {math.floor(t.z)}`
+		end
 		inForest += if t.from == wood.id then 1 else 0
 		inOrchard += if t.from == "orchard" then 1 else 0
+		-- (9.7 the forest round the lodge's zone: how dense, counted in the zone's view round its clearing)
 	end
-	local area = (wood.x1 - wood.x0) * (wood.z1 - wood.z0)
-	check(`the trees ({#trees}): each where the rules let it (off the roads, plots, lots, van ways, places, landmarks, the Auction House, the stream, the clearing)`, treeBad == nil and #trees >= 250, treeBad)
-	check(`…the forest dense round its clearing ({inForest} trees, one every {math.floor(area / math.max(inForest, 1))} studs²), the orchard in rows ({inOrchard} fruit trees)`,
-		inForest >= 150 and area / inForest <= 1100 and inOrchard >= 40)
+	local lodgeZone = (MAP.zone("forest_lodge") :: SandboxMap.Zone).rect
+	local seen = grow(lodgeZone, Config.Runs.Zone.View)
+	local around = 0
+	for _, t in trees do
+		around += if t.from == wood.id and inRect(seen, t.x, t.z) then 1 else 0
+	end
+	local x0, x1 = math.max(seen.x0, wood.x0), math.min(seen.x1, wood.x1)
+	local z0, z1 = math.max(seen.z0, wood.z0), math.min(seen.z1, wood.z1)
+	local c = wood.clearings[1]
+	local area = (x1 - x0) * (z1 - z0) - (c.x1 - c.x0) * (c.z1 - c.z0)
+	check(`the trees ({#trees}): each where the rules let it (off the yards, plots, lots, van ways, places, landmarks, the Auction House, the stream, the clearing; 9.7 where a run zone sees it)`,
+		treeBad == nil and #trees >= 150, treeBad)
+	check(`…the forest dense round the lodge's clearing ({around} trees, one every {math.floor(area / math.max(around, 1))} studs²), the orchard in rows ({inOrchard} fruit trees)`,
+		around >= 60 and area / around <= 1100 and inOrchard >= 40)
 	-- the lines and the stream: their pieces, decoration
 	local lines = VillageScenery.lines()
 	local hedges, posts = 0, 0
@@ -483,30 +499,13 @@ do
 	for _, p in streams do
 		wet += if p.name == "Water" then 1 else 0
 	end
-	check(`the hedges ({hedges}) and the orchard's fence ({posts} posts), the stream ({wet} stretches of water)`, hedges >= 3 and posts >= 20 and wet == #MAP.Streams[1].points - 1)
-	-- the D5's lanes: two each way on the carriageways' tops, run past the Bounds onto the far D5
-	local lanes = VillageScenery.lanes()
-	local north, south = 0, 0
-	local laneOk = #lanes == 4
-	local farRoad: { number }? = nil
-	local villageFar: string? = nil
-	for _, p in VillageScenery.far() do
-		if p.name == "FarCarriageway" then
-			local x0, x1, _, y1, z0, z1 = VillageLooks.box(p)
-			farRoad = { x0, x1, y1, z1 - z0 }
-		elseif p.name == "FarHouse" or p.name == "FarRoof" or p.name == "FarChurch" or p.name == "FarSpire" then
-			villageFar = p.name
-		end
+	local screens = 0
+	for _, p in lines do
+		screens += if p.name == "ScreenHedge" then 1 else 0
 	end
-	for _, l in lanes do
-		north += if l.dz < 0 then 1 else 0
-		south += if l.dz > 0 then 1 else 0
-		laneOk = laneOk and farRoad ~= nil and l.x > farRoad[1] and l.x < farRoad[2] and math.abs(l.y - farRoad[3]) < 0.01
-			and l.z0 == B.z0 - Config.VillageWorld.Cars.Beyond and l.z1 == B.z1 + Config.VillageWorld.Cars.Beyond and Config.VillageWorld.Cars.Beyond < farRoad[4]
-			and (l.dz < 0) == (l.x > 360)
-	end
-	check("the D5's four lanes: two north on the east carriageway, two south on the west (right-hand), on the far D5 past the Bounds", laneOk and north == 2 and south == 2)
-	check("…and no village on the far horizon either (no far roofs, no church tower)", villageFar == nil, villageFar)
+	check(`the orchard's fence ({posts} posts), 9.7 the run zones' screen hedges ({screens}), the stream where a zone sees it ({wet} stretches of water)`,
+		posts >= 20 and screens >= 4 * #MAP.Zones and wet >= 1 and wet <= #MAP.Streams[1].points - 1, `{hedges} hedges, {posts} posts, {screens} screens, {wet} water`)
+	check("9.7: no D5's lanes, no far view (VillageScenery.lanes and .far: nothing)", #VillageScenery.lanes() == 0 and #VillageScenery.far() == 0)
 end
 
 -- ── The world ──────────────────────────────────────────────────────────────
@@ -536,12 +535,12 @@ local far = world:FindFirstChild("Far")
 local ground = world:FindFirstChild("Ground")
 do
 	local budget = SandboxScenery.Budget
-	check(`the map's part budget holds with the Auction House on, with room to spare ({#all} parts, at most {budget}; {budget - #all} left)`, #all <= budget - 300 and #all > 1200, #all)
+	check(`the map's part budget holds with the Auction House on, with room to spare ({#all} parts, at most {budget}; {budget - #all} left)`, #all <= budget - 300 and #all > 1000, #all)
 	print(`INFO  the map: {#all} parts ({village and #village:GetDescendants() or 0} in Village with models and words)`)
-	check("the countryside in workspace.Sandbox: Village, the Persistent Motorway, Railway and Far, the Ground and the Roads Persistent too", village ~= nil and motorway ~= nil
-		and motorway.ModelStreamingMode == Enum.ModelStreamingMode.Persistent and railway ~= nil and railway.ModelStreamingMode == Enum.ModelStreamingMode.Persistent
-		and far ~= nil and far.ModelStreamingMode == Enum.ModelStreamingMode.Persistent and ground ~= nil and ground.ModelStreamingMode == Enum.ModelStreamingMode.Persistent
-		and world:FindFirstChild("Roads").ModelStreamingMode == Enum.ModelStreamingMode.Persistent)
+	local lobby = world:FindFirstChild("Lobby")
+	check("the countryside in workspace.Sandbox: Village, the Ground and the Roads Persistent, 9.7 the Lobby Persistent; no Motorway, Railway or Far", village ~= nil
+		and motorway == nil and railway == nil and far == nil and ground ~= nil and ground.ModelStreamingMode == Enum.ModelStreamingMode.Persistent
+		and world:FindFirstChild("Roads").ModelStreamingMode == Enum.ModelStreamingMode.Persistent and lobby ~= nil and lobby.ModelStreamingMode == Enum.ModelStreamingMode.Persistent)
 	-- the chunks: every model under Village an Atomic Village_<chunk>
 	local chunkBad: string? = nil
 	local chunks = 0
@@ -559,7 +558,7 @@ do
 			markModels += 1
 		end
 	end
-	check(`the five places (SandboxWorld's), the landmarks ({markModels}) and the trees in {chunks} Atomic chunk models (Village_<chunk>)`, chunkBad == nil and chunks > 20
+	check(`the five places (SandboxWorld's), the landmarks ({markModels}) and the trees in {chunks} Atomic chunk models (Village_<chunk>)`, chunkBad == nil and chunks >= 6
 		and houseModels == 5 and markModels == #marks, chunkBad)
 	-- the places to empty: each built once, rich (its look's rich pieces: the doorstep, the mailbox), in its own model
 	local emptyBad: string? = nil
@@ -580,8 +579,8 @@ do
 		end
 	end
 	check("the five places each built once, in its own model (SandboxHouse), its door", emptyBad == nil, emptyBad)
-	-- nothing of the countryside on a road, its shoulder, the turnaround, a plot, the farmstead's lot and path, the vans'
-	-- ways, a place's box or the Auction House
+	-- nothing of the countryside on a yard, its shoulder, a plot, the farmstead's lot and path, the vans' ways, a place's
+	-- box or the Auction House
 	local keep: { { name: string, rect: Rect } } = {}
 	for n, r in MAP.Roads do
 		table.insert(keep, { name = `{r.name} {n}`, rect = grow(rectOf(r), RUN) })
@@ -623,27 +622,10 @@ do
 					onRoad = `{p.Name} of {p.Parent.Name} on {k.name}`
 				end
 			end
-			local cx, cz = math.clamp(TURN.x, b.x0, b.x1), math.clamp(TURN.z, b.z0, b.z1)
-			if (cx - TURN.x) ^ 2 + (cz - TURN.z) ^ 2 < (TURN.r + RUN) ^ 2 then
-				onRoad = `{p.Name} on the turnaround`
-			end
 		end
 	end
-	check(`nothing of the countryside ({seen} parts) on a road or its shoulder, the turnaround, a plot, the farmstead's lot or path, a van's way, a place's box or the Auction House`,
-		onRoad == nil and seen > 800, onRoad)
-	-- the D5 and the railway inside the Bounds, the far view outside them
-	local farBad: string? = nil
-	for _, b in all do
-		if far and b.part:IsDescendantOf(far) and b.y1 > MAP.GroundTop + EPS and b.x0 < B.x1 and b.x1 > B.x0 and b.z0 < B.z1 and b.z1 > B.z0 then
-			farBad = b.part.Name
-		elseif motorway and b.part:IsDescendantOf(motorway) and (b.x0 < B.x0 or b.x1 > B.x1 or b.z0 < B.z0 - EPS or b.z1 > B.z1 + EPS or b.x0 < 300) then
-			farBad = `the D5's {b.part.Name}`
-		elseif railway and b.part:IsDescendantOf(railway) and (b.x0 < B.x0 - EPS or b.x1 > B.x1 + EPS or b.z0 < 700 or b.z1 > B.z1) then
-			farBad = `the railway's {b.part.Name}`
-		end
-	end
-	check("the D5 at the map's east edge and the railway along its south edge inside the Bounds, the far view outside them", farBad == nil and motorway ~= nil
-		and #motorway:GetChildren() == 1 and railway ~= nil and #railway:GetChildren() == 2, farBad)
+	check(`nothing of the countryside ({seen} parts) on a yard or its shoulder, a plot, the farmstead's lot or path, a van's way, a place's box or the Auction House`,
+		onRoad == nil and seen > 500, onRoad)
 	-- the words
 	local texts: { [string]: number } = {}
 	local contracts = 0
@@ -654,7 +636,7 @@ do
 			contracts += 1
 		end
 	end
-	check("the words: the halt's MEADOW HALT; none of a village's (no CORNER DRUGSTORE, ROAD CLOSED, MOVING CONTRACTS noticeboard)", texts["MEADOW HALT"] == 1
+	check("the words: none of a village's (no CORNER DRUGSTORE, ROAD CLOSED, MOVING CONTRACTS noticeboard; 9.7 no MEADOW HALT)", texts["MEADOW HALT"] == nil
 		and texts["CORNER DRUGSTORE"] == nil and texts["ROAD CLOSED"] == nil and texts["MOVING CONTRACTS"] == nil and contracts == 0)
 	-- the ground: the fields (each a tile and its rows) and the lawns in the Ground, flush with the meadow
 	local fields, lawns, high = 0, 0, nil :: string?
@@ -667,7 +649,7 @@ do
 			end
 		end
 	end
-	check(`the ground: {fields} field tiles and {lawns} lawns (the forest's floor) in the Ground, their tops the meadow's`, fields == #MAP.Fields and lawns == #MAP.Lawns and high == nil, high)
+	check(`the ground: {fields} field tiles (9.7 none) and {lawns} lawns (the forest's floor) in the Ground, their tops the meadow's`, fields == #MAP.Fields and lawns == #MAP.Lawns and high == nil, high)
 end
 
 -- nothing alpine left: no spruce's needles, no mound, hill, peak or snow, no wildflowers or rail fence round the edge,

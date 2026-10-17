@@ -55,6 +55,9 @@ at 844 x 390, 667 x 375, 1280 x 800 and 1920 x 1080 clear of the rest; the guide
 9.1 the drive pedals (the real DrivePedals beside the HUD's pieces and the real OfferCard: drivepedals.luau) on phones
 held sideways and upright, tablets and computers: shown only in your own driver's seat with the HUD up, clear of the touch
 controls, the speed and the offer card, held to drive on a touch screen, the feet and a gamepad's R2 / L2 on a computer.
+9.7 runs: the pad panel (the host's difficulty buttons, another player's line) and the run's results card (the real
+RunUi beside SandboxHud and SandboxTasksUi: runs.luau) on phones, a computer and a big screen: on the screen, clear of the
+rest, the words fitting, a finger's size, the requests.
 """
 import argparse
 from pathlib import Path
@@ -260,7 +263,7 @@ local NumberSequence, NumberSequenceKeypoint = mock.NumberSequence, mock.NumberS
     found = '''local __require = require
 local function require(module) if type(module) == "table" and module.fakeModule ~= nil then return module.fakeModule end return __require(module) end
 '''
-    for name in ("SandboxGuide", "MovingHud", "MoveHelperHud", "MoveStoryUi", "Portrait", "CardKit", "TouchLayout", "MoveLayout", "TopBlocks", "PadGlyph"):  # (8.3 keys: PadGlyph)
+    for name in ("SandboxGuide", "MovingHud", "MoveHelperHud", "MoveStoryUi", "Portrait", "CardKit", "TouchLayout", "MoveLayout", "TopBlocks", "PadGlyph", "RunUi"):  # (8.3 keys: PadGlyph; 9.7: RunUi's pad)
         text = (ROOT / f"src/client/{name}.luau").read_text()
         text = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', text)
         (dest / f"{name}.luau").write_text(prefix + (found if name == "SandboxGuide" else "") + text)
@@ -391,3 +394,12 @@ from drivepedalsenv import drivepedals_env  # noqa: E402
 with tempfile.TemporaryDirectory() as folder:
     drivepedals_env(Path(folder))
     subprocess.run([args.luau, "drivepedals.luau"], cwd=folder, check=True)
+# 9.7 runs: the pad panel and the run's results card (client/RunUi.luau) beside the real SandboxHud and SandboxTasksUi
+# and Hud's groups: tools/phone-ui/runs.luau (runsenv.py builds the folder) at 844 x 390, 667 x 375, 1280 x 800 and
+# 1920 x 1080: on the screen, clear of the chips, the groups and the touch controls, the words fitting, a finger's size
+# on a phone (the difficulty buttons, OK), the host's pick sent, a locked one said, the card's list scrolling.
+from runsenv import runs_env  # noqa: E402
+
+with tempfile.TemporaryDirectory() as folder:
+    runs_env(Path(folder))
+    subprocess.run([args.luau, "runs.luau"], cwd=folder, check=True)

@@ -326,7 +326,15 @@ def stage(tmp: Path, manifest: dict):
     text = (ROOT / "src/server/SandboxWorld.luau").read_text()
     text = re.sub(r"require\(Shared\.(\w+)\)", r'require("./\1")', text).replace("require(script.Parent.HouseMesh)", 'require("./HouseMeshWorld")')
     text = text.replace("require(script.Parent.VillageWorld)", 'require("./VillageWorldServer")')  # 8.9: Jinočany's village
+    text = text.replace("require(script.Parent.LobbyWorld)", 'require("./LobbyWorldServer")')  # 9.7: the lobby
     (tmp / "SandboxWorldServer.luau").write_text(env + text)
+    # 9.7: the lobby (server/LobbyWorld.luau) with its dispatch kiosk's art (server/MoveSites.luau, DayNight a stand-in)
+    text = re.sub(r"require\(Shared\.(\w+)\)", r'require("./\1")', (ROOT / "src/server/MoveSites.luau").read_text())
+    (tmp / "MoveSitesWorld.luau").write_text(env + text.replace("require(script.Parent.DayNight)", "{ nightLight = function() end }"))
+    text = re.sub(r"require\(Shared\.(\w+)\)", r'require("./\1")', (ROOT / "src/server/LobbyWorld.luau").read_text())
+    text = text.replace("require(script.Parent.MoveSites)", 'require("./MoveSitesWorld")')
+    text = text.replace("require(script.Parent.VillageWorld)", 'require("./VillageWorldServer")')
+    (tmp / "LobbyWorldServer.luau").write_text(env + text)
     text = re.sub(r"require\(Shared\.(\w+)\)", r'require("./\1")', (ROOT / "src/server/VillageWorld.luau").read_text())
     (tmp / "VillageWorldServer.luau").write_text(env + text)
     text = (ROOT / "src/server/HouseMesh.luau").read_text()

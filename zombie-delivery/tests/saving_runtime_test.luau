@@ -23,6 +23,8 @@
 --     only from a real save written with its flag (junk, an older save, a lock-only record, a new player: none).
 --     8.9: which house it is (sandboxHouse) the same way, only an id shared/SandboxMap.luau knows; a real 8.4 save
 --     with a seed and no house's flag: the farmstead's (its seed was rolled for the one house there was).
+--   * 9.7 runs: the difficulties open (runUnlocked) the same way: written with its flag, read back on another server;
+--     a real save from before 9.7 (no flag), junk, a lock-only record, a new player: Easy and Normal (Config.Runs.Open).
 --   * Size: the biggest realistic sandbox save, measured.
 --   * The shutdown (BindToClose): every player saved at once, in parallel, waited for (a failed try too); a store that
 --     never answers is given up on at CloseWait.
@@ -718,6 +720,53 @@ do
 	check("… a new player: none; the save the flag, no house", (PlayerData.get(fresh) :: any).sandboxHouse == nil)
 	E.leave(fresh)
 	check("… a new player's save: the flag, no house", E.saves.Player_234.sandboxHouseKept == true and E.saves.Player_234.sandboxHouse == nil)
+end
+
+-- ── 9.7 RUNS: the difficulties open (runUnlocked) ─────────────────────────
+-- (shared/RunRules.luau fromSave: tests/runrules_test.luau; the unlocks themselves: tests/sandbox_e2e_runtime_test.luau)
+do
+	local R = Config.Runs
+	local unlocked = save83(900)
+	unlocked.runUnlocked, unlocked[R.Flag] = 4, true
+	E.saves.Player_235 = unlocked
+	local U1 = E.join(235, "Una")
+	check("9.7: a save with its runs' count and the flag: read (Insane open)", (PlayerData.get(U1) :: any).runUnlocked == 4)
+	;(PlayerData.get(U1) :: any).runUnlocked = 5 -- (a run finished at Insane: Nightmare open)
+	E.leave(U1)
+	check("… the leave save writes it back with its flag", E.saves.Player_235.runUnlocked == 5 and E.saves.Player_235[R.Flag] == true)
+	local U2 = E.join(235, "Una")
+	check("… joining another server: the same count", (PlayerData.get(U2) :: any).runUnlocked == 5)
+	E.leave(U2)
+	local before = save83(900) -- (a real save from before 9.7: no flag; a stray count in it is not read)
+	before.runUnlocked = 5
+	E.saves.Player_236 = before
+	local U3 = E.join(236, "Uli")
+	check("9.7 the migration: a real save from before the runs (no flag): Easy and Normal open (Open), loaded and not kicked", (PlayerData.get(U3) :: any) ~= nil
+		and (PlayerData.get(U3) :: any).runUnlocked == R.Open)
+	E.leave(U3)
+	check("… written back with the flag (read from now on)", E.saves.Player_236[R.Flag] == true and E.saves.Player_236.runUnlocked == R.Open)
+	local kept = {}
+	for index, value in { 2.5, -1, 99, "4", true, { 4 } } :: { any } do -- (no NaN: a DataStore keeps none)
+		local junkSave = save83(100)
+		junkSave.runUnlocked, junkSave[R.Flag] = value, true
+		E.saves.Player_237 = junkSave
+		local J = E.join(237, "Jo")
+		local pj = PlayerData.get(J) :: any
+		local want = if value == 99 then #R.Difficulties else R.Open
+		if pj == nil or pj.runUnlocked ~= want then
+			table.insert(kept, `{index}: {tostring(value)} → {pj and pj.runUnlocked}`)
+		end
+		E.leave(J)
+	end
+	check("9.7: junk counts (not whole, negative, a string, a boolean, a table): Open; too many: all five; loaded and not kicked", #kept == 0, table.concat(kept, "; "))
+	E.saves.Player_238 = { runUnlocked = 5, [R.Flag] = true, lock = { job = "another-server", at = 0 } }
+	local L1 = E.join(238, "Lu")
+	check("… a lock-only record (no money: a new player's): Open", (PlayerData.get(L1) :: any).runUnlocked == R.Open)
+	E.leave(L1)
+	local fresh = E.join(239, "Max")
+	check("… a new player: Open; the save the flag", (PlayerData.get(fresh) :: any).runUnlocked == R.Open)
+	E.leave(fresh)
+	check("… a new player's save: the flag, Open", E.saves.Player_239[R.Flag] == true and E.saves.Player_239.runUnlocked == R.Open)
 end
 
 -- ── Size: the biggest realistic sandbox save ───────────────────────────────
