@@ -782,7 +782,12 @@ for _, size in SIZES do
 end
 check("… the chevron over the UPGRADES desk at the level-2 warehouse's back wall (shared/WarehouseLayout.luau terminal), its tag", marker.Enabled
 	and at(desk2.x, desk2.z) and string.find(tag.Text, "^UPGRADES DESK · %d+ m$") ~= nil and (desk1.z ~= desk2.z), `{tag.Text} {desk1.z} {desk2.z}`)
-check("… a path to it", lit() >= 1, lit())
+check("10.3 … no path on the ground once something of yours is home (Config.SandboxGuide.Path \"new\"): the chevron alone", lit() == 0, lit())
+SandboxGuide.goTo(M.Vector3.new(desk2.x, 0, desk2.z), "UPGRADES DESK", 60)
+tick()
+check("10.3 … a place picked on the big map shows its path all the same", lit() >= 1, lit())
+SandboxGuide.goTo(nil)
+tick()
 coveredNow = true
 tick()
 check("never while something covers the screen (a grip check, the result card, a window): quiet", SandboxGuide.step() ~= "grow" and not hint.Visible and not marker.Enabled)

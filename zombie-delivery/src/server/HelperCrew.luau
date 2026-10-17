@@ -27,8 +27,9 @@
 --     player is near; tagged RunRescue (CollectionService) with his CrewKind on the model, so the map shows him. Holding
 --     E Rescue.Hold s ("Untie <name>") frees him: he says his line, joins the crew of EVERY party player who lacks him
 --     (saved soon; the whole party carried the run together, and nobody races a friend to the prompt), the others get
---     the bonus money instead (CrewRescue), and he walks after the party for the rest of the run (put by them when they
---     are in the other world or far), gone at its end.
+--     the bonus money instead (CrewRescue). 10.3 (the owner: "why does the yellow one I freed walk after me? Let him
+--     stay home, not bother me"): he never follows the party; he says he'll wait at your warehouse and, Rescue.Leave s
+--     later, fades away (Rescue.Fade s): he is home, in the CREW window.
 --   * Down in a run: a helper at 0 health lies down (MoveHelper's fall) and stays down Down.Seconds: a ProximityPrompt
 --     on him ("Revive <name>", E held Down.Revive s, any party player), his model tagged CrewDown with its
 --     CrewDownUntil (the server time: client/CrewUi.luau's ring and countdown over him). Revived: up where he lies
@@ -66,7 +67,6 @@ local HelperCrew = {}
 
 local C = Config.Crew
 local H = Config.MoveHelper
-local INSIDE = 400 -- studs from a move's interior origin that count as inside it (server/MoveHelper.luau's)
 local TAG = "RunRescue"
 local DOWN = "CrewDown" -- (a helper down in a run: client/CrewUi.luau's ring over him)
 local SIT = "rbxassetid://2506281703" -- Roblox's R15 sit (server/MoveHelper.luau's, server/Buddy.luau's)
@@ -100,7 +100,9 @@ type Rescue = {
 	freed: boolean,
 	by: Player?,
 	helpAt: number,
-	followAt: number,
+	leaveAt: number, -- 10.3 when the freed one fades away home (math.huge: not freed yet)
+	fading: { [BasePart]: number }?, -- 10.3 his parts' own transparency while he fades (the step's clock drives it)
+	gone: boolean,
 }
 -- A move seen (sync): its helper, its rescue (decided once), the players given CrewSense, said "nobody comes".
 type Run = { h: any, decided: boolean, rescue: Rescue?, sensed: { [Player]: boolean }, told: boolean }
@@ -140,11 +142,6 @@ end
 
 local function isRun(s: any): boolean
 	return type(s.contract) == "table" and s.contract.difficulty ~= nil
-end
-
-local function insideOf(s: any, at: Vector3): boolean
-	local origin: CFrame = s.origin
-	return (at - origin.Position).Magnitude < INSIDE
 end
 
 local function stateOf(h: any): State
@@ -697,7 +694,7 @@ local function decide(s: any, run: Run)
 	end
 	local def = defOf(kind)
 	local rescue: Rescue = { kind = kind, model = model, chair = chair, prompt = nil, ropes = ropes, sit = sitDown(model), freed = false, by = nil,
-		helpAt = 0, followAt = 0 }
+		helpAt = 0, leaveAt = math.huge, fading = nil, gone = false }
 	if root then
 		local prompt = Instance.new("ProximityPrompt")
 		prompt.Name = "RescuePrompt"
@@ -717,7 +714,7 @@ local function decide(s: any, run: Run)
 end
 
 -- `player` of the run held Untie: he is free, says his line, joins every party player's crew who lacks him (the
--- others: the bonus), and walks after the party from now on. True when freed now.
+-- others: the bonus), and heads home (10.3: he fades away Rescue.Leave s later, never follows). True when freed now.
 function HelperCrew.free(s: any, player: Player): boolean
 	local run = runs[s]
 	local rescue = run and run.rescue
@@ -754,6 +751,7 @@ function HelperCrew.free(s: any, player: Player): boolean
 		model:PivotTo(up)
 	end
 	Npcs.say(model, def.Freed, 5)
+	rescue.leaveAt = os.clock() + C.Rescue.Leave -- 10.3: home, not after the party
 	local bonus = CrewRules.rescueBonus(s.contract.difficulty)
 	local him = CrewRules.him(kind)
 	for member in s.members do
@@ -762,7 +760,7 @@ function HelperCrew.free(s: any, player: Player): boolean
 		end
 		local crew = HelperCrew.crewOf(member)
 		if CrewRules.add(crew, kind) then
-			say(member, `🎉 {def.Icon} {def.Name} joined your crew! {def.Ability}. Pick {him} in the CREW window (your helper at your warehouse) to bring {him} into runs.`)
+			say(member, `🎉 {def.Icon} {def.Name} joined your crew! {def.Ability}. {CrewRules.he(kind)}'ll wait at your warehouse: pick {him} in the CREW window to bring {him} into runs.`)
 			saveSoon(member)
 			HelperCrew.sendState(member)
 		else
@@ -776,65 +774,35 @@ function HelperCrew.free(s: any, player: Player): boolean
 	return true
 end
 
--- The freed one walks after the party (Rescue.Follow): to the nearest of them, through the house on its grid's way;
--- put by them when they are in the other world (a door's trip) or Far studs off.
-local function follow(s: any, rescue: Rescue, clock: number)
-	local F = C.Rescue.Follow
-	if clock < rescue.followAt then
+-- 10.3 the freed one goes home: Rescue.Leave s after his line he fades away (Rescue.Fade s), his body gone; he waits
+-- at your warehouse (the CREW window), never after the party.
+local function leave(rescue: Rescue, clock: number)
+	if rescue.gone or clock < rescue.leaveAt then
 		return
 	end
-	rescue.followAt = clock + F.Every
 	local model = rescue.model
-	local root = model.PrimaryPart
-	if not root or not model.Parent then
-		return
-	end
-	local here = root.Position
-	local target: BasePart? = nil
-	local far = math.huge
-	for player in s.members do
-		local r = rootOf(player)
-		if r and (r.Position - here).Magnitude < far then
-			target, far = r, (r.Position - here).Magnitude
-		end
-	end
-	if not target then
+	local fading = rescue.fading
+	if not fading then
 		Npcs.stop(model)
-		return
-	end
-	local at = target.Position
-	if insideOf(s, here) ~= insideOf(s, at) or far > F.Far then
-		local back = target.CFrame.LookVector
-		local spot = at - Vector3.new(back.X, 0, back.Z) * 4
-		Npcs.stop(model)
-		root.Anchored = true
-		model:PivotTo(CFrame.lookAt(spot, Vector3.new(at.X, spot.Y, at.Z)))
-		return
-	end
-	if flat(here, at) <= F.Near then
-		Npcs.stop(model)
-		return
-	end
-	local goal = at
-	if insideOf(s, at) then
-		local origin: CFrame = s.origin
-		local made, grid = pcall(Route.grid, s.plan, nil, nil, nil)
-		if made and grid then
-			local a = origin:PointToObjectSpace(here)
-			local b = origin:PointToObjectSpace(at)
-			local path = Route.path(grid :: Route.Grid, a.X, a.Z, b.X, b.Z)
-			local next = path and path[1]
-			if next then
-				local w = origin * Vector3.new(next.x, 0, next.z)
-				goal = Vector3.new(w.X, at.Y, w.Z)
+		local parts: { [BasePart]: number } = {}
+		for _, d in model:GetDescendants() do
+			if d:IsA("BasePart") then
+				parts[d] = d.Transparency
 			end
 		end
+		rescue.fading = parts
+		fading = parts
 	end
-	local humanoid = model:FindFirstChildOfClass("Humanoid")
-	if humanoid then
-		humanoid.WalkSpeed = F.Speed
+	local k = math.clamp((clock - rescue.leaveAt) / C.Rescue.Fade, 0, 1)
+	for part, was in fading :: { [BasePart]: number } do
+		if part.Parent then
+			part.Transparency = was + (1 - was) * k
+		end
 	end
-	Npcs.walkTo(model, goal, nil, 4, { through = true, jump = false, legs = true })
+	if k >= 1 then
+		rescue.gone = true
+		Npcs.remove(model)
+	end
 end
 
 local function endRun(s: any, run: Run)
@@ -1078,7 +1046,7 @@ function HelperCrew.step(_dt: number)
 			continue
 		end
 		if rescue.freed then
-			follow(s, rescue, clock)
+			leave(rescue, clock)
 		elseif clock >= rescue.helpAt then
 			-- "Help!" now and then while a party player is near (the house is quiet otherwise)
 			rescue.helpAt = clock + C.Rescue.Help
