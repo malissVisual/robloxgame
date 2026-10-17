@@ -1,5 +1,5 @@
 --!strict
--- 10.x danger: a run's bat (server/RunDanger.luau: its Tool's click). 10.5: only this is left of the city's close
+-- 10.x danger: a run's bat (server/RunDanger.luau: its Tool's click). 10.6: only this is left of the city's close
 -- combat (its holster, B, and its fists and gun strikes, V, went with the guns): CloseCombat.swing checks every swing
 -- as they did.
 --   CloseCombat.swing(player, kind, direction?, held?)   one swing of `kind` (Config.Melee.Kinds: the run's "bat"):

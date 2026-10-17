@@ -34,6 +34,7 @@ PURE += ("CountryLooks",)  # 9.4 sandbox, the countryside's art kit (tests/count
 PURE += ("HouseRoute",)  # 9.0 Danny's way inside a house, on its plan's grid (tests/houseroute_test.luau, tests/dannynav_runtime_test.luau; 9.3 his walk along it, audited against the built parts: tests/movehelper_stuck_runtime_test.luau)
 PURE += ("CharacterLooks", "SaveSlotRules")  # 10.1 the start: the courier you make, the save slots (tests/characterlooks_test.luau, tests/saveslots_test.luau, tests/saveslots_runtime_test.luau)
 PURE += ("RunRules",)  # 9.7 runs: the difficulties and their unlocks, the pads, the votes, whose stock (tests/runrules_test.luau)
+PURE += ("RoundRules",)  # 10.5 rounds: the place, the table, the vans' spots, the landing (tests/roundrules_test.luau)
 PURE += ("LootRules",)  # 9.x loot: a house's pieces' rarities by the difficulty, the stars, the toasts (tests/loot_test.luau)
 PURE += ("SandboxMapRules",)  # 10.x the map: the plan's code, the frames, the yard, the fog, the words, the layout (tests/sandboxmaprules_test.luau)
 PURE += ("DangerRules",)  # 10.x danger: a run's locks, keys, vault and hazards on the real plans (tests/danger_test.luau; it requires FurnitureLooks, the recorder's copy below)
@@ -688,7 +689,7 @@ def analytics_check():
 if not analytics_check():
     ok = False
 
-# 10.5 (only the sandbox is the game): the HUD is the game's only (client/Hud.luau, read as text: the HUD is Roblox's
+# 10.6 (only the sandbox is the game): the HUD is the game's only (client/Hud.luau, read as text: the HUD is Roblox's
 # through and through): the groups the other modules find by name, Hud.topSlot, Hud.toast and ESC's close, and no city
 # module required; the key hints show the move's keys only (client/KeyHints.luau sandboxLines). What the client starts:
 # tests/clientboot_test.luau.
@@ -756,7 +757,7 @@ def pad_check():
     root = os.path.dirname(HERE)
     client = os.path.join(root, "src", "client")
     main = open(os.path.join(client, "Main.client.luau"), encoding="utf-8").read()
-    block = main  # (10.5: the whole client is the sandbox's)
+    block = main  # (10.6: the whole client is the sandbox's)
     started = set(re.findall(r"require\(Client\.(\w+)\)", block))
     own = re.search(r"for _, name in \{([^}]*)\} do", block)
     started |= set(re.findall(r'"(\w+)"', own.group(1))) if own else set()

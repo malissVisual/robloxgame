@@ -1,5 +1,5 @@
 --!strict
--- The server's boot (8.0 SANDBOX; 10.5: the sandbox is the game, the old city is gone): server/Main.server.luau calls
+-- The server's boot (8.0 SANDBOX; 10.6: the sandbox is the game, the old city is gone): server/Main.server.luau calls
 -- SandboxBoot.start and stops there. The map sets a fixed pleasant day (server/DayNight.luau is only the lamps' day
 -- look), and there are no weapons of your own (server/Hand.luau and CloseCombat are only a run's bat's: every body is
 -- holstered).
@@ -27,8 +27,8 @@
 --     outside the house (server/Moving.luau respawnAt);
 --   * PLAY (the Play remote): 9.7 runs: no van in the lobby (your truck, Config.Sandbox.Van, is parked at a run's house
 --     when the run starts: server/Runs.luau); it is your only vehicle (profile.car; no bike, no dealer). Marge's first
---     day is off (no Tutorial);
---   * no CAR (10.5: the client calls no car, nobody drives): no chauffeur and no repair bay, every van parked here
+--     day is off (no Tutorial). 10.5 rounds: the player attribute InGame (server/Runs.luau takes them on the next round);
+--   * no CAR (the client calls no car, nobody drives): no chauffeur and no repair bay, every van parked here
 --     comes repaired. A forced spawn (an admin's: Vehicles.homeGarage) and Vehicles.placeNear park it at the spot
 --     nearest you (a run's curb, else your plot's old van spot);
 --   * RequestState sends the State (Main's queueState).
@@ -251,6 +251,7 @@ local function remotes(queueState: (Player) -> ())
 			return
 		end
 		playing[player] = true
+		player:SetAttribute("InGame", true) -- 10.5 rounds: in the game now (server/Runs.luau takes them on the next round)
 		local slots = Server:FindFirstChild("SaveSlots") -- 10.1: a PLAY with no slot picked (an old client): the slot saved last
 		if slots and slots:IsA("ModuleScript") then
 			local picked, why = pcall(function()

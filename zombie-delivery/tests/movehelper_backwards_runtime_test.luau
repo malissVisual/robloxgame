@@ -73,7 +73,7 @@ E.items.sofa.size = V3(SOFA.X, SOFA.Y, SOFA.Z) -- (the runtime's sofa and slab a
 E.items.slab.size = V3(TABLE.X, TABLE.Y, TABLE.Z)
 E.items.slab.name = "Dining Table"
 
-local HOUSE = "lone_house" -- (10.5: a run on the lone house, the van at its curb)
+local HOUSE = "lone_house" -- (10.6: a run on the lone house, the van at its curb)
 local door, facing, outside = E.doorOf(SandboxMap.house(HOUSE))
 local lobby = V3(SandboxMap.Lobby.spawn.x, 3, SandboxMap.Lobby.spawn.z)
 E.Zombies.findSpot = function(center: any): any

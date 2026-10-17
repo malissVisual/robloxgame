@@ -3,7 +3,7 @@
 -- client/SandboxZones.luau recorded as M.MZones):
 --   * an admin: two tabs, SANDBOX first and the one that opens; its groups and every button of SandboxAdmin.Actions
 --     are there, each sends ("sandbox", its id, the TARGET's UserId) on the Admin remote; 🔍 SHOW ZONES toggles
---     SandboxZones (no command) and shows ON; the heading follows the target's Plot; 10.5: OP, its FLY and NOCLIP
+--     SandboxZones (no command) and shows ON; the heading follows the target's Plot; 10.6: OP, its FLY and NOCLIP
 --     (("fly" | "noclip", on, the TARGET)) and the PERFORMANCE overlay (AdminPanel.onPerformance, no command); on a
 --     phone held sideways (844 × 390) the window fits the screen and every SANDBOX button fits its cell;
 --   * a player who is not an admin: P does not open it, the ADMIN button stays hidden.
@@ -207,7 +207,7 @@ end
 check("844 × 390: every SANDBOX button fits its cell, every cell the content", #tight == 0 and cells == #SandboxAdmin.Actions + 1, table.concat(tight, ", "))
 check("844 × 390: the two tabs fit the sidebar", #tabs * (40 + 6) <= window.Size.Y.Offset - 51 - 20)
 
--- 10.5 OP: FLY and NOCLIP for the TARGET, the performance overlay (yours, no command)
+-- 10.6 OP: FLY and NOCLIP for the TARGET, the performance overlay (yours, no command)
 tabs[2].Activated:Fire()
 content = contentOf(gui)
 check("OP: its heading names the target", string.sub(headings(content)[1] or "", 1, 8) == "OP tools", headings(content)[1])

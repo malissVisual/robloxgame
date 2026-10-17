@@ -22,6 +22,9 @@
 -- the whole height (its GIVE UP at the end of what scrolls). The key is O (Tab is Roblox's player list), a key another
 -- thing took is left alone. ESC closes the list (MovingHud.closeAll, Main's Hud.onCloseWindows).
 --   MovingHud.start(), isOpen(), active(), closeAll(), panel()
+-- 10.5 rounds (the state's `run.round`): the line is "YOURS n · $ · the place · the difficulty" (what you loaded into
+-- your own van), the next step says to load it into YOUR van, no FINISH and no vote, the list's footer LEAVE THE ROUND
+-- for everybody.
 -- 8.3 keys (shared/SandboxPad.luau, client/PadGlyph.luau): the panel's words name the keys of the device used now, a
 -- gamepad used last first: what to do next ("Pick up the loot (E)", "(X)" with a gamepad, no key on a touch screen: the
 -- prompt is tapped) and the list's hint ("LIST [O]", "TAP: LIST" on a touch screen, none with a gamepad: no button opens
@@ -271,6 +274,14 @@ local function nextStep(s: any): string
 	local counts = s.counts or {}
 	local out, total = tonumber(counts.out) or 0, tonumber(counts.total) or 0
 	local carried = tonumber(counts.carried) or 0
+	if type(s.run) == "table" and s.run.round == true then -- 10.5 rounds: your own van, no FINISH
+		if s.inside == true then
+			return if carried > 0 then "Carry it out to YOUR van: walk out through a door" else `{keyed("Pick up the loot")} · the best first`
+		elseif carried > 0 then
+			return keyed("Load it into YOUR van (its back)")
+		end
+		return "Grab more before the clock runs out: the most value wins"
+	end
 	if s.inside == true then
 		return if carried > 0 then "Carry it out: walk out through a door" else `{keyed("Pick up the loot")} · ★ first`
 	elseif carried > 0 then
@@ -302,9 +313,11 @@ refreshPanel = function()
 	refs.timer.Text = if late and grace then `⏱ {clock(grace - nowAt)}` else `⏱ {clock(left)}`
 	refs.timer.TextColor3 = if left <= 60 then K.red elseif s.horde == true then K.warn else K.text
 	local broken = tonumber(counts.broken) or 0
-	-- what is in the truck, the stars, the difficulty
+	-- what is in the truck, the stars, the difficulty (10.5 rounds: what you loaded into your own van)
 	local run = if type(s.run) == "table" then s.run else {}
-	refs.check.Text = `IN THE TRUCK {counts.out or 0}/{counts.total or 0} · ★ {counts.stars or 0} · {string.upper(tostring(run.name or ""))}{if broken > 0 then ` · 💥 {broken}` else ""}{if s.horde ~= true and hordeIn > 0 then ` · 🧟 {clock(hordeIn)}` else ""}`
+	refs.check.Text = if run.round == true
+		then `YOURS {tonumber(run.count) or 0} · {Ui.money(tonumber(run.value) or 0)} · {string.upper(tostring(s.name or ""))} · {string.upper(tostring(run.name or ""))}`
+		else `IN THE TRUCK {counts.out or 0}/{counts.total or 0} · ★ {counts.stars or 0} · {string.upper(tostring(run.name or ""))}{if broken > 0 then ` · 💥 {broken}` else ""}{if s.horde ~= true and hordeIn > 0 then ` · 🧟 {clock(hordeIn)}` else ""}`
 	local fill = math.clamp(tonumber(s.fill) or 0, 0, 1)
 	refs.truckLabel.Text = `🚐 VAN {math.floor(fill * 100 + 0.5)}%`
 	refs.fill.Size = UDim2.fromScale(fill, 1)
@@ -316,7 +329,7 @@ refreshPanel = function()
 	if finish then
 		local sure = os.clock() - finishAt <= GIVE_UP_SURE
 		local voter = run.mine ~= true and s.mine ~= true
-		finish.Visible = true
+		finish.Visible = run.round ~= true -- (10.5 rounds: no FINISH, no vote)
 		finish.Text = if sure then (if voter then "TAP TO VOTE" else "TAP TO FINISH") elseif voter then "✓ VOTE FINISH" else "✓ FINISH"
 	end
 	if refs.edge then
@@ -609,7 +622,7 @@ local function drawList()
 			else Ui.make("Frame", { Name = "Footer", Size = UDim2.new(1, -24, 0, 40), Position = UDim2.new(0, 12, 1, -46), BackgroundTransparency = 1 }, frame)
 		CardKit.bigButton(foot, {
 			name = "LeaveRun",
-			text = "LEAVE THE RUN",
+			text = if s.run.round == true then "LEAVE THE ROUND" else "LEAVE THE RUN", -- (10.5 rounds)
 			kind = "shut",
 			height = if sheet then finger else 40,
 			textSize = 14,

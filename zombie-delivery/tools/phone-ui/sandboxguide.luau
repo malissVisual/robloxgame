@@ -228,6 +228,7 @@ end
 local Config = require("./Config")
 local G = Config.SandboxGuide
 G.HideHold, G.OffNote = 0.05, 0.05 -- (the waits short: the check's own clock is the real one)
+Config.Rounds.On = false -- (10.5: the portals' flow here; the rounds' words are tests/sandboxsteps_test.luau's)
 local TouchLayout = require("./TouchLayout")
 local MoveLayout = require("./MoveLayout")
 local SandboxSteps = require("./SandboxSteps")

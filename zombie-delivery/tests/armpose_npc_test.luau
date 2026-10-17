@@ -1,4 +1,4 @@
--- 10.5: the people's arms (Danny, the helpers): the real client/ArmPose.luau (tests/run_tests.py builds
+-- 10.6: the people's arms (Danny, the helpers): the real client/ArmPose.luau (tests/run_tests.py builds
 -- ArmPoseClient.luau on tests/runtime/ClientRuntime.luau's few Roblox pieces) poses the people in workspace.Npcs from
 -- their attributes. Here:
 --   * standing, nothing on his arms (the animation's own);

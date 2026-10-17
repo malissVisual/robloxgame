@@ -5,7 +5,7 @@ stand-in's environment) into `out`; the caller then writes its own main.luau and
 tools/perf/sandbox_count.py (the sandbox's census) and tools/sandbox-map/render.py (the map's export, which
 tools/countryside/views.py and tools/lobby/views.py use too).
 
-10.5: its own count of the old city's server/World.luau (world-count.luau, the 6.13.1 performance report) went with
+10.6: its own count of the old city's server/World.luau (world-count.luau, the 6.13.1 performance report) went with
 the city; this file keeps its name for the importers above.
 """
 import os

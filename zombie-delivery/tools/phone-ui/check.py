@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """The game's windows and HUD pieces run for real against a narrow UI instance recorder (callbacks, construction, the
-server's data, resizing and cleanup; not Studio's layout or fonts). 10.5: the old city's phone, MISSIONS window and
+server's data, resizing and cleanup; not Studio's layout or fonts). 10.6: the old city's phone, MISSIONS window and
 bottom bar went with the city; so did the city's map, the moves' story cards and the drive pedals.
 7.0 review: the move's screen at 844 x 390 (MovingHud, MoveHelperHud, QuickChat: movehud.luau): nothing on the touch
 buttons or on each other, a finger's sizes, the list a sheet, the keys, ESC, a resize.

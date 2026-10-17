@@ -2,7 +2,7 @@
 -- tools/vehicle-preview/roblox-mock.luau) in the Luau CLI, as server/LobbyWorld.luau calls it (MoveSites.kiosk at
 -- SandboxMap.Lobby.dispatch). One JSON line a part (where, its turn, size, colour, material, shape, flags, its lights,
 -- its text), then a summary. check.py writes MoveSitesServer.luau and the shared modules next to it and checks the
--- lines. 10.5: the city's moving world (the depot's kiosk, the Wall's checkpoint, the houses, the farm, the banner, the
+-- lines. 10.6: the city's moving world (the depot's kiosk, the Wall's checkpoint, the houses, the farm, the banner, the
 -- evacuation spots, the plots' kiosks) went with the city.
 local M = require("./ItemMock")
 local MoveSites = require("./MoveSitesServer")

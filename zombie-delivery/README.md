@@ -1,17 +1,17 @@
 # Deliveros
 
-**Deliveros** is a Roblox moving game for up to four players. You start in a small **lobby** with your own
-**warehouse**, step onto a portal with your friends, ride out to a house in the countryside and **empty it against the
-clock**: carry the furniture and the rare finds out to the truck, past locked rooms, traps and, on the harder
-difficulties, zombies. Everything you bring home is **loot**: each piece has a rarity, an outline in its colour and its
-stars. At home you put the best pieces **on show**, where they earn money every minute you play, or sell them, trade
-them with other players, fill the **collection book**, grow the warehouse from a garage to a logistics centre and build
-up a **crew** of helpers you rescued on the runs.
+**Deliveros** is a Roblox moving game. You start in a small **lobby** with your own **warehouse**. Every few minutes a
+**round** starts for the whole server: everybody rides out to the same house in the countryside, each with their own
+van, and **empties it against the clock**: what you carry out and load into YOUR van is yours, past locked rooms and
+traps. Everything you bring home is **loot**: each piece has a rarity, an outline in its colour and its stars. At home
+you put the best pieces **on show**, where they earn money every minute you play, or sell them, trade them with other
+players, fill the **collection book**, grow the warehouse from a garage to a logistics centre and build up a **crew**
+of helpers.
 
-> **10.5: only the sandbox.** The old city game (Zombie Delivery 1.0 – 7.x: deliveries, missions, the city map, the
+> **10.6: only the sandbox.** The old city game (Zombie Delivery 1.0 – 7.x: deliveries, missions, the city map, the
 > phone, the guns, the bikes, the traffic, the day and night) is gone. The owner (17. 10. 2026): "remove everything
 > that is not active now, only the sandbox; that will be the game". Its code, tests, tools, art and designs are in
-> git's history up to 10.4 (main's Deliveros 10.4). What was the 8.0 "sandbox" is the whole game now; the code still
+> git's history up to 10.6 (main's Deliveros 10.6). What was the 8.0 "sandbox" is the whole game now; the code still
 > calls many of its parts Sandbox… (`SandboxBoot`, `SandboxMap`, `Config.Sandbox`).
 
 Everything is built in code (the world, the houses, the truck, the people, the interface), so the game needs no assets
@@ -120,6 +120,29 @@ dispatch; the four players' plots with their warehouses along the north edge; th
 booth; the **TOP MOVERS** board; the Auction House's place; and **six portals**, one for each house (a gate, a facade
 in the house's colours, its sign and a glowing pad: blue FREE, amber counting down, red IN USE). Previews:
 `design/lobby/`.
+
+## Rounds (10.5)
+
+The owner: "zombies I don't want in the game at all"; "16 people on one server … a round starts at one place, everybody
+runs there, everyone has their own car, what you carry off to it quickly is yours … not teams". **Rounds replace the
+portals' runs** (`Config.Rounds`; `server/Runs.luau`'s block "10.5 ROUNDS", `shared/RoundRules.luau`,
+`client/RoundUi.luau`; `Config.Rounds.On = false` brings the portals' pads back, see **The runs** below).
+- After PLAY you wait in the lobby: a banner counts down to the next round (`Wait`, 45 s), names its place and
+  difficulty (never the same place twice in a row; its portal says NEXT ROUND HERE).
+- Everybody in the game rides there together (10.4's ride: "ROUND · n MOVERS"), each player's **own van** parked at
+  the house's curb, side by side and in rows behind it (`Config.Rounds.Park`), locked, its back open, its owner's name
+  over it (yours says YOUR VAN, seen through walls).
+- Grab the loot, carry it out and **Load** it at YOUR van (E, only you see its prompt): it is yours at once, straight
+  into your warehouse's stock (`Moving.claim`, `MovingRules.claim`). Everybody hears who took what (the feed) and sees
+  **the table** (the top five by value and your place).
+- The move's panel has the clock (`Seconds`, 5:00) and what you loaded. Nobody FINISHes or votes (the clock ends it);
+  LEAVE THE ROUND takes you back alone; the host leaving the game hands the round over (`Moving.handOver`), never ends
+  it; no helper comes.
+- At 0:00 the results card ranks everybody who came ("🥇 YOU: 1ST OF 6"), the ride back to the plaza, the vans go and
+  the next countdown starts; whoever pressed PLAY during a round goes in the next one. The admin's
+  `Runs.admin(…, "round")` starts the countdown's round now.
+- **No zombies** at any difficulty, no bat, no boss (`Config.Runs.Danger`; their code stays switched off). The locks,
+  the vault and the floor's hazards stay.
 
 ## The runs (10.0)
 
@@ -463,11 +486,12 @@ python3 tools/check-requires.py
 ## History
 
 - **1.0 – 7.x, Zombie Delivery:** a delivery game in a zombie city (jobs, missions, the phone, the guns, cars and bikes,
-  traffic, the day and night, real estate, 7.x's moving rework). Gone in 10.5; git's history up to 10.4 has it all.
+  traffic, the day and night, real estate, 7.x's moving rework). Gone in 10.6; git's history up to 10.5 has it all.
 - **8.0, the sandbox:** a small test world in place of the city (an alpine meadow with one road, one house to empty,
   four plots with a warehouse each, the walk-in Sprinter you drove home), then the collection, the book, the tasks, the
   warehouse's levels, the market, the visitors, the PAINT shop, trading (8.1 – 8.7).
 - **8.9, Jinočany:** the owner's village as the map; **9.0, the countryside:** open fields and six places to empty.
 - **10.0, the lobby and the runs:** no more driving, loot with rarities; 10.1 the intro, save slots and the character
   creator; 10.2 the danger, the map and the crew; 10.3 a quieter guide; 10.4 the ride.
-- **10.5:** only the sandbox is the game.
+- **10.5, rounds:** one round for the whole server, everybody loading into their own van; no zombies.
+- **10.6:** only the sandbox is the game.

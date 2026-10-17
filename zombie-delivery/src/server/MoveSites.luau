@@ -3,7 +3,7 @@
 -- pieces as anchored parts (Config.MoveSites). Only the pieces the looks mark solid collide and stop bullets; the rest
 -- is decoration (CanCollide and CanQuery off). CanTouch off everywhere, no loops, no meshes: the lamp's glass and its
 -- PointLight take their day look through DayNight. Text is SurfaceGuis drawn within MoveSiteLooks.textRange
--- (tests/movesites_test.luau on the looks, tools/move-sites/check.py on what this builds on the recorder). 10.5: the
+-- (tests/movesites_test.luau on the looks, tools/move-sites/check.py on what this builds on the recorder). 10.6: the
 -- city's moving world (the depot's board, the Wall's drop-off, the houses' moving-day dress, Walt's farm, the depot's
 -- banner and the evacuation spots) went with the city.
 --

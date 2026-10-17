@@ -49,7 +49,7 @@ H.HoldLead.Base, H.HoldLead.Ping = E.gameLead.Base, E.gameLead.Ping -- (the game
 H.PairLead.On = false
 T.Doors.Walk = false -- (the walk-in doors off: these walks stay in the living room)
 
-local HOUSE = "lone_house" -- (10.5: a run on the lone house, the van at its curb)
+local HOUSE = "lone_house" -- (10.6: a run on the lone house, the van at its curb)
 local door, facing, outside = E.doorOf(SandboxMap.house(HOUSE))
 local lobby = V3(SandboxMap.Lobby.spawn.x, 3, SandboxMap.Lobby.spawn.z)
 E.Zombies.findSpot = function(center: any): any

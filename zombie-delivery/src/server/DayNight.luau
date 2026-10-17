@@ -1,5 +1,5 @@
 --!strict
--- The lamps' look. 10.5 (only the sandbox is the game): its day never turns (server/SandboxWorld.luau's fixed
+-- The lamps' look. 10.6 (only the sandbox is the game): its day never turns (server/SandboxWorld.luau's fixed
 -- afternoon, Config.Sandbox's Light.Clock), so the city's clock, its Night attribute, the weather and the night lights'
 -- switching are gone; what registered a night light shows its day look at once. The name stays: the vehicle, house and
 -- site builders pass DayNight.nightLight on, and the tests' and the art tools' stand-ins replace this module by it.

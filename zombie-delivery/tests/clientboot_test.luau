@@ -2,7 +2,7 @@
 -- 8.0 SANDBOX (design/sandbox/KONTRAKT.md), the client's boot: the real client/Main.client.luau (tests/run_tests.py
 -- copies it as ClientMain.luau, a function of the globals it reads) runs on recorders: every module it requires is a
 -- stand-in that takes any field, call or assignment and writes the calls down. Checked:
---   * 10.5 (only the sandbox is the game): Config.Sandbox.On = false starts the sandbox all the same;
+--   * 10.6 (only the sandbox is the game): Config.Sandbox.On = false starts the sandbox all the same;
 --   * the sandbox (On = true): only the sandbox's systems start, none of the city's is even required; the sandbox's
 --     own modules (SandboxHud, WarehouseUi, SandboxGuide: other workers') start only when they are there, one that
 --     fails to load or has no start is skipped; 8.1: SandboxSounds (the sandbox's sounds) starts last, with or without
@@ -11,7 +11,7 @@
 --     SandboxLight (the eyes) starts after SandboxSounds; 8.3 review: another window opening only hides a visitor's
 --     offer card (OfferCard.hide), ESC declines it (OfferCard.close); 8.7: TradePrompts (the trade prompts on your own
 --     stands hidden) right after CargoPrompts, TradeUi (trading between players) a window like the others, the STOCK
---     list's 🏷 opening its price picker and the picker going back to the list; 10.5: nothing of the driving starts
+--     list's 🏷 opening its price picker and the picker going back to the list; 10.6: nothing of the driving starts
 --     (nobody drives since 10.0: no Drive, no boarding, no pedals, no car's sway, tyres or crashes). Run with
 --     tests/run_tests.py.
 
@@ -41,7 +41,7 @@ local LAST = { "SandboxSounds", "SandboxLight" } -- 8.1: the sandbox's sounds, a
 
 -- The city's systems the sandbox must never require (the phone, the board, the windows, the maps, the tutorial, the
 -- buses, the rentals, the zips, the guns and the hands, the throw, the chips and banners, the leaderboard, the weather,
--- the traffic, the animals, 10.5 the driving ...).
+-- the traffic, the animals, 10.6 the driving ...).
 local CITY_ONLY = {
 	"Phone", "MissionsUi", "DispatchUi", "EstateUi", "BusinessUi", "GarageUi", "CareerUi", "Discovery", "TutorialUi",
 	"LocationTag", "RoadEventUi", "BusRide", "BusMapBoard", "RentalUi", "ZipRide", "Throw", "GrindChips", "EventBanner",
@@ -268,12 +268,12 @@ local function concat(...: { string }): { string }
 	return out
 end
 
--- ── 10.5: no city any more (Config.Sandbox.On = false) ─────────────────────
+-- ── 10.6: no city any more (Config.Sandbox.On = false) ─────────────────────
 
 do
 	local run = boot(false, { SandboxHud = "ok", WarehouseUi = "ok", SandboxGuide = "ok", UpgradeUi = "ok", CollectionBookUi = "ok", SandboxTasksUi = "ok", MoveHelperCard = "ok", DannyOrders = "ok", OfferCard = "ok", VanPaintUi = "ok", TradeUi = "ok" }, true)
 	local ok, where = same(starts(run), concat(SANDBOX, OWN, LAST))
-	check("10.5: Config.Sandbox.On false starts the sandbox all the same", ok, where)
+	check("10.6: Config.Sandbox.On false starts the sandbox all the same", ok, where)
 end
 
 -- ── The sandbox (Config.Sandbox.On = true) ──────────────────────────────────
@@ -316,7 +316,7 @@ do
 	if connect and type(connect[2]) == "function" then
 		connect[2]({ money = 100 })
 	end
-	check("the State reaches SandboxHud.setState (10.5: the start screen reads none of it)", called(run, "SandboxHud.setState") and not called(run, "Menu.setState"))
+	check("the State reaches SandboxHud.setState (10.6: the start screen reads none of it)", called(run, "SandboxHud.setState") and not called(run, "Menu.setState"))
 	local notice = run.args["Net.get(Notice).OnClientEvent.Connect"]
 	check("the server's notices go through SandboxHud.notice (8.3: in this device's words)", notice ~= nil and notice[2] == run.modules.SandboxHud.notice and type(notice[2]) == "function")
 	check("toasts for the sounds", run.modules.Sounds.notify == run.modules.Hud.toast)

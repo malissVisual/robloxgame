@@ -1,5 +1,5 @@
 --!strict
--- A run's party (10.5: the city's crews, their invitations, the crew board and the CREW panel's remotes are gone; the
+-- A run's party (10.6: the city's crews, their invitations, the crew board and the CREW panel's remotes are gone; the
 -- client has no crew panel any more). server/Runs.luau sets both hooks as it starts: a run's party is its host's, the
 -- players who stepped onto the portal's pads with them. server/Moving.luau asks them for whoever is on a run.
 --

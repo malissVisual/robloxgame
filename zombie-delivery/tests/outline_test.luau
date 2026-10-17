@@ -33,7 +33,7 @@ check("picked a few times a second (0.1 … 0.5 s)", O.Every >= 0.1 and O.Every 
 check("the hold is a little more than the range", O.HoldRange > 1 and O.HoldRange < 1.5, O.HoldRange)
 check("a phone still outlines a few", math.floor(O.Count * Config.Performance.Lite.Count + 0.5) >= 4 and O.Range * Config.Performance.Lite.Range >= 60)
 
--- Which colour: the zombie kinds red; orange only for a kind HumanKinds names (10.5: no bandits, nobody marked Bandit).
+-- Which colour: the zombie kinds red; orange only for a kind HumanKinds names (10.6: no bandits, nobody marked Bandit).
 check("a walker is red", OutlinePick.tone("walker") == "zombie")
 check("a runner is red", OutlinePick.tone("runner") == "zombie")
 check("a brute is red", OutlinePick.tone("brute") == "zombie")

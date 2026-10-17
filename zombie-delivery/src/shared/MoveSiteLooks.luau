@@ -2,7 +2,7 @@
 -- The ZDC dispatch kiosk's look (9.7 runs: the lobby's dispatch, server/LobbyWorld.luau at SandboxMap.Lobby.dispatch),
 -- as plain numbers: its parts in its own frame (Config.MoveSites). server/MoveSites.luau builds them (anchored, CanTouch
 -- off; only the pieces marked solid collide and stop bullets), tests/movesites_test.luau checks them, tools/move-sites/
--- check.py checks the built parts. Pure Luau. 10.5: the city's moving world (the Wall's checkpoint, the depot's kiosk
+-- check.py checks the built parts. Pure Luau. 10.6: the city's moving world (the Wall's checkpoint, the depot's kiosk
 -- and banner, the houses' moving-day dress, the evacuation spots, Walt's farm) went with the city.
 --
 -- A piece: name (unique in its set), size, at (its middle in the set's frame: +X right, +Y up from the ground, -Z

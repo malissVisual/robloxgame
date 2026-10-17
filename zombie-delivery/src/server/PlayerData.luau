@@ -1,5 +1,5 @@
 --!strict
--- The player's progress (10.5: only the sandbox is the game), loaded from and saved to the sandbox's DataStore
+-- The player's progress (10.6: only the sandbox is the game), loaded from and saved to the sandbox's DataStore
 -- (Config.Sandbox.Store, ZombieDelivery_v2_Sandbox; the key Player_<UserId> and the 10.1 slots' own keys, the lock).
 -- In Studio without API access it simply runs without saving.
 --
@@ -30,7 +30,7 @@
 -- new one is written at once) and the courier made for it (profile.character: shared/CharacterLooks.luau's look and its
 -- name, read from a real save only); unset (the tests): slot 1 at once. Every save also writes the time played
 -- (playTime, s: this session's added at each save) and when (savedAt, os.time) for the start screen's cards.
--- 10.5, the save stays the sandbox's as it was: the same store, keys, slots and lock; every sandbox field and its flag;
+-- 10.6, the save stays the sandbox's as it was: the same store, keys, slots and lock; every sandbox field and its flag;
 -- the city's boolean flags still written (xpCurve, carStages, vanStages, vestKit, starterKit, noPacks, noJacket,
 -- noShoes, perGameBags, vanOnly: an older server reading a save of this one never pays a refund or gives a kit twice).
 -- The city's fields a loaded save has (its guns, kit, tutorial, phone, wardrobe, skills, tasks, story …) are no field of
@@ -287,7 +287,7 @@ local function applyLevelRewards(profile: Profile, saved: { [any]: any })
 	end
 end
 
--- Saved data is checked, never trusted. (10.5: the city's fields and migrations went; what a save has of them is
+-- Saved data is checked, never trusted. (10.6: the city's fields and migrations went; what a save has of them is
 -- written back as it was: an unknown key.)
 local function applySaved(profile: Profile, saved: any)
 	if type(saved) ~= "table" then
@@ -622,7 +622,7 @@ build = function(profile: Profile, lock: any): { [string]: any }
 		carGuns = profile.carGuns,
 		xp = profile.xp,
 		levelRewards = profile.levelRewards, -- 4.6
-		-- 10.5: the city's flags, still written: an older server reading this save never runs their migration again
+		-- 10.6: the city's flags, still written: an older server reading this save never runs their migration again
 		xpCurve = Config.Levels.Curve, -- 3.2: the XP curve the xp is on
 		carStages = true, -- 3.5: the cars' room is their stages
 		vanStages = true, -- 4.0: the Old Van's four stages
@@ -927,7 +927,7 @@ end
 -- ── Levels (Config.Levels, shared/Levels.luau) ────────────────────────────
 
 -- 4.6, the career: every level reached whose reward (Config.Levels.Rewards) was not given yet gives its money now, once
--- (profile.levelRewards; counted as earned). 10.5: its items, kit, paint and title went with the city. 6.13: returns
+-- (profile.levelRewards; counted as earned). 10.6: its items, kit, paint and title went with the city. 6.13: returns
 -- the money it gave (for analytics).
 local function giveLevelRewards(profile: Profile): number
 	local cash = 0

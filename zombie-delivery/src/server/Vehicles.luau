@@ -22,7 +22,7 @@
 -- the attribute CarGun = the gun's id (the clients read it).
 --
 -- Lights: every car (the players', the bandits', the traffic's) has headlights and tail lights (server/DayNight.luau:
--- 10.5 their day look, the sandbox's day never turns); the headlights
+-- 10.6 their day look, the sandbox's day never turns); the headlights
 -- carry SpotLights (two on a player's car, one on an NPC car: cheap). The ambulance has a roof light bar: its lenses
 -- are tagged "SirenLight" and flash on every client (client/Weather.luau) while the car's attribute Siren is true
 -- (a company ambulance lent for a job, or Vehicles.setSiren).
@@ -188,7 +188,7 @@ local Config = require(Shared.Config)
 local Economy = require(Shared.Economy)
 local Net = require(Shared.Net)
 local PlayerData = require(script.Parent.PlayerData)
-local DayNight = require(script.Parent.DayNight) -- (10.5: only the lamps' day look: the sandbox's day never turns)
+local DayNight = require(script.Parent.DayNight) -- (10.6: only the lamps' day look: the sandbox's day never turns)
 local Boarding = require(Shared.Boarding)
 local SpawnSpot = require(Shared.SpawnSpot) -- 6.26: a vehicle never comes out into something (findRoom)
 local VehicleArt = require(script.Parent.VehicleArt.Builder)
@@ -5216,7 +5216,7 @@ local function wreck(car: Car, reason: string)
 	end)
 end
 
--- `cause` what hit it ("ram": a zombie run over, "crash": a bandit car's ram; nil anything else; 10.5: no skills take
+-- `cause` what hit it ("ram": a zombie run over, "crash": a bandit car's ram; nil anything else; 10.6: no skills take
 -- a share off any more, the city's server/Skills.luau went). Returns the damage it took.
 function Vehicles.damage(car: Car, amount: number, reason: string?, cause: string?): number
 	if car.wrecked or amount <= 0 then

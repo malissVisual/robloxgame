@@ -3,8 +3,8 @@
 -- money, the runs, the warehouse's stock and stands, the book, the upgrades, the paints, the teleports) and the OP
 -- toggles FLY and NOCLIP. Admins (a Studio Play test, the owner of a user-owned place, Config.Admin.UserIds) get the
 -- player attribute "Admin" (the client shows the panel, client/AdminPanel.luau); every command is checked here again.
--- 10.5 (only the sandbox is the game): the city's commands are gone (the money and XP, the cars, guns and items, the
--- jobs and missions, the estate, the enemies, the time and the weather, the buddies: in git's history up to 10.4).
+-- 10.6 (only the sandbox is the game): the city's commands are gone (the money and XP, the cars, guns and items, the
+-- jobs and missions, the estate, the enemies, the time and the weather, the buddies: in git's history up to 10.5).
 -- 6.13: every admin's player attribute AdminAnalytics carries the analytics line (server/Analytics.luau summary: on or
 -- off, what this server logged), refreshed every second.
 --
@@ -468,7 +468,7 @@ function Sandbox.command(player: Player, arg: any, admin: Player)
 	if isAdmin and not Net.limit(admin, "AdminSandbox", Config.Robust.Limits.AdminSandbox) then
 		return
 	end
-	local action, why = Sandbox.Rules.check(isAdmin, true, arg) -- (10.5: the sandbox is the game)
+	local action, why = Sandbox.Rules.check(isAdmin, true, arg) -- (10.6: the sandbox is the game)
 	if not action then
 		if isAdmin then
 			notice:FireClient(admin, `ADMIN: {why}`)

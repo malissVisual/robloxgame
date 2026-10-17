@@ -1,7 +1,7 @@
 --!strict
 -- Zombie Delivery (Deliveros): the server. The imports out of the Workspace, the collision groups and the State,
--- then server/SandboxBoot.luau boots the game: the lobby, the runs, the warehouses. 10.5 (the owner: "only the sandbox
--- is the game now"): the old city game is gone (in git's history up to 10.4).
+-- then server/SandboxBoot.luau boots the game: the lobby, the runs, the warehouses. 10.6 (the owner: "only the sandbox
+-- is the game now"): the old city game is gone (in git's history up to 10.5).
 
 -- 8.0.2: the owner's Blender imports (Import 3D leaves each in the Workspace, its parts loose: the sandbox builds no
 -- Marge's house, so nothing took ZDCHouseArt away and its pieces fell apart over the plots) leave the world first
@@ -56,7 +56,7 @@ PhysicsService:CollisionGroupSetCollidable("EnemyCar", "Corpse", false)
 
 local stateRemote = Net.get("State")
 
--- The State: the money (the client's money line, its windows and sounds), all the client reads of the save (10.5: the
+-- The State: the money (the client's money line, its windows and sounds), all the client reads of the save (10.6: the
 -- start screen, the save slots and the courier you make use the Slots remote).
 local function sendState(player: Player)
 	local profile = PlayerData.get(player)

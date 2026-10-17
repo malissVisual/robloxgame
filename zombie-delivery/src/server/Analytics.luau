@@ -6,7 +6,7 @@
 -- shared/AnalyticsPlan.luau, the numbers Config.Analytics, the owner's guide design/analytics/NAVOD.md.
 -- The game never requires this module where it plays: Analytics.start puts its hooks in PlayerData.analytics (called
 -- through PlayerData.track) and PlayerData.onMoney, so a module that failed to load or start only means no analytics.
---   onboarding   8.2: AnalyticsPlan.SandboxSteps (Roblox keeps one onboarding funnel an experience; 10.5: the city's
+--   onboarding   8.2: AnalyticsPlan.SandboxSteps (Roblox keeps one onboarding funnel an experience; 10.6: the city's
 --                Steps went with it), each once for life: Joined (the save loaded), PressedPlay (SandboxBoot's Play),
 --                the rest through the "step" hook from server/SandboxAnalytics.luau. A step goes into the save
 --                (profile.sandboxOnboarding, server/PlayerData.luau) only once Roblox took it: in Studio, switched off

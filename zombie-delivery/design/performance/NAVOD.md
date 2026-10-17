@@ -3,7 +3,7 @@
 Hodně hráčů hraje na telefonu. Hra je proto lehká: lobby má asi 1 300 dílů, malé nápisy se kreslí jen zblízka a sklady
 se se streamováním načítají vždy celé. Podrobnosti pro Clauda jsou v [`REPORT.md`](REPORT.md).
 
-(10.5: návod ke starému městu, jeho denní době a jeho místům je pryč i s městem; zůstává v historii Gitu do verze 10.4.)
+(10.6: návod ke starému městu, jeho denní době a jeho místům je pryč i s městem; zůstává v historii Gitu do verze 10.5.)
 
 ## Krok 1: zapni streamování (jednou, ve Studiu)
 

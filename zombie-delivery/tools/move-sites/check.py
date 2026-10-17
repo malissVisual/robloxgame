@@ -9,7 +9,7 @@ server/LobbyWorld.luau calls MoveSites.kiosk) and checks what comes out, in the 
   * the text: drawn within MoveSiteLooks.textRange (Config.MoveSites.TextRange at least), 25-100 pixels a stud, scaled
   * the model as the runs need it: Persistent, its corkboard "Board" its PrimaryPart (the prompt's part, solid), within
     a stud of SandboxMap.Lobby.dispatch's spot sideways
-(10.5: the city's moving world, the depot's kiosk, the Wall's checkpoint, the houses' dress, Walt's farm, the banner
+(10.6: the city's moving world, the depot's kiosk, the Wall's checkpoint, the houses' dress, Walt's farm, the banner
 and the evacuation spots, went with the city; so did their render.)
 
     python3 zombie-delivery/tools/move-sites/check.py <luau>

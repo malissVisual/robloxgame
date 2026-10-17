@@ -1,4 +1,4 @@
--- The real house art × a whole run end to end (10.5: every move a run): the real shared/FurnitureLooks.luau,
+-- The real house art × a whole run end to end (10.6: every move a run): the real shared/FurnitureLooks.luau,
 -- shared/HouseLayout.luau and server/HouseInterior.luau (tests/run_tests.py builds them on tools/fixtures/item-mock.luau,
 -- the recorder tests/runtime/MovingRuntime.luau's fakes stand on) and the real server/Moving.luau: a run of Ann and Bob
 -- on the lone house (a family house's plan, seed 1955: Ann's card), the real interior built and in the world, in through

@@ -38,7 +38,7 @@ local V3 = M.Vector3.new
 local workspace = M.workspace
 
 Config.MoveHelper.WaitForHelper = false -- (the crew lifts its two-person pieces itself: nobody waits for Danny)
-local depot = V3(SandboxMap.Lobby.spawn.x, 3, SandboxMap.Lobby.spawn.z) -- (10.5: the lobby; the run on the lone house)
+local depot = V3(SandboxMap.Lobby.spawn.x, 3, SandboxMap.Lobby.spawn.z) -- (10.6: the lobby; the run on the lone house)
 local ann = E.player(11, "Ann", depot)
 local bob = E.player(22, "Bob", depot + V3(3, 0, 0))
 local cid = E.player(33, "Cid", depot + V3(-3, 0, 0))

@@ -5,7 +5,7 @@ Simulates the Roblox import of design/blender-fixtures/roblox/ZDCFixtureArt.fbx 
 every piece's box in its kind's frame, written by fixtures.py; design/blender-fixtures/KONTRAKT.md): the importer turns
 the model a quarter round, makes it 3 times bigger and moves it; FixtureMesh must find the markers, undo that and dress
 every fixture server/HouseInterior.luau builds (shared/HouseLayout.luau plans of a few seeds of the kinds "house" and
-"big"; 10.5: the farm went with the city). Checks:
+"big"; 10.6: the farm went with the city). Checks:
   - the manifest: every kind of the contract's table at its size, every piece "<kind>_<finish>" a finish of
     FixtureMesh.Looks (and the manifest's "finishes", when it has them, FixtureMesh.Looks exactly: the colours,
     materials, palette, shine and see-through; tools/fixtures-art/looks.py --write copies them), at most 10,000 triangles a

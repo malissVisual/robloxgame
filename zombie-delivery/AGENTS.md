@@ -6,10 +6,10 @@ This file holds the rules both follow. `COLLAB.md` next to it is the shared task
 Read `README.md` first. It describes the whole game: the lobby, the runs, the danger, loot, the crew, your warehouse,
 saving and the code map.
 
-## The game is the sandbox (10.5)
-- Since 10.5 the game is only what was the 8.0 sandbox: the lobby, the runs into the countryside's houses and the
+## The game is the sandbox (10.6)
+- Since 10.6 the game is only what was the 8.0 sandbox: the lobby, the runs into the countryside's houses and the
   warehouse. The old city game (Zombie Delivery 1.0 – 7.x: deliveries, missions, the city, the phone, guns, bikes,
-  traffic, day and night) is gone, with its code, tests, tools, art and designs. It is in git's history up to 10.4.
+  traffic, day and night) is gone, with its code, tests, tools, art and designs. It is in git's history up to 10.5.
 - Do not bring city code back, and do not build on it. Work on what the game has; if an idea needs something the city
   had, take it from git's history into a new module of the game.
 - Many names still say Sandbox (`SandboxBoot`, `SandboxMap`, `Config.Sandbox`): they are the game's.

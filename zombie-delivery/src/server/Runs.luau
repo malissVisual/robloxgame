@@ -52,7 +52,28 @@
 -- difficulty?, party?, seconds } (Config.Runs.Ride): client/RideUi.luau shows the van on its way over the fade.
 -- 10.x danger (server/RunDanger.luau: the locks and keys, the vault, the hazards, the zombies, the bat): started with the
 -- runs (Runs.start); the results card's `danger` ({ vault = true / false / nil: none, stopped = zombies killed }) is
--- RunDanger.result's (the blocks marked "10.x danger").
+-- RunDanger.result's (the blocks marked "10.x danger"). 10.5: no zombies, no bat (Config.Runs.Danger).
+-- 10.5 ROUNDS (Config.Rounds.On; the owner: "16 people on one server … a round starts at one place, everybody runs
+-- there, everyone has their own car, what you carry off to it quickly is yours … not teams"; the rules
+-- shared/RoundRules.luau, the client client/RoundUi.luau; the block "10.5 ROUNDS" below): the portals' pads do nothing,
+-- one round at a time for the whole server instead.
+--   * The countdown (Wait s) runs in the lobby while somebody is in the game (the player attribute InGame: PLAY,
+--     server/SandboxBoot.luau); the next place is picked as it starts (never the last one again) and its difficulty
+--     (Config.Rounds.Difficulties, at random): the portals' signs and the map say where (its portal NEXT ROUND HERE).
+--   * The start: everybody in the game and free (alive, on no move, not on a jump) goes. Each player's own van is
+--     parked at the house (RoundRules.parking: side by side at its curb and in rows behind it, the spots with
+--     something solid in the way last), locked as a run's truck, its back open, its owner's name over it (its model's
+--     attribute RoundVan = their UserId) and its Load prompt (E, only they see it: MoveOnly). The run is the host's
+--     (the first player's) Moving.startRun with the round's clock (Seconds): its contract's `round` (server/Moving.luau
+--     "10.5 ROUNDS": no move truck, no helper, no FINISH). Everybody rides there (10.4) and lands in rows by the door.
+--   * In the round: Load at your own van while you carry something (Moving.claim): it is yours at once, into your
+--     warehouse's stock; everybody in the round hears it ({ kind = "claim", … }: the feed) and sees the table
+--     ({ kind = "round", … }: RoundUi's). LEAVE (the list's: the Runs remote's "leave") takes you back alone (your van
+--     goes); the host leaving hands the round's move over (Moving.handOver), it never ends it.
+--   * The end: the clock (Moving's tick ends the run): the results card ranks everybody in it (RoundRules.ranking: its
+--     `round`), Results s later everybody rides back to the lobby, the vans go, the next countdown starts.
+--   Runs.round()                       the round's state now (the tests'): { phase, endsAt, house, difficulty, run?, vans }
+--   Runs.roundStep()                   one look at the round (Runs.step's while Config.Rounds.On)
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -62,6 +83,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Net = require(Shared.Net)
 local RunRules = require(Shared.RunRules)
+local RoundRules = require(Shared.RoundRules) -- 10.5 rounds
 local SandboxMap = require(Shared.SandboxMap)
 
 local Server = script.Parent
@@ -82,6 +104,7 @@ type Run = {
 	votes: { [number]: boolean },
 	prompts: { Instance },
 	ended: boolean,
+	round: boolean?, -- 10.5 rounds: the server's round (no host's FINISH, no votes)
 }
 local remote: RemoteEvent? = nil
 local pads: { [string]: RunRules.Pad } = {}
@@ -95,6 +118,26 @@ local shownState: { [string]: string } = {} -- 10.x the map: the portal's attrib
 local inUseSaid: { [Player]: string } = {}
 local adminPick: { [Player]: string } = {}
 local started = false
+-- 10.5 rounds (the block "10.5 ROUNDS" below: its functions): the server's one round, in one table (the -O0 registers)
+--   phase    "idle" (nobody in the game) | "wait" (the countdown) | "play" (the round) | "over" (its results, the ride back)
+--   endsAt   the server's time the phase ends (wait: the start; play: the round's clock; over: the next countdown)
+--   house, difficulty   the next round's (wait) or this one's (play); last: the round before's house
+--   run      this round's run (play); vans / prompts: each player's van at the house and its Load prompt
+--   came     everybody who came ({ id, name }, the order they came); pieces: what they loaded ({ to, value })
+--   sent     the last round view sent to each player (a key: only what changed goes)
+local Round = {
+	phase = "idle",
+	endsAt = 0,
+	house = nil :: string?,
+	difficulty = nil :: string?,
+	last = nil :: string?,
+	run = nil :: Run?,
+	vans = {} :: { [Player]: any },
+	prompts = {} :: { [Player]: ProximityPrompt },
+	came = {} :: { { id: number, name: string } },
+	pieces = {} :: { { to: number, value: number } },
+	sent = {} :: { [Player]: string },
+}
 
 local function send(player: Player, message: { [string]: any })
 	local r = remote
@@ -254,7 +297,10 @@ end
 -- before the jump's fade: the run's difficulty and who else rides along (a run's party; on the way back, nobody).
 local function ride(player: Player, to: string, back: boolean, run: Run?)
 	local others: { string } = {}
-	if run and not back then
+	if run and run.round and not back then -- (10.5 rounds: how many ride along, not their names)
+		send(player, { kind = "ride", to = to, back = false, difficulty = run.difficulty, party = {}, round = #run.party, seconds = R.Ride.To })
+		return
+	elseif run and not back then
 		for _, p in run.party do
 			if p ~= player then
 				table.insert(others, p.DisplayName)
@@ -271,8 +317,15 @@ local function ride(player: Player, to: string, back: boolean, run: Run?)
 	})
 end
 
-local function backTo(house: string, players: { Player })
+local function backTo(house: string, players: { Player }, round: boolean?)
 	local portal = SandboxMap.portal(house)
+	if round then -- (10.5 rounds: the plaza's spawn, in rows: never a portal's pad)
+		for n, spot in RoundRules.spread(L.spawn, #players, Config.Rounds.Spread) do
+			ride(players[n], R.Ride.Home, true, nil)
+			jump(players[n], SandboxMap.cframe(spot))
+		end
+		return
+	end
 	local spot = if portal then portal.back else L.spawn
 	for n, frame in spread(spot, #players) do
 		ride(players[n], R.Ride.Home, true, nil) -- 10.4
@@ -467,7 +520,7 @@ end
 
 function Runs.finish(player: Player): boolean
 	local run = runOf[player]
-	if not run or run.ended then
+	if not run or run.ended or run.round then -- (10.5 rounds: only the clock ends one)
 		return false
 	end
 	if run.host ~= player then
@@ -479,7 +532,7 @@ end
 
 function Runs.vote(player: Player)
 	local run = runOf[player]
-	if not run or run.ended then
+	if not run or run.ended or run.round then
 		return
 	end
 	if run.host == player then
@@ -514,7 +567,19 @@ function Runs.leave(player: Player)
 	if not run or run.ended then
 		return
 	end
-	if run.host == player then
+	if run.host == player and run.round then -- 10.5 rounds: the round's move goes over to the next player in it
+		local heir: Player? = nil
+		for _, p in run.party do
+			if p ~= player and p.Parent and not heir then
+				heir = p
+			end
+		end
+		if not heir or not moving().handOver(player, heir) then
+			moving().endRun(player, `{player.DisplayName} left the round: it is over`)
+			return
+		end
+		run.host = heir :: Player
+	elseif run.host == player then
 		moving().endRun(player, `{player.DisplayName} (the host) left the run: what was in the truck went home`)
 		return
 	end
@@ -526,14 +591,21 @@ function Runs.leave(player: Player)
 	run.votes[player.UserId] = nil
 	table.insert(run.gone, player)
 	send(player, { kind = "run" })
-	say(player, "🚪 You leave the run: back to the lobby. What you loaded still goes to your warehouse at its end.")
+	say(player, if run.round
+		then "🚪 You leave the round: back to the lobby. What you loaded is in your warehouse already."
+		else "🚪 You leave the run: back to the lobby. What you loaded still goes to your warehouse at its end.")
 	for _, member in run.party do
-		say(member, `🚪 {player.DisplayName} left the run.`)
+		say(member, `🚪 {player.DisplayName} left the {if run.round then "round" else "run"}.`)
 	end
 	sendRun(run)
 	task.delay(R.LeaveHold, function()
 		if player.Parent and not runOf[player] then
-			backTo(run.house, { player })
+			backTo(run.house, { player }, run.round)
+			if run.round then -- (10.5 rounds: their van goes once they are back)
+				task.delay(R.Fade.Out + 0.2, function()
+					Round.dropVan(player)
+				end)
+			end
 		end
 	end)
 end
@@ -590,10 +662,11 @@ local function onEnd(host: Player, facts: { [string]: any })
 	pcall(function()
 		danger = require(Server.RunDanger).result(host)
 	end)
+	local ranking = if run.round then Round.ranking(list) else nil -- 10.5 rounds: the table
 	for _, p in everyone do
 		local sum = RunRules.summary(list :: any, p.UserId)
 		local opened: string? = nil
-		if finished and table.find(run.party, p) then
+		if finished and table.find(run.party, p) and not run.round then
 			local profile = PlayerData.get(p)
 			if profile then
 				local count, id = RunRules.unlock(openOf(p), run.difficulty)
@@ -622,6 +695,7 @@ local function onEnd(host: Player, facts: { [string]: any })
 			opened = opened,
 			openedName = if opened then (RunRules.def(opened) :: any).name else nil,
 			danger = danger, -- 10.x danger
+			round = if ranking then { ranking = ranking, place = (RoundRules.rankOf(ranking, p.UserId) or { place = 0 }).place, players = #ranking } else nil, -- 10.5
 		})
 		if opened then
 			send(p, { kind = "unlocked", id = opened, name = (RunRules.def(opened) :: any).name })
@@ -633,20 +707,376 @@ local function onEnd(host: Player, facts: { [string]: any })
 	end
 	local party = table.clone(run.party)
 	release(run)
-	task.delay(R.EndHold, function()
+	if run.round then
+		Round.over(run)
+	end
+	task.delay(if run.round then Config.Rounds.Results else R.EndHold, function()
 		local back: { Player } = {}
 		for _, p in party do
 			if p.Parent and not runOf[p] then
 				table.insert(back, p)
 			end
 		end
-		backTo(run.house, back)
+		backTo(run.house, back, run.round)
 		task.delay(R.Fade.Out + 0.2, function()
-			if not runOf[host] then
+			if run.round then
+				for _, p in party do
+					if not runOf[p] then
+						Round.dropVan(p)
+					end
+				end
+			elseif not runOf[host] then
 				pcall(Vehicles.remove, host)
 			end
 		end)
 	end)
+end
+
+-- ── 10.5 ROUNDS (Config.Rounds; shared/RoundRules.luau; client/RoundUi.luau) ─────────────────────────────────
+
+local Q = Config.Rounds
+
+-- Pressed PLAY (the attribute InGame: server/SandboxBoot.luau), loaded, alive, on no move and no jump: goes on the round.
+function Round.ready(player: Player): boolean
+	if player:GetAttribute("InGame") ~= true or runOf[player] or (away[player] and os.clock() < away[player]) then
+		return false
+	end
+	return PlayerData.get(player) ~= nil and rootOf(player) ~= nil and moving().busy(player) == nil
+end
+
+-- How many are in the game (pressed PLAY).
+function Round.inGame(): number
+	local n = 0
+	for _, p in Players:GetPlayers() do
+		if p:GetAttribute("InGame") == true then
+			n += 1
+		end
+	end
+	return n
+end
+
+-- The countdown to the next round: its place (never the last one again) and difficulty.
+function Round.plan(now: number)
+	local ids: { string } = {}
+	for _, h in SandboxMap.Houses do
+		if SandboxMap.zone(h.id) then
+			table.insert(ids, h.id)
+		end
+	end
+	Round.house = RoundRules.pick(ids, Round.last, math.random())
+	Round.difficulty = RoundRules.difficulty(Q.Difficulties, math.random())
+	Round.phase, Round.endsAt = "wait", now + Q.Wait
+end
+
+-- Is a van's spot clear (nothing solid in the box over it: a tree, a fence, a wall; the players and the cars aside)?
+function Round.clear(spot: SandboxMap.Spot): boolean
+	local P = Q.Park
+	local skip: { Instance } = {}
+	for _, p in Players:GetPlayers() do
+		if p.Character then
+			table.insert(skip, p.Character)
+		end
+	end
+	local cars = workspace:FindFirstChild("Cars")
+	if cars then
+		table.insert(skip, cars)
+	end
+	local params = OverlapParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = skip
+	params.RespectCanCollide = true
+	local ok, hits = pcall(function(): { BasePart }
+		return workspace:GetPartBoundsInBox(SandboxMap.cframe(spot) * CFrame.new(0, 1 + P.Height / 2, 0), Vector3.new(P.Width, P.Height, P.Length), params)
+	end)
+	return not ok or #(hits :: { BasePart }) == 0
+end
+
+-- The owner's name over their van (client/RoundUi.luau makes yours YOUR VAN).
+function Round.label(car: any, player: Player)
+	local tag = Instance.new("BillboardGui")
+	tag.Name = "RoundVanTag"
+	tag.Size = UDim2.fromOffset(180, 34)
+	tag.StudsOffset = Vector3.new(0, 8, 0)
+	tag.MaxDistance = 160
+	tag.AlwaysOnTop = false
+	local words = Instance.new("TextLabel")
+	words.Name = "Words"
+	words.Size = UDim2.fromScale(1, 1)
+	words.BackgroundTransparency = 1
+	words.TextScaled = true
+	words.Font = Enum.Font.GothamBlack
+	words.TextColor3 = Color3.fromRGB(255, 255, 255)
+	words.TextStrokeTransparency = 0.4
+	words.Text = `🚐 {player.DisplayName}`
+	words.Parent = tag
+	tag.Parent = car.chassis
+end
+
+-- The van's Load prompt at its back: only its owner sees it (MoveOnly), on while they carry something (Round.step).
+function Round.prompt(player: Player, car: any)
+	local door = Vehicles.cargoDoor(car)
+	local p = Instance.new("ProximityPrompt")
+	p.Name = "RoundLoadPrompt"
+	p.ActionText = "Load"
+	p.ObjectText = "YOUR VAN"
+	p.KeyboardKeyCode = Enum.KeyCode.E
+	p.HoldDuration = 0
+	p.MaxActivationDistance = Q.Reach
+	p.RequiresLineOfSight = false
+	p.Enabled = false
+	p:SetAttribute("MoveOnly", player.UserId)
+	CollectionService:AddTag(p, "MovePrompt")
+	p.Triggered:Connect(function(by: Player)
+		if by == player then
+			Round.claim(player)
+		end
+	end)
+	p.Parent = door or car.chassis
+	Round.prompts[player] = p
+end
+
+-- A player's round van goes (back in the lobby, or they left).
+function Round.dropVan(player: Player)
+	local car = Round.vans[player]
+	local prompt = Round.prompts[player]
+	Round.vans[player], Round.prompts[player] = nil, nil
+	if prompt then
+		prompt:Destroy()
+	end
+	if car and player.Parent and Vehicles.get(player) == car then
+		pcall(Vehicles.remove, player)
+	end
+end
+
+-- Load at your own van: what you carry is yours (Moving.claim), the round hears it.
+function Round.claim(player: Player)
+	local run = Round.run
+	local car = Round.vans[player]
+	if not run or runOf[player] ~= run or not car then
+		return
+	end
+	local piece, why = moving().claim(player, car)
+	if not piece then
+		if why then
+			say(player, why)
+		end
+		return
+	end
+	local value = math.floor((tonumber(piece.value) or 0) + 0.5)
+	table.insert(Round.pieces, { to = player.UserId, value = value })
+	for _, p in run.party do
+		send(p, { kind = "claim", by = player.DisplayName, mine = p == player, name = piece.name, icon = piece.icon, rarity = piece.rarity, value = value })
+	end
+	Round.broadcast()
+end
+
+function Round.begin(house: string, players: { Player }, difficulty: string): string?
+	local H = SandboxMap.house(house)
+	local zone = SandboxMap.zone(house)
+	local park = moving().parkVan
+	if not H or not zone or #players == 0 then
+		return "No such house."
+	elseif runs[house] then
+		return `{H.name} is in use.`
+	elseif not park then
+		return "Rounds are not ready yet."
+	end
+	local spots: { SandboxMap.Spot } = {}
+	local blocked: { SandboxMap.Spot } = {}
+	for _, spot in RoundRules.parking(H.curb, zone.rect, H.lot, #players, Q.Park) do
+		table.insert(if Round.clear(spot) then spots else blocked, spot)
+	end
+	for _, spot in blocked do -- (something in the way: still better than no van)
+		table.insert(spots, spot)
+	end
+	local going: { Player } = {}
+	for _, p in players do
+		local spot = spots[#going + 1]
+		local err, car = nil, nil
+		if spot then
+			err, car = park(p, spot, false)
+		end
+		if car then
+			lockVan(car)
+			car.model:SetAttribute("RoundVan", p.UserId)
+			pcall(Vehicles.setBack, car, true)
+			Round.label(car, p)
+			Round.vans[p] = car
+			Round.prompt(p, car)
+			table.insert(going, p)
+		else
+			say(p, `⛔ Your van could not come to {H.name} ({err or "no room"}): you sit this round out.`)
+		end
+	end
+	if #going == 0 then
+		return "The vans could not come."
+	end
+	local run: Run = { host = going[1], house = house, name = H.name, difficulty = difficulty, party = table.clone(going), gone = {}, votes = {}, prompts = {}, ended = false, round = true }
+	runs[house] = run
+	for _, p in going do
+		runOf[p] = run
+	end
+	local failed = moving().startRun(going[1], house, difficulty, Q.Seconds)
+	if failed then
+		release(run)
+		for _, p in going do
+			Round.dropVan(p)
+		end
+		return failed
+	end
+	local model = houseModel(house)
+	if model then
+		model:SetAttribute("RunDifficulty", difficulty)
+	end
+	Round.run, Round.phase, Round.endsAt = run, "play", workspace:GetServerTimeNow() + Q.Seconds
+	Round.came, Round.pieces = {}, {}
+	for _, p in going do
+		table.insert(Round.came, { id = p.UserId, name = p.DisplayName })
+	end
+	for n, spot in RoundRules.spread(zone.arrive, #going, Q.Spread) do
+		local p = going[n]
+		padKey[p] = ""
+		ride(p, H.name, false, run) -- 10.4: the van on its way there, over the fade
+		jump(p, SandboxMap.cframe(spot))
+	end
+	sendRun(run)
+	return nil
+end
+
+-- The results card's table (RoundRules.ranking over what everybody who came loaded).
+function Round.ranking(list: { { [string]: any } }): { RoundRules.Rank }
+	local pieces: { RoundRules.Piece } = {}
+	for _, piece in list do
+		if type(piece.to) == "number" then
+			table.insert(pieces, { to = piece.to, value = tonumber(piece.value) or 0 })
+		end
+	end
+	return RoundRules.ranking(pieces, Round.came)
+end
+
+-- The round ended (onEnd): its results, then the next countdown once everybody is back.
+function Round.over(run: Run?)
+	Round.phase = "over"
+	Round.endsAt = workspace:GetServerTimeNow() + Q.Results + R.Fade.Out + 1
+	Round.last = if run then run.house else Round.house
+	Round.run = nil
+	for _, prompt in Round.prompts do
+		prompt:Destroy()
+	end
+	table.clear(Round.prompts)
+end
+
+-- What RoundUi shows a player now: the phase and its clock, the place, the table's top rows and theirs.
+function Round.view(player: Player, rows: { RoundRules.Rank }): { [string]: any }
+	local H = if Round.house then SandboxMap.house(Round.house) else nil
+	local top: { { [string]: any } } = {}
+	for n = 1, math.min(Q.Top, #rows) do
+		local row = rows[n]
+		table.insert(top, { name = row.name, count = row.count, value = row.value, place = row.place, me = row.id == player.UserId })
+	end
+	local mine = RoundRules.rankOf(rows, player.UserId)
+	local run = Round.run
+	return {
+		kind = "round",
+		phase = Round.phase,
+		endsAt = Round.endsAt,
+		house = Round.house,
+		name = if H then H.name else nil,
+		difficulty = Round.difficulty,
+		inRound = run ~= nil and runOf[player] == run,
+		players = if run then #run.party else Round.inGame(),
+		ready = player:GetAttribute("InGame") == true,
+		top = top,
+		mine = if mine then { place = mine.place, count = mine.count, value = mine.value } else nil,
+	}
+end
+
+-- Every player's round view, when it changed.
+function Round.broadcast()
+	local rows = if Round.phase == "play" or Round.phase == "over" then RoundRules.ranking(Round.pieces, Round.came) else {}
+	for _, player in Players:GetPlayers() do
+		local view = Round.view(player, rows)
+		local mine = view.mine
+		local key = `{view.phase}|{view.endsAt}|{view.house}|{view.inRound}|{view.players}|{view.ready}|{if mine then `{mine.place},{mine.count},{mine.value}` else ""}|{#rows}`
+		for _, row in view.top do
+			key ..= `|{row.name},{row.count},{row.value}`
+		end
+		if Round.sent[player] ~= key then
+			Round.sent[player] = key
+			send(player, view)
+		end
+	end
+end
+
+-- The portals' signs and the map in rounds: the round's place says so, the others that rounds need no pad.
+function Round.signs(now: number)
+	local run = Round.run
+	for _, portal in L.portals do
+		local house = portal.house
+		if Round.phase == "wait" and house == Round.house then
+			paint(house, `NEXT ROUND HERE · {RoundRules.clock(Round.endsAt - now)}`, R.Portal.Waiting)
+			publish(house, "wait", Round.endsAt, {}, Round.difficulty)
+		elseif run and house == run.house then
+			paint(house, `ROUND ON · {RoundRules.clock(Round.endsAt - now)}`, R.Portal.InUse)
+			publish(house, "use", nil, { `{#run.party} movers` }, run.difficulty)
+		else
+			paint(house, "ROUNDS · WAIT IN THE LOBBY", R.Portal.Free)
+			publish(house, "free", nil, {}, nil)
+		end
+	end
+end
+
+function Runs.roundStep()
+	local now = workspace:GetServerTimeNow()
+	if Round.phase == "idle" or Round.phase == "wait" then
+		if Round.inGame() == 0 then
+			Round.phase, Round.house = "idle", nil
+		elseif Round.phase == "idle" then
+			Round.plan(now)
+		elseif now >= Round.endsAt then
+			local going: { Player } = {}
+			for _, p in Players:GetPlayers() do
+				if Round.ready(p) then
+					table.insert(going, p)
+				end
+			end
+			local house = Round.house
+			if #going == 0 then
+				Round.plan(now) -- (nobody free to go: the countdown again)
+			else
+				local err = if house then Round.begin(house, going, Round.difficulty or R.Default) else "No place to go."
+				if err then
+					for _, p in going do
+						say(p, `⛔ The round could not start: {err}`)
+					end
+					Round.last = house
+					Round.plan(now)
+					Round.endsAt = now + math.min(Q.Wait, 10)
+				end
+			end
+		end
+	elseif Round.phase == "play" then
+		local run = Round.run
+		if not run or runs[run.house] ~= run then
+			Round.over(run) -- (ended without its end heard: never stuck)
+		else
+			for p, prompt in Round.prompts do -- the Load prompts: on while their owner carries something
+				local name = if runOf[p] == run then moving().carrying(p) else nil
+				prompt.Enabled = name ~= nil
+				if name and prompt.ActionText ~= `Load {name}` then
+					prompt.ActionText = `Load {name}`
+				end
+			end
+		end
+	elseif Round.phase == "over" and now >= Round.endsAt then
+		Round.plan(now)
+	end
+	Round.signs(now)
+	Round.broadcast()
+end
+
+function Runs.round(): { [string]: any }
+	return { phase = Round.phase, endsAt = Round.endsAt, house = Round.house, difficulty = Round.difficulty, run = Round.run, vans = Round.vans, prompts = Round.prompts, pieces = Round.pieces }
 end
 
 -- ── The pads ───────────────────────────────────────────────────────────────
@@ -677,6 +1107,10 @@ local function onPad(root: BasePart, pad: SandboxMap.Rect): boolean
 end
 
 function Runs.step()
+	if Config.Rounds.On then
+		Runs.roundStep() -- 10.5 rounds: no pads
+		return
+	end
 	local now = workspace:GetServerTimeNow()
 	local standing: { [Player]: string } = {}
 	local roots: { [Player]: BasePart } = {}
@@ -783,6 +1217,7 @@ local function onRequest(player: Player, message: any)
 			send(player, runView(run, player))
 		end
 		padKey[player] = nil
+		Round.sent[player] = nil -- (10.5 rounds: the round's view again at the next look)
 	elseif kind == "difficulty" then
 		for house, pad in pads do
 			if pad.host == player.UserId and not runs[house] then
@@ -834,6 +1269,14 @@ function Runs.admin(player: Player, what: string, arg: string?, admin: Player?):
 		local pick = adminPick[by] or R.Default
 		local err = Runs.begin(house, { player }, pick, true)
 		return if err then `ADMIN: {err}` else `ADMIN: a run at {h.name} ({string.upper((RunRules.def(pick) :: any).name)}) started for you.`
+	elseif what == "round" then -- 10.5 rounds: the countdown over now
+		if not Config.Rounds.On then
+			return "ADMIN: rounds are off (Config.Rounds.On)."
+		elseif Round.phase ~= "wait" then
+			return "ADMIN: no countdown now."
+		end
+		Round.endsAt = workspace:GetServerTimeNow()
+		return "ADMIN: the round starts now."
 	elseif what == "end" then
 		local run = runOf[player]
 		if not run then
@@ -842,7 +1285,7 @@ function Runs.admin(player: Player, what: string, arg: string?, admin: Player?):
 		moving().endRun(run.host, "Ended by the admin: what was in the truck went home")
 		return "ADMIN: the run ended."
 	end
-	return "ADMIN: start | difficulty | end."
+	return "ADMIN: start | difficulty | round | end."
 end
 
 -- ── Starting ───────────────────────────────────────────────────────────────
@@ -877,6 +1320,15 @@ function Runs.start()
 	findSigns()
 	wrapCrew()
 	moving().onRunEnd(onEnd)
+	moving().roundVan = function(player: Player): any -- 10.5 rounds: a new body stands by your own van
+		return Round.vans[player]
+	end
+	moving().onHandOver(function(old: Player, new: Player) -- 10.5 rounds: the host left the game: the round goes on
+		local run = runOf[new]
+		if run and run.round then
+			run.host = new
+		end
+	end)
 	local ok, err = pcall(function() -- 10.x danger: every run's locks, vault, hazards and zombies
 		require(Server.RunDanger).start(moving())
 	end)
@@ -891,14 +1343,18 @@ function Runs.start()
 			if d:IsA("BasePart") and d:GetAttribute("RunDispatch") == true then
 				local prompt = Instance.new("ProximityPrompt")
 				prompt.Name = "DispatchPrompt"
-				prompt.ActionText = "How runs work"
+				prompt.ActionText = if Config.Rounds.On then "How rounds work" else "How runs work"
 				prompt.ObjectText = "DELIVEROS DISPATCH"
 				prompt.KeyboardKeyCode = Enum.KeyCode.E
 				prompt.HoldDuration = 0
 				prompt.MaxActivationDistance = 12
 				prompt.RequiresLineOfSight = false
 				prompt.Triggered:Connect(function(player: Player)
-					say(player, `🏠 Walk onto a house's glowing pad: in {R.Countdown} s everybody on it goes in ({R.MaxParty} at most). The first on it picks the difficulty. Carry the loot into the truck at the door, FINISH at the truck (or beat the clock): it all comes home to your warehouse.`)
+					if Config.Rounds.On then -- 10.5 rounds
+						say(player, `🏁 Every round everybody rides to one house, each to their own van. Grab the loot, carry it to YOUR van and Load it: it is yours at once. {RoundRules.clock(Config.Rounds.Seconds)} on the clock, the most value wins. The next round starts by itself: wait here.`)
+					else
+						say(player, `🏠 Walk onto a house's glowing pad: in {R.Countdown} s everybody on it goes in ({R.MaxParty} at most). The first on it picks the difficulty. Carry the loot into the truck at the door, FINISH at the truck (or beat the clock): it all comes home to your warehouse.`)
+					end
 				end)
 				prompt.Parent = d
 			end
@@ -906,7 +1362,7 @@ function Runs.start()
 	end
 	Players.PlayerRemoving:Connect(function(player: Player)
 		local run = runOf[player]
-		if run and run.host ~= player then
+		if run and (run.host ~= player or run.round) then -- (10.5 rounds: the host's move goes over: Moving.handOver)
 			runOf[player] = nil
 			local at = table.find(run.party, player)
 			if at then
@@ -916,6 +1372,8 @@ function Runs.start()
 			sendRun(run)
 		end
 		away[player], padKey[player], inUseSaid[player], adminPick[player] = nil, nil, nil, nil
+		Round.dropVan(player) -- (10.5 rounds)
+		Round.sent[player] = nil
 	end)
 	task.spawn(function()
 		while true do

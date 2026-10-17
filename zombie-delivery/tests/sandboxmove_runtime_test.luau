@@ -500,7 +500,7 @@ local function loadOne(spot: number, action: string?)
 	step()
 	return model
 end
--- 10.5: a run on the house of `player`'s card (Moving.houseOf: its seed kept while nothing came home; none yet: the
+-- 10.6: a run on the house of `player`'s card (Moving.houseOf: its seed kept while nothing came home; none yet: the
 -- farmstead), the van parked at its curb first, as server/Runs.luau parks it (Moving.parkVan); nil: it started.
 local function cardRun(player: any, difficulty: string?): string?
 	local h = Moving.houseOf(player) or House

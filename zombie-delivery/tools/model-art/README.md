@@ -11,6 +11,6 @@ blender -b -t 4 --python zombie-delivery/tools/model-art/render.py -- zombie-del
 ```
 
 `--workbench` uses Blender's Workbench engine (no noise); a third argument after the output folder renders one model id
-only. 10.5: the city's art handoff tools that lived here (the kit's, the bikes', the phone's and the gas station's
+only. 10.6: the city's art handoff tools that lived here (the kit's, the bikes', the phone's and the gas station's
 exports, contact sheets, the icons' rasterizer, the building blueprints) went with the city; they are in git's history
 up to 10.4.

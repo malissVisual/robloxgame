@@ -9,7 +9,7 @@
 -- time are the test's (Runtime.clock, Runtime.now); task.delay runs at once.
 -- 7.0, the depot's helper: the real server/MoveHelper.luau (MoveHelperServer.luau, tests/movehelper_runtime_test.luau)
 -- runs on these too: its body from the fake Npcs (Runtime.said: what he says), the zombies' roots and Zombies.all.
--- 10.5 (only the sandbox is the game): Config.Sandbox.On, every move a run (Moving.startRun, as server/Runs.luau starts
+-- 10.6 (only the sandbox is the game): Config.Sandbox.On, every move a run (Moving.startRun, as server/Runs.luau starts
 -- one: Runtime.startRun). Its fakes: SandboxPlots (Runtime.plots: player → a SandboxMap plot) and Collection
 -- (Runtime.collected: every Collection.add, its uid back unless Runtime.refuse); server/SandboxBoot.luau's hook
 -- Moving.parkVan is the test's own or Runtime.parkVan (a fake car, Runtime.makeCar, of Runtime.carId: the Sprinter).
@@ -25,7 +25,7 @@
 -- leader's client with it (tests/movehelper_backwards_runtime_test.luau).
 local Mock = require("./ItemMock") :: any
 local Config = require("./Config") :: any
-Config.Sandbox.On = true -- (10.5: the game; Moving.start reads it)
+Config.Sandbox.On = true -- (10.6: the game; Moving.start reads it)
 local SandboxMap = require("./SandboxMap") :: any
 -- 8.1 grip: no timing checks by default (a pick lifts at once, no wobbles: the moves' other tests carry as before);
 -- tests/carrygrip_runtime_test.luau turns them on (the server reads Config.CarryGrip.On at every lift and carry).
@@ -589,7 +589,7 @@ local function makeCar(owner: any, id: string, at: any): any
 		local door = Mock.Instance.new("Attachment")
 		door.Name = "CargoDoor"
 		door.Position = Mock.Vector3.new(0, 3, 9)
-		door.CFrame = Mock.CFrame.new(0, 3, 9) -- (10.5: the recorder reads an attachment's Position off its CFrame: the bay's middle from it)
+		door.CFrame = Mock.CFrame.new(0, 3, 9) -- (10.6: the recorder reads an attachment's Position off its CFrame: the bay's middle from it)
 		door.Parent = chassis
 		local back = Mock.Instance.new("ProximityPrompt")
 		back.Name = "BackPrompt"
@@ -641,7 +641,7 @@ end
 Runtime.sat = {} -- 8.3: { { seat, humanoid } } every Seat:Sit
 Runtime.makeCar = makeCar -- (8.0 SANDBOX: the test's own Moving.parkVan parks one)
 Runtime.truckAt = Mock.Vector3.new(0, 2, 0) -- where placeNear puts the truck (the test sets it)
--- a move goes with its owner's own van (10.5: the Sprinter, Config.Sandbox.Van, its walk-in bay Config.Moving.Beds.sprinter)
+-- a move goes with its owner's own van (10.6: the Sprinter, Config.Sandbox.Van, its walk-in bay Config.Moving.Beds.sprinter)
 Runtime.carId = Config.Sandbox.Van
 Runtime.profiles = {} -- 7.2 review: player → a profile of the test's own (PlayerData.get returns it)
 
@@ -753,7 +753,7 @@ Runtime.Vehicles = stub("Vehicles", {
 })
 Runtime.doorSwings = {} -- 8.5 { { car, door, openAt, closeAt, now, clock } } every Vehicles.swingDoor
 
--- 10.5: server/SandboxBoot.luau's parkVan as the tests stand it in (Moving.parkVan): the player's van (no carId: their own,
+-- 10.6: server/SandboxBoot.luau's parkVan as the tests stand it in (Moving.parkVan): the player's van (no carId: their own,
 -- Runtime.carId) at the spot, its nose the spot's way, the old one gone; every call kept (Runtime.parked).
 Runtime.parked = {} -- { { player, spot, seat, carId } }
 function Runtime.parkVan(player: any, spot: any, seat: boolean, carId: string?): (string?, any)
@@ -767,7 +767,7 @@ function Runtime.parkVan(player: any, spot: any, seat: boolean, carId: string?):
 	Runtime.cars[player] = car
 	return nil, car
 end
--- 10.5: a run on the house `house` (a SandboxMap.Houses id; nil: The Old Farmstead) at `difficulty` (nil: Normal) for
+-- 10.6: a run on the house `house` (a SandboxMap.Houses id; nil: The Old Farmstead) at `difficulty` (nil: Normal) for
 -- `owner` and their crew (Runtime.crew), as server/Runs.luau begins one: the owner a plot when they have none (the
 -- first free one of SandboxMap.Plots: Runtime.plots), their van parked at the house's curb (Moving.parkVan: the test's,
 -- else Runtime.parkVan), then Moving.startRun. Returns its refusal (nil: the run started).
@@ -790,7 +790,7 @@ function Runtime.startRun(owner: any, house: string?, difficulty: string?): stri
 	park(owner, h.curb, false)
 	return Moving.startRun(owner, h.id, difficulty or "normal")
 end
--- 10.5: the house of `player`'s run (its state's contract; nil: The Old Farmstead), its door's foot, out of it (its
+-- 10.6: the house of `player`'s run (its state's contract; nil: The Old Farmstead), its door's foot, out of it (its
 -- look), and where you stand in front of it (3 studs out).
 function Runtime.houseOf(player: any): any
 	local view = Runtime.last(player, "Moving", "state")

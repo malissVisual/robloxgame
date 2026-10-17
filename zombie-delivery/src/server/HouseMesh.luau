@@ -8,7 +8,7 @@
 -- MeshParts (anchored, not colliding, not queried, not touched); its own parts stay where they are, invisible, still
 -- what collides. No import, a house not listed or of another size: the house as it was built. 8.2.1: the import is the
 -- owner's big house (house.py TARGET "sandbox", 44 × 14.5 × 34). Only the farmstead (SandboxMap.Houses[1], the big
--- house) wears it; the countryside's other places to empty are never handed here (their own looks). (10.5: Marge's
+-- house) wears it; the countryside's other places to empty are never handed here (their own looks). (10.6: Marge's
 -- house in the city went with it.)
 --
 --   HouseMesh.start()               at the server's start: finds the import and takes it out of the world

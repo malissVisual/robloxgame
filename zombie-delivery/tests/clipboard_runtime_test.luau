@@ -50,7 +50,7 @@ local H = Config.MoveHelper
 local V3 = M.Vector3.new
 local workspace = M.workspace
 
-local HOUSE = "lone_house" -- (10.5: a run on the lone house, the van at its curb)
+local HOUSE = "lone_house" -- (10.6: a run on the lone house, the van at its curb)
 local door, facing, outside = E.doorOf(SandboxMap.house(HOUSE))
 local lobby = V3(SandboxMap.Lobby.spawn.x, 3, SandboxMap.Lobby.spawn.z)
 E.Zombies.findSpot = function(center: any): any
@@ -74,7 +74,7 @@ MoveHelper.useMover({
 })
 
 -- Ann (the move's owner) and Bob (a crew mate later), each with a right hand (the courier's: 0.22 × 0.36 × 0.4)
-local depot = lobby -- (10.5: the lobby; the runs on the lone house)
+local depot = lobby -- (10.6: the lobby; the runs on the lone house)
 local ann = E.player(71, "Ann", depot)
 local bob = E.player(72, "Bob", depot + V3(4, 0, 0))
 local function giveHand(player: any): any

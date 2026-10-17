@@ -1,7 +1,7 @@
 -- 6.24, the special zombies (the owner: "new zombies, so the fighting isn't always the same"): shared/ZombieKinds.luau,
 -- Config.Zombies' runner / brute / bloater and Config.ZombieTypes in the standalone Luau CLI: the spawn weights (the
 -- night, the danger, the level, the Blood Moon, the caps), the brute's armour maths, the bloater's blast falloff and
--- fuse, the moves, and the parts budget of every look of every kind. (10.5: the city's fixed missions and their
+-- fuse, the moves, and the parts budget of every look of every kind. (10.6: the city's fixed missions and their
 -- plans went with shared/MissionPlan.luau.)
 -- Run: python3 tests/run_tests.py [path to the luau binary]
 

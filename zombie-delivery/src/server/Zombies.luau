@@ -8,7 +8,7 @@
 --   * the safe zone (isSafe: the old city's middle, SAFE_HALF) is never entered, zombies hanging on a car die when it
 --     drives in
 --
--- Who goes after whom (10.5: only who calls Zombies.spawn brings any: a run's horde and its danger; the city's
+-- Who goes after whom (10.6: only who calls Zombies.spawn brings any: a run's horde and its danger; the city's
 -- residents, roamers round every player and roadblocks are gone):
 --   * a roamer (Config.Horde.Roam's walk) shambles around its spot; it hunts a player who comes close, shoots nearby
 --     or hits it, and calms down when it loses them. A march's zombie (Zombies.march: a run's horde) goes at its spot.
@@ -57,7 +57,7 @@
 --     blast (an Explosion for the looks, the sound and the camera's shake) hurts every zombie round it (a chain: another
 --     bloater goes off too; the kills are its killer's), the players on foot (through the vest, thrown away) and the
 --     cars. The Fuse attribute (the server time it goes off) shows the warning on the clients;
---   * every random pick of a kind (a run's horde and its danger's) goes through Zombies.pickKind: the night (10.5:
+--   * every random pick of a kind (a run's horde and its danger's) goes through Zombies.pickKind: the night (10.6:
 --     never: DayNight.nightFactor 0), the danger (a job's tier from Zombies.tierOf; else how far from the old city's
 --     depot, DEPOT), the player's level, and MaxAlive of a special kind in the server at most.
 --   * a kill pays ZombieDef.xp XP on top (the money stays the "KillReward").
@@ -81,12 +81,12 @@ local Joints = require(Shared.Joints)
 local GunModels = require(Shared.GunModels)
 local Vehicles = require(script.Parent.Vehicles)
 local PlayerData = require(script.Parent.PlayerData)
-local DayNight = require(script.Parent.DayNight) -- (10.5: nightFactor 0, the sandbox's day)
+local DayNight = require(script.Parent.DayNight) -- (10.6: nightFactor 0, the sandbox's day)
 local Armour = require(script.Parent.Armour) -- 6.0: every bite and bullet on a player goes through the vest
 local ZombieStyle = require(Shared.ZombieStyle) -- 6.16: the looks, the falls, the Hit attribute
 local Kinds = require(Shared.ZombieKinds) -- 6.24: the special zombies' rules
 
--- 10.5 (the city's server/World.luau and shared/Map.luau went): the old road level (World.RoadTop: a road spot's
+-- 10.6 (the city's server/World.luau and shared/Map.luau went): the old road level (World.RoadTop: a road spot's
 -- height), the old safe zone round the middle (Config.City.SafeHalf: |x|, |z| below it; nothing of the sandbox's
 -- world is in it, it matters only if a horde ever gets there) and the old depot (Map.Depot: the special kinds' danger
 -- grows with the distance from it, ZombieKinds.danger).

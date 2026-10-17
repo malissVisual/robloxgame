@@ -1,14 +1,14 @@
 # Performance: what the sandbox costs to draw (8.2)
 
 The game is public and many players are on phones. This is 8.2's count and review of the sandbox (the game since
-10.5), made without Studio: offline counts of what the real server code builds, a review of the per-frame and per-tick
+10.6), made without Studio: offline counts of what the real server code builds, a review of the per-frame and per-tick
 code, and the safe fixes it led to. The owner's steps (Czech) are in [`NAVOD.md`](NAVOD.md).
 
 - **The numbers below are 8.2's**, the alpine meadow's with its chalet and kiosks. The world has changed since (9.0
   the countryside, 10.0 the lobby and the runs). Re-count today's with `python3 tools/perf/sandbox_count.py <luau>`:
   at 10.4 the lobby's map is 1,313 parts (1,414 with the Auction House) of `SandboxScenery.Budget`'s 2,500.
-- 10.5: the 6.13.1 audit of the old city (its streaming, rendering, CPU and mobile sections and its counts by
-  `tools/perf/world_count.py`) went with the city; it is in git's history up to 10.4.
+- 10.6: the 6.13.1 audit of the old city (its streaming, rendering, CPU and mobile sections and its counts by
+  `tools/perf/world_count.py`) went with the city; it is in git's history up to 10.5.
 
 **How the numbers were made.** `python3 tools/perf/sandbox_count.py <luau>` (new) runs the real server code in the
 Luau CLI, twice:
@@ -121,7 +121,7 @@ The map is 680 × 920 studs, and the chalet is about 690 studs from the warehous
 
 **Per-frame and per-tick code of the sandbox's own modules.** The city modules that the sandbox also starts (Hud,
 CameraRig, ArmPose, GaitPose, BodyLife, CarVisuals, CarSway, TyreFx, ZombieAnimator …) were reviewed in the old
-city audit's section 3 (git's history up to 10.4). CarSway
+city audit's section 3 (git's history up to 10.5). CarSway
 leaves a parked van's body at rest. EnemyOutline, TyreFx, ZombieFx and QuickChat do almost nothing per frame while
 idle: a clock check, or an empty list.
 

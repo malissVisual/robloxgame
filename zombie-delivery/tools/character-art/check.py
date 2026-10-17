@@ -5,7 +5,7 @@ The recorder does not simulate Roblox joints.
 
     python3 tools/character-art/check.py <luau> design/character-models/geometry.json [--looks looks.json]
 
-10.5: the city's checks went (the worn bags of server/KitWear.luau, the STYLE cosmetics of server/StyleWear.luau and
+10.6: the city's checks went (the worn bags of server/KitWear.luau, the STYLE cosmetics of server/StyleWear.luau and
 the 6.9 avatar template's lifecycle); the avatar is checked by tests/characterlooks_test.luau and
 tests/saveslots_runtime_test.luau now."""
 import argparse

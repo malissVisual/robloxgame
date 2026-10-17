@@ -9,7 +9,7 @@
 --   * PUT IT DOWN ("helper", "putdown"): a piece in his arms set down where he stands, its condition kept, off his
 --     list ("Setting it down."); a two-person piece he holds with you: both ends down, your hands free, his hold off;
 --     nothing in his hands: refused ("Danny isn't carrying anything.")
---   (10.5: nobody drives the van in a run, so he never rides in it: no GET OUT)
+--   (10.6: nobody drives the van in a run, so he never rides in it: no GET OUT)
 --   * a player not of the crew: nothing; the rate limit (MoveHelperOrder, Config.Robust.Limits.MoveHelperOrder)
 local E = require("./MovingRuntime")
 local Moving = require("./MovingServer")
@@ -36,7 +36,7 @@ local M = E.Mock
 local V3 = M.Vector3.new
 local workspace = M.workspace
 
-local HOUSE = "lone_house" -- (10.5: a run on the lone house, the van at its curb)
+local HOUSE = "lone_house" -- (10.6: a run on the lone house, the van at its curb)
 local door, facing, outside = E.doorOf(SandboxMap.house(HOUSE))
 local lobby = V3(SandboxMap.Lobby.spawn.x, 3, SandboxMap.Lobby.spawn.z)
 E.Zombies.findSpot = function(center: any): any

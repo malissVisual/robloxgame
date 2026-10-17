@@ -8,7 +8,7 @@
 --     yours (the only vehicle, Marge's tutorial never asked) but none parked in the lobby, a second PLAY nothing, a
 --     respawn brings none, CAR in a run at the house's curb, in the lobby none (said why), a player without a plot in
 --     the plaza's middle, RequestState through Main's queueState.
---   * 10.5 (only the sandbox is the game): Main boots the sandbox whatever Config.Sandbox.On says and requires none of
+--   * 10.6 (only the sandbox is the game): Main boots the sandbox whatever Config.Sandbox.On says and requires none of
 --     the old city's modules itself.
 --   * 8.0.1: Moving's hook parkVan is SandboxBoot.parkVan, set before Moving starts (a move's START parks the van the
 --     sandbox's way: at the vanSpot, not seated, repaired); a respawn on a move stands where Moving.respawnAt says (by
@@ -244,7 +244,7 @@ check("sandbox: the place's baseplate goes (the map has its own ground)", E.call
 for _, remote in { "Play", "RequestState" } do
 	check(`sandbox: the {remote} remote answered`, E.handlers[`Net.get({remote}).OnServerEvent`] ~= nil and #E.handlers[`Net.get({remote}).OnServerEvent`] == 1)
 end
-check("sandbox: no Aiming listener (no weapons), 10.5 no SpawnCar (nobody calls a car)", E.handlers["Net.get(Aiming).OnServerEvent"] == nil
+check("sandbox: no Aiming listener (no weapons), 10.6 no SpawnCar (nobody calls a car)", E.handlers["Net.get(Aiming).OnServerEvent"] == nil
 	and E.handlers["Net.get(SpawnCar).OnServerEvent"] == nil)
 check("sandbox: it says it runs", contains(E.printed, "SANDBOX is running"))
 check("sandbox: no warnings", #E.warnings == 0, table.concat(E.warnings, " | "))
@@ -340,21 +340,21 @@ check("missing modules: none of them run", #early == 0, table.concat(early, ", "
 check("missing modules: the rest still starts (Moving last)", started.PlayerData ~= nil and started.Zombies ~= nil and started.Moving ~= nil and started.SandboxPlots ~= nil)
 check("missing map: the place's baseplate stays (something to stand on)", not E.called("Baseplate.Destroy"))
 
--- ── 10.5: no city any more ─────────────────────────────────────────────────
+-- ── 10.6: no city any more ─────────────────────────────────────────────────
 Config.Sandbox.On = false
 E.reset()
 E.fakes.SandboxBoot = loadBoot()
 main()
 started = E.started()
-check("10.5: Main boots the sandbox whatever Config.Sandbox.On says", started.SandboxWorld ~= nil and started.PlayerData ~= nil and started.Moving ~= nil)
+check("10.6: Main boots the sandbox whatever Config.Sandbox.On says", started.SandboxWorld ~= nil and started.PlayerData ~= nil and started.Moving ~= nil)
 local requiredCity = {}
 for _, name in NEVER do
 	if E.modules[name] ~= nil then
 		table.insert(requiredCity, name)
 	end
 end
-check("10.5: Main requires none of the old city's modules (no World, Jobs, Gun, Shops …)", #requiredCity == 0, table.concat(requiredCity, ", "))
-check("10.5: no world build, no Alps", E.find("World.build") == nil and E.find("MapStyle.publish") == nil and #E.deferred == 0)
+check("10.6: Main requires none of the old city's modules (no World, Jobs, Gun, Shops …)", #requiredCity == 0, table.concat(requiredCity, ", "))
+check("10.6: no world build, no Alps", E.find("World.build") == nil and E.find("MapStyle.publish") == nil and #E.deferred == 0)
 Config.Sandbox.On = true
 
 if failures == 0 then

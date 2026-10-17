@@ -6,7 +6,7 @@
 --     them who can ("Sol carries the Sofa with Danny: only they can set it down."); the carrier's own sets it down as
 --     ever. A piece in his arms alone: anybody's, the rest of the crew told who asked ("Bob had Danny set the Lamp
 --     down: off his list.")
--- (10.5: nobody drives the van in a run, so he never rides in it: no GET OUT.)
+-- (10.6: nobody drives the van in a run, so he never rides in it: no GET OUT.)
 -- (Each fix taken back on its own, its checks here fail.)
 local E = require("./MovingRuntime")
 local Moving = require("./MovingServer")
@@ -31,7 +31,7 @@ local M = E.Mock
 local V3 = M.Vector3.new
 local workspace = M.workspace
 
-local HOUSE = "lone_house" -- (10.5: a run on the lone house, the van at its curb)
+local HOUSE = "lone_house" -- (10.6: a run on the lone house, the van at its curb)
 local _, _, outside = E.doorOf(SandboxMap.house(HOUSE))
 local lobby = V3(SandboxMap.Lobby.spawn.x, 3, SandboxMap.Lobby.spawn.z)
 E.Zombies.findSpot = function(center: any): any

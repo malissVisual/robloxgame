@@ -7,7 +7,7 @@
 --     refused, told who waits, nothing lifted, the owner's call still on
 --   * the lift check Danny's arrival opens, never answered: closed without a knock ("waits at the other end"), the call
 --     still ready; the next Lift opens a new check, and that one, a press's, unanswered is a miss as ever (a knock)
---   (10.5: nobody drives the van in a run, so he never rides in it: no seats of his)
+--   (10.6: nobody drives the van in a run, so he never rides in it: no seats of his)
 --   * the move's end with the crew inside: the interior goes only after the trip out (FadeOut + Margin + Stream + 0.5 s
 --     at least: the floor never vanishes under somebody still in the dark)
 -- (Each fix taken back on its own, its checks here fail.)
@@ -35,7 +35,7 @@ local M = E.Mock
 local V3 = M.Vector3.new
 local workspace = M.workspace
 
-local HOUSE = "lone_house" -- (10.5: a run on the lone house, the van at its curb)
+local HOUSE = "lone_house" -- (10.6: a run on the lone house, the van at its curb)
 local door, facing, outside = E.doorOf(SandboxMap.house(HOUSE))
 local lobby = V3(SandboxMap.Lobby.spawn.x, 3, SandboxMap.Lobby.spawn.z)
 E.Zombies.findSpot = function(center: any): any

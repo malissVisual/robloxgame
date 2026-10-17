@@ -1,4 +1,4 @@
--- 7.0 prototype, MOVES (10.5: every move a run): the real server/Moving.luau run in the Luau CLI (tests/run_tests.py
+-- 7.0 prototype, MOVES (10.6: every move a run): the real server/Moving.luau run in the Luau CLI (tests/run_tests.py
 -- builds MovingServer.luau with tests/runtime/MovingRuntime.luau's fakes in place of its server modules; the art is a
 -- fake shaped like the art branch's FurnitureLooks / HouseLayout / HouseInterior). A whole run of a crew: its start
 -- (the van at the house's curb, the interior), the crew, the door in and out with its fades, picking up, dragging and

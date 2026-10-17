@@ -1,7 +1,7 @@
 -- The ZDC dispatch kiosk (shared/MoveSiteLooks.luau, Config.MoveSites; server/MoveSites.luau builds it in the lobby,
 -- server/LobbyWorld.luau at SandboxMap.Lobby.dispatch): sound pieces, the part and light budget, the corkboard solid
 -- at a hand's height with the countryside's places to empty on it, nothing solid in front of it; its words the
--- sandbox's (nothing of the city's story: no Marge, no Walt, no Wall, no evacuation). 10.5: the city's moving world
+-- sandbox's (nothing of the city's story: no Marge, no Walt, no Wall, no evacuation). 10.6: the city's moving world
 -- (the Wall's checkpoint, the depot's kiosk and banner, the houses' moving-day dress, the evacuation spots, Walt's farm)
 -- went with the city. In the standalone Luau CLI.
 -- Run: python3 tests/run_tests.py [path to the luau binary]

@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "10.3"
+Config.Version = "10.5"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -6546,7 +6546,7 @@ Config.Moving = {
 			hordeAt = 3.5 * 60,
 			pay = 1.25,
 		},
-	} :: { { id: string, name: string, client: string, icon: string, home: string?, place: string?, seed: number, kind: string, blurb: string, time: number?, hordeAt: number?, pay: number?, difficulty: string? } },
+	} :: { { id: string, name: string, client: string, icon: string, home: string?, place: string?, seed: number, kind: string, blurb: string, time: number?, hordeAt: number?, pay: number?, difficulty: string?, round: boolean? } },
 	Sites = {
 		farm = {
 			House = { At = { 45, -84 } :: { number }, Size = { 26, 10, 16 } :: { number } },
@@ -7707,11 +7707,11 @@ Config.Runs = {
 	Danger = {
 		easy = { Locks = 1, Vault = 0, Legendary = 0, Creak = 2, Puddle = 1, Plaster = 0, Harm = 1, Inside = 0, Yard = 0, Wave = 0, Speed = 1, Boss = false, Weapon = false, Kinds = {} },
 		normal = { Locks = 1, Vault = 1, Legendary = 0, Creak = 2, Puddle = 2, Plaster = 1, Harm = 1.15, Inside = 0, Yard = 0, Wave = 0, Speed = 1, Boss = false, Weapon = false, Kinds = {} },
-		hard = { Locks = 2, Vault = 1, Legendary = 0, Creak = 3, Puddle = 2, Plaster = 2, Harm = 1.3, Inside = 3, Yard = 3, Wave = 0, Speed = 1, Boss = false, Weapon = true, Kinds = { walker = 1 } },
-		insane = { Locks = 2, Vault = 2, Legendary = 0, Creak = 3, Puddle = 3, Plaster = 3, Harm = 1.45, Inside = 5, Yard = 4, Wave = 8, Speed = 1.2, Boss = false, Weapon = true,
-			Kinds = { walker = 0.65, runner = 0.25, bloater = 0.1 } },
-		nightmare = { Locks = 2, Vault = 2, Legendary = 0.35, Creak = 4, Puddle = 3, Plaster = 4, Harm = 1.6, Inside = 7, Yard = 6, Wave = 12, Speed = 1.3, Boss = true, Weapon = true,
-			Kinds = { walker = 0.5, runner = 0.25, brute = 0.15, bloater = 0.1 } },
+		-- (10.5 the owner: "zombies I don't want in the game at all": none at any difficulty, no bat, no boss; the zombies'
+		-- code stays: tests/danger_runtime_test.luau turns them on for itself)
+		hard = { Locks = 2, Vault = 1, Legendary = 0, Creak = 3, Puddle = 2, Plaster = 2, Harm = 1.3, Inside = 0, Yard = 0, Wave = 0, Speed = 1, Boss = false, Weapon = false, Kinds = {} },
+		insane = { Locks = 2, Vault = 2, Legendary = 0, Creak = 3, Puddle = 3, Plaster = 3, Harm = 1.45, Inside = 0, Yard = 0, Wave = 0, Speed = 1, Boss = false, Weapon = false, Kinds = {} },
+		nightmare = { Locks = 2, Vault = 2, Legendary = 0.35, Creak = 4, Puddle = 3, Plaster = 4, Harm = 1.6, Inside = 0, Yard = 0, Wave = 0, Speed = 1, Boss = false, Weapon = false, Kinds = {} },
 	} :: { [string]: RunDanger },
 	Locks = { Hold = 0.5, Reach = 8, Lift = 1, Swing = 0.7, Open = 100, Leaf = { 104, 70, 44 } :: { number }, Iron = { 58, 58, 64 } :: { number }, Brass = { 214, 170, 70 } :: { number } },
 	Search = {
@@ -7756,6 +7756,39 @@ Config.Runs = {
 	},
 	Weapon = { Kind = "bat", Name = "Bat" },
 	DangerHud = { Width = 360, Event = 4, Banner = 3.2, Every = 0.2, Hint = 10, TouchScale = 0.8 },
+}
+
+-- 10.5 ROUNDS (the owner: "16 people on one server … a round starts at one place, everybody runs there, everyone has
+-- their own car, what you carry off to it quickly is yours … not teams"): the lobby's portals give way to one round for
+-- the whole server at a time (server/Runs.luau's round loop, its rules shared/RoundRules.luau, the client
+-- client/RoundUi.luau). A countdown in the lobby (the next place named), then everybody in the game rides there, every
+-- player's own van parked at its curb; whatever you carry to YOUR van and load is yours at once (into your warehouse's
+-- stock); the clock ends it, the results card ranks everybody, the ride back, the next countdown.
+--   On            the rounds (false: the portals' runs as before 10.5)
+--   Wait          s of the countdown in the lobby (it runs while somebody is in the game: pressed PLAY)
+--   Seconds       a round's clock
+--   Difficulties  a round's difficulty, one at random (its locks, vault and floor hazards: Config.Runs.Danger; its loot:
+--                 Config.Loot); never a zombie since 10.5
+--   Park          the vans at the place: Across studs apart side by side (a Sprinter with its mirrors is Width wide,
+--                 Length long), the rows Along apart behind the curb's (the way its nose looks), Cols × Rows spots
+--                 looked at, Margin off the zone's edge; Height the box over each spot looked through for anything solid
+--                 in the way (a tree, a fence: the spot is skipped)
+--   Reach         the Load prompt at your van's back (only you see it)
+--   Spread        where the players land: PerRow abreast Apart apart, each row Back nearer the door
+--   Results       s the results card shows before the ride back
+--   Top           the HUD's live table: its first Top rows (yours under them when you are further down)
+--   Every         s between the loop's looks
+Config.Rounds = {
+	On = true,
+	Wait = 45,
+	Seconds = 300,
+	Difficulties = { "normal", "hard", "insane" } :: { string },
+	Park = { Across = 13, Along = 28, Cols = 17, Rows = 5, Margin = 10, Width = 9.6, Length = 22, Height = 8 },
+	Reach = 10,
+	Spread = { PerRow = 8, Apart = 3.5, Back = 3 },
+	Results = 8,
+	Top = 5,
+	Every = 0.25,
 }
 
 -- 9.x LOOT (the owner: "like Dungeon Quest: you go into a house and you get loot there ... outlines with their own colour

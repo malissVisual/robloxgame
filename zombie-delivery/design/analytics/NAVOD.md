@@ -7,8 +7,8 @@ grafy na tvé stránce pro tvůrce.
 Nic z toho nemusíš zapínat. Stačí hru zveřejnit a hrát. Celou analytiku vypneš v `src/shared/Config.luau`:
 `Config.Analytics.Enabled = false`.
 
-(10.5: popis starého města, jeho cesty nového hráče, zakázek, misí a jeho peněz je pryč i s městem; zůstává
-v historii Gitu do verze 10.4. Když vybíráš období grafu, začni až dnem, kdy jsi zveřejnil sandbox (8.2 nebo novější):
+(10.6: popis starého města, jeho cesty nového hráče, zakázek, misí a jeho peněz je pryč i s městem; zůstává
+v historii Gitu do verze 10.5. Když vybíráš období grafu, začni až dnem, kdy jsi zveřejnil sandbox (8.2 nebo novější):
 kroky 3 až 10 dřív znamenaly něco jiného.)
 
 ## Kde to najdeš
@@ -127,4 +127,4 @@ jako nový hráč), číslo **custom** po každé události. Na konci řádku je
 - Řádek **Analytics** z admin panelu (P) na živém serveru.
 - Řádky z **Output**, které začínají `[Analytics]` (i varování kolem nich).
 - Z **Error Reportu**: jméno skriptu, celé hlášení chyby a kolikrát se stala.
-- **Verzi hry** (je v Output, např. `[Server] … 10.5 is running`) a jestli se to stalo ve Studiu, nebo na zveřejněné hře.
+- **Verzi hry** (je v Output, např. `[Server] … 10.6 is running`) a jestli se to stalo ve Studiu, nebo na zveřejněné hře.

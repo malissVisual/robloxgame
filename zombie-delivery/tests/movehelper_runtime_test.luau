@@ -25,7 +25,7 @@
 -- player lifts it with him through the grip's lift check; stuck (9.3: a new way, his ways out walked, a fade only at
 -- the end); his body taken away while he
 -- carries; 10.1 once with a move he stays when the crew grows and shrinks (nothing to end: no hire).
--- 10.5 (only the sandbox is the game): every move a run (E.startRun: the van parked at the house's curb, Moving.startRun);
+-- 10.6 (only the sandbox is the game): every move a run (E.startRun: the van parked at the house's curb, Moving.startRun);
 -- nobody drives the van any more (a run's seats are shut: server/Runs.luau), so he never rides in it.
 local E = require("./MovingRuntime")
 local Moving = require("./MovingServer")
@@ -54,7 +54,7 @@ local M = E.Mock
 local V3 = M.Vector3.new
 local workspace = M.workspace
 
-local HOUSE = "lone_house" -- (10.5: a run on the lone house, the van at its curb)
+local HOUSE = "lone_house" -- (10.6: a run on the lone house, the van at its curb)
 local door, facing, outside = E.doorOf(SandboxMap.house(HOUSE))
 local lobby = V3(SandboxMap.Lobby.spawn.x, 3, SandboxMap.Lobby.spawn.z)
 E.Zombies.findSpot = function(center: any): any
@@ -454,7 +454,7 @@ do
 			mine += 1
 		end
 	end
-	-- (10.5: client/Hud.luau shows its "Put it down" pill only for a piece carried alone: none while CarryPair is set)
+	-- (10.6: client/Hud.luau shows its "Put it down" pill only for a piece carried alone: none while CarryPair is set)
 	check("9.0 one put-down on her screen: the Sofa's own \"Put down\" (G) for her, no \"G PUT IT DOWN\" pill (CarryPair)", mine == 1 and character:GetAttribute("CarryPair") == true,
 		`{mine} prompts, CarryPair {character:GetAttribute("CarryPair")}`)
 end

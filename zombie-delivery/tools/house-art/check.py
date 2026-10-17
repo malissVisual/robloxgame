@@ -4,7 +4,7 @@
 Simulates the Roblox import of design/blender-house/roblox/ZDCHouseArt.fbx from its manifest (ZDCHouseArt.json: every
 piece's box and every detail's, in the house's space, written by house.py): the importer turns the model a quarter
 round, makes it 3 times bigger and moves it; HouseMesh must find the markers, undo that and dress the house.
-(10.5: Marge's city house, built as World's buildHouse built it, went with the city; house.py TARGET "sandbox" only.)
+(10.6: Marge's city house, built as World's buildHouse built it, went with the city; house.py TARGET "sandbox" only.)
 8.1 SANDBOX: the sandbox's one house too, built by the real server/SandboxWorld.luau (the whole test world, on
 tools/perf/world-mock.luau) with the same import in the Workspace. Checks:
   - shared/SandboxMap.luau's House box is house.py's; without the import the chalet as it is (nothing hidden, no mesh);
@@ -235,7 +235,7 @@ def main():
     luau = str(Path(sys.argv[1]).resolve())
     manifest = json.loads((Path(sys.argv[2]) if len(sys.argv) > 2 else MANIFEST).read_text())  # (another export: its JSON)
     target = manifest.get("target", "city")
-    assert target == "sandbox", f"house.py TARGET {target!r}: only the sandbox's house is left (10.5: Marge's went with the city)"
+    assert target == "sandbox", f"house.py TARGET {target!r}: only the sandbox's house is left (10.6: Marge's went with the city)"
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
         stage(tmp, manifest)

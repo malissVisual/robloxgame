@@ -82,7 +82,7 @@ MoveHelper.useMover({
 	end,
 })
 
-local HOUSE = "lone_house" -- (10.5: a run on the lone house, a family house's plan; the van at its curb)
+local HOUSE = "lone_house" -- (10.6: a run on the lone house, a family house's plan; the van at its curb)
 local door, facing, outside = E.doorOf(SandboxMap.house(HOUSE))
 E.Zombies.findSpot = function(center: any): any
 	return center + V3(900, 0, 0) -- (the roamers far off)
