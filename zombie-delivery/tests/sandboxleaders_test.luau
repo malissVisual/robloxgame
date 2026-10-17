@@ -1,8 +1,8 @@
 -- 8.2 SANDBOX, showing off: shared/SandboxLeadersRules.luau (the money's short words, $ a minute to a tenth, the
 -- legendaries counted, the ranking and its ties, a row's words, the board's columns) and where the TOP MOVERS board
--- stands: at the crossroads' south-east corner, its face to the crossroads, its whole footprint on flat meadow clear of
--- the roads and their shoulders, the turnaround, the plots, the vans' ways, the house's lot and path, the signpost, the
--- lamps and 8.9 the village's trees (SandboxMap, SandboxScenery and VillageScenery's numbers), and clear of everything the real
+-- stands: 9.7 in the lobby (SandboxMap.Lobby.shops.leaders) by the plaza's west edge, its face to the spawn, its whole
+-- footprint on flat meadow inside the lobby's hedge, clear of the plots, the portals and their pads, the dispatch, the
+-- lobby's lamps and trees (SandboxMap and SandboxScenery's numbers), and clear of everything the real
 -- server/SandboxWorld.luau builds there (SandboxWorldServer.luau on tools/perf/world-mock.luau: only meadow under it).
 -- The board's own parts inside that footprint: tests/sandboxleaders_runtime_test.luau. Run with tests/run_tests.py.
 local Config = require("./Config")
@@ -169,8 +169,6 @@ end
 -- ── Where the board stands ─────────────────────────────────────────────────
 
 local spot = Rules.spot()
-local MAIN, DEPOT = SandboxMap.Roads[1], SandboxMap.Roads[2]
-local RUN = SandboxScenery.Run
 local C = SandboxScenery.Clear
 local corners = Rules.corners(spot)
 local foot = Rules.footprint()
@@ -193,14 +191,15 @@ local function samples(by: number): { { number } }
 end
 
 do
-	check("the spot: the crossroads' south-east corner (east of Pražská, south of Depot Row)", spot.x > MAIN.x1 and spot.z > DEPOT.z1 and spot.x < MAIN.x1 + 60 and spot.z < DEPOT.z1 + 60, `{spot.x}, {spot.z}`)
-	local sign = SandboxScenery.Signpost
-	check("near the signpost (across Pražská from it)", (spot.x - sign.x) ^ 2 + (spot.z - sign.z) ^ 2 < 90 ^ 2 and sign.x < MAIN.x0 and spot.x > MAIN.x1)
+	local own = SandboxMap.Lobby.shops.leaders.spot
+	local plaza = SandboxMap.Lobby.plaza
+	check("9.7: the spot: the lobby's (SandboxMap.Lobby.shops.leaders), just west of its plaza", spot.x == own.x and spot.z == own.z and spot.yaw == own.yaw
+		and SandboxMap.inLobby(spot.x, spot.z) and spot.x < plaza.x0 and plaza.x0 - spot.x < 60 and spot.z > plaza.z0 and spot.z < plaza.z1, `{spot.x}, {spot.z}`)
 	local lx, lz = Rules.look(spot)
-	local cx, cz = (MAIN.x0 + MAIN.x1) / 2, (DEPOT.z0 + DEPOT.z1) / 2
+	local cx, cz = SandboxMap.Lobby.spawn.x, SandboxMap.Lobby.spawn.z
 	local tx, tz = cx - spot.x, cz - spot.z
 	local cos = (lx * tx + lz * tz) / math.sqrt(tx * tx + tz * tz)
-	check("its face looks at the crossroads (within 20°)", cos > math.cos(math.rad(20)), cos)
+	check("its face looks across the plaza at the spawn (within 20°)", cos > math.cos(math.rad(20)), cos)
 	check("the footprint: the roof's (the panel and Over each side, Run each way)", foot.width == Config.SandboxLeaders.Board.Width + 2 * Config.SandboxLeaders.Board.Roof.Over and foot.depth == 2 * Config.SandboxLeaders.Board.Roof.Run)
 	local d01 = math.sqrt((corners[1].x - corners[2].x) ^ 2 + (corners[1].z - corners[2].z) ^ 2)
 	local d12 = math.sqrt((corners[2].x - corners[3].x) ^ 2 + (corners[2].z - corners[3].z) ^ 2)
@@ -212,64 +211,48 @@ do
 end
 
 do
-	local B = SandboxMap.Bounds
-	local inset = C.Edge
+	local L = SandboxMap.Lobby
 	local why: string? = nil
-	local trees = VillageScenery.trees()
-	local lamps = SandboxScenery.lamps()
-	local sign = SandboxScenery.Signpost
-	local margin = 3 -- studs past the shoulders, the lamps, the trees: room to walk round the board
+	local margin = 3 -- studs past the lamps, the trees: room to walk round the board
+	local keep: { { name: string, rect: any, by: number } } = {}
+	for _, plot in SandboxMap.Plots do
+		table.insert(keep, { name = `plot {plot.id}`, rect = plot.rect, by = C.Plot })
+	end
+	for _, portal in L.portals do
+		table.insert(keep, { name = `{portal.house}'s portal`, rect = portal.foot, by = margin })
+		table.insert(keep, { name = `{portal.house}'s pad`, rect = portal.pad, by = margin })
+	end
+	local d = L.dispatch
+	table.insert(keep, { name = "the dispatch", rect = { x0 = d.x - 4, x1 = d.x + 4, z0 = d.z - 3, z1 = d.z + 3 }, by = margin })
+	table.insert(keep, { name = "the paint shop", rect = L.shops.paint.rect, by = margin })
+	table.insert(keep, { name = "the Auction House", rect = L.shops.auction.rect, by = margin })
+	table.insert(keep, { name = "the plaza", rect = L.plaza, by = 0 })
 	for _, p in samples(0) do
 		local x, z = p[1], p[2]
-		if x < B.x0 + inset or x > B.x1 - inset or z < B.z0 + inset or z > B.z1 - inset then
-			why = "at the map's edge"
+		local b = L.bounds
+		if x < b.x0 + L.hedge + C.Edge or x > b.x1 - L.hedge - C.Edge or z < b.z0 + L.hedge + C.Edge or z > b.z1 - L.hedge - C.Edge then
+			why = "on the lobby's hedge"
 		end
-		for _, road in SandboxMap.Roads do
-			if SandboxScenery.rectDistance(road :: any, x, z) < RUN + margin then
-				why = `on {road.name} or its shoulder at {x}, {z}`
+		for _, k in keep do
+			if SandboxScenery.rectDistance(k.rect, x, z) < k.by then
+				why = `on {k.name} at {x}, {z}`
 			end
 		end
-		if SandboxScenery.circleOut(x, z) < RUN + margin then
-			why = "on the turnaround"
-		end
-		for _, plot in SandboxMap.Plots do
-			if SandboxScenery.rectDistance(plot.rect, x, z) < C.Plot then
-				why = `on plot {plot.id}`
+		for _, l in L.lamps do
+			if math.sqrt((x - l.x) ^ 2 + (z - l.z) ^ 2) < margin then
+				why = `on the lamp at {l.x}, {l.z}`
 			end
 		end
-		for n, way in SandboxScenery.vanPaths() do
-			if SandboxScenery.rectDistance(way, x, z) < C.Plot then
-				why = `on van way {n}`
-			end
-		end
-		if SandboxScenery.rectDistance(SandboxMap.House.lot, x, z) < C.Lot or SandboxScenery.rectDistance(SandboxScenery.Path, x, z) < C.Lot then
-			why = "on the house's lot or path"
-		end
-		if math.sqrt((x - sign.x) ^ 2 + (z - sign.z) ^ 2) < C.Sign + margin then
-			why = "on the signpost"
-		end
-		for _, l in lamps do
-			-- the pole and its arm out over the road (4.4 long)
-			for t = 0, 4.4, 0.4 do
-				if math.sqrt((x - (l.x + l.rx * t)) ^ 2 + (z - (l.z + l.rz * t)) ^ 2) < margin then
-					why = `on the lamp at {l.x}, {l.z}`
-				end
-			end
-		end
-		for _, t in trees do
-			if math.sqrt((x - t.x) ^ 2 + (z - t.z) ^ 2) < t.radius + margin then
-				why = `under the tree at {math.floor(t.x)}, {math.floor(t.z)}`
+		for _, t in L.trees do
+			if math.sqrt((x - t.x) ^ 2 + (z - t.z) ^ 2) < 6 + margin then
+				why = `under the tree at {t.x}, {t.z}`
 			end
 		end
 		if math.abs(SandboxScenery.groundAt(x, z) - SandboxMap.GroundTop) > 1e-9 then
 			why = `on a mound at {x}, {z}`
 		end
-		local rule = SandboxScenery.treeRule(x, z, 0) -- (where not even a tree may stand: the roads' 12 studs and all)
-		if rule or SandboxMap.plotAt(x, z) then
-			why = `where SandboxScenery says no ({rule or "a plot"}) at {x}, {z}`
-		end
 	end
-	check("the board's footprint: inside the map's edge, clear of the roads and their shoulders, the turnaround, the plots, the vans' ways, the house, the signpost, the lamps and 8.9 the village's trees, on flat meadow", why == nil, why)
+	check("the board's footprint: inside the lobby's hedge, clear of the plots, the portals and their pads, the dispatch, the paint shop, the Auction House, the plaza, the lamps and the trees, on flat meadow", why == nil, why)
 	check("…and it stands on the meadow's top", spot.y == SandboxMap.GroundTop)
 end
 

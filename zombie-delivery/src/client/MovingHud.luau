@@ -47,6 +47,11 @@
 -- before): the state's `drop` ("your warehouse": the drop-off's words in the panel, the list, the GPS, a delivered
 -- thing is HOME); the card's `story` false (no intro, no CHAPTERS) and `note` (no pay per piece), a horde at 0:00 none;
 -- the result's `home` (what came home: the pieces, their value; no pay lines).
+-- 9.7 runs (the state's `run`: server/Moving.luau's SB.runView; client/RunUi.luau has the pad panel and the results
+-- card): no trips and no driving: the panel's line is "IN THE TRUCK n/total · ★ · the difficulty", its next step says to
+-- load the truck and FINISH at it (or beat the clock); the host's FINISH is always there, the others' is VOTE FINISH
+-- (the Runs remote's "vote"), the list's footer LEAVE THE RUN for them (the Runs remote's "leave", asked twice); a
+-- run's own results card is RunUi's (the Moving remote's "result" carries none for a run).
 -- 8.3 keys (the sandbox; shared/SandboxPad.luau, client/PadGlyph.luau): the panel's words name the keys of the device
 -- used now, a gamepad used last first: what to do next ("Pick up the things (E)", "(X)" with a gamepad, no key on a
 -- touch screen: the prompt is tapped) and the list's hint ("LIST [O]", "TAP: LIST" on a touch screen, none with a
@@ -354,7 +359,12 @@ local function buildPanel(root: ScreenGui)
 		onClick = function()
 			if os.clock() - finishAt <= GIVE_UP_SURE then
 				finishAt = 0
-				remote:FireServer("finish")
+				local run = if type(state) == "table" and type(state.run) == "table" then state.run else nil
+				if run and run.mine ~= true then
+					Net.get("Runs"):FireServer({ kind = "vote" }) -- 9.7 runs: a party member's vote to finish
+				else
+					remote:FireServer("finish")
+				end
 				return
 			end
 			finishAt = os.clock()
@@ -390,6 +400,16 @@ local function nextStep(s: any): string
 	local out, total = tonumber(counts.out) or 0, tonumber(counts.total) or 0
 	local carried = tonumber(counts.carried) or 0
 	local delivered = tonumber(counts.delivered) or 0
+	if type(s.run) == "table" then -- 9.7 runs: the truck at the door, no driving
+		if s.inside == true then
+			return if carried > 0 then "Carry it out: walk out through a door" else `{keyed("Pick up the loot")} · ★ first`
+		elseif carried > 0 then
+			return if s.backOpen == true then keyed("Load it into the truck") else `{keyed("Open the truck's back")}, then Load`
+		elseif out > 0 and out >= total then
+			return "Everything is in the truck: FINISH at the truck"
+		end
+		return if out > 0 then "Load more, or FINISH at the truck before the clock runs out" else `Walk in through {s.name}'s door`
+	end
 	if s.truck ~= true then -- (7.x van moves: the van lost)
 		local wait = math.ceil((tonumber(s.vanAgainAt) or 0) - workspace:GetServerTimeNow())
 		return if wait > 0 then `💥 The van is lost · CAR brings it back in {wait} s` else "💥 The van is lost · CAR brings it back now"
@@ -454,8 +474,11 @@ refreshPanel = function()
 	refs.timer.TextColor3 = if left <= 60 then K.red elseif s.horde == true then K.warn else K.text
 	local broken = tonumber(counts.broken) or 0
 	local delivered = tonumber(counts.delivered) or 0
-	-- 7.x van moves: the trip under way and what reached the Wall over every trip
-	refs.check.Text = `TRIP {(tonumber(s.trips) or 0) + 1} · delivered {delivered}/{counts.total or 0} · ★ {counts.starsDelivered or 0}/{counts.stars or 0}{if broken > 0 then ` · 💥 {broken}` else ""}{if s.horde ~= true and hordeIn > 0 then ` · 🧟 {clock(hordeIn)}` else ""}`
+	-- 7.x van moves: the trip under way and what reached the Wall over every trip (9.7 runs: what is in the truck)
+	local run = if type(s.run) == "table" then s.run else nil
+	refs.check.Text = if run
+		then `IN THE TRUCK {counts.out or 0}/{counts.total or 0} · ★ {counts.stars or 0} · {string.upper(tostring(run.name or ""))}{if broken > 0 then ` · 💥 {broken}` else ""}`
+		else `TRIP {(tonumber(s.trips) or 0) + 1} · delivered {delivered}/{counts.total or 0} · ★ {counts.starsDelivered or 0}/{counts.stars or 0}{if broken > 0 then ` · 💥 {broken}` else ""}{if s.horde ~= true and hordeIn > 0 then ` · 🧟 {clock(hordeIn)}` else ""}`
 	local fill = math.clamp(tonumber(s.fill) or 0, 0, 1)
 	refs.truckLabel.Text = `🚐 VAN {math.floor(fill * 100 + 0.5)}%`
 	refs.fill.Size = UDim2.fromScale(fill, 1)
@@ -468,10 +491,10 @@ refreshPanel = function()
 	end
 	local finish = refs.finish -- 7.x van moves: the owner's FINISH once something reached the Wall (asked twice)
 	if finish then
-		local can = s.mine == true and delivered > 0
+		local can = (s.mine == true and delivered > 0) or run ~= nil -- (9.7 runs: the host's FINISH, the others' vote)
 		local sure = os.clock() - finishAt <= GIVE_UP_SURE
 		finish.Visible = can
-		finish.Text = if sure then "TAP TO FINISH" else "✓ FINISH"
+		finish.Text = if sure then (if run and run.mine ~= true then "TAP TO VOTE" else "TAP TO FINISH") elseif run and run.mine ~= true then "✓ VOTE FINISH" else "✓ FINISH"
 		refs.role.Size = UDim2.new(1, if can then -140 else -24, 0, 16)
 	end
 	if refs.edge then
@@ -741,8 +764,10 @@ local function drawList()
 	Ui.closeButton(frame, function()
 		closeList()
 	end)
-	-- (a computer: GIVE UP under the rows; a touch sheet: at the end of what scrolls)
-	local footer = if s.mine == true and not sheet then 52 else 0
+	-- (a computer: GIVE UP under the rows; a touch sheet: at the end of what scrolls; 9.7 runs: LEAVE THE RUN for the
+	-- party but the host)
+	local leaving = type(s.run) == "table" and s.mine ~= true
+	local footer = if (s.mine == true or leaving) and not sheet then 52 else 0
 	local rows = Ui.make("ScrollingFrame", {
 		Name = "Rows",
 		Size = UDim2.new(1, -16, 1, -(58 + footer)),
@@ -777,7 +802,7 @@ local function drawList()
 	rows.CanvasPosition = keep
 	if s.mine == true then
 		if sheet then
-			if (tonumber(counts.delivered) or 0) > 0 then -- 7.x van moves: FINISH a finger's size on a phone (asked twice)
+			if (tonumber(counts.delivered) or 0) > 0 or type(s.run) == "table" then -- 7.x van moves: FINISH a finger's size on a phone (asked twice)
 				local row = Ui.make("Frame", { Name = "FinishRow", Size = UDim2.new(1, 0, 0, finger), BackgroundTransparency = 1, LayoutOrder = #ordered + 9 }, rows)
 				CardKit.bigButton(row, {
 					name = "FinishMove",
@@ -805,6 +830,30 @@ local function drawList()
 			local foot = Ui.make("Frame", { Name = "Footer", Size = UDim2.new(1, -24, 0, 40), Position = UDim2.new(0, 12, 1, -46), BackgroundTransparency = 1 }, frame)
 			giveUpButton(foot, 40)
 		end
+	elseif leaving then -- 9.7 runs: out of the run alone (asked twice)
+		local foot = if sheet
+			then Ui.make("Frame", { Name = "Footer", Size = UDim2.new(1, 0, 0, finger), BackgroundTransparency = 1, LayoutOrder = #ordered + 10 }, rows)
+			else Ui.make("Frame", { Name = "Footer", Size = UDim2.new(1, -24, 0, 40), Position = UDim2.new(0, 12, 1, -46), BackgroundTransparency = 1 }, frame)
+		CardKit.bigButton(foot, {
+			name = "LeaveRun",
+			text = "LEAVE THE RUN",
+			kind = "shut",
+			height = if sheet then finger else 40,
+			textSize = 14,
+			onClick = function()
+				if os.clock() - giveUpAt <= GIVE_UP_SURE then
+					giveUpAt = 0
+					Net.get("Runs"):FireServer({ kind = "leave" })
+					return
+				end
+				giveUpAt = os.clock()
+				local made: any = foot:FindFirstChild("LeaveRun")
+				if made then
+					made.Text = "TAP AGAIN TO LEAVE"
+					CardKit.paint(made, "primary")
+				end
+			end,
+		})
 	end
 end
 
@@ -1015,8 +1064,8 @@ end
 local HEAD: { [string]: string } = { done = "MOVE COMPLETE", late = "TIME'S UP", cancelled = "MOVE CALLED OFF", failed = "MOVE LOST" }
 
 local function showResult(r: any)
-	if type(r) ~= "table" then
-		return
+	if type(r) ~= "table" or r.run ~= nil then
+		return -- (9.7 runs: client/RunUi.luau's results card)
 	end
 	closeList()
 	local good = r.how == "done" or r.how == "late"

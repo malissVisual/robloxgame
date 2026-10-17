@@ -22,16 +22,23 @@
 --   CollectionBookRules.number(item)        its place in the book (1 … #Pieces), nil for anything else
 --   CollectionBookRules.rarityOf(item)      shared/CollectionRules.luau's: a collectible's own, else by its value
 --   CollectionBookRules.valueOf(item)       its catalogue value ($)
---   CollectionBookRules.record(book, item, condition, bought?)   one more of `item` came home: n + 1 (MaxCount at
---                                           most), best the better condition → true when it is new in the book (a piece
---                                           not in the book: nothing, false). 8.7 review: `bought` (a deal between
---                                           players): a page marked bought (n + 1 on one already bought), never a
---                                           discovery (false), nothing on a page found for real; a piece brought home
---                                           onto a bought page: found for real now (n 1, its condition; true)
+--   9.x loot (Config.Loot): a piece may come home rarer (or, from an Easy house, plainer) than its item's own rarity; a
+--   page keeps the rarest found (`top`, only when rarer than the item's own: nil reads as its own, as every page did
+--   before 9.x), so the book shows the same tier and value the stock showed for that piece:
+--   CollectionBookRules.pageRarity(item, found?)   the page's rarity: its `top`, else the item's own
+--   CollectionBookRules.pageValue(item, found?)    its value at that rarity (CollectionRules.valueOf)
+--   CollectionBookRules.record(book, item, condition, bought?, rarity?)   one more of `item` came home: n + 1
+--                                           (MaxCount at most), best the better condition → true when it is new in the
+--                                           book (a piece not in the book: nothing, false). 8.7 review: `bought` (a deal
+--                                           between players): a page marked bought (n + 1 on one already bought), never
+--                                           a discovery (false), nothing on a page found for real; a piece brought home
+--                                           onto a bought page: found for real now (n 1, its condition; true). 9.x loot:
+--                                           `rarity` the piece's (CollectionRules.pieceRarity): the page's `top` the
+--                                           rarer of the two (where the rest of the page changes)
 --   CollectionBookRules.isFound(book, item) 8.7 review: its page is there and not only bought
 --   CollectionBookRules.counts(book)        { found, total, furniture, furnitureTotal, collectibles, collectiblesTotal,
 --                                           legendary } (found: pieces of the book in it, the bought-only ones not;
---                                           legendary: legendary ones)
+--                                           legendary: legendary ones; 9.x loot: a page whose rarest found is Legendary)
 --   CollectionBookRules.Milestones          Config.CollectionBook.Milestones
 --   CollectionBookRules.Retired             8.4 review: Config.CollectionBook.Retired (a retired milestone's id → the one
 --                                           that took its place): kept as paid, never due, never in paidList
@@ -42,7 +49,7 @@
 --   CollectionBookRules.due(book, paid)     the milestones reached and not paid yet, in order (what the server pays)
 --   CollectionBookRules.fill(book)          the admin's FILL BOOK: every piece not found yet found once (best 1; 8.7
 --                                           review: a bought-only one too) → the pieces it added, in order
---   CollectionBookRules.view(book)          a copy for the remote ({ [item] = { n, best, bought? } }, best to the
+--   CollectionBookRules.view(book)          a copy for the remote ({ [item] = { n, best, bought?, top? } }, best to the
 --                                           thousandth)
 --   CollectionBookRules.paidList(paid)      the paid milestones' ids, in order (for the remote)
 --   The save (profile.collectionBook = { [item] = { n, best, bought? } }, profile.collectionBookPaid =
@@ -51,11 +58,14 @@
 --   CollectionBookRules.clean(raw)          a saved book checked, never trusted: only the book's pieces, n a whole
 --                                           number 1 … MaxCount (none: 1; under 1: not found), best 0 … 1; 8.7 review:
 --                                           bought kept only as true (an older server's clean drops it: the page reads
---                                           as found there, as it did before 8.7; a rollout's few minutes at most)
+--                                           as found there, as it did before 8.7; a rollout's few minutes at most); 9.x
+--                                           loot: top kept only as a tier rarer than the item's own (an older server's
+--                                           clean drops it: the page reads as its item's own rarity there)
 --   CollectionBookRules.cleanPaid(raw)      the known milestones' ids marked true, nothing else (a list of ids too); 8.4
 --                                           review: a retired one too (an older server paid it: never paid there again)
 --   CollectionBookRules.backfill(entries)   a book from a collection's pieces (shared/CollectionRules.luau Entry: item,
---                                           condition): each piece of the book in it counted, its best condition
+--                                           condition; 9.x rarity): each piece of the book in it counted, its best
+--                                           condition, its rarest rarity
 --   CollectionBookRules.fromSave(saved, collection)   the migration (server/PlayerData.luau applySaved) → book, paid:
 --                                           only a real save (money in it) has a book; written with the flag (Flag) its
 --                                           own, cleaned (the stock's pieces where it has no page: a bought page
@@ -70,7 +80,7 @@ local CollectionRules = require(script.Parent.CollectionRules)
 
 local CollectionBookRules = {}
 
-export type Found = { n: number, best: number, bought: boolean? } -- (8.7 review: bought, only ever bought from a player)
+export type Found = { n: number, best: number, bought: boolean?, top: string? } -- (8.7 review: bought, only ever bought from a player; 9.x loot: top, the rarest found when rarer than its own)
 export type Book = { [string]: Found }
 export type Paid = { [string]: boolean }
 export type Counts = {
@@ -149,33 +159,58 @@ function CollectionBookRules.valueOf(item: string): number
 	return CollectionRules.valueOf({ item = item })
 end
 
+-- 9.x loot: a tier's id rarer than the item's own and than `than` (a page's top so far), else nil.
+local function rarer(item: string, rarity: any, than: any?): string?
+	local tiers = Config.Collection.Tiers
+	if type(rarity) ~= "string" or tiers[rarity] == nil then
+		return nil
+	end
+	local floor = tiers[CollectionBookRules.rarityOf(item)].rank
+	if type(than) == "string" and tiers[than] ~= nil then
+		floor = math.max(floor, tiers[than].rank)
+	end
+	return if tiers[rarity].rank > floor then rarity else nil
+end
+
+function CollectionBookRules.pageRarity(item: string, found: Found?): string
+	local top = if found then found.top else nil
+	return rarer(item, top) or CollectionBookRules.rarityOf(item)
+end
+
+function CollectionBookRules.pageValue(item: string, found: Found?): number
+	return CollectionRules.valueOf({ item = item, rarity = CollectionBookRules.pageRarity(item, found) })
+end
+
 -- ── Found ──────────────────────────────────────────────────────────────────
 
 local function unit(condition: any): number
 	return if finite(condition) then math.clamp(condition, 0, 1) else 0
 end
 
-function CollectionBookRules.record(book: Book, item: any, condition: any, bought: boolean?): boolean
+function CollectionBookRules.record(book: Book, item: any, condition: any, bought: boolean?, rarity: any?): boolean
 	if not CollectionBookRules.inBook(item) then
 		return false
 	end
 	local best = unit(condition)
 	local found = book[item]
+	local top = rarer(item, rarity) -- (9.x loot: rarer than its own, else nil)
 	if bought == true then -- (8.7 review: a deal between players: shown, never found)
 		if not found then
-			book[item] = { n = 1, best = best, bought = true }
+			book[item] = { n = 1, best = best, bought = true, top = top }
 		elseif found.bought == true then
 			found.n = math.min(found.n + 1, tune().MaxCount)
 			found.best = math.max(found.best, best)
+			found.top = rarer(item, top, found.top) or found.top
 		end
 		return false
 	end
 	if found and found.bought ~= true then
 		found.n = math.min(found.n + 1, tune().MaxCount)
 		found.best = math.max(found.best, best)
+		found.top = rarer(item, top, found.top) or found.top
 		return false
 	end
-	book[item] = { n = 1, best = best } -- (new, or 8.7 review: found for real on a bought page)
+	book[item] = { n = 1, best = best, top = top } -- (new, or 8.7 review: found for real on a bought page)
 	return true
 end
 
@@ -202,7 +237,7 @@ function CollectionBookRules.counts(book: Book): Counts
 			else
 				out.furniture += 1
 			end
-			if CollectionBookRules.rarityOf(id) == "legendary" then
+			if CollectionBookRules.pageRarity(id, book[id]) == "legendary" then -- (9.x loot: its rarest found)
 				out.legendary += 1
 			end
 		end
@@ -276,7 +311,7 @@ function CollectionBookRules.view(book: Book): Book
 	for _, id in pieces do
 		local found = book[id]
 		if found then
-			out[id] = { n = found.n, best = math.floor(found.best * 1000 + 0.5) / 1000, bought = if found.bought == true then true else nil }
+			out[id] = { n = found.n, best = math.floor(found.best * 1000 + 0.5) / 1000, bought = if found.bought == true then true else nil, top = rarer(id, found.top) }
 		end
 	end
 	return out
@@ -308,7 +343,7 @@ function CollectionBookRules.clean(raw: any): Book
 		if type(found) == "table" then
 			local n = if finite(found.n) then math.floor(found.n) elseif found.n == nil then 1 else 0
 			if n >= 1 then
-				out[id] = { n = math.min(n, tune().MaxCount), best = unit(found.best), bought = if found.bought == true then true else nil }
+				out[id] = { n = math.min(n, tune().MaxCount), best = unit(found.best), bought = if found.bought == true then true else nil, top = rarer(id, found.top) }
 			end
 		end
 	end
@@ -349,8 +384,8 @@ function CollectionBookRules.backfill(entries: any): Book
 		return out
 	end
 	for _, entry in entries do
-		if type(entry) == "table" then
-			CollectionBookRules.record(out, entry.item, entry.condition)
+		if type(entry) == "table" and type(entry.item) == "string" then
+			CollectionBookRules.record(out, entry.item, entry.condition, nil, CollectionRules.pieceRarity(entry)) -- (9.x loot)
 		end
 	end
 	return out

@@ -33,7 +33,9 @@
 --     "halt"        the lone halt: the platform and its edge, a ramp up, a shelter with its bench, the MEADOW HALT sign,
 --                   a lamp
 --   The lines (SandboxMap.TreeLines' kinds that are not trees, CountryLooks.line): "hedge" (a low hedge along each
---   segment), "fence" (a post-and-rail fence: its posts Lines.Post apart at most, two rails)
+--   segment), "fence" (a post-and-rail fence: its posts Lines.Post apart at most, two rails), 9.7 "screen" (a run
+--   zone's screen hedge on its edge, Config.Runs.Zone.Screen: tall, dense and solid, one part a segment, its corners
+--   closed: out of sight of the other zones, nobody through it)
 --   The stream (SandboxMap.Streams, CountryLooks.stream): its bed (Bank wider each side) and its water along each
 --   segment, a hair higher every other one (no two tops on one plane where they meet)
 --   The far view (CountryLooks.farRails): the railway going on past the Bounds at the ends it meets them
@@ -58,7 +60,7 @@ local C = Config.Country
 local P = C.Palette
 
 CountryLooks.Landmarks = { "barn", "tractor", "bales", "paddock", "muckheap", "fishpond", "garden", "woodyard", "weir", "footbridge", "apiary", "railway", "halt" }
-CountryLooks.Lines = { "hedge", "fence" }
+CountryLooks.Lines = { "hedge", "fence", "screen" }
 
 -- A roof's numbers (as VillageLooks' houses): its overhang over the walls and the gables, its slabs' thickness.
 local EAVE, VERGE, SLAB = 0.9, 0.7, 0.45
@@ -503,6 +505,16 @@ function CountryLooks.line(kind: string, points: { { x: number, z: number } }, s
 			local k: Kit = { out = out, chunk = VillageLooks.chunkOf((a.x + b.x) / 2, (a.z + b.z) / 2) }
 			local tall = H.Height + (i % 2) * 0.15
 			put(k, "Hedge", { length + (if #points > 2 then H.Width else 0), tall, H.Width }, { (a.x + b.x) / 2, tall / 2, (a.z + b.z) / 2 }, P.Hedge, "LeafyGrass", { turn = heading(dx, dz) })
+		end
+	elseif kind == "screen" then -- 9.7: a run zone's screen hedge (Config.Runs.Zone.Screen)
+		local Sc = Config.Runs.Zone.Screen
+		for i = 1, #points - 1 do
+			local a, b = points[i], points[i + 1]
+			local dx, dz = b.x - a.x, b.z - a.z
+			local length = math.sqrt(dx * dx + dz * dz)
+			local k: Kit = { out = out, chunk = VillageLooks.chunkOf((a.x + b.x) / 2, (a.z + b.z) / 2) }
+			put(k, "ScreenHedge", { length + Sc.Width, Sc.Height, Sc.Width }, { (a.x + b.x) / 2, Sc.Height / 2, (a.z + b.z) / 2 }, Sc.Color, "LeafyGrass",
+				{ turn = heading(dx, dz), solid = true })
 		end
 	elseif kind == "fence" then
 		local seen: { [string]: boolean } = {}

@@ -17,11 +17,12 @@
 --                  and the woods' (a jittered grid, Config.Country.Woods), each where treeRule lets its crown stand:
 --                  else moved off its spot (Config.VillageWorld.Trees: Step studs at a time across its line, then
 --                  along it, at most Nudge), else left out
---   The lines      the hedges and fences of SandboxMap.TreeLines (CountryLooks.line)
---   The streams    SandboxMap.Streams (CountryLooks.stream: its bed and its water)
+--   The lines      the hedges and fences of SandboxMap.TreeLines (CountryLooks.line; 9.7 the run zones' screen hedges)
+--   The streams    SandboxMap.Streams (CountryLooks.stream: its bed and its water; 9.7 only the pieces a zone sees)
 --   The fields     SandboxMap.Fields, a tile each (VillageLooks.field: the ground in its crop's colour, its rows)
 --   The far view   VillageLooks.horizon round SandboxMap.Bounds but its far roofs and church tower (no village on the
---                  horizon either), the railway going on past them (CountryLooks.farRails)
+--                  horizon either), the railway going on past them (CountryLooks.farRails); 9.7: none while there are
+--                  run zones (SandboxMap.Zones: each ends at its screen hedge)
 --
 --   VillageScenery.houses(extra?)    { Placed }: the places to empty but the farmstead (rich): kind (the look drawn),
 --                                    box, yaw, seed, opts, ids, street (extra: their PlanHouses, enter()'s; the same)
@@ -36,7 +37,10 @@
 --                                    (a line, "orchard" or a wood's id)
 --   VillageScenery.treeRule(x, z, r) why a crown r wide may not stand there (nil: it may): SandboxScenery.treeRule's
 --                                    reasons, then "house", "landmark", "auction" (Keep studs off each), "stream" (its
---                                    crown off the water by Config.Country.Streams.Clear), "clearing" (in a wood's)
+--                                    crown off the water by Config.Country.Streams.Clear), "clearing" (in a wood's), 9.7
+--                                    "zone" (over a run zone's screen hedge), "view" (farther than Config.Runs.Zone.View
+--                                    from every zone: nobody would see it)
+--   VillageScenery.inView(x, z, grow)   9.7: within Config.Runs.Zone.View + grow studs of a run zone
 --   VillageScenery.lines()           the hedges' and fences' pieces on the map
 --   VillageScenery.streams()         the streams' pieces on the map
 --   VillageScenery.fields()          { FieldTile }: kind, rect, seed
@@ -198,7 +202,30 @@ function VillageScenery.treeRule(x: number, z: number, r: number): string?
 			end
 		end
 	end
+	-- 9.7: a crown never over a run zone's screen hedge (its edge), never beyond every zone's view (nobody sees it)
+	for _, zone in MAP.Zones do
+		local q = zone.rect
+		local inside = x > q.x0 and x < q.x1 and z > q.z0 and z < q.z1
+		local edge = if inside then math.min(x - q.x0, q.x1 - x, z - q.z0, q.z1 - z) else SandboxScenery.rectDistance(q, x, z)
+		if edge < r + Config.Runs.Zone.Screen.Width then
+			return "zone"
+		end
+	end
+	if not VillageScenery.inView(x, z, 0) then
+		return "view"
+	end
 	return nil
+end
+
+-- 9.7: is (x, z) within Config.Runs.Zone.View (+ `grow`) studs of a run zone (SandboxMap.Zones: somebody there may see it)?
+function VillageScenery.inView(x: number, z: number, grow: number): boolean
+	local view = Config.Runs.Zone.View + grow
+	for _, zone in MAP.Zones do
+		if SandboxScenery.rectDistance(zone.rect, x, z) <= view then
+			return true
+		end
+	end
+	return false
 end
 
 local TREE_LINES = { windbreak = true, alley = true } -- (the tree lines of trees; the rest, hedges and fences, are lines())
@@ -297,7 +324,11 @@ function VillageScenery.streams(): { VillageLooks.Piece }
 	local out: { VillageLooks.Piece } = {}
 	for n, s in MAP.Streams do
 		for _, p in CountryLooks.stream(s.points, s.width, n) do
-			table.insert(out, p)
+			-- (9.7: only where a run zone sees it: a piece's middle within the view, its half length more)
+			local half = math.max(p.size[1], p.size[3]) / 2
+			if VillageScenery.inView(p.at[1], p.at[3], half) then
+				table.insert(out, p)
+			end
 		end
 	end
 	return out
@@ -316,6 +347,9 @@ local VILLAGE_FAR = { FarHouse = true, FarRoof = true, FarChurch = true, FarSpir
 
 function VillageScenery.far(): { VillageLooks.Piece }
 	local out: { VillageLooks.Piece } = {}
+	if #MAP.Zones > 0 then
+		return out -- (9.7: no far view: every run zone ends at its screen hedge, the lobby at its own)
+	end
 	for _, p in VillageLooks.horizon(MAP.Bounds, 1) do
 		if not VILLAGE_FAR[p.name] then
 			table.insert(out, p)

@@ -226,6 +226,9 @@ export type Profile = {
 	-- 8.9: the house of that card (a SandboxMap.Houses id; the seed nil: the house emptied last), read only from a
 	-- real save written with its flag (sandboxHouseKept); an older real save with a seed: the farmstead's; nil: none yet
 	sandboxHouse: string?,
+	-- 9.7 RUNS: how many of the runs' difficulties are open (shared/RunRules.luau: Config.Runs.Open at first, one more
+	-- for a run finished at the hardest open one): read only from a real save written with its flag (runUnlockedKept)
+	runUnlocked: number,
 	deliveries: number,
 	kills: number,
 	earned: number,
@@ -347,6 +350,7 @@ local function newProfile(): Profile
 		vanPaint = VanPaintRules.empty(), -- 8.3: nothing bought, the factory's look
 		sandboxHouseSeed = nil, -- 8.4: no house rolled yet
 		sandboxHouse = nil, -- none of the six yet
+		runUnlocked = Config.Runs.Open, -- 9.7: Easy and Normal
 		deliveries = 0,
 		kills = 0,
 		earned = 0,
@@ -710,6 +714,9 @@ local function applySaved(profile: Profile, saved: any)
 	else
 		profile.sandboxHouse = if profile.sandboxHouseSeed ~= nil then require(Shared.SandboxMap).House.id else nil
 	end
+	-- 9.7 RUNS: the difficulties open, only from a real save written with its flag (runUnlockedKept: Config.Runs.Flag);
+	-- a save from before 9.7 (or a lock-only record) starts with Easy and Normal (RunRules.fromSave)
+	profile.runUnlocked = require(Shared.RunRules).fromSave(saved)
 	-- (6.4: the bag chosen was read here; 6.23: it is per game, never saved: a game starts with the best bag you have)
 	if saved.xpCurve ~= Config.Levels.Curve then
 		profile.xp = Levels.fromLegacy(profile.xp) -- 3.2: a 3.1 save, the old XP curve: it keeps its level
@@ -1139,6 +1146,8 @@ build = function(profile: Profile, lock: any): { [string]: any }
 		sandboxHouseSeedKept = true, -- 8.4 (applySaved reads the house's seed only with it)
 		sandboxHouse = profile.sandboxHouse, -- 8.9 (nil: none)
 		sandboxHouseKept = true, -- 8.9 (applySaved reads which house only with it)
+		runUnlocked = profile.runUnlocked, -- 9.7
+		runUnlockedKept = true, -- 9.7: Config.Runs.Flag (applySaved reads the difficulties open only with it)
 		deliveries = profile.deliveries,
 		kills = profile.kills,
 		earned = profile.earned,

@@ -9,18 +9,18 @@ Houses among it, is left as it is). Deterministic: the same plan, the same lines
 --check writes nothing and fails when the section is not what the plan gives (tests/run_tests.py runs it that way).
 
 What it writes:
-  Bounds      plan.bounds
-  Roads       Pražská and Depot Row first, as SandboxMap always had them (read by name and by number; Pražská from
-              Depot Row's north edge, z -74: the junction is Depot Row's asphalt), then the plan's lanes in its order
-              (a lane's rects share its name; yard = true for a spot's turning yard at its end); lane = true for a
-              road narrower than a main road and for a yard (its lane's)
+  Bounds      plan.bounds (9.7: round the run zones and the lobby, design/lobby/plan.json)
+  Roads       9.7 the yards only (no driving: the lanes, Pražská and Depot Row are gone): each spot's yard, where its
+              truck stands, named after the road its spot stood on (yard = true, lane = true)
   Landmarks   plan.landmarks: id, name, kind, rect, yaw (the way its front looks)
-  Fields      plan.fields (the plan keeps them off every road, spot, lot and landmark; none over another or a plot)
+  Fields      plan.fields (9.7: none; the plan keeps any off every yard, spot, lot and landmark, none over another)
   Lawns       plan.lawns: ground tiles of their own (kind, rect): the forest's floor
   TreeLines   plan.treeLines: windbreaks and fruit alleys (trees), hedges and fences
   Woods       plan.woods: a wood's rect (its trees on a jittered grid) and its clearings (no tree)
   Orchard     plan.orchard: the orchard's rect (its fruit trees in rows)
   Streams     plan.streams: a stream's water `width` wide along its middle line's points
+  Zones       9.7 plan.zones: each place's run zone by its spot's id: its rect (a screen hedge and invisible walls on its
+              edge) and where a run's party arrives (a Spot in its front yard, facing the door)
 """
 import argparse
 import json
@@ -33,10 +33,6 @@ GAME = os.path.dirname(os.path.dirname(HERE))
 PLAN = os.path.join(GAME, "design", "countryside", "plan.json")
 TARGET = os.path.join(GAME, "src", "shared", "SandboxMap.luau")
 BEGIN, END = "-- BEGIN COUNTRYSIDE", "-- END COUNTRYSIDE"
-
-FIXED_ORDER = ["Pražská", "Depot Row"]  # Roads[1], Roads[2], as they always were
-MAIN_WIDTH = 28  # a road this wide is a main road (Depot Row, Pražská); the narrower ones are lanes
-
 
 def num(v):
     if isinstance(v, float) and v.is_integer():
@@ -64,16 +60,10 @@ def section(plan):
     lines = [BEGIN + " (tools/countryside/sandboxmap.py writes these lines from design/countryside/plan.json: do not edit them)"]
     lines.append(f"SandboxMap.Bounds = {{ {rect_text(plan['bounds'])} }} :: Rect")
 
-    # the roads: Pražská and Depot Row first, then the lanes in the plan's order
-    roads = sorted([r for r in plan["roads"] if r["name"] in FIXED_ORDER], key=lambda r: FIXED_ORDER.index(r["name"]))
-    roads += [r for r in plan["roads"] if r["name"] not in FIXED_ORDER]
-    if [r["name"] for r in roads[:2]] != FIXED_ORDER:
-        raise SystemExit("sandboxmap: the plan has no Pražská or no Depot Row")
+    # the yards (9.7: the roads that stay), in the plan's order
     lines.append("SandboxMap.Roads = {")
-    for road in roads:
-        r = road["rect"]
-        lane = road["yard"] or min(r["x1"] - r["x0"], r["z1"] - r["z0"]) < MAIN_WIDTH  # (a yard: its lane's)
-        lines.append(f"\t{{ name = {q(road['name'])}, {rect_text(r)}, lane = {'true' if lane else 'false'}, yard = {'true' if road['yard'] else 'false'} }},")
+    for road in plan["roads"]:
+        lines.append(f"\t{{ name = {q(road['name'])}, {rect_text(road['rect'])}, lane = true, yard = true }},")
     lines.append("} :: { Road }")
 
     lines.append("SandboxMap.Landmarks = {")
@@ -81,12 +71,12 @@ def section(plan):
         lines.append(f"\t{{ id = {q(l['id'])}, name = {q(l['name'])}, kind = {q(l['kind'])}, {rect_text(l['rect'])}, yaw = {num(l['yaw'])} }},")
     lines.append("} :: { Landmark }")
 
-    fixed = [p["rect"] for p in plan["plots"]] + [s["lot"] for s in plan["spots"] if s.get("fixed")]
+    fixed = [s["lot"] for s in plan["spots"]]
     lines.append("SandboxMap.Fields = {")
     for n, f in enumerate(plan["fields"]):
         for block in fixed:
             if overlap(f["rect"], block):
-                raise SystemExit(f"sandboxmap: field {n + 1} on a plot or the farmstead's lot")
+                raise SystemExit(f"sandboxmap: field {n + 1} on a place's lot")
         for m, g in enumerate(plan["fields"]):
             if m > n and overlap(f["rect"], g["rect"]):
                 raise SystemExit(f"sandboxmap: fields {n + 1} and {m + 1} over each other")
@@ -114,6 +104,12 @@ def section(plan):
     for s in plan["streams"]:
         lines.append(f"\t{{ id = {q(s['id'])}, width = {num(s['width'])}, points = {{ {points_text(s['points'])} }} }},")
     lines.append("} :: { Stream }")
+
+    lines.append("SandboxMap.Zones = {")
+    for z in plan["zones"]:
+        a = z["arrive"]
+        lines.append(f"\t{{ id = {q(z['id'])}, rect = {{ {rect_text(z['rect'])} }}, arrive = {{ x = {num(a['x'])}, y = {num(a['y'])}, z = {num(a['z'])}, yaw = {num(a['yaw'])} }} }},")
+    lines.append("} :: { Zone }")
     lines.append(END)
     return lines
 

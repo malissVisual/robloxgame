@@ -10,8 +10,9 @@
 -- in as bought (CollectionBookRules.record's `bought`): the book shows it, tagged, but it is not found, so no milestone,
 -- no badge and no "New in your book" comes of it; the first one a move brings home makes it found.
 --
---   CollectionBook.record(player, item, condition, bought?)   one more `item` came home (8.7 review: `bought`: bought
---                                                    from a player) → true when it is new in the book (the state goes
+--   CollectionBook.record(player, item, condition, bought?, rarity?)   one more `item` came home (8.7 review: `bought`:
+--                                                    bought from a player; 9.x loot: `rarity` the piece's, the page keeps
+--                                                    the rarest) → true when it is new in the book (the state goes
 --                                                    out at the frame's end, then the milestones it reached pay); a
 --                                                    piece not in the book, a bought one or a player not loaded: false
 --   CollectionBook.book(player)                      a copy of the player's book (CollectionBookRules.view; nil: not
@@ -40,6 +41,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Net = require(Shared.Net)
 local Rules = require(Shared.CollectionBookRules)
+local CollectionRules = require(Shared.CollectionRules) -- 9.x loot: a piece's own rarity (pieceRarity)
 local PlayerData = require(script.Parent.PlayerData)
 local Collection = require(script.Parent.Collection)
 
@@ -105,12 +107,12 @@ local function push(player: Player, item: string?)
 	end
 end
 
-function CollectionBook.record(player: Player, item: any, condition: any, bought: boolean?): boolean
+function CollectionBook.record(player: Player, item: any, condition: any, bought: boolean?, rarity: any?): boolean
 	local book = bookOf(player)
 	if not book or not Rules.inBook(item) then
 		return false
 	end
-	local new = Rules.record(book, item, condition, bought == true)
+	local new = Rules.record(book, item, condition, bought == true, rarity)
 	push(player, if new then item else nil)
 	return new
 end
@@ -182,13 +184,18 @@ local function onRemote(player: Player, message: any)
 	end
 end
 
+-- 9.x loot: a piece's own rarity (its house's roll, else its item's), nil for junk.
+local function rarityOf(entry: any): string?
+	return if type(entry) == "table" and type(entry.item) == "string" then CollectionRules.pieceRarity(entry) else nil
+end
+
 function CollectionBook.start()
 	remote.OnServerEvent:Connect(onRemote)
 	Collection.onAdded(function(player: Player, entry: any)
-		CollectionBook.record(player, entry.item, entry.condition)
+		CollectionBook.record(player, entry.item, entry.condition, nil, rarityOf(entry)) -- (9.x loot: its rarity)
 	end)
 	Collection.onTransferred(function(buyer: Player, _seller: Player, entry: any) -- (8.7 review: bought, never found)
-		CollectionBook.record(buyer, entry.item, entry.condition, true)
+		CollectionBook.record(buyer, entry.item, entry.condition, true, rarityOf(entry))
 	end)
 	PlayerData.Changed:Connect(onJoined)
 	for _, player in Players:GetPlayers() do

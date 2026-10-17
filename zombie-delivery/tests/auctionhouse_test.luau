@@ -1,6 +1,6 @@
 -- 8.8 SANDBOX, the Auction House (shared/AuctionHouseLayout.luau, Config.Auction.House; server/SandboxWorld.luau builds
--- it only while Config.Auction.On): its place (on Depot Row east of the crossroads, its door to the road, across from
--- the plots, near the TOP MOVERS board), every part inside its footprint and within its budget, a walk free from the
+-- it only while Config.Auction.On): its place (9.7: in the lobby, SandboxMap.Lobby.shops.auction, on the plaza's
+-- south side, its door to the plaza, near the spawn, in sight of the TOP MOVERS board), every part inside its footprint and within its budget, a walk free from the
 -- steps through the doorway down the aisle to the stage, the desk, the lot's pedestal, the sign and the lot display;
 -- clear of today's map (the roads and their 12 studs, the plots, the vans' ways, the house, the signpost, the lamps, 8.9
 -- the countryside's trees, the board; flat meadow) and of design/countryside/plan.json (CountryPlan.luau: the
@@ -33,7 +33,6 @@ end
 type Rect = { x0: number, x1: number, z0: number, z1: number }
 local H = Config.Auction.House
 local C = SandboxScenery.Clear
-local MAIN, DEPOT = SandboxMap.Roads[1], SandboxMap.Roads[2]
 local EPS = 1e-6
 
 local function rectDistance(r: Rect, x: number, z: number): number
@@ -126,14 +125,18 @@ do
 	local spot = Layout.spot()
 	check("one place for it: Config.Auction.House.Spot (on the ground)", spot == H.Spot and spot.y == 0)
 	local site = Layout.site()
-	check("on Depot Row east of the crossroads, across from plots 3 and 4: x 132 … 184, z -26 … 12", site.x0 == 132 and site.x1 == 184 and site.z0 == -26 and site.z1 == 12,
-		`{site.x0} … {site.x1}, {site.z0} … {site.z1}`)
+	local own = SandboxMap.Lobby.shops.auction.rect
+	check("9.7: in the lobby, on its plan's footprint (SandboxMap.Lobby.shops.auction: x 1774 … 1826, z 152 … 190)", site.x0 == own.x0 and site.x1 == own.x1 and site.z0 == own.z0
+		and site.z1 == own.z1 and SandboxMap.inLobby(site.x0, site.z0) and SandboxMap.inLobby(site.x1, site.z1), `{site.x0} … {site.x1}, {site.z0} … {site.z1}`)
 	local door = Layout.door()
 	local lx, lz = -math.sin(math.rad(door.yaw)), -math.cos(math.rad(door.yaw))
-	check("its door looks out over Depot Row, 20 studs off its edge (players see it from their plots)", lx == 0 and lz == -1 and math.abs(door.z - DEPOT.z1 - 20) < EPS and SandboxMap.plotAt(door.x, DEPOT.z0 - 20) ~= nil)
+	local plaza = SandboxMap.Lobby.plaza
+	check("its door looks north over the plaza, a few studs off its edge (players see it from the spawn)", lx == 0 and lz == -1 and door.z > plaza.z1 and door.z - plaza.z1 < 12
+		and door.x > plaza.x0 and door.x < plaza.x1)
 	local board = Leaders.spot()
-	local cross = { x = (MAIN.x0 + MAIN.x1) / 2, z = (DEPOT.z0 + DEPOT.z1) / 2 }
-	check("near the TOP MOVERS board and the crossroads", math.sqrt((door.x - board.x) ^ 2 + (door.z - board.z) ^ 2) < 130 and math.sqrt((door.x - cross.x) ^ 2 + (door.z - cross.z) ^ 2) < 170)
+	local spawn = SandboxMap.Lobby.spawn
+	check("near the spawn, in sight of the TOP MOVERS board (across the plaza)", math.sqrt((door.x - spawn.x) ^ 2 + (door.z - spawn.z) ^ 2) < 170
+		and math.sqrt((door.x - board.x) ^ 2 + (door.z - board.z) ^ 2) < 330)
 	local tags: { [string]: number } = {}
 	for _, p in Layout.parts() do
 		if p.tag then
@@ -167,40 +170,41 @@ end
 
 -- ── Clear of today's map ────────────────────────────────────────────────────
 do
-	local B = SandboxMap.Bounds
-	local inset = C.Edge
+	-- (9.7: in the lobby: inside its hedge, off the plots, the portals and their pads, the dispatch, the paint shop,
+	-- the lamps, the trees and the TOP MOVERS board; on flat meadow)
+	local L = SandboxMap.Lobby
 	local why: string? = nil
-	local trees = VillageScenery.trees()
-	local lamps = SandboxScenery.lamps()
-	local sign = SandboxScenery.Signpost
 	local margin = 3
+	local keep: { { name: string, rect: any, by: number } } = {}
+	for _, plot in SandboxMap.Plots do
+		table.insert(keep, { name = `plot {plot.id}`, rect = plot.rect, by = C.Plot })
+	end
+	for _, portal in L.portals do
+		table.insert(keep, { name = `{portal.house}'s portal`, rect = portal.foot, by = margin })
+		table.insert(keep, { name = `{portal.house}'s pad`, rect = portal.pad, by = margin })
+	end
+	local d = L.dispatch
+	table.insert(keep, { name = "the dispatch", rect = { x0 = d.x - 4, x1 = d.x + 4, z0 = d.z - 3, z1 = d.z + 3 }, by = margin })
+	table.insert(keep, { name = "the paint shop", rect = L.shops.paint.rect, by = margin })
 	for _, p in samples(0) do
 		local x, z = p[1], p[2]
-		if x < B.x0 + inset or x > B.x1 - inset or z < B.z0 + inset or z > B.z1 - inset then
-			why = "at the map's edge"
+		local b = L.bounds
+		if x < b.x0 + L.hedge + C.Edge or x > b.x1 - L.hedge - C.Edge or z < b.z0 + L.hedge + C.Edge or z > b.z1 - L.hedge - C.Edge then
+			why = "on the lobby's hedge"
 		end
-		local rule = SandboxScenery.treeRule(x, z, 0) -- (the roads' 12 studs, the turnaround, the plots, the house, its path, the vans' ways, the signpost)
-		if rule or SandboxMap.plotAt(x, z) then
-			why = `where SandboxScenery says no ({rule or "a plot"}) at {x}, {z}`
-		end
-		for n, way in SandboxScenery.vanPaths() do
-			if rectDistance(way, x, z) < C.Plot then
-				why = `on van way {n}`
+		for _, k in keep do
+			if rectDistance(k.rect, x, z) < k.by then
+				why = `on {k.name} at {x}, {z}`
 			end
 		end
-		if math.sqrt((x - sign.x) ^ 2 + (z - sign.z) ^ 2) < C.Sign + margin then
-			why = "on the signpost"
-		end
-		for _, l in lamps do
-			for t = 0, 4.4, 0.4 do
-				if math.sqrt((x - (l.x + l.rx * t)) ^ 2 + (z - (l.z + l.rz * t)) ^ 2) < margin then
-					why = `on the lamp at {l.x}, {l.z}`
-				end
+		for _, l in L.lamps do
+			if math.sqrt((x - l.x) ^ 2 + (z - l.z) ^ 2) < margin then
+				why = `on the lamp at {l.x}, {l.z}`
 			end
 		end
-		for _, t in trees do
-			if math.sqrt((x - t.x) ^ 2 + (z - t.z) ^ 2) < t.radius + margin then
-				why = `under the tree at {math.floor(t.x)}, {math.floor(t.z)}`
+		for _, t in L.trees do
+			if math.sqrt((x - t.x) ^ 2 + (z - t.z) ^ 2) < 6 + margin then
+				why = `under the tree at {t.x}, {t.z}`
 			end
 		end
 		if math.abs(SandboxScenery.groundAt(x, z) - SandboxMap.GroundTop) > 1e-9 then
@@ -212,7 +216,7 @@ do
 			end
 		end
 	end
-	check("clear of the map: inside its edge, 12 studs off every road, off the plots, the vans' ways, the house and its path, the signpost, the lamps, 8.9 the village's trees and the TOP MOVERS board, on flat meadow", why == nil, why)
+	check("clear of the lobby: inside its hedge, off the plots, the portals and their pads, the dispatch, the paint shop, the lamps, the trees and the TOP MOVERS board, on flat meadow", why == nil, why)
 end
 
 -- ── Clear of the countryside's plan (design/countryside/plan.json) ─────────
@@ -242,7 +246,8 @@ do
 			end
 		end
 	end
-	check(`clear of the countryside's plan: its {#Plan.areas} roads, landmarks, fields, places and lots (12 studs off a road, 6 off the rest) and its tree lines`, why == nil and #Plan.areas > 50, why)
+	check(`clear of the countryside's plan: its {#Plan.areas} yards, landmarks, places and lots (12 studs off a yard, 6 off the rest) and its tree lines (9.7: the lobby far from them all)`,
+		why == nil and #Plan.areas > 20, why)
 end
 
 -- ── Turned with its spot ────────────────────────────────────────────────────
@@ -254,7 +259,7 @@ do
 	check("a spot turned 90°: the door looks west, the hall behind it to the east", -math.sin(a) < -0.99 and Layout.site().x1 > H.Spot.x + H.Depth and door.x < H.Spot.x)
 	placeChecks("turned 90°")
 	H.Spot = saved
-	check("…and back: the parts follow the spot again", Layout.site().x0 == 132)
+	check("…and back: the parts follow the spot again", Layout.site().x0 == SandboxMap.Lobby.shops.auction.rect.x0)
 end
 
 -- ── The world SandboxWorld builds ───────────────────────────────────────────

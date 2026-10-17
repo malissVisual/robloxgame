@@ -1,0 +1,248 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Loot preview</title>
+<style>
+@font-face { font-family: Gotham; src: url(montserrat-500.woff2); font-weight: 500; }
+@font-face { font-family: Gotham; src: url(montserrat-700.woff2); font-weight: 700; }
+html,body{margin:0;background:#0e1014;overflow:hidden}
+canvas#out{display:block}
+</style>
+</head>
+<body>
+<canvas id="out"></canvas>
+<script type="module">
+// 9.x loot: draws preview.py's pieces (the real FurnitureLooks builders' parts, tools/furniture/export.luau) standing
+// in a room with three.js, then over the picture what the game draws over them: each piece's Highlight (its visible
+// pixels from a depth-tested mask pass: the edge in its tier's colour, a soft fill of it; never through another
+// piece) and its stars' BillboardGui (the charcoal pill, ★ × its stars in the tier's colour, its tier and value as a
+// piece within Stars.Near shows them), a caption under each, the loot toast and a legend. Not Roblox's renderer.
+import * as THREE from './three.module.min.js';
+
+const W = 1800, H = 760;
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1);
+renderer.setSize(W, H);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+const unitBox = new THREE.BoxGeometry(1, 1, 1);
+const unitCyl = new THREE.CylinderGeometry(0.5, 0.5, 1, 40).rotateZ(-Math.PI / 2);
+const unitBall = new THREE.SphereGeometry(0.5, 32, 20);
+const unitWedge = (() => {
+  const v = { bfl: [-.5, -.5, -.5], bfr: [.5, -.5, -.5], bbl: [-.5, -.5, .5], bbr: [.5, -.5, .5], tbl: [-.5, .5, .5], tbr: [.5, .5, .5] };
+  const tris = [['bfl', 'bbr', 'bfr'], ['bfl', 'bbl', 'bbr'], ['bbl', 'tbr', 'bbr'], ['bbl', 'tbl', 'tbr'], ['bfl', 'bfr', 'tbr'], ['bfl', 'tbr', 'tbl'], ['bfl', 'tbl', 'bbl'], ['bfr', 'bbr', 'tbr']];
+  const pos = [];
+  for (const t of tris) for (const k of t) pos.push(...v[k]);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.computeVertexNormals();
+  return g;
+})();
+const ROUGH = { SmoothPlastic: 0.45, Plastic: 0.6, Metal: 0.35, Glass: 0.08, Fabric: 0.95, Leather: 0.6, Wood: 0.75, WoodPlanks: 0.7, Neon: 1, Marble: 0.25 };
+const METAL = { Metal: 0.5, DiamondPlate: 0.5 };
+const srgb = c => new THREE.Color().setRGB(c[0], c[1], c[2], THREE.SRGBColorSpace);
+
+// One part at `at` (the piece's floor point): the export's parts are about the piece's middle.
+function mesh(p, at, lift) {
+  const geom = p.class === 'WedgePart' ? unitWedge : p.shape === 'Cylinder' ? unitCyl : p.shape === 'Ball' ? unitBall : unitBox;
+  const opts = { color: srgb(p.color), roughness: ROUGH[p.material] ?? 0.6, metalness: METAL[p.material] ?? 0 };
+  if (p.material === 'Neon') { opts.emissive = srgb(p.color); opts.emissiveIntensity = 1.1; }
+  if (p.opacity < 0.99) { opts.transparent = true; opts.opacity = Math.max(0.2, p.opacity); opts.depthWrite = false; }
+  const m = new THREE.Mesh(geom, new THREE.MeshStandardMaterial(opts));
+  const r = p.rotation, q = p.position, s = p.size;
+  const sz = p.shape === 'Ball' ? [Math.min(...s), Math.min(...s), Math.min(...s)] : p.shape === 'Cylinder' ? [s[0], Math.min(s[1], s[2]), Math.min(s[1], s[2])] : s;
+  const mtx = new THREE.Matrix4().set(r[0], r[1], r[2], q[0] + at[0], r[3], r[4], r[5], q[1] + lift, r[6], r[7], r[8], q[2] + at[2], 0, 0, 0, 1);
+  mtx.multiply(new THREE.Matrix4().makeScale(sz[0], sz[1], sz[2]));
+  m.matrixAutoUpdate = false;
+  m.matrix.copy(mtx);
+  m.matrixWorld.copy(mtx);
+  return m;
+}
+
+function planks() {
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const g = c.getContext('2d');
+  let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (let row = 0; row < 8; row++) {
+    for (let k = 0; k < 3; k++) {
+      const v = Math.floor(200 + rnd() * 40); g.fillStyle = `rgb(${v},${Math.floor(v * 0.78)},${Math.floor(v * 0.55)})`;
+      const off = (row % 3) * 70 + k * 120; g.fillRect(off % 256, row * 32, 120, 32); g.fillRect((off % 256) - 256, row * 32, 120, 32);
+    }
+    g.fillStyle = 'rgb(90,64,44)'; g.fillRect(0, row * 32, 256, 2);
+  }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(11, 9);
+  return t;
+}
+
+window.renderLoot = function (data) {
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x14171c);
+  const room = new THREE.Group();
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(90, 70).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ map: planks(), roughness: 0.8 }));
+  floor.position.set(0, 0, -25); room.add(floor);
+  const wall = new THREE.Mesh(new THREE.BoxGeometry(90, 30, 0.6), new THREE.MeshStandardMaterial({ color: 0xd9cdb6, roughness: 0.9 }));
+  wall.position.set(0, 15, 9.5); room.add(wall);
+  const skirting = new THREE.Mesh(new THREE.BoxGeometry(90, 0.6, 0.2), new THREE.MeshStandardMaterial({ color: 0x6b4a32, roughness: 0.7 }));
+  skirting.position.set(0, 0.3, 9.15); room.add(skirting);
+  scene.add(room);
+  scene.add(new THREE.HemisphereLight(0xfff3e0, 0x4a3a2c, 1.5));
+  const key = new THREE.DirectionalLight(0xfff0dc, 2.2); key.position.set(-10, 18, -14); scene.add(key);
+  const fill = new THREE.DirectionalLight(0xc8d8ff, 0.6); fill.position.set(12, 8, -6); scene.add(fill);
+  const groups = [];
+  for (const piece of data.pieces) {
+    const g = new THREE.Group();
+    for (const p of piece.parts) g.add(mesh(p, piece.at, piece.size[1] / 2));
+    g.matrixAutoUpdate = false;
+    scene.add(g);
+    groups.push(g);
+  }
+  const camera = new THREE.PerspectiveCamera(32, W / H, 0.5, 400);
+  camera.position.set(0, 7, -38);
+  camera.lookAt(0, 4.4, 1.5);
+  camera.updateMatrixWorld();
+  renderer.render(scene, camera);
+  const base = document.createElement('canvas'); base.width = W; base.height = H;
+  const bg = base.getContext('2d');
+  bg.drawImage(renderer.domElement, 0, 0);
+
+  // each piece's visible pixels: everything into the depth, then the piece alone in white where it is in front
+  const maskMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const depthMat = new THREE.MeshBasicMaterial({ colorWrite: false });
+  const masks = [];
+  const buffer = new Uint8Array(W * H * 4);
+  for (let i = 0; i < groups.length; i++) {
+    scene.background = new THREE.Color(0x000000);
+    scene.overrideMaterial = depthMat;
+    renderer.autoClear = true;
+    renderer.render(scene, camera);
+    renderer.autoClear = false;
+    scene.overrideMaterial = null;
+    const only = new THREE.Scene();
+    const clone = groups[i].clone(true);
+    clone.traverse(o => { if (o.isMesh) { o.material = maskMat; } });
+    only.add(clone);
+    maskMat.depthFunc = THREE.LessEqualDepth;
+    renderer.render(only, camera);
+    renderer.autoClear = true;
+    const gl = renderer.getContext();
+    gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, buffer);
+    const mask = new Uint8Array(W * H);
+    const box = { x0: W, y0: H, x1: -1, y1: -1 };
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      if (buffer[(y * W + x) * 4] > 128) {
+        const yy = H - 1 - y;
+        mask[yy * W + x] = 1;
+        box.x0 = Math.min(box.x0, x); box.x1 = Math.max(box.x1, x); box.y0 = Math.min(box.y0, yy); box.y1 = Math.max(box.y1, yy);
+      }
+    }
+    masks.push({ mask, box });
+  }
+
+  // the Highlights: the edge (OutlineTransparency) round the visible pixels, the fill (FillTransparency) over them
+  const img = bg.getImageData(0, 0, W, H);
+  const px = img.data;
+  const R = 3;
+  data.pieces.forEach((piece, i) => {
+    if (!piece.outlined) return;
+    const { mask, box } = masks[i];
+    if (box.x1 < 0) return;
+    const c = piece.color, fillA = 1 - data.fill, edgeA = 1 - data.edge;
+    for (let y = Math.max(0, box.y0 - R); y <= Math.min(H - 1, box.y1 + R); y++) for (let x = Math.max(0, box.x0 - R); x <= Math.min(W - 1, box.x1 + R); x++) {
+      const k = y * W + x;
+      if (mask[k]) {
+        for (let ch = 0; ch < 3; ch++) px[k * 4 + ch] = px[k * 4 + ch] * (1 - fillA) + c[ch] * fillA;
+        continue;
+      }
+      let near = false;
+      for (let dy = -R; dy <= R && !near; dy++) {
+        const yy = y + dy; if (yy < 0 || yy >= H) continue;
+        for (let dx = -R; dx <= R; dx++) {
+          const xx = x + dx; if (xx < 0 || xx >= W) continue;
+          if (dx * dx + dy * dy <= R * R && mask[yy * W + xx]) { near = true; break; }
+        }
+      }
+      if (near) for (let ch = 0; ch < 3; ch++) px[k * 4 + ch] = px[k * 4 + ch] * (1 - edgeA) + c[ch] * edgeA;
+    }
+  });
+  bg.putImageData(img, 0, 0);
+
+  // the stars' bubbles over each piece's top (its root's top + Stars.Lift), as the BillboardGui draws them: px sizes
+  const S = data.stars;
+  const project = (x, y, z) => { const v = new THREE.Vector3(x, y, z).project(camera); return [(v.x + 1) / 2 * W, (1 - v.y) / 2 * H]; };
+  const rgb = c => `rgb(${c[0]},${c[1]},${c[2]})`;
+  const scale = 1.2; // (the picture is big: the bubble drawn at 1.2 × its px)
+  data.pieces.forEach(piece => {
+    const [x, y] = project(piece.at[0], piece.size[1] + S.lift, piece.at[2]);
+    bg.font = `700 ${S.text * scale}px Gotham, sans-serif`;
+    const starW = bg.measureText(piece.starsText).width;
+    bg.font = `700 ${S.detail * scale}px Gotham, sans-serif`;
+    const infoW = piece.near ? bg.measureText(piece.info).width : 0;
+    const pad = S.pad * scale, gap = 5 * scale, h = S.tall * scale;
+    const w = pad + starW + (piece.near ? gap + infoW : 0) + pad;
+    const x0 = x - w / 2, y0 = y - h;
+    bg.fillStyle = 'rgba(20,23,28,0.88)';
+    bg.beginPath(); bg.roundRect(x0, y0, w, h, h / 2); bg.fill();
+    bg.strokeStyle = `rgba(${piece.color[0]},${piece.color[1]},${piece.color[2]},0.45)`; bg.lineWidth = 1.5; bg.stroke();
+    bg.textBaseline = 'middle';
+    bg.font = `700 ${S.text * scale}px Gotham, sans-serif`; bg.fillStyle = rgb(piece.color);
+    bg.fillText(piece.starsText, x0 + pad, y0 + h / 2 + 1);
+    if (piece.near) { bg.font = `700 ${S.detail * scale}px Gotham, sans-serif`; bg.fillStyle = '#f2f2f0'; bg.fillText(piece.info, x0 + pad + starW + gap, y0 + h / 2 + 1); }
+    // its caption on the floor in front of it
+    const [cx, cy] = project(piece.at[0], 0, piece.at[2] - piece.size[2] / 2 - 0.6);
+    bg.textAlign = 'center';
+    bg.font = '700 17px Gotham, sans-serif'; bg.fillStyle = '#f2f2f0'; bg.fillText(piece.name, cx, cy + 14);
+    bg.font = '500 14px Gotham, sans-serif'; bg.fillStyle = 'rgba(242,242,240,0.7)'; bg.fillText(piece.caption, cx, cy + 34);
+    bg.textAlign = 'left';
+  });
+
+  // the picture: a title, the scene, the toast and the legend under it
+  const out = document.getElementById('out');
+  const FOOT = 190, HEAD = 70;
+  out.width = W; out.height = HEAD + H + FOOT;
+  const o = out.getContext('2d');
+  o.fillStyle = '#0e1014'; o.fillRect(0, 0, out.width, out.height);
+  o.font = '700 28px Gotham, sans-serif'; o.fillStyle = '#f2f2f0'; o.textBaseline = 'alphabetic';
+  o.fillText(data.title, 24, 40);
+  o.font = '500 15px Gotham, sans-serif'; o.fillStyle = 'rgba(242,242,240,0.65)';
+  o.fillText(data.subtitle, 24, 62);
+  o.drawImage(base, 0, HEAD);
+  // the toast (the HUD's column: "+ RARE Grandfather Clock ★★★ $1,350")
+  let y = HEAD + H + 26;
+  o.font = '700 13px Gotham, sans-serif'; o.fillStyle = '#d74a46'; o.fillText('THE TOAST (PICK-UP OR LOAD, UNCOMMON AND UP)', 24, y);
+  y += 14;
+  data.toasts.forEach((t, i) => {
+    const ty = y + i * 40, tx = 24;
+    const parts = [[t.head, rgb(t.color), 700], [t.name, '#f2f2f0', 500], [t.stars, rgb(t.color), 700], [t.value, 'rgb(132,200,122)', 700]];
+    o.font = '700 18px Gotham, sans-serif';
+    let wsum = 3 + 14;
+    const widths = parts.map(([s, , wgt]) => { o.font = `${wgt} 18px Gotham, sans-serif`; return o.measureText(s).width; });
+    wsum += widths.reduce((a, b) => a + b, 0) + 8 * 3 + 14;
+    o.fillStyle = 'rgba(20,23,28,0.92)'; o.fillRect(tx, ty, wsum, 32);
+    o.fillStyle = rgb(t.color); o.fillRect(tx, ty, 4, 32);
+    let x = tx + 3 + 14;
+    o.textBaseline = 'middle';
+    parts.forEach(([s, ink, wgt], k) => { o.font = `${wgt} 18px Gotham, sans-serif`; o.fillStyle = ink; o.fillText(s, x, ty + 17); x += widths[k] + 8; });
+    o.textBaseline = 'alphabetic';
+  });
+  // the legend: the tiers
+  let lx = 880; const ly = HEAD + H + 26;
+  o.font = '700 13px Gotham, sans-serif'; o.fillStyle = '#d74a46'; o.fillText('THE TIERS (OUTLINE · STARS)', lx, ly);
+  data.tiers.forEach((t, i) => {
+    const ty = ly + 22 + i * 28;
+    if (t.outlined) {
+      o.strokeStyle = rgb(t.color); o.lineWidth = 3; o.strokeRect(lx, ty - 14, 26, 18);
+      o.fillStyle = `rgba(${t.color[0]},${t.color[1]},${t.color[2]},0.18)`; o.fillRect(lx, ty - 14, 26, 18);
+    } else {
+      o.strokeStyle = 'rgba(178,182,188,0.35)'; o.lineWidth = 1; o.setLineDash([3, 3]); o.strokeRect(lx, ty - 14, 26, 18); o.setLineDash([]);
+    }
+    o.font = '700 16px Gotham, sans-serif'; o.fillStyle = rgb(t.color); o.fillText(t.stars, lx + 38, ty);
+    o.fillStyle = '#f2f2f0'; o.fillText(t.name, lx + 140, ty);
+    o.font = '500 14px Gotham, sans-serif'; o.fillStyle = 'rgba(242,242,240,0.65)'; o.fillText(t.note, lx + 270, ty);
+  });
+  return true;
+};
+window.ready = true;
+</script>
+</body>
+</html>
