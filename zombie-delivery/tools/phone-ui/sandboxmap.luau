@@ -1,22 +1,24 @@
 -- 10.x the map: the big map (client/SandboxMapUi.luau) and a run's minimap (client/SandboxMiniMap.luau), run for real
 -- with client/SandboxMapData.luau and client/SandboxMapDraw.luau on sandbox_mock.luau's recorder beside the real
--- client/SandboxHud.luau (the money block), client/SandboxTasksUi.luau (the TASKS chip) and client/RunUi.luau (a run, the
--- pad panel), Hud's groups where client/Hud.luau puts them, on phones held sideways (844 × 390 and 667 × 375: under
+-- client/SandboxHud.luau (the money block), client/SandboxTasksUi.luau (the TASKS chip) and client/RunUi.luau (a run; 10.4
+-- client/PlayUi.luau's lobby bar), Hud's groups where client/Hud.luau puts them, on phones held sideways (844 × 390 and 667 × 375: under
 -- Roblox's top bar, the touch layout), a computer (1280 × 800) and a big screen (1920 × 1080). The world: the players
--- (you, Ann), the lobby's portals with server/Runs.luau's attributes, the warehouses' levels, a run's interior with its
+-- (you, Ann), 10.4 the lobby's PLAY circle with server/Parties.luau's attribute (the open lobbies, the runs now), the
+-- warehouses' levels, a run's interior with its
 -- MapPlan (plans.luau: the real HouseLayout's farmstead, server/HouseInterior.luau's code), its loot (the LootPiece tag),
 -- Danny, zombies near and far, the truck, the danger tags; the walls a stand-in ray (a piece in another room is hidden).
 --   * the 🗺 MAP chip beside the TASKS chip (in its ScreenGui), as tall, on the screen, clear of the money block, the
---     chips, the touch controls and the pad panel, a finger's size on a phone, M on a computer's key, the gamepad's L2;
+--     chips, the touch controls and the lobby bar, a finger's size on a phone, M on a computer's key, the gamepad's L2;
 --     it opens and closes the map;
 --   * M opens it (a window: its onOpen ran), M again, B, the ✕, the shade, SandboxMapUi.close() (ESC) close it; L2 with
 --     a gamepad on foot opens it, not while carrying or in a seat;
---   * the lobby: on the screen, its map and its side column (HOUSES: a row a portal with its live line, a finger's
---     size on a phone), the plaza, the hedge, the plots (yours YOUR WAREHOUSE in gold, its UPGRADES desk), PAINT, TOP
---     MOVERS, DISPATCH, the six portals with their names and their state's line and colour (free, counting down with who
---     is on the pad, IN USE with the difficulty and the party), Ann's dot and name, you a ▲ turned your way; every
---     label in the map, none on another, its words fitting, 11 px at least; a click on a portal (the map's or a row)
---     has the guide show the way to its pad (SandboxGuide.goTo) and closes the map;
+--   * the lobby: on the screen, its map and its side column (10.4: the PLAY row; OPEN LOBBIES, a row a lobby: its host
+--     and house over its difficulty, n/4, FRIENDS ONLY, FULL, STARTING; IN A RUN, a row a run: its house over its
+--     difficulty and party; a finger's size on a phone), the plaza, the hedge, the plots (yours YOUR WAREHOUSE in gold,
+--     its UPGRADES desk), PAINT, TOP MOVERS, DISPATCH, the PLAY circle (▶ PLAY over its line, its ring amber while a
+--     lobby counts down), Ann's dot and name, you a ▲ turned your way; every label in the map, none on another, its
+--     words fitting, 11 px at least; a click on the circle (the map's, the PLAY row or a lobby's row) has the guide show
+--     the way to it (SandboxGuide.goTo) and closes the map;
 --   * a run: the farmstead's floor plan (its rooms, walls, doorways, fixtures, windows, the FRONT DOOR at the bottom
 --     and the BACK DOOR), the yard's strip with the truck under it, you, Ann, Danny, the zombie near (not the far one),
 --     the loot under fog (seen in your room within 40 studs, never through a wall, kept once seen, gone once in the
@@ -36,6 +38,7 @@ local MoveLayout = require("./MoveLayout")
 local TopBlocks = require("./TopBlocks")
 local TasksRules = require("./SandboxTasks")
 local Plans = require("./plans")
+local PartyRules = require("./PartyRules")
 
 local dump = select(1, ...) == "dump"
 local function check(name, condition, detail)
@@ -127,7 +130,7 @@ end
 -- none on another
 local function pillsOverlap(root)
 	local pills = all(root, function(o)
-		return o.ClassName == "TextLabel" and shown(o) and ((o.BackgroundTransparency or 1) < 1 or string.sub(o.Name, 1, 11) == "PortalLine_") and o.Text ~= ""
+		return o.ClassName == "TextLabel" and shown(o) and ((o.BackgroundTransparency or 1) < 1 or o.Name == "PlayLine") and o.Text ~= ""
 			and o.Name ~= "PersonName" and o.Name ~= "Danger"
 	end)
 	for i = 1, #pills do
@@ -224,14 +227,7 @@ table.insert(players, ann)
 -- the world's folders
 local world = M.make("Folder", { Name = "Sandbox" }, M.workspace)
 local lobby = M.make("Model", { Name = "Lobby" }, world)
-local portals = M.make("Folder", { Name = "Portals" }, lobby)
-for _, p in SandboxMap.Lobby.portals do
-	local model = M.make("Model", { Name = `Portal_{p.house}` }, portals)
-	model:SetAttribute("RunPortal", p.house)
-end
-local function portalModel(house)
-	return portals:FindFirstChild(`Portal_{house}`)
-end
+local playModel = M.make("Model", { Name = "PlayCircle" }, lobby) -- (10.4: server/LobbyWorld.luau's, its attribute server/Parties.luau's)
 local halls = M.make("Folder", { Name = "Warehouses" }, M.workspace)
 for id, level in { 3, 4, 2, 5 } do
 	halls:SetAttribute(`Level{id}`, level)
@@ -324,7 +320,7 @@ local function look()
 	M.flush()
 end
 
--- What the chip and the minimap keep clear of: the touch controls, Hud's groups, the chips, the pad panel.
+-- What the chip and the minimap keep clear of: the touch controls, Hud's groups, the chips.
 local function chipBlocks()
 	local list = {}
 	local S = M.MUi.scaleFor(M.Vector2.new(M.width, M.height))
@@ -412,18 +408,14 @@ local function scene(name)
 	table.insert(scenes, { name = name, width = M.width, height = M.height + 36, inset = 36, touch = M.touch, overlay = overlay, tree = tree })
 end
 
--- ── The lobby: the portals' state, the chip ─────────────────────────────────
+-- ── The lobby: the open lobbies and the runs now (the PLAY circle's attribute), the chip ──
 M.now = 1000
-local function portalState(house, state, endsAt, who, difficulty)
-	local model = portalModel(house)
-	model:SetAttribute("RunState", state)
-	model:SetAttribute("RunEndsAt", endsAt)
-	model:SetAttribute("RunWho", who)
-	model:SetAttribute("RunDifficulty", difficulty)
-end
-portalState("old_mill", "wait", 1006.2, "Ann, Bob, Cid, Dee, Eve", "normal")
-portalState("sandbox_house", "use", nil, "Cid, Dee", "hard")
-portalState("pond_cabin", "free", nil, nil, nil)
+playModel:SetAttribute(Config.Runs.Party.Attribute, PartyRules.encode({
+	{ host = "Ann", house = "old_mill", difficulty = "normal", n = 3, max = 4, friends = false, state = "starting" },
+	{ host = "Bob", house = "pond_cabin", difficulty = "hard", n = 2, max = 4, friends = true, state = "open" },
+	{ host = "Evangelina Longname", house = "orchard_cottage", difficulty = "nightmare", n = 4, max = 4, friends = false, state = "full" },
+	{ host = "Cid", house = "sandbox_house", difficulty = "hard", n = 2, max = 4, friends = false, state = "run", who = "Cid, Dee" },
+}))
 
 local SCREENS = { { true, 844, 354, "a phone (844 × 390)", "844x390" }, { true, 667, 339, "a small phone (667 × 375)", "667x375" },
 	{ false, 1280, 764, "a computer (1280 × 800)", "1280x800" }, { false, 1920, 1044, "a big screen (1920 × 1080)", "1920x1080" } }
@@ -454,35 +446,34 @@ local function lobbyChecks(label)
 	local w = box(window)
 	check(`{label}: … on the screen`, inside(w), show(w))
 	check(`{label}: … its map and its side column in it`, within(box(map), w) and side ~= nil and within(box(side), w) and not overlap(box(map), box(side)))
-	check(`{label}: … the lobby drawn: the hedge, the meadow, the plaza, the fountain, 4 plots and warehouses with their desks, PAINT, TOP MOVERS, DISPATCH, 6 portals`,
+	check(`{label}: … the lobby drawn: the hedge, the meadow, the plaza, the fountain, 4 plots and warehouses with their desks, PAINT, TOP MOVERS, DISPATCH, the PLAY circle`,
 		named(map, "Hedge") and named(map, "Meadow") and named(map, "Plaza") and named(map, "Fountain") and named(map, "Plot4") and named(map, "Warehouse4") and named(map, "Desk4")
-			and named(map, "Paint") and named(map, "Leaders") and named(map, "Dispatch") and named(map, "Portal_orchard_cottage") and named(map, "Pad_old_mill") and true)
+			and named(map, "Paint") and named(map, "Leaders") and named(map, "Dispatch") and named(map, "PlayCircle") and named(map, "Portal_orchard_cottage") == nil and true)
 	check(`{label}: … your plot named in gold (YOUR WAREHOUSE) with its UPGRADES desk, Ann's by her name`, named(map, "PlotName2").Text == "YOUR" and named(map, "PlotName2b").Text == "WAREHOUSE"
 		and sameColor(named(map, "PlotName2").TextColor3, rgb(Config.SandboxMapUi.Colors.Yours)) and named(map, "Upgrades") ~= nil and named(map, "PlotName1").Text == "ANN"
 		and named(map, "PlotName3").Text == "FREE")
-	local P = Config.Runs.Portal
-	if canvas.long then
-		check(`{label}: … the portals' lines (a roomy map): free, counting down with who is on the pad (two names), IN USE with the difficulty and the party`,
-			named(map, "PortalLine_pond_cabin").Text == "FREE · WALK ONTO THE PAD" and named(map, "PortalLine_old_mill").Text == "STARTING IN 7 · Ann, Bob +3"
-				and named(map, "PortalLine_sandbox_house").Text == "IN USE · HARD · Cid, Dee", named(map, "PortalLine_old_mill").Text)
-	else
-		check(`{label}: … the portals' lines (a small map: the side column says who): FREE, STARTING IN 7, IN USE · HARD`,
-			named(map, "PortalLine_pond_cabin").Text == "FREE" and named(map, "PortalLine_old_mill").Text == "STARTING IN 7"
-				and named(map, "PortalLine_sandbox_house").Text == "IN USE · HARD", named(map, "PortalLine_old_mill").Text)
-	end
-	check(`{label}: … a phone's lobby small (short lines), a computer's roomy (long)`, canvas.long == not M.touch)
-	local linesShown = 0
-	for _, p in SandboxMap.Lobby.portals do
-		if shown(named(map, `PortalLine_{p.house}`)) then
-			linesShown += 1
+	local W = Config.Runs.Play
+	local circle, playName, playLine = named(map, "PlayCircle"), named(map, "PlayName"), named(map, "PlayLine")
+	local cb = box(circle)
+	check(`{label}: … the PLAY circle round (as wide as tall), its ring amber (Ann's lobby counts down)`, math.abs((cb.x1 - cb.x0) - (cb.y1 - cb.y0)) < 1.01 and cb.x1 - cb.x0 >= 8
+		and sameColor(named(circle, "Ring").Color, rgb(W.Waiting)), show(cb))
+	check(`{label}: … ▶ PLAY over its line STARTING beside it, both shown, clear of the circle`, shown(playName) and shown(playLine) and playName.Text == "▶ PLAY" and playLine.Text == "STARTING"
+		and box(playLine).y0 >= box(playName).y1 - 0.01 and not overlap(box(playName), cb) and not overlap(box(playLine), cb), `{playLine.Text} {show(box(playName))} {show(box(playLine))} by {show(cb)}`)
+	local rows, play = parts.rows, parts.play
+	check(`{label}: … the side column: the PLAY row (▶ THE PLAY CIRCLE), OPEN LOBBIES (Ann's STARTING, Bob's FRIENDS ONLY, the full one), IN A RUN (the farmstead, its party)`,
+		play ~= nil and play.top.Text == "▶ THE PLAY CIRCLE" and rows ~= nil and rows[1].row.Visible and rows[1].top.Text == "ANN · THE OLD MILL" and rows[1].bottom.Text == "STARTING · NORMAL · 3/4"
+			and rows[2].top.Text == "BOB · THE POND CABIN" and rows[2].bottom.Text == "HARD · 2/4 · FRIENDS ONLY" and rows[3].bottom.Text == "NIGHTMARE · 4/4 · FULL"
+			and rows[4].top.Text == "THE OLD FARMSTEAD" and rows[4].bottom.Text == "IN A RUN · HARD · Cid, Dee" and not rows[5].row.Visible
+			and shown(named(side, "OpenTitle")) and shown(named(side, "RunsTitle")) and not shown(named(side, "None")),
+		rows and `{rows[1].top.Text} / {rows[1].bottom.Text} / {rows[2].bottom.Text} / {rows[3].bottom.Text} / {rows[4].top.Text} / {rows[4].bottom.Text}`)
+	local order = { play.row, named(side, "OpenTitle"), rows[1].row, rows[2].row, rows[3].row, named(side, "RunsTitle"), rows[4].row, named(side, "LegendTitle") }
+	local stacked = nil
+	for n = 2, #order do
+		if box(order[n]).y0 < box(order[n - 1]).y1 - 0.01 then
+			stacked = `{order[n].Name} {show(box(order[n]))} on {order[n - 1].Name} {show(box(order[n - 1]))}`
 		end
 	end
-	check(`{label}: … every portal's state line on the map (or, a map too crowded for them, none: the pads' colours and HOUSES say it)`, (linesShown == 6 and canvas.lines)
-		or (linesShown == 0 and not canvas.lines), linesShown)
-	check(`{label}: … the pads in their state's colours`, sameColor(named(map, "Pad_pond_cabin").BackgroundColor3, rgb(P.Free)) and sameColor(named(map, "Pad_old_mill").BackgroundColor3, rgb(P.Waiting))
-		and sameColor(named(map, "Pad_sandbox_house").BackgroundColor3, rgb(P.InUse)))
-	local rows = parts.rows
-	check(`{label}: … the side column's HOUSES: a row a portal, its line (a phone's narrow column: FREE alone)`, rows ~= nil and rows.old_mill ~= nil and rows.old_mill.line.Text == "STARTING IN 7 · Ann, Bob, Cid +2" and rows.lone_house.line.Text == (if M.touch then "FREE" else "FREE · WALK ONTO THE PAD"))
+	check(`{label}: … its rows down the column in that order, none on another, the legend under them`, stacked == nil, stacked)
 	local mapBox = box(map)
 	local outside = nil
 	for _, o in all(map, function(o)
@@ -497,7 +488,7 @@ local function lobbyChecks(label)
 	check(`{label}: … the words fit`, #badTexts(window) == 0, badTexts(window)[1])
 	check(`{label}: … readable: 11 px and more`, #smallTexts(window, 11) == 0, smallTexts(window, 11)[1])
 	if M.touch then
-		check(`{label}: … a finger's size (the ✕, the rows, the portals)`, #smallButtons(window) == 0, smallButtons(window)[1])
+		check(`{label}: … a finger's size (the ✕, the rows, the PLAY circle)`, #smallButtons(window) == 0, smallButtons(window)[1])
 	end
 	-- the people: Ann's dot and name, you a ▲ turned your way (south: 180°)
 	local you = named(map, "You")
@@ -567,43 +558,51 @@ M.gamepad = false
 M.inputChanged()
 SandboxMapUi.arrange()
 
--- a portal picked: the guide shows the way to its pad; the map closes
+-- 10.4 the PLAY circle picked: the guide shows the way to it; the map closes
 SandboxMapUi.open()
-SandboxMapUi.parts().rows.old_mill.row.Activated:Fire()
+SandboxMapUi.parts().play.row.Activated:Fire()
 M.flush()
-local mill = SandboxMap.portal("old_mill")
+local P = SandboxMap.Lobby.play
 local guided = M.guided[#M.guided]
-check("a click on a house in HOUSES: the guide shows the way to its pad (SandboxGuide.goTo), the map closes, a toast says so", guided ~= nil and guided.label == "THE OLD MILL"
-	and math.abs(guided.at.X - (mill.pad.x0 + mill.pad.x1) / 2) < 0.01 and math.abs(guided.at.Z - (mill.pad.z0 + mill.pad.z1) / 2) < 0.01 and not SandboxMapUi.isOpen()
-	and #M.toasts > toasts and string.find(M.toasts[#M.toasts], "THE OLD MILL", 1, true) ~= nil)
+check("a click on the PLAY row: the guide shows the way to the PLAY circle (SandboxGuide.goTo), the map closes, a toast says so", guided ~= nil and guided.label == "PLAY"
+	and math.abs(guided.at.X - P.x) < 0.01 and math.abs(guided.at.Z - P.z) < 0.01 and not SandboxMapUi.isOpen()
+	and #M.toasts > toasts and string.find(M.toasts[#M.toasts], "PLAY", 1, true) ~= nil)
+SandboxMapUi.open()
+local guides = #M.guided
+SandboxMapUi.parts().rows[2].row.Activated:Fire()
+M.flush()
+check("… a click on an open lobby's row too (it is joined in the circle)", #M.guided == guides + 1 and M.guided[#M.guided].label == "PLAY" and not SandboxMapUi.isOpen())
 SandboxMapUi.open()
 local onMap = all(SandboxMapUi.parts().map, function(o)
-	return o.Name == "PortalButton_forest_lodge"
+	return o.Name == "PlayButton"
 end)[1]
 onMap.Activated:Fire()
 M.flush()
-check("… a click on a portal on the map too", M.guided[#M.guided].label == "THE FOREST LODGE" and not SandboxMapUi.isOpen())
+check("… a click on the circle on the map too", #M.guided == guides + 2 and M.guided[#M.guided].label == "PLAY" and not SandboxMapUi.isOpen())
 
--- the pad panel of a small phone stands where the chip would be: the chip waits
+-- 10.4 the lobby bar (client/PlayUi.luau) of a small phone may stand where the chip would be: the chip waits
 screen(true, 667, 339)
 tasksView = TasksRules.view(TasksRules.fresh(42, NOW), NOW) :: any
 tasksView.kind = "state"
 tasksView.ready = 1
 M.remotes.SandboxTasks.OnClientEvent:Fire(tasksView)
 M.flush()
-M.remotes.Runs.OnClientEvent:Fire({ kind = "pad", house = "sandbox_house", name = "The Old Farmstead", endsAt = 1010, left = 7, host = 14, hostName = "Courier",
-	party = { "Courier" }, going = 1, max = 4, difficulty = "normal", open = { "easy", "normal" }, mine = true, place = 1 })
+local me14 = M.player.UserId
+M.remotes.Party.OnClientEvent:Fire({ kind = "play", circle = false, me = me14, open = { "easy", "normal" }, houses = {}, lobbies = {},
+	lobby = { id = 3, host = me14, hostName = "Courier", mine = true, house = "sandbox_house", name = "The Old Farmstead", difficulty = "normal", friends = false, max = 4,
+		ready = 0, open = { "easy", "normal" }, canStart = false, members = { { id = me14, name = "Courier", ready = false, host = true } } } })
 M.flush()
 SandboxMapUi.arrange()
-local padPanel = named(M.gui:FindFirstChild("RunUi"), "PadPanel")
+local lobbyBar = named(M.gui:FindFirstChild("PlayUi"), "PlayBar")
 local chipNow = SandboxMapUi.parts().chip
-check("a small phone with the pad panel up: the chip never on it (it waits when it would be)", not chipNow.Visible or not overlap(box(chipNow), box(padPanel)))
-M.remotes.Runs.OnClientEvent:Fire({ kind = "pad" })
+check("a small phone with the lobby bar up: the chip never on it (it waits when it would be)", lobbyBar ~= nil and shown(lobbyBar)
+	and (not chipNow.Visible or not overlap(box(chipNow), box(lobbyBar))))
+M.remotes.Party.OnClientEvent:Fire({ kind = "play" })
 tasksView.ready = 0
 M.remotes.SandboxTasks.OnClientEvent:Fire(tasksView)
 M.flush()
 SandboxMapUi.arrange()
-check("… off the pad: it is back", SandboxMapUi.parts().chip.Visible)
+check("… out of the lobby: it is back", SandboxMapUi.parts().chip.Visible)
 
 -- ── A run: the farmstead ─────────────────────────────────────────────────────
 local farm = Plans.big

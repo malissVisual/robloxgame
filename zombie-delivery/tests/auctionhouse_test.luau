@@ -126,13 +126,15 @@ do
 	check("one place for it: Config.Auction.House.Spot (on the ground)", spot == H.Spot and spot.y == 0)
 	local site = Layout.site()
 	local own = SandboxMap.Lobby.shops.auction.rect
-	check("9.7: in the lobby, on its plan's footprint (SandboxMap.Lobby.shops.auction: x 1774 … 1826, z 152 … 190)", site.x0 == own.x0 and site.x1 == own.x1 and site.z0 == own.z0
+	check("9.7: in the lobby, on its plan's footprint (SandboxMap.Lobby.shops.auction: 10.4 x 1926 … 1964, z 18 … 70)", site.x0 == own.x0 and site.x1 == own.x1 and site.z0 == own.z0
 		and site.z1 == own.z1 and SandboxMap.inLobby(site.x0, site.z0) and SandboxMap.inLobby(site.x1, site.z1), `{site.x0} … {site.x1}, {site.z0} … {site.z1}`)
 	local door = Layout.door()
 	local lx, lz = -math.sin(math.rad(door.yaw)), -math.cos(math.rad(door.yaw))
 	local plaza = SandboxMap.Lobby.plaza
-	check("its door looks north over the plaza, a few studs off its edge (players see it from the spawn)", lx == 0 and lz == -1 and door.z > plaza.z1 and door.z - plaza.z1 < 12
-		and door.x > plaza.x0 and door.x < plaza.x1)
+	local play = SandboxMap.Lobby.play
+	check("10.4: its door looks west at the PLAY circle across the plaza, on the plaza (a few seconds from the circle)", math.abs(lx + 1) < 1e-9 and math.abs(lz) < 1e-9
+		and door.x > play.x + play.r and door.x < plaza.x1 and door.z > plaza.z0 and door.z < plaza.z1 and math.abs(door.z - play.z) < 1
+		and math.sqrt((door.x - play.x) ^ 2 + (door.z - play.z) ^ 2) / Config.Movement.Walk < 10, `{door.x}, {door.z}`)
 	local board = Leaders.spot()
 	local spawn = SandboxMap.Lobby.spawn
 	check("near the spawn, in sight of the TOP MOVERS board (across the plaza)", math.sqrt((door.x - spawn.x) ^ 2 + (door.z - spawn.z) ^ 2) < 170
@@ -170,8 +172,8 @@ end
 
 -- ── Clear of today's map ────────────────────────────────────────────────────
 do
-	-- (9.7: in the lobby: inside its hedge, off the plots, the portals and their pads, the dispatch, the paint shop,
-	-- the lamps, the trees and the TOP MOVERS board; on flat meadow)
+	-- (9.7: in the lobby: inside its hedge, off the plots, 10.4 the PLAY circle, the dispatch, the paint shop, the lamps,
+	-- the trees and the TOP MOVERS board; on flat ground)
 	local L = SandboxMap.Lobby
 	local why: string? = nil
 	local margin = 3
@@ -179,10 +181,8 @@ do
 	for _, plot in SandboxMap.Plots do
 		table.insert(keep, { name = `plot {plot.id}`, rect = plot.rect, by = C.Plot })
 	end
-	for _, portal in L.portals do
-		table.insert(keep, { name = `{portal.house}'s portal`, rect = portal.foot, by = margin })
-		table.insert(keep, { name = `{portal.house}'s pad`, rect = portal.pad, by = margin })
-	end
+	local play = L.play
+	table.insert(keep, { name = "the PLAY circle", rect = { x0 = play.x - play.r, x1 = play.x + play.r, z0 = play.z - play.r, z1 = play.z + play.r }, by = margin })
 	local d = L.dispatch
 	table.insert(keep, { name = "the dispatch", rect = { x0 = d.x - 4, x1 = d.x + 4, z0 = d.z - 3, z1 = d.z + 3 }, by = margin })
 	table.insert(keep, { name = "the paint shop", rect = L.shops.paint.rect, by = margin })
@@ -381,7 +381,7 @@ do
 						out = `{d.Name} on {road.name}`
 					end
 				end
-			elseif d.Name ~= "Meadow" and d.Name ~= "Mound" and d.Shape ~= Enum.PartType.Ball then
+			elseif d.Name ~= "Meadow" and d.Name ~= "Mound" and d.Name ~= "Plaza" and d.Shape ~= Enum.PartType.Ball then -- (10.4: it stands on the plaza's paving)
 				seen += 1
 				if hits(x - hx, x + hx, z - hz, z + hz) then
 					hit = `{d.Name} at {math.floor(x)}, {math.floor(z)}`
@@ -389,7 +389,7 @@ do
 			end
 		end
 	end
-	check(`nothing else the map builds within 1.5 studs of it, only meadow under it ({seen} parts looked at)`, hit == nil and seen > 300, hit)
+	check(`nothing else the map builds within 1.5 studs of it, only meadow or the plaza's paving under it ({seen} parts looked at)`, hit == nil and seen > 300, hit)
 	check("its parts inside the Bounds, nothing of it on a road", out == nil, out)
 	check(`the map's part budget holds with it ({total} parts, at most {SandboxScenery.Budget})`, total <= SandboxScenery.Budget, total)
 end

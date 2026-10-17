@@ -5,8 +5,8 @@
 -- The state (client/SandboxGuide.luau fills one table again every Config.SandboxGuide.Every seconds):
 --   plot          your plot (the player attribute Plot, server/SandboxPlots.luau; nil: none yet)
 --   move          a move runs (the Moving remote's "state" is a table, client/MovingHud.luau; 9.7: a run)
---   pad           9.7: you stand on a portal's pad (client/RunUi.luau's pad view); padHost: you are its host (you pick
---                 the difficulty)
+--   lobby         10.4: you are in a party lobby (the PLAY circle's: client/RunUi.luau's lobby view); lobbyHost: you
+--                 are its host (you pick the house and the difficulty, you press START)
 --   inside        you are in the house (the state's `inside`, server/HouseInterior.luau)
 --   carrying      you carry a piece (one of the state's items is `mine` and "carried")
 --   vanLoad       the pieces in the truck now (the state's counts.out)
@@ -46,11 +46,11 @@
 --   the truck has things, the run is on finish    "Finish or beat the clock: FINISH at the truck …"       the truck's back
 --   a run, outside, nothing loaded      door      "Walk in through the front door"                        its door
 --   no move, the planning open          plan      "Press LAUNCH to start the move" / the crew waits       (no target)
---   on a portal's pad, the host         pick      "Pick a difficulty: the run starts when the clock runs out" (no target)
---   on a portal's pad                   waitPad   "Stay on the pad: the run starts in a moment"           (no target)
+--   in a lobby, its host                lobbyHost "Your lobby: press READY, then START"                   (no target)
+--   in a lobby                          lobbyWait "In a lobby: press READY, the host starts the run"      (no target)
 --   no move, pieces in the stock        show      "Put your pieces on show: E at an empty stand"          a free stand
---   no move, pieces on show             earn      "Your pieces earn money while you play. …"              a portal
---   no move                             portal    "Walk to a portal: step onto a house's glowing pad"     the nearest portal
+--   no move, pieces on show             earn      "Your pieces earn money while you play. …"              the PLAY circle
+--   no move                             play      "Step into PLAY to start a run"                         the PLAY circle
 --
 -- Done once, a step stays quiet for the session (SandboxSteps.doneBy: what the player did, seen this session: a count
 -- that went up, not one a save brought along; `earn` only says something, so the client counts it done after
@@ -76,8 +76,8 @@
 --   SandboxSteps.nearestShown(x, z, spots, taken) -> index?  8.9: the nearest stand with a piece on show (taken[i])
 --
 -- 8.3, the soft steps: what 8.3 added, each said at its moment and never nagging (SandboxSteps.choose). The core loop
--- always wins: a run (in the house, carrying, the truck loaded), the planning, a portal's pad, and a core step not
--- done yet (walk to a portal, put your pieces on show); only `earn` (it only says something) gives way. Nothing soft while
+-- always wins: a run (in the house, carrying, the truck loaded), the planning, a party lobby, and a core step not
+-- done yet (step into PLAY, put your pieces on show); only `earn` (it only says something) gives way. Nothing soft while
 -- something covers the screen (a grip check, the move's result card, a sandbox window, the start screen: `covered`) or
 -- while something else talks (a first-time hint, shared/SandboxHints.luau busy; a soft step just ended: `hush`). The
 -- first that fits, in this order (SandboxSteps.Soft):
@@ -143,8 +143,8 @@ local SandboxSteps = {}
 export type State = {
 	plot: number?,
 	move: boolean,
-	pad: boolean?, -- 9.7: on a portal's pad (padHost: its host)
-	padHost: boolean?,
+	lobby: boolean?, -- 10.4: in a party lobby (lobbyHost: its host)
+	lobbyHost: boolean?,
 	inside: boolean,
 	carrying: boolean,
 	vanLoad: number,
@@ -183,7 +183,7 @@ export type State = {
 	house: string?,
 }
 
--- target: what the 3D guide points at (client/SandboxGuide.luau finds it): 9.7 "portal" (the nearest portal's pad) |
+-- target: what the 3D guide points at (client/SandboxGuide.luau finds it): 10.4 "play" (the PLAY circle) |
 -- "door" | "van" (the truck's back) | "stand" | 8.3: "desk" (the UPGRADES desk) | "hot" (a free stand, else the 📦 STOCK
 -- chip) | "paint" (9.7: the PAINT shop's booth) | 8.4: "danny" (Danny's body) | 8.9: "sale" (your nearest piece on
 -- show: its Set price prompt) | nil (the hint only). nav: the arrow stays while you drive, done or not.
@@ -223,9 +223,9 @@ end
 
 SandboxSteps.Steps = {
 	-- 9.7 runs: the lobby's (no contract board, no driving: drive, back and home are gone)
-	portal = step("portal", "Walk to a portal: step onto a house's glowing pad", "portal", false, false),
-	pick = step("pick", "Pick a difficulty: the run starts when the clock runs out", nil, false, false),
-	waitPad = step("waitPad", "Stay on the pad: the run starts in a moment", nil, false, false),
+	play = step("play", "Step into PLAY to start a run", "play", false, false), -- (10.4: the one PLAY circle)
+	lobbyHost = step("lobbyHost", "Your lobby: press READY, then START", nil, false, false),
+	lobbyWait = step("lobbyWait", "In a lobby: press READY, the host starts the run", nil, false, false),
 	plan = step("plan", "Press LAUNCH to start the move", nil, false, false),
 	planCrew = step("planCrew", "Get ready: the move's owner presses LAUNCH", nil, false, false),
 	door = step("door", "Walk in through the front door", "door", false, false), -- (8.1 walk-in doors: no E)
@@ -233,7 +233,7 @@ SandboxSteps.Steps = {
 	load = step("load", "Load the truck: walk in or E at its back", "van", false, false),
 	finish = step("finish", "Finish or beat the clock: load more, or FINISH at the truck", "van", false, false),
 	show = step("show", "Put your pieces on show: E at an empty stand", "stand", false, false),
-	earn = step("earn", "Your pieces earn money while you play. Walk into another house for more!", "portal", false, true),
+	earn = step("earn", "Your pieces earn money while you play. Step into PLAY for another run!", "play", false, true),
 	-- 8.3, the soft steps (their words with the price or the piece: SandboxSteps.words)
 	grow = step("grow", "Your warehouse is full: grow it at the UPGRADES desk", "desk", false, false, true),
 	hot = step("hot", "🔥 Your piece is hot today: sell it or show it", "hot", false, false, true),
@@ -281,8 +281,8 @@ function SandboxSteps.decide(s: State, done: { [string]: boolean }?): Step
 	if s.planning then
 		return if s.planningMine then S.plan else S.planCrew -- (8.4: no Danny yet: he comes with the move)
 	end
-	if s.pad == true then -- 9.7 runs: on a portal's pad
-		return if s.padHost == true then S.pick else S.waitPad
+	if s.lobby == true then -- 10.4: in a party lobby (the PLAY circle's)
+		return if s.lobbyHost == true then S.lobbyHost else S.lobbyWait
 	end
 	local free = s.freeStands
 	if s.stock > 0 and (free == nil or free > 0) then
@@ -291,7 +291,7 @@ function SandboxSteps.decide(s: State, done: { [string]: boolean }?): Step
 	if s.shown > 0 then
 		return S.earn
 	end
-	return S.portal
+	return S.play
 end
 
 -- Did the count go up since the look before (nil before: not known yet, nothing to say)?
@@ -303,14 +303,14 @@ end
 -- when they go up (a piece loaded, a trip unloaded, a piece put on show), so what a save or a crew brought along before
 -- you looked does not.
 function SandboxSteps.doneBy(s: State, done: { [string]: boolean }, last: Last)
-	if s.move or s.planning or s.pad == true then
-		done.portal = true -- (9.7 runs: on a pad, or in the run)
+	if s.move or s.planning or s.lobby == true then
+		done.play = true -- (10.4: in a lobby, or in the run)
 	end
 	if s.move then
 		done.plan = true
 		done.planCrew = true
-		done.pick = true
-		done.waitPad = true
+		done.lobbyHost = true
+		done.lobbyWait = true
 		if s.inside then
 			done.door = true
 		elseif s.carrying then

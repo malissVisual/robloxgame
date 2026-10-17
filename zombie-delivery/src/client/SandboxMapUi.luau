@@ -4,10 +4,13 @@
 -- charcoal window, the map glyph and MAP, a fine line, the square ✕). What it shows is client/SandboxMapData.luau's,
 -- drawn by client/SandboxMapDraw.luau; where it all goes is shared/SandboxMapRules.luau's (window, fit).
 --   * In the lobby: its plan (SandboxMap.Lobby): the plaza and the hedge, the four plots (yours in gold: YOUR
---     WAREHOUSE, its UPGRADES desk), the PAINT shop, the TOP MOVERS board, the ZDC DISPATCH, the six portals with their
---     live state (server/Runs.luau's portal attributes: FREE; STARTING IN 7 · who is on the pad; IN USE · HARD · the
---     party), the players as dots with their names and you as a ▲. A click or a tap on a portal (on the map or in the
---     side column's HOUSES) has the guide show the way there (client/SandboxGuide.luau goTo) and closes the map.
+--     WAREHOUSE, its UPGRADES desk), the PAINT shop, the TOP MOVERS board, the DISPATCH, 10.4 the PLAY circle (its
+--     ring amber while a lobby counts down; its line: STEP IN, 2 OPEN LOBBIES, STARTING), the players as dots with
+--     their names and you as a ▲; the side column's OPEN LOBBIES (a row a lobby: its host and house over its
+--     difficulty, n/4, FRIENDS ONLY, STARTING) and IN A RUN (a row a run: its house over its difficulty and party),
+--     server/Parties.luau's attribute on the PLAY circle. A click or a tap on the circle (on the map, on the side
+--     column's PLAY row or on a lobby's row) has the guide show the way there (client/SandboxGuide.luau goTo) and
+--     closes the map.
 --   * In a run: the house's floor plan (rooms, walls, doorways, fixtures, windows) over a strip of its front yard (the
 --     front door, the truck), who is where (you, your party, Danny and the helpers, the zombies near you), the loot you
 --     saw (dots in their tiers' colours; an uncarried Epic or Legendary pulses) and the dangers' markers; the side
@@ -19,7 +22,7 @@
 --   * The 🗺 MAP chip: beside client/SandboxTasksUi.luau's 📋 TASKS chip, in its ScreenGui "SandboxTasksChip" (so what
 --     keeps clear of the HUD's chips keeps clear of it too: Danny's line and card, the offer card, the guide's line),
 --     at its scale and height (a finger's size on a touch screen); its key outline M on a computer, the gamepad's L2
---     glyph with a gamepad, none on a touch screen. Hidden while client/RunUi.luau's pad panel stands where it would be
+--     glyph with a gamepad, none on a touch screen. Hidden while client/PlayUi.luau's lobby bar stands where it would be
 --     (a small phone). Without the TASKS chip: under the money block, in a ScreenGui of its own.
 --   * Cheap: the plan is drawn once an open (again only when the place or the screen changes), the markers move every
 --     Config.SandboxMapUi.Every s while it is open, nothing runs while it is shut but the chip's place (on its signals
@@ -130,23 +133,19 @@ local function screenGui(): ScreenGui?
 	return gui
 end
 
--- A portal picked (on the map or in HOUSES): the guide shows the way to its pad.
-local function guideTo(house: string)
-	local portal = SandboxMap.portal(house)
-	if not portal then
-		return
-	end
+-- 10.4 the PLAY circle picked (on the map, its row or a lobby's): the guide shows the way to it.
+local function guideToPlay()
 	local ok, guide = pcall(function(): any
 		return require(script.Parent.SandboxGuide)
 	end)
 	if not ok or type(guide) ~= "table" or type(guide.goTo) ~= "function" then
 		return
 	end
-	local pad = portal.pad
-	pcall(guide.goTo, Vector3.new((pad.x0 + pad.x1) / 2, SandboxMap.GroundTop + 1, (pad.z0 + pad.z1) / 2), string.upper(portal.name))
+	local p = SandboxMap.Lobby.play
+	pcall(guide.goTo, Vector3.new(p.x, SandboxMap.GroundTop + 1, p.z), "PLAY")
 	CardKit.click()
 	SandboxMapUi.close()
-	toast(`🧭 The guide shows the way to {string.upper(portal.name)}`)
+	toast("🧭 The guide shows the way to PLAY")
 end
 
 local function canGuide(): boolean
@@ -169,45 +168,64 @@ local function buildSide(side: ScrollingFrame, place: Data.Place, u: number, wid
 		y += smallSize + 10
 	end
 	if place.kind == "lobby" then
-		title(if canGuide() then (if touch then "HOUSES · TAP ONE TO GO" else "HOUSES · CLICK ONE TO GO") else "HOUSES")
+		-- 10.4: the PLAY circle (a row: the guide shows the way), the open lobbies and the runs now (rows the look fills)
+		local guided = canGuide()
 		local rowH = math.max(if touch then Ui.MinTouch else 0, math.floor(2 * labelSize + 16))
-		for _, p in SandboxMap.Lobby.portals do
-			local row = Ui.make("TextButton", {
-				Name = `House_{p.house}`,
+		local function row(name: string, y0: number): any
+			local made = Ui.make("TextButton", {
+				Name = name,
 				Text = "",
 				AutoButtonColor = false,
 				BackgroundColor3 = K.row,
 				BorderSizePixel = 0,
 				Size = UDim2.fromOffset(inner, rowH),
-				Position = UDim2.fromOffset(0, y),
+				Position = UDim2.fromOffset(0, y0),
 				ZIndex = 3,
 			}, side)
-			Ui.make("UICorner", { CornerRadius = UDim.new(0, 4) }, row)
-			local bar = Ui.make("Frame", { Name = "State", Size = UDim2.new(0, 4, 1, -8), Position = UDim2.fromOffset(4, 4), BackgroundColor3 = rgb(Config.Runs.Portal.Free), BorderSizePixel = 0, ZIndex = 4 }, row)
-			label(row, "Name", string.upper(p.name), 14, 4, inner - 20, labelSize, K.text, true, 4)
-			local line = label(row, "Line", if touch then "FREE" else "FREE · WALK ONTO THE PAD", 14, 4 + labelSize + 4, inner - 20, smallSize, rgb(Config.Runs.Portal.Free), false, 4, true)
-			if canGuide() then
-				row.Activated:Connect(function()
-					guideTo(p.house)
-				end)
+			Ui.make("UICorner", { CornerRadius = UDim.new(0, 4) }, made)
+			local bar = Ui.make("Frame", { Name = "State", Size = UDim2.new(0, 4, 1, -8), Position = UDim2.fromOffset(4, 4), BackgroundColor3 = rgb(Config.Runs.Play.Free), BorderSizePixel = 0, ZIndex = 4 }, made)
+			local top = label(made, "Top", "", 14, 4, inner - 20, labelSize, K.text, true, 4, true)
+			local bottom = label(made, "Bottom", "", 14, 4 + labelSize + 4, inner - 20, smallSize, K.secondary, false, 4, true)
+			if guided then
+				made.Activated:Connect(guideToPlay)
 			else
-				row.Selectable = false
+				made.Selectable = false
 			end
-			row.MouseEnter:Connect(function()
-				row.BackgroundColor3 = K.raised
+			made.MouseEnter:Connect(function()
+				made.BackgroundColor3 = K.raised
 			end)
-			row.MouseLeave:Connect(function()
-				row.BackgroundColor3 = K.row
+			made.MouseLeave:Connect(function()
+				made.BackgroundColor3 = K.row
 			end)
-			ui.rows[p.house] = { row = row, bar = bar, line = line }
-			y += rowH + 6
+			return { row = made, bar = bar, top = top, bottom = bottom }
 		end
-		y += 6
-		title("ON THE MAP")
+		title(if guided then (if touch then "PLAY · TAP TO GO" else "PLAY · CLICK TO GO") else "PLAY")
+		local play = row("Play", y)
+		play.top.Text = "▶ THE PLAY CIRCLE"
+		play.top.TextColor3 = rgb(Config.Runs.Play.Free)
+		play.bottom.Text = "STEP IN: CREATE A LOBBY OR JOIN ONE"
+		ui.play = play
+		y += rowH + 12
+		ui.listTop = y
+		ui.rowH = rowH
+		ui.rows = {}
+		ui.titles = {
+			open = label(side, "OpenTitle", "OPEN LOBBIES", 0, y, inner, smallSize, K.secondary, true),
+			none = label(side, "None", "NONE YET: STEP INTO PLAY TO MAKE ONE", 0, y, inner, smallSize, K.secondary, false, nil, true),
+			runs = label(side, "RunsTitle", "IN A RUN", 0, y, inner, smallSize, K.secondary, true),
+		}
+		for n = 1, C.Rows do
+			local r = row(`Row{n}`, y)
+			r.row.Visible = false
+			ui.rows[n] = r
+		end
+		ui.legend = {}
 		for _, entry in { { "▲", "YOU", "You" }, { "●", "PLAYERS", "Player" }, { "■", "YOUR WAREHOUSE", "Yours" }, { "■", "UPGRADES DESK", "Desk" } } do
-			label(side, `Legend_{entry[2]}`, `{entry[1]}  {entry[2]}`, 0, y, inner, smallSize, rgb(C.Colors[entry[3]]), true)
-			y += smallSize + 8
+			table.insert(ui.legend, label(side, `Legend_{entry[2]}`, `{entry[1]}  {entry[2]}`, 0, y, inner, smallSize, rgb(C.Colors[entry[3]]), true))
 		end
+		ui.legendTitle = label(side, "LegendTitle", "ON THE MAP", 0, y, inner, smallSize, K.secondary, true)
+		ui.small = smallSize
+		y += smallSize + 10 -- (the look lays the rest out: SandboxMapUi.step)
 	else
 		label(side, "House", place.name, 0, y, inner, labelSize, K.text, true, nil, true)
 		y += labelSize + 6
@@ -351,7 +369,7 @@ local function build(place: Data.Place)
 	local canvas: Draw.Canvas
 	if place.kind == "lobby" then
 		local frame = Rules.fit(Rules.lobbyBox(), 0, m.w, m.h, 6)
-		canvas = Draw.lobby(holder, frame, u, m.w, m.h, if canGuide() then guideTo else nil, Data.plots())
+		canvas = Draw.lobby(holder, frame, u, m.w, m.h, if canGuide() then guideToPlay else nil, Data.plots())
 	else
 		local plan, yard = place.plan, place.yard
 		local box = if plan then Rules.houseBox(plan, yard) elseif yard then yard.strip else { x0 = -20, z0 = -20, x1 = 20, z1 = 20 }
@@ -383,11 +401,74 @@ end
 
 -- ── A look ───────────────────────────────────────────────────────────────────
 
-local function now(): number
-	local ok, t = pcall(function(): number
-		return workspace:GetServerTimeNow()
-	end)
-	return if ok then t else os.clock()
+-- 10.4: the side column's OPEN LOBBIES and IN A RUN rows for `entries` (SandboxMapData.lobbies), laid out under the PLAY
+-- row, the legend under them (the side's canvas follows).
+local function layoutRows(entries: { any })
+	local side, rows, titles = ui.side, ui.rows, ui.titles
+	if not side or not rows or not titles then
+		return
+	end
+	local small, rowH = ui.small or 12, ui.rowH or 40
+	local y = ui.listTop or 0
+	local open, runs = {}, {}
+	for _, e in entries do
+		table.insert(if e.state == "run" then runs else open, e)
+	end
+	local used = 0
+	local function put(list: { any })
+		for _, e in list do
+			used += 1
+			local r = rows[used]
+			if not r then
+				return
+			end
+			local top, bottom, tone = Rules.lobbyLine(e)
+			if r.top.Text ~= top then
+				r.top.Text = top
+			end
+			if r.bottom.Text ~= bottom then
+				r.bottom.Text = bottom
+			end
+			local c = if tone == "run" then K.red elseif tone == "starting" then rgb(Config.Runs.Play.Waiting) elseif tone == "full" then K.secondary else rgb(Config.Runs.Play.Free)
+			r.bar.BackgroundColor3 = c
+			r.bottom.TextColor3 = if tone == "starting" then c else K.secondary
+			r.row.Position = UDim2.fromOffset(0, y)
+			r.row.Visible = true
+			y += rowH + 6
+		end
+	end
+	titles.open.Position = UDim2.fromOffset(0, y)
+	y += small + 10
+	titles.none.Visible = #open == 0
+	if #open == 0 then
+		titles.none.Position = UDim2.fromOffset(0, y)
+		y += small + 12
+	end
+	put(open)
+	titles.runs.Visible = #runs > 0
+	if #runs > 0 then
+		y += 6
+		titles.runs.Position = UDim2.fromOffset(0, y)
+		y += small + 10
+		put(runs)
+	end
+	for n = used + 1, #rows do
+		rows[n].row.Visible = false
+	end
+	y += 6
+	ui.legendTitle.Position = UDim2.fromOffset(0, y)
+	y += small + 10
+	for _, l in ui.legend do
+		l.Position = UDim2.fromOffset(0, y)
+		y += small + 8
+	end
+	local keys = side:FindFirstChild("Keys")
+	if keys and keys:IsA("GuiObject") then
+		y += 4
+		keys.Position = UDim2.fromOffset(0, y)
+		y += small + 8
+	end
+	side.CanvasSize = UDim2.fromOffset(0, y)
 end
 
 function SandboxMapUi.step()
@@ -408,23 +489,9 @@ function SandboxMapUi.step()
 	local dangers = Data.dangers(place)
 	Draw.marks(canvas, people, loot, dangers, Data.truck(place))
 	if place.kind == "lobby" then
-		local states = Data.portals()
-		local t = now()
-		Draw.portals(canvas, states, t)
-		for _, s in states do
-			local row = ui.rows and ui.rows[s.house]
-			if row then
-				local who: { string } = if type(s.who) == "string" then string.split(s.who, ", ") else {}
-				local text, tone = Rules.portal(s.state, s.endsAt, t, Rules.names(who, C.Names), s.difficulty, if Ui.touchLayout() then "row" else "long")
-				local P = Config.Runs.Portal
-				local c = rgb(if tone == "use" then P.InUse elseif tone == "wait" then P.Waiting else P.Free)
-				if row.line.Text ~= text then
-					row.line.Text = text
-				end
-				row.line.TextColor3 = c
-				row.bar.BackgroundColor3 = c
-			end
-		end
+		local entries = Data.lobbies()
+		Draw.play(canvas, entries)
+		layoutRows(entries)
 	else
 		local status = Data.status(place)
 		local lines = ui.lines
@@ -475,13 +542,8 @@ function SandboxMapUi.open()
 	if not ok then
 		warn(`[SandboxMapUi] {err}`)
 	end
-	-- the gamepad's selection on the first house (the lobby) or the ✕
-	local first: GuiObject? = nil
-	if ui.rows then
-		local p = SandboxMap.Lobby.portals[1]
-		local row = p and ui.rows[p.house]
-		first = if row then row.row else nil
-	end
+	-- the gamepad's selection on the PLAY row (the lobby) or the ✕
+	local first: GuiObject? = if ui.play and ui.play.row.Parent then ui.play.row else nil
 	Ui.gamepadFocus(first or ui.close)
 	task.spawn(function()
 		while opened and opens == mine do
@@ -514,7 +576,7 @@ function SandboxMapUi.toggle()
 end
 
 function SandboxMapUi.parts(): { [string]: any }
-	return { gui = ui.gui, window = ui.window, map = ui.map, side = ui.side, canvas = ui.canvas, close = ui.close, rows = ui.rows, lines = ui.lines, chip = chip.button, chipGui = chip.gui }
+	return { gui = ui.gui, window = ui.window, map = ui.map, side = ui.side, canvas = ui.canvas, close = ui.close, rows = ui.rows, play = ui.play, lines = ui.lines, chip = chip.button, chipGui = chip.gui }
 end
 
 -- ── The 🗺 MAP chip ──────────────────────────────────────────────────────────
@@ -604,8 +666,8 @@ function SandboxMapUi.arrange()
 	button.Position = UDim2.fromOffset(math.floor(x - origin.X + 0.5), math.floor(y - origin.Y + 0.5))
 	chip.corner.CornerRadius = UDim.new(0, math.floor(chipH / 2))
 	chip.label.Size = UDim2.new(1, -(12 + (if keyShown then 28 else 0)), 1, 0)
-	-- (a small phone: the pad panel of client/RunUi.luau may stand where it would be; then it waits)
-	local panel = find("RunUi", "PadPanel")
+	-- (a small phone: the lobby bar of client/PlayUi.luau may stand where it would be; then it waits)
+	local panel = find("PlayUi", "PlayBar")
 	local clear = true
 	if panel and panel.Visible then
 		local a, b = boxOf(button), boxOf(panel)

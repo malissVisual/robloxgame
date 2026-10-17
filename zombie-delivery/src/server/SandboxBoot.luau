@@ -64,7 +64,7 @@ local SandboxBoot = {}
 
 local PLOT_WAIT = 3 -- seconds a new body waits for its player's plot (SandboxPlots claims it when they join)
 local SAVE_WAIT = 15 -- seconds PLAY waits for the save to load
-local NO_VAN = "No vans in the lobby: your truck waits at the house when a run starts (walk onto a portal's pad)."
+local NO_VAN = "No vans in the lobby: your truck waits at the house when a run starts (step into PLAY)."
 
 local notice = Net.get("Notice")
 local playing: { [Player]: boolean } = {} -- PLAY pressed (the van is theirs to keep)
@@ -456,7 +456,7 @@ local function sandbox()
 		Moving.start()
 	end)
 	optional("HelperCrew", "start") -- 10.1: the helpers' crew (the CREW window's remote, your helper at your warehouse)
-	optional("Runs", "start") -- 9.7: the lobby's portals and the runs (after Moving: it wraps the crews, hears the ends)
+	optional("Runs", "start") -- 9.7: the runs, 10.4 the PLAY circle's party lobbies (after Moving: it wraps the crews, hears the ends)
 end
 
 function SandboxBoot.start(queueState: (Player) -> ())
