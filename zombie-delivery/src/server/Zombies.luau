@@ -1038,14 +1038,9 @@ end
 -- 6.24: a random kind from a kinds table for a spot (shared/ZombieKinds.luau weights: the night, the danger;
 -- Config.ZombieTypes); a special kind at its MaxAlive comes as a walker. (10.6: no job's tier, no level, no Blood
 -- Moon: the city's.)
-function Zombies.pickKind(kinds: { [string]: number }, at: Vector3?, _owner: Player?): string
+function Zombies.pickKind(kinds: { [string]: number }, at: Vector3?): string
 	local distance = if at then Vector3.new(at.X - DEPOT.X, 0, at.Z - DEPOT.Z).Magnitude else nil
-	local weights = Kinds.weights(kinds, {
-		night = DayNight.nightFactor(),
-		danger = Kinds.danger(nil, distance),
-		level = nil,
-		bloodMoon = false,
-	})
+	local weights = Kinds.weights(kinds, { night = DayNight.nightFactor(), danger = Kinds.danger(distance) })
 	local kind = DangerRules.pickKind(weights, rng:NextNumber())
 	if Types.MaxAlive[kind] then
 		local alive = 0

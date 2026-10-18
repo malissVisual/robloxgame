@@ -3240,7 +3240,7 @@ local function hordeBurst(s: Session, clock: number)
 	local door = doors[s.bursts % #doors + 1].door
 	for _ = 1, math.ceil(T.Horde.Count / math.max(1, T.Horde.Bursts)) do
 		local spot = Zombies.findSpot(door, nil, T.Horde.Near, T.Horde.Far)
-		local z = if spot then Zombies.spawn(Zombies.pickKind(T.Horde.Kinds, spot, s.owner), spot, s.owner) else nil
+		local z = if spot then Zombies.spawn(Zombies.pickKind(T.Horde.Kinds, spot), spot, s.owner) else nil
 		if z then
 			Zombies.march(z, door)
 			table.insert(s.horde, z)
@@ -3272,7 +3272,7 @@ local function keepRoam(s: Session, clock: number)
 	end
 	for _ = 1, T.Sandbox.Roam - #s.roam do -- (Config.Moving.Sandbox.Roam: the test world's few; 0: none)
 		local spot = Zombies.findSpot(s.site.door, nil, T.Roam.Near, T.Roam.Far)
-		local z = if spot then Zombies.spawn(Zombies.pickKind(T.Roam.Kinds, spot, s.owner), spot, s.owner, false, true) else nil
+		local z = if spot then Zombies.spawn(Zombies.pickKind(T.Roam.Kinds, spot), spot, s.owner, false, true) else nil
 		if z then
 			table.insert(s.roam, z)
 		end
