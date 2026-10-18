@@ -1,4 +1,4 @@
-# 10.6: only the sandbox (the contract for the workers)
+# 10.9: only the sandbox (the contract for the workers)
 
 The owner (17. 10. 2026): "remove everything that is not active now, only the sandbox; that will be the game, what
 was before I don't want any more" and, asked to confirm, "ano, smaž to" (yes, delete it). The reason: helpers keep

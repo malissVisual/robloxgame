@@ -138,7 +138,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Net = require(Shared.Net)
 local Rules = require(Shared.MovingRules)
-local MoveRoles = require(Shared.MoveRoles) -- (8.8 no roles: only the climb's rules and the van call's words)
+local MoveRoles = require(Shared.MoveRoles) -- (the climb's rules and the van call's words)
 local SandboxMap = require(Shared.SandboxMap) -- the houses and the plots
 local Crew = require(script.Parent.Crew)
 local MoveLobby = require(script.Parent.MoveLobby) -- 7.0 planning: the quick chat on a run
@@ -688,7 +688,7 @@ local function climbOf(s: Session, spot: number): number
 	if not c or not c.slow or not thing then
 		return 1
 	end
-	return MoveRoles.climbFactor(nil, Rules.mode(thing))
+	return MoveRoles.climbFactor(Rules.mode(thing))
 end
 
 -- ── The places: the drop-off, the houses' doors ────────────────────────────
@@ -2677,7 +2677,7 @@ end
 
 -- ── The party on a run (8.8 no roles: everybody does everything) ──────────
 
-local R = Config.MoveRoles -- (the van call's Driver.Near, the climb's Mover.Hold: the numbers stayed there)
+local R = Config.MoveRoles -- (the van call's CallNear, the climb's Climb.Hold)
 
 -- "Enter house" at the house's front door: this run's own, for its party only (MoveOwner); the door is never locked.
 -- One at every door of the site (the farmstead's back door too: "Enter by the back door"), each to its own way in
@@ -2741,7 +2741,7 @@ local function callTruck(s: Session, player: Player)
 	end
 	local door = doorNear(s, player)
 	local spot, heading = door.park, door.heading
-	if flat(truck.chassis.Position, spot) <= R.Driver.Near then
+	if flat(truck.chassis.Position, spot) <= R.CallNear then
 		say(player, "The van is at the door already.")
 		return
 	end
@@ -2760,8 +2760,8 @@ local function callTruck(s: Session, player: Player)
 	end)
 end
 
--- A carried thing going up stairs or a slope (its carrier rose Mover.Rise a stud along, held Hold s): its walk ×
--- Mover.Climb (not a thing in one hand: MoveRoles.climbFactor); watchCarried calls it every tick.
+-- A carried thing going up stairs or a slope (its carrier rose Climb.Rise a stud along, held Hold s): its walk ×
+-- Climb.Walk (not a thing in one hand: MoveRoles.climbFactor); watchCarried calls it every tick.
 local function climbStep(s: Session, spot: number, holder: Player, root: BasePart, clock: number)
 	local thing = s.move.things[spot]
 	local c = s.team.climb[spot]
@@ -2778,11 +2778,11 @@ local function climbStep(s: Session, spot: number, holder: Player, root: BasePar
 	end
 	if clock - c.time >= 0.15 then
 		if MoveRoles.climbing(at.Y - c.at.Y, flat(at, c.at)) then
-			c.upUntil = clock + R.Mover.Hold
+			c.upUntil = clock + R.Climb.Hold
 		end
 		c.at, c.time = at, clock
 	end
-	local slow = clock < c.upUntil and MoveRoles.climbFactor(nil, Rules.mode(thing)) < 1
+	local slow = clock < c.upUntil and MoveRoles.climbFactor(Rules.mode(thing)) < 1
 	if slow ~= c.slow then
 		c.slow = slow
 		local item = s.items[spot]

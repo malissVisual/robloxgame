@@ -10,7 +10,7 @@
 --     its walk-in bay Config.Moving.Beds.sprinter).
 --   * "Enter house" on the map's front door (the part with the attribute SandboxDoor), out at the door; the truck at
 --     House.curb (its nose to the road, its back to the door).
---   * 8.8 no roles (tests/noroles_runtime_test.luau has the crew's): Ann has none on the move (no MoveRole, the state's
+--   * 8.8 no roles: Ann has none on the move (no MoveRole, the state's
 --     team only says the van was called), the van's Load holds no time.
 --   * Load at the back doors, and from inside the walk-in bay (its own Load, the back shut), every piece inside the
 --     bay; Danny on a solo move (10.1: free, with you from the start; a two-person Lift without his answer, Config.MoveHelper

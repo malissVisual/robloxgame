@@ -2359,29 +2359,19 @@ export type EmployerDef = {
 	person: string, -- who runs it (the R15 NPC at their board)
 }
 
--- 5.7, robustness and load (server/Zombies.luau, shared/Net.luau, server/Shops.luau, server/Jobs.luau, Main.server).
--- Zombies: TouchEvery = how often (seconds) the car-touch test and the targets' list run (20 Hz, not every frame:
--- a car at 120 studs/s moves 6 studs between two tests, far less than its own length plus the reach). Limits: how
--- many requests a second each remote takes from one player (a token bucket: as many in a burst, then that many a
--- second; Net.limit drops the rest, Net.latest keeps the last one and runs it once there is room again). Aiming,
--- PinOrder and RequestOffers keep the last (a state: the final one always arrives; a burst of board requests is
--- answered once); the shop actions and CancelJob drop the extra clicks.
+-- 5.7, robustness and load (server/Zombies.luau, shared/Net.luau). Zombies: TouchEvery = how often (seconds) the
+-- targets' list runs (20 Hz, not every frame). Limits: how many requests a second each remote takes from one player (a
+-- token bucket: as many in a burst, then that many a second; Net.limit drops the rest, Net.latest keeps the last one
+-- and runs it once there is room again).
 Config.Robust = {
 	Zombies = {
 		TouchEvery = 0.05,
 	},
 	Limits = {
-		Buy = 5,
-		Paint = 5,
 		AdminSandbox = 4, -- 8.0 SANDBOX: the admin panel's SANDBOX buttons (server/Admin.luau "sandbox", shared/SandboxAdmin.luau)
-		Zip = 4, -- 6.10 review: a zip line's grab (a jump on the start platform) and letgo (server/ZipLines.luau)
-		Tasks = 4, -- 6.12: the TASKS app's "open" and CLAIM (server/Tasks.luau)
 		ClientError = 0.05, -- 6.13: a client's script error (its script and line): one every 20 s at most (server/Analytics.luau)
-		CrateDown = 4, -- 6.15: the PutDown remote (the touch PUT DOWN) while you carry a supply drop's crate (server/LiveEvents.luau)
 		Moving = 6, -- 7.0: the Moving remote: the contract card's START, GIVE UP, the item list (server/Moving.luau)
-		MoveLobby = 6, -- 7.0 planning: the MoveLobby remote's role, READY, LAUNCH, CANCEL (server/MoveLobby.luau)
 		QuickChat = 0.5, -- 7.0 planning: a quick chat line (the MoveLobby remote's "chat"): one every 2 s at most
-		MovingBoard = 1, -- 7.0 review: the moving board's prompt (its contract card): one a second
 		Collection = 6, -- 8.0: the Collection remote's display / undisplay / sell / state (server/Collection.luau)
 		CollectionBulk = 1, -- 8.2: and its bulk buttons (fillbest / sellmany / undisplayall): one a second, on top
 		Upgrades = 4, -- 8.1: the Upgrades remote's state / buy (server/Upgrades.luau)
@@ -3154,43 +3144,16 @@ Config.Moving = {
 	},
 }
 
--- 7.0 planning (design/rework/NAVRH.md §2–3, step 2 of §7): the planning lobby before a move and the three roles (the
--- owner took the Technician out: no locked front door, no fuse box, the house is lit from the start; the client greets
--- the crew at the door instead: Config.MoveGreeters). shared/MoveRoles.luau has the rules (tests/moveroles_test.luau), server/MoveLobby.luau the lobby and the quick chat,
--- server/Moving.luau the roles' abilities, client/MoveLobbyUi.luau, client/QuickChat.luau and client/MovingHud.luau
--- show them.
---   On                8.8 (the owner: "I don't want roles in the game. Everyone is simply the same."): the roles at
---                     all (MoveRoles.on), the city's only: the sandbox (Config.Sandbox.On) never has them, whatever this
---                     says. Without them nobody picks or has a role (the lobby is the crew, READY and LAUNCH; the HUD
---                     has no role line), everybody loads and unloads the van with no wait, anybody calls it to the
---                     door once a move (whoever is first: Driver.Curb, Driver.Near), and nobody has the Mover's or the
---                     Guard's perks (no pair piece carried alone, everybody × Mover.Climb up stairs, no damage bonus,
---                     barricades or sight through walls) nor the Driver's truck damage. false takes them out of the
---                     city too.
---   Order             the roles, in the lobby's order (a newcomer gets the first free one)
---   Switch            s between two role switches on a move (solo: switch to do everything; a crew: a free role)
---   Lobby             Timeout: s the planning stays open; Tick: its loop (the crew joining and leaving); TouchScale:
---                     the lobby window at least this big on a touch screen (it scrolls there; Ui.screenScale may be 0.55)
---   Driver            TruckDamage: × a hit on the truck (and so on its load) while a Driver is at its wheel; the
---                     truck's Load / Unload wait nothing for a Driver (client/MovingHud.luau); "Call truck to door"
---                     once a move: to the house's curb (Curb studs from the road's middle) unless somebody sits in it
---                     or it stands within Near of it already
---   Mover             Alone: × the walk with a pair thing ALONE (carried, not dragged at Moving.Speed.Drag); Carry: ×
---                     the carry's walk on everything else (never over the walk); the others go up stairs and slopes
---                     (Rise studs up a stud along, held Hold s) at × Climb with anything not one-handed, a Mover not
---   Guard             Damage: × weapon damage on the move's zombies (within Range of its house's door or its truck);
---                     Barricades a move, each Hp (Bite hp a second off it for every zombie within Reach) for Life s, put
---                     up outside within Near of the house's door (off the road, clear of cars and players); XRay: the
---                     zombies outlined through walls within this (client/EnemyOutline.luau)
---   Chat             the quick chat (hold T): Bubble s over the sender, Feed s in the move's HUD, Hold s of T
+-- A run's quick chat and the climb with a carried piece (shared/MoveRoles.luau, the name the 7.0 roles'; 10.9 the roles
+-- and the planning lobby gone; tests/moveroles_test.luau).
+--   Climb      a piece carried up stairs and slopes (its carrier Rise studs up a stud along, held Hold s): × Walk on
+--              the carry's walk, unless it is in one hand (server/Moving.luau)
+--   CallNear   "Call the van to the door" (once a run, whoever is first): not while the van stands within this of the
+--              door's curb already
+--   Chat       the quick chat (hold T): Bubble s over the sender, Feed s in the run's HUD, Hold s of T
 Config.MoveRoles = {
-	On = true, -- (the city's; the sandbox has none)
-	Order = { "driver", "mover", "guard" } :: { string },
-	Switch = 30,
-	Lobby = { Timeout = 15 * 60, Tick = 0.5, TouchScale = 0.75 },
-	Driver = { TruckDamage = 0.6, Curb = 5, Near = 25 },
-	Mover = { Alone = 0.6, Carry = 1.15, Climb = 0.75, Rise = 0.35, Hold = 0.8 },
-	Guard = { Damage = 1.5, Range = 150, Barricades = 2, Hp = 400, Bite = 30, Reach = 4.5, Life = 120, Near = 40, XRay = 60 },
+	Climb = { Walk = 0.75, Rise = 0.35, Hold = 0.8 },
+	CallNear = 25,
 	Chat = { Bubble = 4, Feed = 6, Hold = 0.18 },
 }
 

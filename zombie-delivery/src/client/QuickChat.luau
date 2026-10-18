@@ -10,8 +10,7 @@
 -- clear of the touch buttons and the HUD's groups, and hides while a window or the move's list covers the screen
 -- (QuickChat.covered, set by Main); on a touch screen the ring's lines are a finger's size (MoveLayout.ring); a ring
 -- shut while T is still held stays shut (the hold starts again on the next press).
--- 8.8 (no roles: MoveRoles.on): the chat is nobody's role, it stays as it is (its lines and numbers only live with the
--- roles' in shared/MoveRoles.luau and Config.MoveRoles.Chat).
+-- Its lines are shared/MoveRoles.luau's, its numbers Config.MoveRoles.Chat (the name the 7.0 roles', gone).
 --   QuickChat.start()    the key, the touch button, the lines coming in
 --   QuickChat.active()   on a move
 --   QuickChat.isOpen()   the ring is open (Main: the mouse is free while it is)

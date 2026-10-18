@@ -9,7 +9,7 @@
 -- 7.0 review (server): nothing replaces the truck mid-move (Vehicles' placeAt / spawnAt), Moving.busy,
 -- a door trip whose move ends meanwhile, Load's pace check, Unload's full hands, the end's listeners
 -- failing (the cleanup still runs), the plan made once a seed.
--- 8.8 no roles: anybody of the crew calls the van to the door, once a run (tests/noroles_runtime_test.luau has the rest).
+-- 8.8 no roles: anybody of the crew calls the van to the door, once a run.
 -- 8.1 walk-in doors (Config.Moving.Doors; the E prompts there but off): walking into the door's zone facing it goes in
 -- after the dwell (not a stranger, not from a seat, not walking past, not brushing past, not beside the doorway), out by
 -- the doorway inside, no ping-pong (shut until you left the zone you came out in and Rearm s went by, whichever later),
