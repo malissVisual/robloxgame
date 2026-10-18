@@ -25,7 +25,8 @@
 --     SandboxMapRules.turn(x, z, degrees) -> (x, z)    a direction turned as toLocal (yaw: the plan's origin's) and
 --                                                      toYard (yaw: the house's) turn a point: a look on the map
 --     SandboxMapRules.houseBox(plan, yard?) -> Box      what the run's map shows: the plan and the yard's strip
---     SandboxMapRules.lobbyBox() -> Box                 the lobby's bounds (SandboxMap.Lobby)
+--     SandboxMapRules.lobbyBox() -> Box                 the lobby's island (10.6: SandboxMap.Islands' first: its bounds
+--                                                      and the rim of grass round them to its edge)
 --   Drawing (a Frame maps content studs to px: its centre cx, cz; rot in degrees, 0 north up, 180 the house's front
 --   door at the bottom; scale px a stud; ox, oy the px the centre lands on):
 --     SandboxMapRules.fit(box, rot, w, h, pad) -> Frame        the box as big as fits in w × h px, pad px round it
@@ -362,7 +363,8 @@ function SandboxMapRules.houseBox(plan: Plan, yard: Yard?): Box
 end
 
 function SandboxMapRules.lobbyBox(): Box
-	local b = SandboxMap.Lobby.bounds
+	local island = SandboxMap.Islands[1]
+	local b = if island then island.rect else SandboxMap.Lobby.bounds
 	return { x0 = b.x0, z0 = b.z0, x1 = b.x1, z1 = b.z1 }
 end
 

@@ -5,24 +5,28 @@
 -- deterministic. 8.9: the Alps are gone; 9.4 the countryside's own dress (design/countryside/plan.py) is
 -- shared/VillageScenery.luau's. 9.7 runs: no driving (design/lobby/plan.py, design/countryside/plan.py): Pražská,
 -- Depot Row, the lanes, the turnaround, the markings, the street lamps and the signpost are gone; the asphalt is the run
--- zones' yards, where the trucks stand; the lobby's own dress is server/LobbyWorld.luau's.
+-- zones' yards, where the trucks stand; the lobby's own dress is server/LobbyWorld.luau's. 10.6 the floating islands
+-- (design/islands/plan.py, SandboxMap.Islands): no meadow under everything any more, the sky under them; each island's
+-- grass is its ground, at its own height (its rock under it: shared/IslandLooks.luau).
 --
---   The ground     a flat meadow (Grass, its top at SandboxMap.GroundTop) over the Bounds in a few tiles that leave
---                  out the plots' concrete pads, the farmstead's lawn, 9.7 the lobby's plaza and 8.9 the fields and
---                  the lawns (SandboxMap.Fields, Lawns: each flush with it, no two tops on one plane); 9.4 cut in bands
---                  along z or along x, whichever takes fewer tiles
---   The yards      the asphalt (SandboxMap.Roads: 9.7 each run zone's yard) stands RoadTop over the meadow; every edge
---                  drops back to it on a gravel shoulder, a slope Run studs wide (a wedge), a hip at a convex corner
+--   The ground     10.6 every island's grass (Grass, 2 deep, its top at the island's top: SandboxMap.groundAt) over its
+--                  top in a few tiles that leave out what has a ground of its own there: the plots' concrete pads, the
+--                  farmstead's lawn, the lobby's plaza and the lawns (SandboxMap.Fields, Lawns: each flush with it, no two
+--                  tops on one plane); cut in bands along z or along x, whichever takes fewer tiles
+--   The yards      the asphalt (SandboxMap.Roads: each place's yard, its van parking) stands RoadTop - GroundTop over its
+--                  island's grass; every edge drops back to it on a gravel shoulder, a slope Run studs wide (a wedge), a
+--                  hip at a convex corner
 --   The house      the curb-to-door Path, the garden's fence round its lot (decoration: nothing stops a mover), the
 --                  gate with its THE OLD FARMSTEAD board, the mailbox, the flower boxes (the house itself is
 --                  shared/ChaletLooks.luau's, on SandboxMap.House.house; 8.1: the owner's Blender house once imported)
---   Where things may grow   treeRule: never on a yard, a plot, a place to empty's lot or a truck's spot (the six
---                  places' lots and curbs, SandboxMap.Houses, the farmstead's among them), 9.7 never in the lobby
+--   Where things may grow   treeRule: 10.6 only on an island's grass (Clear.Edge in from its edge), never on a yard, a
+--                  plot, a place to empty's lot or a truck's spot (the six places' lots and yards: a round's vans park
+--                  there, SandboxMap.Houses, the farmstead's among them), 9.7 never in the lobby
 --
---   SandboxScenery.meadow()             the meadow's tiles (Rects) and the holes they leave (holes(): the pads, the
---                                       farmstead's lawn, the plaza, the fields, the lawns)
---   SandboxScenery.groundAt(x, z)       the ground's top there (8.9: flat, GroundTop everywhere)
---   SandboxScenery.asphalt()            the asphalt's slabs (a yard's name and rect), none over another
+--   SandboxScenery.tops()               10.6 the islands' grass tiles ({ island, top, rect }) round the holes
+--   SandboxScenery.holes()              what has its own ground (the pads, the farmstead's lawn, the plaza, the fields, the lawns)
+--   SandboxScenery.groundAt(x, z)       the ground's top there (10.6: its island's top, SandboxMap.groundAt)
+--   SandboxScenery.asphalt()            the asphalt's slabs (a yard's name, rect and top), none over another
 --   SandboxScenery.ramps()              the yards' shoulders (wedges as CurbShape's pieces: kind, middle, size, X axis)
 --   SandboxScenery.shoulderAt(ramp, x, z)   a shoulder's top at (x, z) (nil: not over it)
 --   SandboxScenery.treeRule(x, z, r)    why nothing r wide may grow there (nil: it may)
@@ -40,9 +44,11 @@ export type Rect = SandboxMap.Rect
 -- meadow), a "corner" a CornerWedgePart (its apex over its (+X, -Z) corner, the asphalt's corner); its middle, its size
 -- along its own axes and its X axis on the ground (rx, rz; Y up, Z = X × Y). (shared/CurbShape.luau's convention.)
 export type Ramp = { kind: string, x: number, y: number, z: number, sx: number, sy: number, sz: number, rx: number, rz: number }
--- 8.9: a slab of asphalt (a yard's, SandboxMap.Roads' name)
-export type Slab = { name: string, x0: number, x1: number, z0: number, z1: number }
+-- 8.9: a slab of asphalt (a yard's, SandboxMap.Roads' name; 10.6 its top: its island's road level)
+export type Slab = { name: string, x0: number, x1: number, z0: number, z1: number, top: number }
 export type Segment = { ax: number, az: number, bx: number, bz: number }
+-- 10.6: a tile of an island's grass (its island's id, its top's height, its rect)
+export type Tile = { island: string, top: number, rect: Rect }
 
 local MAP = SandboxMap
 local BOUNDS = MAP.Bounds
@@ -54,7 +60,7 @@ SandboxScenery.Budget = 2500 -- parts in workspace.Sandbox at most
 SandboxScenery.Run = 4 -- the shoulders: from the asphalt's top down to the meadow over this many studs (1 in 10)
 SandboxScenery.RoadDepth = 1 -- the asphalt slabs' thickness (their bottom under the meadow's top)
 SandboxScenery.Shadow = { Long = 4, Wide = 1 } -- a part throws a shadow only this big (and RenderBudget's rule)
-SandboxScenery.WallHeight = 300 -- the invisible walls on the Bounds
+SandboxScenery.Grass = Config.Islands.Body.Grass -- 10.6 an island's grass tiles' depth (its rock under them: shared/IslandLooks.luau)
 -- the chalet on House.house (its walls the box's height), its dice: "tyrol". 8.1: Pitch is the owner's Blender house's roof
 -- (design/blender-house/house.py PITCH): dressed in it (server/HouseMesh.luau), the chalet's gable wedges are re-cut to
 -- a gable this steep across the house, under that roof (tools/house-art/check.py checks it against the model). 8.2.1:
@@ -88,8 +94,8 @@ local rectDistance = SandboxScenery.rectDistance
 
 -- ── The ground ─────────────────────────────────────────────────────────────
 
--- The holes in the meadow: the plots' pads, the house's lawn, 9.7 the lobby's plaza and 8.9 the fields and the lawns
--- (each its own part, flush with the meadow).
+-- The holes in the islands' grass: the plots' pads, the house's lawn, 9.7 the lobby's plaza and 8.9 the fields and the
+-- lawns (each its own part, flush with the grass).
 function SandboxScenery.holes(): { Rect }
 	local list: { Rect } = {}
 	for _, plot in MAP.Plots do
@@ -107,26 +113,27 @@ function SandboxScenery.holes(): { Rect }
 	return list
 end
 
--- The meadow's tiles: the Bounds less the holes, in bands along one axis, a tile joined to the one before it in that
--- band's direction when they meet edge to edge with the same sides (fewer parts round the fields); 9.4 both ways (bands
--- along z, bands along x), the one with fewer tiles. No two tiles overlap, none longer than a part may be.
-local function sweep(holes: { Rect }, alongX: boolean): { Rect }
+-- A rect's tiles less the holes in it, in bands along one axis, a tile joined to the one before it in that band's
+-- direction when they meet edge to edge with the same sides (fewer parts round the holes); 9.4 both ways (bands along
+-- z, bands along x), the one with fewer tiles. No two tiles overlap, none longer than a part may be. (10.6: an island's
+-- top, 8.9 – 10.5 the Bounds' meadow.)
+local function sweep(area: Rect, holes: { Rect }, alongX: boolean): { Rect }
 	-- (u: the axis the bands cut, v: across them; alongX swaps x and z)
 	local function u0(r: Rect): number return if alongX then r.x0 else r.z0 end
 	local function u1(r: Rect): number return if alongX then r.x1 else r.z1 end
 	local function v0(r: Rect): number return if alongX then r.z0 else r.x0 end
 	local function v1(r: Rect): number return if alongX then r.z1 else r.x1 end
-	local cuts = { u0(BOUNDS), u1(BOUNDS) }
+	local cuts = { u0(area), u1(area) }
 	for _, h in holes do
-		table.insert(cuts, u0(h))
-		table.insert(cuts, u1(h))
+		table.insert(cuts, math.clamp(u0(h), u0(area), u1(area)))
+		table.insert(cuts, math.clamp(u1(h), u0(area), u1(area)))
 	end
 	table.sort(cuts)
 	local tiles: { { number } } = {} -- { v0, v1, u0, u1 }
 	for i = 1, #cuts - 1 do
 		local a, b = cuts[i], cuts[i + 1]
 		if b - a > 1e-6 then
-			local open = { { v0(BOUNDS), v1(BOUNDS) } }
+			local open = { { v0(area), v1(area) } }
 			for _, h in holes do
 				if u0(h) < b - 1e-6 and u1(h) > a + 1e-6 then
 					local next: { { number } } = {}
@@ -177,58 +184,79 @@ local function sweep(holes: { Rect }, alongX: boolean): { Rect }
 	return out
 end
 
-function SandboxScenery.meadow(): ({ Rect }, { Rect })
-	local holes = SandboxScenery.holes()
-	local byZ, byX = sweep(holes, false), sweep(holes, true)
-	return if #byX < #byZ then byX else byZ, holes
+-- 10.6 every island's grass: its top less the holes on it, a tile list each (the island's id and top with each tile).
+local topsCache: { Tile }? = nil
+function SandboxScenery.tops(): { Tile }
+	if topsCache then
+		return topsCache
+	end
+	local all = SandboxScenery.holes()
+	local list: { Tile } = {}
+	for _, island in MAP.Islands do
+		local r = island.rect
+		local holes: { Rect } = {}
+		for _, h in all do
+			if h.x0 < r.x1 and h.x1 > r.x0 and h.z0 < r.z1 and h.z1 > r.z0 then
+				table.insert(holes, h)
+			end
+		end
+		local byZ, byX = sweep(r, holes, false), sweep(r, holes, true)
+		for _, t in (if #byX < #byZ then byX else byZ) do
+			table.insert(list, { island = island.id, top = island.top, rect = t })
+		end
+	end
+	topsCache = list
+	return list
 end
 
--- The ground's top at (x, z) off the asphalt (8.9: flat everywhere, the Alps' mounds are gone).
+-- The ground's top at (x, z) off the asphalt (8.9: flat, the Alps' mounds are gone; 10.6 its island's top).
 function SandboxScenery.groundAt(x: number, z: number): number
-	return MAP.GroundTop
+	return MAP.groundAt(x, z)
 end
 
 -- ── The roads' shoulders ───────────────────────────────────────────────────
 
-local function edge(list: { Ramp }, x0: number, x1: number, z0: number, z1: number, nx: number, nz: number, top: number)
-	-- the shoulder over the rect (x0 … x1, z0 … z1) of the meadow, falling away from the asphalt along (nx, nz)
+local function edge(list: { Ramp }, x0: number, x1: number, z0: number, z1: number, nx: number, nz: number, base: number, top: number)
+	-- the shoulder over the rect (x0 … x1, z0 … z1) of the grass (its top `base`), falling away from the asphalt (its
+	-- top `top`) along (nx, nz)
 	local along = if nx ~= 0 then z1 - z0 else x1 - x0
 	local run = if nx ~= 0 then x1 - x0 else z1 - z0
 	table.insert(list, {
 		kind = "edge",
 		x = (x0 + x1) / 2,
-		y = MAP.GroundTop + (top - MAP.GroundTop) / 2,
+		y = base + (top - base) / 2,
 		z = (z0 + z1) / 2,
 		sx = along,
-		sy = top - MAP.GroundTop,
+		sy = top - base,
 		sz = run,
 		rx = -nz,
 		rz = nx,
 	})
 end
 
-local function corner(list: { Ramp }, cx: number, cz: number, sx: number, sz: number, top: number)
+local function corner(list: { Ramp }, cx: number, cz: number, sx: number, sz: number, base: number, top: number)
 	-- the hip at the asphalt's convex corner (cx, cz), out toward (sx, sz) (each ±1): CurbShape's corner piece
 	local run = SandboxScenery.Run
 	local d1x, d1z = if sz == -sx then sx else 0, if sz == -sx then 0 else sz
 	table.insert(list, {
 		kind = "corner",
 		x = cx + sx * run / 2,
-		y = MAP.GroundTop + (top - MAP.GroundTop) / 2,
+		y = base + (top - base) / 2,
 		z = cz + sz * run / 2,
 		sx = run,
-		sy = top - MAP.GroundTop,
+		sy = top - base,
 		sz = run,
 		rx = -d1x,
 		rz = -d1z,
 	})
 end
 
--- 8.9: the asphalt's slabs: every road's rect (9.7: the yards), none over another.
+-- 8.9: the asphalt's slabs: every road's rect (9.7: the yards), none over another; 10.6 each at its island's road level.
 function SandboxScenery.asphalt(): { Slab }
 	local list: { Slab } = {}
 	for _, road in MAP.Roads do
-		table.insert(list, { name = road.name, x0 = road.x0, x1 = road.x1, z0 = road.z0, z1 = road.z1 })
+		local top = MAP.roadAt((road.x0 + road.x1) / 2, (road.z0 + road.z1) / 2)
+		table.insert(list, { name = road.name, x0 = road.x0, x1 = road.x1, z0 = road.z0, z1 = road.z1, top = top })
 	end
 	return list
 end
@@ -262,22 +290,23 @@ local function sidesOf(r: Slab): { Side }
 	}
 end
 
--- The spans of a slab's side with the meadow beyond it: the side less what another slab's asphalt holds just outside
--- it (a junction: the street goes on); none where the Bounds end the road (its shoulder would be outside them).
-local function openSpans(slabs: { Slab }, r: Slab, side: Side): { { number } }
+-- The spans of a slab's side with the grass beyond it: the side less what another slab's asphalt holds just outside it
+-- (a junction: the street goes on); none where its island (10.6; the Bounds before) ends the road (its shoulder would
+-- be over the sky).
+local function openSpans(slabs: { Slab }, r: Slab, side: Side, edgeOf: Rect): { { number } }
 	local run = SandboxScenery.Run
 	local spans = { { side.a, side.b } }
 	local reach = side.c + (side.nx + side.nz) * run -- (the shoulder's foot)
 	if side.along == "x" then
-		if reach < BOUNDS.z0 - 1e-6 or reach > BOUNDS.z1 + 1e-6 then
+		if reach < edgeOf.z0 - 1e-6 or reach > edgeOf.z1 + 1e-6 then
 			return {}
 		end
-		spans = less(less(spans, -math.huge, BOUNDS.x0), BOUNDS.x1, math.huge)
+		spans = less(less(spans, -math.huge, edgeOf.x0), edgeOf.x1, math.huge)
 	else
-		if reach < BOUNDS.x0 - 1e-6 or reach > BOUNDS.x1 + 1e-6 then
+		if reach < edgeOf.x0 - 1e-6 or reach > edgeOf.x1 + 1e-6 then
 			return {}
 		end
-		spans = less(less(spans, -math.huge, BOUNDS.z0), BOUNDS.z1, math.huge)
+		spans = less(less(spans, -math.huge, edgeOf.z0), edgeOf.z1, math.huge)
 	end
 	local probe = side.c + (side.nx + side.nz) * 0.01 -- (just outside the side)
 	for _, q in slabs do
@@ -293,22 +322,26 @@ local function openSpans(slabs: { Slab }, r: Slab, side: Side): { { number } }
 end
 
 -- The yards' shoulders: every road of SandboxMap.Roads (9.7: the yards), each side but where another's asphalt goes on
--- or the Bounds end it, a hip at every convex corner.
+-- or its island ends it, a hip at every convex corner; 10.6 each down to its island's grass from its own asphalt.
 function SandboxScenery.ramps(): { Ramp }
-	local run, top = SandboxScenery.Run, MAP.RoadTop
+	local run = SandboxScenery.Run
 	local list: { Ramp } = {}
 	local slabs = SandboxScenery.asphalt()
 	for _, r in slabs do
+		local top = r.top
+		local base = top - (MAP.RoadTop - MAP.GroundTop)
+		local island = MAP.islandAt((r.x0 + r.x1) / 2, (r.z0 + r.z1) / 2)
+		local edgeOf = if island then island.rect else BOUNDS
 		local reached: { [string]: number } = {} -- (a corner's sides whose shoulder reaches it: "x0z0" …)
 		for _, side in sidesOf(r) do
-			local spans = openSpans(slabs, r, side)
+			local spans = openSpans(slabs, r, side, edgeOf)
 			for _, s in spans do
 				local lo, hi = s[1], s[2]
 				if hi - lo > 1e-6 then
 					local corners: { string } = {}
 					if side.along == "x" then
 						local z0 = if side.nz < 0 then side.c - run else side.c
-						edge(list, lo, hi, z0, z0 + run, 0, side.nz, top)
+						edge(list, lo, hi, z0, z0 + run, 0, side.nz, base, top)
 						local zKey = if side.nz < 0 then "z0" else "z1"
 						if math.abs(lo - r.x0) < 1e-6 then
 							table.insert(corners, "x0" .. zKey)
@@ -318,7 +351,7 @@ function SandboxScenery.ramps(): { Ramp }
 						end
 					else
 						local x0 = if side.nx < 0 then side.c - run else side.c
-						edge(list, x0, x0 + run, lo, hi, side.nx, 0, top)
+						edge(list, x0, x0 + run, lo, hi, side.nx, 0, base, top)
 						local xKey = if side.nx < 0 then "x0" else "x1"
 						if math.abs(lo - r.z0) < 1e-6 then
 							table.insert(corners, xKey .. "z0")
@@ -344,7 +377,7 @@ function SandboxScenery.ramps(): { Ramp }
 					free = free and not (mx > q.x0 and mx < q.x1 and mz > q.z0 and mz < q.z1)
 				end
 				if free then
-					corner(list, cx, cz, sx, sz, top)
+					corner(list, cx, cz, sx, sz, base, top)
 				end
 			end
 		end
@@ -352,7 +385,7 @@ function SandboxScenery.ramps(): { Ramp }
 	return list
 end
 
--- The ground's top at (x, z) from the shoulders alone (the meadow under them): what a wheel rolls on.
+-- The ground's top at (x, z) from the shoulders alone (the grass under them): what a wheel rolls on.
 function SandboxScenery.shoulderAt(ramp: Ramp, x: number, z: number): number?
 	-- (in the piece's frame: X = (rx, rz), Z = X × Y = (-rz, rx))
 	local dx, dz = x - ramp.x, z - ramp.z
@@ -389,7 +422,10 @@ end
 function SandboxScenery.treeRule(x: number, z: number, r: number): string?
 	local C = SandboxScenery.Clear
 	local inset = C.Edge
-	if x - r < BOUNDS.x0 + inset or x + r > BOUNDS.x1 - inset or z - r < BOUNDS.z0 + inset or z + r > BOUNDS.z1 - inset then
+	-- (10.6: on an island's grass, its crown Edge in from its edge: never over the sky)
+	local island = MAP.islandAt(x, z)
+	local edge = if island then island.rect else BOUNDS
+	if not island or x - r < edge.x0 + inset or x + r > edge.x1 - inset or z - r < edge.z0 + inset or z + r > edge.z1 - inset then
 		return "edge"
 	end
 	for _, road in MAP.Roads do

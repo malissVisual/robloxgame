@@ -1,10 +1,12 @@
--- 8.9 SANDBOX on the map, 9.4 the countryside (design/countryside/plan.py, plan.json; the owner: "all the family houses
--- are gone; instead six different spots, no towns, no villages"): shared/SandboxMap.luau's map section
--- (tools/countryside/sandboxmap.py writes it from the plan: CountryPlan.luau, tests/run_tests.py's), shared/VillageScenery
--- .luau's layout and the world the real server/SandboxWorld.luau and server/VillageWorld.luau build (as SandboxWorldServer
--- .luau and VillageWorldServer.luau on tools/perf/world-mock.luau), the Auction House on:
---   * the fixed things exactly where they were: the farmstead; 9.7 the plots and the Auction House's spot in the lobby
---     (SandboxMap.Lobby); the plan's yards, zones, landmarks, lawns, tree lines, woods, orchard and stream;
+-- 8.9 SANDBOX on the map, 9.4 the countryside (the owner: "all the family houses are gone; instead six different spots,
+-- no towns, no villages"), 10.6 the floating islands (design/islands/plan.py, plan.json: each place on an island of its
+-- own): shared/SandboxMap.luau's islands section (tools/islands/sandboxmap.py writes it from the plan: CountryPlan.luau,
+-- tests/run_tests.py's), shared/VillageScenery.luau's layout and the world the real server/SandboxWorld.luau and
+-- server/VillageWorld.luau build (as SandboxWorldServer.luau and VillageWorldServer.luau on tools/perf/world-mock.luau),
+-- the Auction House on:
+--   * the fixed things as they were: the farmstead round its box (10.6 on its island); 9.7 the plots and the Auction
+--     House's spot in the lobby (SandboxMap.Lobby); the plan's yards, zones, landmarks, lawns, tree lines, woods, orchard
+--     and stream;
 --   * 9.7 runs: no roads but each place's front yard (no lane, no Depot Row, no turnaround: nobody drives), every
 --     curb in its yard, every yard and its place in its run zone, the zones apart and far from the lobby;
 --   * nothing over anything else: no yard on another, no yard (its shoulder) on a place, a lot, a landmark, the
@@ -13,11 +15,13 @@
 --   * each place its own spot with its own surroundings: the farm's barn, tractor, bales, paddock and muck heap round
 --     the farmstead; the fish pond by the cabin (its jetty); the lone house's garden and no neighbour within 300 studs;
 --     the forest lodge in the forest's clearing, its woodpile; the old mill on its millrace (past its right-hand side as
---     you face its door), the weir and the footbridge; the orchard cottage in the orchard, its beehives, its fence;
+--     you face its door), from its spring past the weir (upstream), the mill and under the footbridge (downstream) off
+--     its island's edge as a waterfall; the orchard cottage by the orchard, its beehives, the orchard's fence;
 --   * the trees where the rules let them stand (off the roads, lots, van ways, places, landmarks, the stream, the
---     clearing), the forest dense round the clearing, the orchard in rows; the hedges and fences, the stream's pieces;
+--     clearing; 10.6 on their islands' grass, off the walls), the forest dense round the clearing, the orchard in rows;
+--     the hedges (10.6 every map island's low rim hedge) and fences, the stream's pieces;
 --   * the world: the five places built once each, rich, in their own models; the countryside's pieces in Atomic chunks
---     (9.7: only what a run zone sees: no D5, no railway, no far view); nothing of it on a yard, its shoulder, a plot,
+--     (9.7: no D5, no railway, no far view); nothing of it on a yard, its shoulder, a plot,
 --     the farmstead's lot and path, a van's way, a place's box or the Auction House; the words (no village's: no
 --     CORNER DRUGSTORE, ROAD CLOSED, noticeboard; 9.7 no MEADOW HALT either);
 --   * nothing of a village (no street of houses, no chapel, green, school, pitch, shop, hardware store, building site)
@@ -108,8 +112,11 @@ end
 -- ── The data: the plan's, the fixed things unchanged ───────────────────────
 
 do
-	check("the Bounds are the plan's (x -1180 … 2080: 9.7 the lobby east of the countryside, z -680 … 760)", same(B, Plan.bounds) and B.x0 == -1180 and B.x1 == 2080
-		and B.z1 == 760 and B.x1 >= MAP.Lobby.bounds.x1)
+	local round = same(B, Plan.bounds) and B.x0 <= MAP.Lobby.bounds.x0 and B.x1 >= MAP.Lobby.bounds.x1 and B.z0 <= MAP.Lobby.bounds.z0 and B.z1 >= MAP.Lobby.bounds.z1
+	for _, island in MAP.Islands do
+		round = round and B.x0 <= island.rect.x0 and B.x1 >= island.rect.x1 and B.z0 <= island.rect.z0 and B.z1 >= island.rect.z1
+	end
+	check("the Bounds are the plan's (10.6: round every island, the lobby's among them)", round)
 	check("9.7: no turnaround; the ground's and the asphalt's tops, the doors' and the vans' gaps as they were",
 		(MAP :: any).Turnaround == nil and MAP.GroundTop == 0 and MAP.RoadTop == 0.4 and MAP.DoorWidth == 26 and MAP.VanGap == 6)
 	-- 9.7: the four plots in the lobby, each its warehouse and what goes with it in its rect as they were round theirs
@@ -124,9 +131,11 @@ do
 	end
 	check("9.7: the four plots in the lobby (rects, warehouses, doors, van spots, unload circles, spawns, boards as round their old ones)", plotsOk)
 	local H = MAP.House
-	check("the farmstead unchanged: its id, lot, box, door, curb and back door",
-		H.id == "sandbox_house" and same(H.lot, { x0 = -60, x1 = 60, z0 = 504, z1 = 600 }) and H.house.x == 0 and H.house.z == 540 and H.house.sx == 44
-			and H.house.sz == 34 and H.door.z == 523 and H.door.yaw == 0 and H.curb.z == 492 and H.back.z == 557)
+	local f = H.box.z0 -- (10.6: moved to its island, everything of it round its box as before)
+	check("the farmstead unchanged round its box (10.6 on its island): its id, lot, box, door, curb and back door",
+		H.id == "sandbox_house" and same(H.lot, { x0 = H.house.x - 60, x1 = H.house.x + 60, z0 = f - 19, z1 = f + 77 }) and H.house.z == f + 17 and H.house.sx == 44
+			and H.house.sz == 34 and H.door.z == f and H.door.x == H.house.x and H.door.yaw == 0 and H.curb.z == f - 31 and H.back.z == f + 34
+			and H.house.y == (MAP.island("farm") :: any).top)
 	local spot = Config.Auction.House.Spot
 	local lobbySpot = MAP.Lobby.shops.auction.spot
 	check("9.7: the Auction House's spot the lobby's (looking north at its plaza; 48 × 32)", spot.x == lobbySpot.x and spot.z == lobbySpot.z and spot.yaw == lobbySpot.yaw
@@ -296,7 +305,7 @@ do
 	-- what may meet: the roads one another (they meet, their shoulders over each other), a lot its yard's shoulder and
 	-- its box, the stream its own squares, its weir, its footbridge, the pond it runs into and the mill on it
 	local ALLOWED = { road_road = true, lot_road = true, box_lot = true, stream_stream = true }
-	local WET = { weir = true, footbridge = true, pond = true, old_mill = true }
+	local WET = { weir = true, footbridge = true, pond = true, old_mill = true, spring = true, waterfall = true }
 	local bad: string? = nil
 	for i, a in areas do
 		for j = i + 1, #areas do
@@ -317,7 +326,7 @@ do
 			end
 		end
 	end
-	check("nothing over anything else: no yard (its shoulder) on a place, a lot, a landmark, the stream or a plot; no field (9.7 none) (the stream only through its weir, under its footbridge, past the mill, into the pond)",
+	check("nothing over anything else: no yard (its shoulder) on a place, a lot, a landmark, the stream or a plot; no field (9.7 none) (the stream only from its spring, through its weir, past the mill, under its footbridge, over its waterfall)",
 		bad == nil, bad)
 	-- the roads' asphalt: none over another (Pražská's from Depot Row's far edge: its slab from Depot Row's south edge)
 	local roadBad: string? = nil
@@ -385,16 +394,41 @@ do
 	for z = b.z0, b.z1, 2 do
 		alongside = alongside and wallX ~= nil and VillageScenery.streamDistance(wallX + rx * 3, z) <= 0
 	end
-	check("the Old Mill on its millrace: the water along its right-hand side (its west wall, as you face its door), the weir upstream, the footbridge downstream",
-		alongside and near("weir", b, 140) and near("footbridge", b, 30) and (mark("weir") :: any).z1 < b.z0 and (mark("footbridge") :: any).z0 > b.z1, `{rx}, {rz}`)
+	-- (10.6: up- and downstream along the millrace's own points, from its spring: where along it a thing's middle is)
+	local race = MAP.Streams[1]
+	local function along(x: number, z: number): number
+		local best, at, walked = math.huge, 0, 0
+		for i = 1, #race.points - 1 do
+			local p, q = race.points[i], race.points[i + 1]
+			local dx, dz = q.x - p.x, q.z - p.z
+			local length = math.sqrt(dx * dx + dz * dz)
+			local t = math.clamp(((x - p.x) * dx + (z - p.z) * dz) / (length * length), 0, 1)
+			local d = math.sqrt((p.x + dx * t - x) ^ 2 + (p.z + dz * t - z) ^ 2)
+			if d < best then
+				best, at = d, walked + t * length
+			end
+			walked += length
+		end
+		return at
+	end
+	local function middle(r: any): (number, number)
+		return (r.x0 + r.x1) / 2, (r.z0 + r.z1) / 2
+	end
+	local weirAt, millAt, bridgeAt = along(middle(mark("weir"))), along(middle(b)), along(middle(mark("footbridge")))
+	local spring, fall = mark("spring"), mark("waterfall")
+	local first, last = race.points[1], race.points[#race.points]
+	local island = MAP.islandOf("old_mill") :: SandboxMap.Island
+	check("the Old Mill on its millrace: the water along its right-hand side (its west wall, as you face its door), from its spring, the weir upstream, the footbridge downstream, off its island's edge over the waterfall",
+		alongside and near("weir", b, 140) and near("footbridge", b, 90) and weirAt < millAt and millAt < bridgeAt and spring ~= nil and fall ~= nil
+			and inRect(rectOf(spring), first.x, first.z) and inRect(rectOf(fall), last.x, last.z) and math.abs(last.x - island.rect.x0) < 1, `{rx}, {rz}: {weirAt} {millAt} {bridgeAt}`)
 	local cottage = SandboxMap.house("orchard_cottage") :: SandboxMap.House
 	local orchard = MAP.Orchard
 	local fenced = false
 	for _, line in MAP.TreeLines do
 		fenced = fenced or line.kind == "fence"
 	end
-	check("the Orchard Cottage in the orchard (its box in it), its beehives among the fruit trees, a fence round it", inRect(orchard, cottage.box.x0, cottage.box.z0)
-		and inRect(orchard, cottage.box.x1, cottage.box.z1) and near("apiary", orchard, 0) and inRect(orchard, (mark("apiary") :: any).x0, (mark("apiary") :: any).z0) and fenced)
+	check("the Orchard Cottage by the orchard (10.6: its lot within 20 studs of it), its beehives by the fruit trees, a fence round the orchard", distance(cottage.lot, orchard) <= 20
+		and near("apiary", orchard, 10) and fenced and MAP.islandAt(orchard.x0, orchard.z0) == MAP.islandOf("orchard_cottage"))
 end
 
 -- ── The layout ─────────────────────────────────────────────────────────────
@@ -466,15 +500,14 @@ do
 		if VillageScenery.streamDistance(t.x, t.z) < 0 then
 			treeBad = `a tree in the stream at {math.floor(t.x)}, {math.floor(t.z)}`
 		end
-		if not VillageScenery.inView(t.x, t.z, t.radius) then
-			treeBad = `a tree no run zone sees at {math.floor(t.x)}, {math.floor(t.z)}`
+		if not VillageScenery.onIsland(t.x, t.z, 0) or MAP.islandAt(t.x - t.radius, t.z - t.radius) ~= MAP.islandAt(t.x + t.radius, t.z + t.radius) then
+			treeBad = `a tree off its island's grass at {math.floor(t.x)}, {math.floor(t.z)}`
 		end
 		inForest += if t.from == wood.id then 1 else 0
 		inOrchard += if t.from == "orchard" then 1 else 0
 		-- (9.7 the forest round the lodge's zone: how dense, counted in the zone's view round its clearing)
 	end
-	local lodgeZone = (MAP.zone("forest_lodge") :: SandboxMap.Zone).rect
-	local seen = grow(lodgeZone, Config.Runs.Zone.View)
+	local seen = rectOf(wood) -- (10.6: the forest on the lodge's island, round its clearing)
 	local around = 0
 	for _, t in trees do
 		around += if t.from == wood.id and inRect(seen, t.x, t.z) then 1 else 0
@@ -483,10 +516,10 @@ do
 	local z0, z1 = math.max(seen.z0, wood.z0), math.min(seen.z1, wood.z1)
 	local c = wood.clearings[1]
 	local area = (x1 - x0) * (z1 - z0) - (c.x1 - c.x0) * (c.z1 - c.z0)
-	check(`the trees ({#trees}): each where the rules let it (off the yards, plots, lots, van ways, places, landmarks, the Auction House, the stream, the clearing; 9.7 where a run zone sees it)`,
-		treeBad == nil and #trees >= 150, treeBad)
+	check(`the trees ({#trees}): each where the rules let it (off the yards, plots, lots, van ways, places, landmarks, the Auction House, the stream, the clearing; 10.6 on their islands' grass)`,
+		treeBad == nil and #trees >= 60, treeBad)
 	check(`…the forest dense round the lodge's clearing ({around} trees, one every {math.floor(area / math.max(around, 1))} studs²), the orchard in rows ({inOrchard} fruit trees)`,
-		around >= 60 and area / around <= 1100 and inOrchard >= 40)
+		around >= 36 and area / around <= 1100 and inOrchard >= 16)
 	-- the lines and the stream: their pieces, decoration
 	local lines = VillageScenery.lines()
 	local hedges, posts = 0, 0
@@ -503,8 +536,8 @@ do
 	for _, p in lines do
 		screens += if p.name == "ScreenHedge" then 1 else 0
 	end
-	check(`the orchard's fence ({posts} posts), 9.7 the run zones' screen hedges ({screens}), the stream where a zone sees it ({wet} stretches of water)`,
-		posts >= 20 and screens >= 4 * #MAP.Zones and wet >= 1 and wet <= #MAP.Streams[1].points - 1, `{hedges} hedges, {posts} posts, {screens} screens, {wet} water`)
+	check(`the orchard's fence ({posts} posts), 10.6 every map island's low rim hedge ({hedges}; 9.7's tall screen hedges none), the stream on its island ({wet} stretches of water)`,
+		posts >= 20 and hedges >= 4 * #MAP.Zones and screens == 0 and wet == #MAP.Streams[1].points - 1, `{hedges} hedges, {posts} posts, {screens} screens, {wet} water`)
 	check("9.7: no D5's lanes, no far view (VillageScenery.lanes and .far: nothing)", #VillageScenery.lanes() == 0 and #VillageScenery.far() == 0)
 end
 
@@ -538,8 +571,10 @@ do
 	check(`the map's part budget holds with the Auction House on, with room to spare ({#all} parts, at most {budget}; {budget - #all} left)`, #all <= budget - 300 and #all > 1000, #all)
 	print(`INFO  the map: {#all} parts ({village and #village:GetDescendants() or 0} in Village with models and words)`)
 	local lobby = world:FindFirstChild("Lobby")
-	check("the countryside in workspace.Sandbox: Village, the Ground and the Roads Persistent, 9.7 the Lobby Persistent; no Motorway, Railway or Far", village ~= nil
+	local islandsModel = world:FindFirstChild("Islands")
+	check("the countryside in workspace.Sandbox: Village, the Ground and the Roads Persistent, 9.7 the Lobby Persistent, 10.6 the Islands Persistent; no Motorway, Railway or Far", village ~= nil
 		and motorway == nil and railway == nil and far == nil and ground ~= nil and ground.ModelStreamingMode == Enum.ModelStreamingMode.Persistent
+		and islandsModel ~= nil and islandsModel.ModelStreamingMode == Enum.ModelStreamingMode.Persistent
 		and world:FindFirstChild("Roads").ModelStreamingMode == Enum.ModelStreamingMode.Persistent and lobby ~= nil and lobby.ModelStreamingMode == Enum.ModelStreamingMode.Persistent)
 	-- the chunks: every model under Village an Atomic Village_<chunk>
 	local chunkBad: string? = nil
@@ -638,18 +673,19 @@ do
 	end
 	check("the words: none of a village's (no CORNER DRUGSTORE, ROAD CLOSED, MOVING CONTRACTS noticeboard; 9.7 no MEADOW HALT)", texts["MEADOW HALT"] == nil
 		and texts["CORNER DRUGSTORE"] == nil and texts["ROAD CLOSED"] == nil and texts["MOVING CONTRACTS"] == nil and contracts == 0)
-	-- the ground: the fields (each a tile and its rows) and the lawns in the Ground, flush with the meadow
+	-- the ground: the fields (each a tile and its rows) and the lawns in the Ground, flush with their island's grass
 	local fields, lawns, high = 0, 0, nil :: string?
 	for _, b in all do
 		if ground and b.part:IsDescendantOf(ground) then
 			fields += if b.part.Name == "Field" then 1 else 0
 			lawns += if string.sub(b.part.Name, 1, 5) == "Lawn_" then 1 else 0
-			if (b.part.Name == "Field" or string.sub(b.part.Name, 1, 5) == "Lawn_" or b.part.Name == "Meadow") and math.abs(b.y1 - MAP.GroundTop) > EPS then
+			local top = MAP.groundAt((b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2)
+			if (b.part.Name == "Field" or string.sub(b.part.Name, 1, 5) == "Lawn_" or b.part.Name == "Grass") and math.abs(b.y1 - top) > EPS then
 				high = b.part.Name
 			end
 		end
 	end
-	check(`the ground: {fields} field tiles (9.7 none) and {lawns} lawns (the forest's floor) in the Ground, their tops the meadow's`, fields == #MAP.Fields and lawns == #MAP.Lawns and high == nil, high)
+	check(`the ground: {fields} field tiles (9.7 none) and {lawns} lawns (the forest's floor) in the Ground, their tops their island's grass's`, fields == #MAP.Fields and lawns == #MAP.Lawns and high == nil, high)
 end
 
 -- nothing alpine left: no spruce's needles, no mound, hill, peak or snow, no wildflowers or rail fence round the edge,

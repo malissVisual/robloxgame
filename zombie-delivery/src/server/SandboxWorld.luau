@@ -2,16 +2,23 @@
 -- 8.0 SANDBOX, the map (design/sandbox/KONTRAKT.md; the owner: "an easy map, everything light: one house for the
 -- missions, a van, a warehouse"): builds the small test world once, in place of the city, from shared/SandboxMap.luau
 -- (the fixed plots, roads, turnaround and house) and shared/SandboxScenery.luau (its dress as plain numbers). Everything
--- is anchored, in workspace.Sandbox:
+-- is anchored, in workspace.Sandbox. 10.6 the floating islands (design/islands/plan.py; SandboxMap.Islands): no meadow
+-- under everything any more, every island's grass is the ground, at its own height, its rock under it:
 --
---   Ground    the meadow's tiles (Grass, their top at GroundTop), a concrete pad on every plot (the warehouse worker's
---             building stands on it; its top flush with the meadow), the house's lawn (a vehicle's free-room box query
---             passes this model, Config.SpawnSpot.Pass); 8.9 the fields and lawns (server/VillageWorld.luau);
---             a Persistent model (8.9: the map is 1,600 studs across: every client always has the ground it drives
---             on); the Alps' mounds are gone
---   Roads     the asphalt of SandboxMap.Roads (9.7 runs: only the run zones' yards, where the trucks stand; Pražská,
---             Depot Row, the lanes, the turnaround and the markings are gone), the gravel shoulders down to the meadow
---             on every edge; a Persistent model as the ground
+--   Ground    10.6 every island's grass (SandboxScenery.tops: Grass, its top at its island's top), a concrete pad on
+--             every plot (the warehouse worker's building stands on it; its top flush with the grass), the farmstead's
+--             lawn (a vehicle's free-room box query passes this model, Config.SpawnSpot.Pass); 8.9 the fields and
+--             lawns (server/VillageWorld.luau); a Persistent model (every client always has the ground it stands on);
+--             the Alps' mounds are gone
+--   Islands   10.6 (a Persistent model: every client sees every island from anywhere) each island's rock under its
+--             grass (shared/IslandLooks.luau body: its dirt, stone sides, boulders, the tapering rock and its tip, the
+--             rocks hanging under it), the decorative floating rocks (IslandLooks.rock) and the soft clouds under them
+--             all (IslandLooks.clouds; decoration). workspace.FallenPartsDestroyHeight is Config.Islands.Destroy, far
+--             under every island (server/IslandFall.luau puts whoever falls off back on top long before)
+--   Roads     the asphalt of SandboxMap.Roads (9.7 runs: only the places' yards, where the trucks stand; 10.6 a round's
+--             vans' parking, each at its island's height; Pražská, Depot Row, the lanes, the turnaround and the
+--             markings are gone), the gravel shoulders down to the grass on every edge; a Persistent model as the
+--             ground
 --   House     "TheOldFarmstead" (a Model, attribute SandboxHouse): shared/ChaletLooks.luau's chalet (the stand-in look)
 --             on SandboxMap.House.house,
 --             facing north to the road, its front door the part "FrontDoor" (attribute SandboxDoor = true, no collision:
@@ -44,21 +51,20 @@
 --   Lobby     9.7 runs (server/LobbyWorld.luau): the lobby's plaza, fountain, hedge, lamps, trees, 10.4 its PLAY
 --             circle, the Deliveros dispatch kiosk and the PAINT shop (9.7: the street lamps and the signpost
 --             are gone with Pražská)
---   Village   9.4 the countryside (server/VillageWorld.luau): the places' surroundings, the trees, hedges, fences and
---             the stream in Atomic chunks; the D5 in the Persistent model "Motorway", the railway in "Railway"; the far
---             view in "Far" (below)
+--   Village   9.4 the countryside (server/VillageWorld.luau): the places' surroundings, the trees, hedges (10.6 the map
+--             islands' low rim hedges), fences and the stream in Atomic chunks, each on its island
 --   Auction   8.8 (only while Config.Auction.On: the auction's groundwork shows nothing before the server's step): the
 --             Auction House (9.7: at the lobby's south edge, SandboxMap.Lobby.shops.auction; shared/AuctionHouseLayout
 --             .luau's parts, its place Config.Auction.House.Spot) in the Atomic model "AuctionHouse": its sign and lot display (SurfaceGuis the
 --             client paints), the consignment desk's prompt (AuctionDesk), the lot's pedestal (AuctionLotStand), two lamps
---   Boundary  the invisible walls on the Bounds; 9.7 each run zone's on its edge (SandboxMap.Zones: "ZoneWall",
---             Config.Runs.Zone.Wall high; its screen hedge is server/VillageWorld.luau's, SandboxMap.TreeLines')
---   Far       (a Persistent model: every client always has it) outside the Bounds: 8.9 the flat horizon
---             (server/VillageWorld.luau: far fields, tree lines, pylons, the D5 and the railway going on, far roofs); no collision but
---             the far fields', no shadows (the Alps' green hills and snowy peaks are gone)
+--   Boundary  9.7 each run zone's invisible walls on its edge (SandboxMap.Zones: "ZoneWall", Config.Runs.Zone.Wall high;
+--             10.6 a map island's walls, from its top up; its low rim hedge is server/VillageWorld.luau's,
+--             SandboxMap.TreeLines'; the lobby's walls are server/LobbyWorld.luau's); 10.6 none on the Bounds (the sky
+--             round the islands: nobody gets there)
 --
 --   SandboxWorld.build()      builds it once (server/Main.server.luau at the server's start, sandbox mode) and lights
---                             it; returns workspace.Sandbox (a second call returns it as it is)
+--                             it, 10.6 workspace.FallenPartsDestroyHeight set; returns workspace.Sandbox (a second call
+--                             returns it as it is)
 --   SandboxWorld.lighting()   the fixed warm afternoon at central Bohemia's latitude, 50° north (Config.SandboxLight.Sky;
 --                             the Alps' 47° before 8.9; in sandbox mode the city's DayNight and Weather do not
 --                             run): the clock, the sun, the ambient light, the Atmosphere's soft far haze, the sky, the
@@ -86,6 +92,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local AuctionHouseLayout = require(Shared.AuctionHouseLayout) -- 8.8: the Auction House (only while Config.Auction.On)
 local ChaletLooks = require(Shared.ChaletLooks)
 local Config = require(Shared.Config) -- 8.5 walk-in doors: the doors' halls (Config.Moving.Doors.Hall)
+local IslandLooks = require(Shared.IslandLooks) -- 10.6: the islands' rock, the floating rocks, the clouds
 local RenderBudget = require(Shared.RenderBudget)
 local SandboxMap = require(Shared.SandboxMap)
 local SandboxScenery = require(Shared.SandboxScenery)
@@ -199,10 +206,9 @@ local function label(board: BasePart, face: Enum.NormalId, text: string, color: 
 	text_.Parent = gui
 end
 
--- A rail fence along segments: a post every `step` studs (one where two meet), `rails` long rails.
-local function fenceRun(parent: Instance, segments: { SandboxScenery.Segment }, step: number, height: number, rails: number, color: Color3, solid: boolean)
+-- A rail fence along segments on the ground at `y`: a post every `step` studs (one where two meet), `rails` long rails.
+local function fenceRun(parent: Instance, segments: { SandboxScenery.Segment }, step: number, height: number, rails: number, color: Color3, solid: boolean, y: number)
 	local seen: { [string]: boolean } = {}
-	local y = MAP.GroundTop
 	for _, s in segments do
 		local a, b = Vector3.new(s.ax, y, s.az), Vector3.new(s.bx, y, s.bz)
 		local length = (b - a).Magnitude
@@ -239,18 +245,47 @@ local function persistent(parent: Instance, name: string): Model
 	return model
 end
 
+-- (10.6: every island's grass, its tiles round what has its own ground there; the pads on the lobby's, the farmstead's
+-- lawn on the farm's)
 local function ground(world: Instance)
 	local holder = persistent(world, "Ground")
-	local top = MAP.GroundTop
-	local tiles = S.meadow()
-	for _, t in tiles do
-		slab(holder, "Meadow", t, top, 2, rgb(C.Meadow), Enum.Material.Grass)
+	for _, t in S.tops() do
+		local island = MAP.island(t.island)
+		local grass = slab(holder, "Grass", t.rect, t.top, S.Grass, if island then rgb(island.look.grass) else rgb(C.Meadow), Enum.Material.Grass)
+		grass:SetAttribute("Island", t.island)
 	end
 	for _, plot in MAP.Plots do
-		local pad = slab(holder, "Pad", plot.rect, top, 2, rgb(C.Pad), Enum.Material.Concrete)
+		local pad = slab(holder, "Pad", plot.rect, MAP.GroundTop, S.Grass, rgb(C.Pad), Enum.Material.Concrete)
 		pad:SetAttribute("Plot", plot.id)
 	end
-	slab(holder, "Lawn", MAP.House.lot, top, 2, rgb(C.Lawn), Enum.Material.Grass)
+	slab(holder, "Lawn", MAP.House.lot, MAP.House.house.y, S.Grass, rgb(C.Lawn), Enum.Material.Grass)
+end
+
+-- 10.6 the islands' rock under their grass, the floating rocks, the clouds under them (shared/IslandLooks.luau), in one
+-- Persistent model: every client sees every island from anywhere.
+local function islands(world: Instance): Model
+	local holder = persistent(world, "Islands")
+	for _, island in MAP.Islands do
+		local model = Instance.new("Model")
+		model.Name = `Island_{island.id}`
+		model:SetAttribute("Island", island.id)
+		for _, p in IslandLooks.body(island) do
+			VillageWorld.part(model, p, false, 0)
+		end
+		model.Parent = holder
+	end
+	local rocks = folder(holder, "Rocks")
+	for _, r in MAP.Rocks do
+		for _, p in IslandLooks.rock(r) do
+			VillageWorld.part(rocks, p, false, 0)
+		end
+	end
+	local clouds = folder(holder, "Clouds")
+	for _, p in IslandLooks.clouds(MAP.Bounds, MAP.Islands[1].seed) do
+		local cloud = VillageWorld.part(clouds, p, true, 0)
+		cloud.CastShadow = false
+	end
+	return holder
 end
 
 -- ── The roads ──────────────────────────────────────────────────────────────
@@ -261,7 +296,7 @@ local function roads(world: Instance)
 	local depth = S.RoadDepth
 	-- (9.7: the yards' slabs, where the trucks stand)
 	for _, r in S.asphalt() do
-		local road = slab(holder, "Road", r, MAP.RoadTop, depth, asphalt, Enum.Material.Asphalt)
+		local road = slab(holder, "Road", r, r.top, depth, asphalt, Enum.Material.Asphalt) -- (10.6: at its island's road level)
 		road:SetAttribute("Road", r.name)
 	end
 	local gravel = rgb(C.Shoulder)
@@ -514,7 +549,7 @@ function SandboxWorld.villageHouse(world: Instance, placed: VillageScenery.Place
 	local plinth = body:FindFirstChild("Plinth")
 	if plinth and plinth:IsA("BasePart") then
 		deco(plinth)
-		floor = plinth.Position.Y + plinth.Size.Y / 2 - MAP.GroundTop + 0.02
+		floor = plinth.Position.Y + plinth.Size.Y / 2 - H.door.y + 0.02 -- (10.6: over its island's top, its door's foot)
 	end
 	front.CFrame = front.CFrame * CFrame.Angles(0, math.pi, 0)
 	SandboxWorld.walkIn(model, body, H, front.CFrame * CFrame.new(0, -front.Size.Y / 2, front.Size.Z / 2), floor)
@@ -591,35 +626,37 @@ local function house(world: Instance): Model
 	end
 
 	-- The garden: the path from the curb's shoulder to the door, the fence round the lot with its gate, the board over
-	-- the gate, the mailbox, the flower boxes. Decoration all: nothing stops a mover with a sofa.
+	-- the gate, the mailbox, the flower boxes. Decoration all: nothing stops a mover with a sofa. (10.6: on its island's
+	-- grass, `g`.)
 	local garden = folder(model, "Garden")
+	local g = H.house.y
 	local path = S.Path
 	local G = S.Garden
 	local from = G.Front - 2.5 -- (the turnaround's shoulder reaches to about here)
 	local to = door.z - 0.4 -- (the door's front)
-	deco(block(garden, "Path", Vector3.new(path.x1 - path.x0, 0.1, to - from), CFrame.new((path.x0 + path.x1) / 2, MAP.GroundTop + 0.03, (from + to) / 2), rgb(C.Path), Enum.Material.Pebble)).CastShadow = false
-	fenceRun(garden, S.garden(), G.Post, G.Height, 2, rgb(C.Fence), false)
+	deco(block(garden, "Path", Vector3.new(path.x1 - path.x0, 0.1, to - from), CFrame.new((path.x0 + path.x1) / 2, g + 0.03, (from + to) / 2), rgb(C.Path), Enum.Material.Pebble)).CastShadow = false
+	fenceRun(garden, S.garden(), G.Post, G.Height, 2, rgb(C.Fence), false, g)
 	local wood, dark = rgb(C.Fence), Color3.fromRGB(70, 48, 32)
 	local gx, gz = door.x, G.Front
 	for _, side in { -1, 1 } do
 		-- (over the fence's end posts)
-		deco(block(garden, "GatePost", Vector3.new(0.9, 11, 0.9), CFrame.new(gx + side * G.Gate, 5.5, gz), wood, Enum.Material.Wood))
+		deco(block(garden, "GatePost", Vector3.new(0.9, 11, 0.9), CFrame.new(gx + side * G.Gate, g + 5.5, gz), wood, Enum.Material.Wood))
 	end
-	deco(block(garden, "GateBeam", Vector3.new(2 * G.Gate + 1.6, 0.8, 1), CFrame.new(gx, 11.2, gz), dark, Enum.Material.Wood))
-	local name = deco(block(garden, "GateBoard", Vector3.new(9, 1.6, 0.25), CFrame.new(gx, 9.6, gz), Color3.fromRGB(150, 108, 66), Enum.Material.WoodPlanks))
+	deco(block(garden, "GateBeam", Vector3.new(2 * G.Gate + 1.6, 0.8, 1), CFrame.new(gx, g + 11.2, gz), dark, Enum.Material.Wood))
+	local name = deco(block(garden, "GateBoard", Vector3.new(9, 1.6, 0.25), CFrame.new(gx, g + 9.6, gz), Color3.fromRGB(150, 108, 66), Enum.Material.WoodPlanks))
 	label(name, Enum.NormalId.Front, string.upper(H.name), Color3.fromRGB(250, 244, 228))
 	label(name, Enum.NormalId.Back, string.upper(H.name), Color3.fromRGB(250, 244, 228))
 	-- the mailbox outside the fence, left of the gate, its name board to the road
 	local mx, mz = gx - G.Gate - 3.5, gz - 1.4
-	deco(block(garden, "MailboxPost", Vector3.new(0.35, 3.4, 0.35), CFrame.new(mx, 1.7, mz), dark, Enum.Material.Wood))
-	deco(block(garden, "Mailbox", Vector3.new(1.5, 1.1, 1.9), CFrame.new(mx, 3.95, mz), Color3.fromRGB(46, 84, 58), Enum.Material.Metal))
-	local plate = deco(block(garden, "MailboxName", Vector3.new(3.2, 0.7, 0.12), CFrame.new(mx, 2.6, mz - 0.25), Color3.fromRGB(242, 236, 220), Enum.Material.Wood))
+	deco(block(garden, "MailboxPost", Vector3.new(0.35, 3.4, 0.35), CFrame.new(mx, g + 1.7, mz), dark, Enum.Material.Wood))
+	deco(block(garden, "Mailbox", Vector3.new(1.5, 1.1, 1.9), CFrame.new(mx, g + 3.95, mz), Color3.fromRGB(46, 84, 58), Enum.Material.Metal))
+	local plate = deco(block(garden, "MailboxName", Vector3.new(3.2, 0.7, 0.12), CFrame.new(mx, g + 2.6, mz - 0.25), Color3.fromRGB(242, 236, 220), Enum.Material.Wood))
 	label(plate, Enum.NormalId.Front, string.upper(H.name), INK)
 	-- the flower boxes: by the gate inside the fence, either side of the door
 	local blooms = { Color3.fromRGB(210, 38, 46), Color3.fromRGB(246, 196, 52), Color3.fromRGB(226, 96, 150), Color3.fromRGB(150, 92, 200) }
 	for n, spot in { { gx - 10.5, gz + 2.2 }, { gx + 10.5, gz + 2.2 }, { gx - 5.8, door.z - 2.4 }, { gx + 5.8, door.z - 2.4 } } do
-		deco(block(garden, "FlowerBox", Vector3.new(2.8, 1, 1.2), CFrame.new(spot[1], 0.5, spot[2]), Color3.fromRGB(132, 92, 58), Enum.Material.WoodPlanks))
-		deco(block(garden, "Flowers", Vector3.new(2.5, 0.8, 0.95), CFrame.new(spot[1], 1.4, spot[2]), blooms[n], Enum.Material.Grass)).CastShadow = false
+		deco(block(garden, "FlowerBox", Vector3.new(2.8, 1, 1.2), CFrame.new(spot[1], g + 0.5, spot[2]), Color3.fromRGB(132, 92, 58), Enum.Material.WoodPlanks))
+		deco(block(garden, "Flowers", Vector3.new(2.5, 0.8, 0.95), CFrame.new(spot[1], g + 1.4, spot[2]), blooms[n], Enum.Material.Grass)).CastShadow = false
 	end
 	model.Parent = world
 	SandboxWorld.doorLeaves(model) -- 8.3 walk-in doors: its doors' leaves swing (the model's doors copied when dressed)
@@ -711,29 +748,21 @@ end
 
 local function boundary(world: Instance)
 	local holder = folder(world, "Boundary")
-	local b, h, t = MAP.Bounds, S.WallHeight, 2
+	local t = 2
 	local black = Color3.new(0, 0, 0)
-	for _, r in {
-		{ x0 = b.x0, x1 = b.x1, z0 = b.z0, z1 = b.z0 + t },
-		{ x0 = b.x0, x1 = b.x1, z0 = b.z1 - t, z1 = b.z1 },
-		{ x0 = b.x0, x1 = b.x0 + t, z0 = b.z0, z1 = b.z1 },
-		{ x0 = b.x1 - t, x1 = b.x1, z0 = b.z0, z1 = b.z1 },
-	} do
-		local wall = slab(holder, "InvisibleWall", r, MAP.GroundTop + h - 10, h, black, Enum.Material.SmoothPlastic)
-		wall.Transparency = 1
-		wall.CanQuery = false
-	end
-	-- 9.7: each run zone's walls on its edge (its screen hedge stands on the same line): nobody wanders off
+	-- 9.7: each run zone's walls on its edge (10.6: a map island's, from its top up; its low rim hedge on the same
+	-- line): nobody wanders off its island (none on the Bounds: the sky round the islands)
 	local high = Config.Runs.Zone.Wall
 	for _, zone in MAP.Zones do
 		local q = zone.rect
+		local base = MAP.groundAt((q.x0 + q.x1) / 2, (q.z0 + q.z1) / 2)
 		for _, r in {
 			{ x0 = q.x0 - t, x1 = q.x1 + t, z0 = q.z0 - t, z1 = q.z0 },
 			{ x0 = q.x0 - t, x1 = q.x1 + t, z0 = q.z1, z1 = q.z1 + t },
 			{ x0 = q.x0 - t, x1 = q.x0, z0 = q.z0, z1 = q.z1 },
 			{ x0 = q.x1, x1 = q.x1 + t, z0 = q.z0, z1 = q.z1 },
 		} do
-			local wall = slab(holder, "ZoneWall", r, MAP.GroundTop + high, high, black, Enum.Material.SmoothPlastic)
+			local wall = slab(holder, "ZoneWall", r, base + high, high, black, Enum.Material.SmoothPlastic)
 			wall.Transparency = 1
 			wall.CanQuery = false
 			wall:SetAttribute("RunZone", zone.id)
@@ -805,10 +834,11 @@ function SandboxWorld.build(): Folder
 	local world = Instance.new("Folder")
 	world.Name = "Sandbox"
 	ground(world)
+	islands(world) -- 10.6: the islands' rock, the floating rocks, the clouds under them
 	roads(world)
 	house(world)
 	LobbyWorld.build(world) -- 9.7: the lobby (its plaza, dispatch and PAINT shop; 10.4 its PLAY circle)
-	local village = VillageWorld.build(world) -- 9.4: the countryside, its fields and lawns, the D5, the railway, the far view
+	local village = VillageWorld.build(world) -- 9.4: the places' surroundings, lawns, trees, hedges and the stream
 	for _, placed in VillageScenery.houses() do -- (the five other places to empty, each in its look)
 		if SandboxWorld.villageHouse(world, placed) then
 			village.houses += 1
@@ -819,6 +849,8 @@ function SandboxWorld.build(): Folder
 	end
 	boundary(world)
 	world.Parent = workspace -- (in one go)
+	-- 10.6: far under every island (server/IslandFall.luau puts whoever falls off back on top long before)
+	workspace.FallenPartsDestroyHeight = Config.Islands.Destroy
 	SandboxWorld.lighting()
 	local parts = 0
 	for _, d in world:GetDescendants() do

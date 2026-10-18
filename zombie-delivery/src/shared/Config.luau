@@ -3787,19 +3787,21 @@ Config.Soundscape = {
 		-- SoundService.AmbientReverb by place (an Enum.ReverbType's name; a place not here: NoReverb), only while you are
 		-- in the game and SOUND is not all off
 		Reverb = { warehouse = "Room" } :: { [string]: string },
-		-- The D5's far hum (amb_motorway): a 3D loop on the motorway's middle line (SandboxMap's landmark "d5": X, from
-		-- Z0 to Z1) at its point nearest you, Y up, so it always comes from the east; Volume within Near
-		-- studs, fading out (Roblox's inverse taper) to nothing at Range. Outdoors; × FieldsIndoors in a warehouse.
-		Motorway = { X = 360, Z0 = -680, Z1 = 760, Y = 6, Volume = 0.35, Near = 80, Range = 1900 },
+		-- The far hum (amb_motorway; 10.6 the D5 gone with the ground: the world far below the islands): a 3D loop on a
+		-- line east of every island (X, from Z0 to Z1: the Bounds' length) at its point nearest you, Y down below every
+		-- island's bottom (in the clouds), so it always comes from the east and below; Volume within Near studs, fading out
+		-- (Roblox's inverse taper) to nothing at Range. Outdoors; × FieldsIndoors in a warehouse.
+		Motorway = { X = 3000, Z0 = -980, Z1 = 880, Y = -200, Volume = 0.35, Near = 80, Range = 2400 },
 		-- Now and then outdoors, each on its own clock (Gap: seconds between two, a random pick), 3D (you hear where):
 		-- Volume within Near studs, nothing past Range.
-		--   Woodpecker  a woodpecker drumming in the forest (woodpecker_far, one drum) from its middle (SandboxMap's
-		--             wood "forest": X, Z; Y up in the crowns), Drums drums Every s apart
+		--   Woodpecker  a woodpecker drumming in the forest (woodpecker_far, one drum) in it (SandboxMap's wood
+		--             "forest", 10.6 on the Forest Lodge's island, out of its clearing: X, Z; Y up in the crowns over
+		--             the island's top), Drums drums Every s apart
 		--   Dog       a dog barking far off (dog_far), Far studs (a random pick) a random way round you
 		--   Tractor   a tractor on the fields (tractor_far, a loop), Far studs a random way round you at the middle of
 		--             its pass: it drives across your view at Speed studs a second for Seconds s, fading in and out
 		--             over Fade s
-		Woodpecker = { X = -960, Z = -560, Y = 26, Gap = { 90, 200 } :: { number }, Drums = 3, Every = 0.9, Volume = 0.7, Near = 120, Range = 1500 },
+		Woodpecker = { X = 1846, Z = -760, Y = 100, Gap = { 90, 200 } :: { number }, Drums = 3, Every = 0.9, Volume = 0.7, Near = 120, Range = 1500 },
 		Dog = { Gap = { 45, 110 } :: { number }, Far = { 90, 170 } :: { number }, Volume = 0.8, Near = 30, Range = 260 },
 		Tractor = { Gap = { 80, 170 } :: { number }, Far = { 150, 240 } :: { number }, Seconds = 16, Fade = 4, Speed = 5, Volume = 0.9, Near = 40, Range = 360 },
 		Display = 0.7, -- a piece put on a stand (stand_display: a soft thunk and a sparkle)
@@ -7599,9 +7601,8 @@ Config.Collection = {
 --   Truck          Attribute: the truck's model attribute while it stands at a run's house (client/CarVisuals.luau: no
 --                  Drive or Ride along prompt; its driver's seat is Disabled); Reach: its FINISH / VOTE prompts' reach;
 --                  At: their place on its chassis (x across, y up, z along: the driver's side behind the cab)
---   Zone           a run zone's edge (SandboxMap.Zones): Screen (CountryLooks' "screen" hedge: Height, Width, its colour),
---                  Wall (the invisible walls' height on it), View (studs: the forest's and the orchard's trees, the
---                  stream's pieces kept within this of a zone, the rest of them never built)
+--   Zone           a run zone's edge (SandboxMap.Zones; 10.6 a map island's walls, its low rim hedge on them): Wall (the
+--                  invisible walls' height on it; the lobby's on its bounds too)
 --   Play           10.4 the PLAY circle (server/LobbyWorld.luau builds it, server/Parties.luau watches it): Radius
 --                  (studs: SandboxMap.Lobby.play.r, the same), Height (studs over the ground a body's root may be and
 --                  still stand in it), Ring (studs: the glowing ring's width), its glow's colours (Free: no lobby
@@ -7697,13 +7698,14 @@ Config.Runs = {
 	Every = 0.2,
 	Apart = 3.5,
 	Fade = { Out = 0.45, In = 0.6 },
-	-- 10.4 the ride (client/RideUi.luau): s the van drives on its way to a house (To) and back (Back), over the fade;
-	-- Home: the lobby's name on the way back; Out: s the ride fades into the place
-	Ride = { To = 3.4, Back = 2.4, Out = 0.5, Home = "the Deliveros depot" },
+	-- 10.4 the ride (client/RideUi.luau; 10.6 a card over the fade: "→ THE POND CABIN"): s it shows on the way to a
+	-- house (To: its island streams in behind it) and back (Back); Home: the lobby's name on the way back; Out: s it
+	-- fades into the place
+	Ride = { To = 3, Back = 2.2, Out = 0.5, Home = "the lobby" },
 	EndHold = 3.5,
 	LeaveHold = 3,
 	Truck = { Attribute = "RunParked", Reach = 9, At = { -4.6, 3.4, -1.5 } :: { number } },
-	Zone = { Screen = { Height = 14, Width = 4, Color = { 44, 82, 38 } :: { number } }, Wall = 80, View = 110 },
+	Zone = { Wall = 80 },
 	Play = {
 		Radius = 16,
 		Height = 8,
@@ -8553,6 +8555,7 @@ Config.SandboxLeaders = {
 --                  the HUD, under a window and during a grip check
 --   Danger         the tags another worker's runs put on the house's dangers (none: nothing drawn): their icon; RunLock
 --                  (a locked doorway: its attribute Open), RunKey, RunVault (Open), RunHazard (its Kind: Hazards), RunRescue
+--   Edge           10.6 studs of the lobby island's rock edge drawn round its rim of grass (Colors Cliff, Rim)
 --   Colors         { r, g, b } of the drawing
 Config.SandboxMapUi = {
 	Key = "M",
@@ -8564,6 +8567,7 @@ Config.SandboxMapUi = {
 	Below = 6,
 	Above = 8,
 	Yard = { Depth = 6, Truck = 22, Half = 20 },
+	Edge = 3,
 	Fog = { See = 40, Eye = 1.5, Every = 0.25, Most = 16 },
 	Pulse = { From = "epic", Seconds = 0.7 },
 	Zombies = 60,
@@ -8581,6 +8585,8 @@ Config.SandboxMapUi = {
 		Back = { 16, 19, 23 },
 		Meadow = { 74, 112, 62 },
 		Hedge = { 38, 70, 34 },
+		Cliff = { 104, 92, 80 }, -- (10.6: the lobby island's rock edge)
+		Rim = { 84, 124, 66 }, -- (… its rim of grass outside the hedge)
 		Plaza = { 178, 170, 156 },
 		PlayFloor = { 44, 66, 86 }, -- (10.4: the PLAY circle's floor; its ring Config.Runs.Play's)
 		Water = { 76, 140, 190 },
@@ -8887,7 +8893,9 @@ Config.VanPaint = {
 --              Outdoor (OutdoorAmbient), ShiftTop / ShiftBottom (ColorShift_Top / _Bottom), Diffuse / Specular
 --              (EnvironmentDiffuseScale / SpecularScale), Softness (ShadowSoftness); the Atmosphere: Air (its Color and
 --              the fog's), Decay, Density, Offset, Glare, Haze; Fog (FogStart, FogEnd: only without an Atmosphere); the
---              grade SandboxGrade: Tint, Saturation, Contrast, Lift (its Brightness); Clouds; Sun (the sun's size, deg)
+--              grade SandboxGrade: Tint, Saturation, Contrast, Lift (its Brightness); Clouds; Sun (the sun's size, deg).
+--              10.6 the floating islands: the air light enough that the far islands read (Config.Islands: the clouds
+--              under them are parts, the sky's Clouds over them)
 --   Places     the eyes (client/SandboxLight.luau): each place's look, eased in whenever you walk into it ("outdoors",
 --              "house": the move's house inside, "warehouse": a plot's hall, "van": a Sprinter's walk-in bay):
 --                Exposure   added to Sky.Exposure (Lighting.ExposureCompensation, stops; Roblox takes -3 … 3)
@@ -8938,10 +8946,10 @@ Config.SandboxLight = {
 		Softness = 0.3,
 		Air = { 200, 204, 212 } :: { number },
 		Decay = { 132, 136, 150 } :: { number },
-		Density = 0.26,
+		Density = 0.2, -- (10.6: the other islands 400 … 1 500 studs off the lobby in a light haze, not lost in it)
 		Offset = 0.12,
 		Glare = 0.4,
-		Haze = 1.3,
+		Haze = 1.1,
 		Fog = { 1200, 4000 } :: { number },
 		Tint = { 255, 246, 232 } :: { number },
 		Saturation = 0.06,
@@ -9365,11 +9373,73 @@ Config.Country = {
 		apiary = 16,
 		railway = 10,
 		halt = 14,
+		spring = 10, -- 10.6
+		waterfall = 6, -- 10.6
 	} :: { [string]: number },
 	Woods = { Spacing = 26, Jitter = 5, Mix = { "oak", "linden", "oak", "birch", "linden" } :: { string } },
 	Lines = { Post = 24, Rails = { 1.5, 2.9 } :: { number }, Hedge = { Height = 3.4, Width = 2.6 } },
 	Streams = { Water = 0.22, Bank = 1.5, BankTop = 0.12, Clear = 2 },
 	Far = { Rails = 900 },
+	-- 10.6 the mill's spring (a round pool on its bank, a few stones) and its waterfall (the millrace over its island's
+	-- edge: Drop studs down its side, Wide studs wide, its spray Mist studs round at its foot)
+	Spring = { Bank = 3, Stones = 5 },
+	Waterfall = { Drop = 70, Wide = 7, Mist = 14 },
+}
+
+-- 10.6 THE FLOATING ISLANDS (the owner: "the world is made of blocks: the lobby is one big block, each map a smaller
+-- block that holds only that map ... floating islands in the sky: grass on top, dirt and stone sides with tapering rock
+-- underneath, the sky all round and below; the other islands seen in the distance from the lobby"; travel: "a fade").
+-- design/islands/plan.py lays the islands out (shared/SandboxMap.luau Islands, Rocks: their places, sizes, heights and
+-- colours), shared/IslandLooks.luau draws their rock, server/SandboxWorld.luau builds it (the grass on top:
+-- shared/SandboxScenery.luau tops), server/IslandFall.luau catches whoever falls off.
+--   Destroy    workspace.FallenPartsDestroyHeight in the sandbox: far under every island's bottom (design/islands/plan.py
+--              DESTROY: the same); the fall catch has a body long before it gets there
+--   LobbyHedge the lobby's hedge's height (server/LobbyWorld.luau: low, the other islands seen over it; a map island's
+--              rim hedge is Config.Country.Lines.Hedge's)
+--   Body       an island's rock under its grass (Grass deep: shared/SandboxScenery.luau tops' tiles): Dirt studs of dirt,
+--              Inset studs in from the grass's edge (the
+--              grass's lip over it), Stone studs of stone under it (Narrow: its sides that much further in); the rest of
+--              its depth Taper blocks, each Shrink of the one over it (Share of what is left), turned Turn degrees at most
+--              and off its middle Shift of its size at most, the last an upside-down pyramid down to the tip; Bulges: a
+--              boulder out of a side every that many studs of it (Out studs out); Hanging: rocks hanging under its edge
+--              (one every that many studs round it, Size studs across at most, Long studs down at most); Tint: each piece's
+--              colour up to that much lighter or darker
+--   Rock       a floating rock: its stone block (Cap: a grass cap on every other one), its pyramid under it
+--   Clouds     the soft clouds under the islands (decoration: nothing collides, no shadow): Count banks of Puffs puffs
+--              each, a puff Size studs across (its least, its most), Flat × as tall, the banks Height studs high (± Rise),
+--              Spread studs past the Bounds round them; Color, Alpha (its transparency)
+--   Fall       the fall catch (server/IslandFall.luau): Every s between two looks at every body (the players, their
+--              helpers in workspace.Npcs); a body Below studs under its island's bottom (its top less its depth: the
+--              island it stood on last, else the one under it, else the lobby's) is caught: put back on that island's
+--              top where it stood last (Inset studs inside its walls at least, else at its home: the lobby's spawn, the
+--              run zone's arrive: a root's height over the ground both), Up studs over it, still; a player behind the
+--              doors' fade (Fade out, In: the
+--              Moving remote's) and what they carried dropped there (server/Moving.luau runDrop); Hold s before a caught
+--              body may be caught again; Notice: the words a caught player gets
+Config.Islands = {
+	Destroy = -1000,
+	LobbyHedge = 3,
+	Body = {
+		Grass = 2,
+		Dirt = 6,
+		Inset = 1.2,
+		Stone = 14,
+		Narrow = 3,
+		Taper = 3,
+		Shrink = 0.72,
+		Share = 0.55,
+		Turn = 9,
+		Shift = 0.05,
+		Bulges = 110,
+		Out = 3.5,
+		Hanging = 150,
+		Size = 30,
+		Long = 34,
+		Tint = 8,
+	},
+	Rock = { Cap = 2 },
+	Clouds = { Count = 14, Puffs = 3, Size = { 70, 150 } :: { number }, Flat = 0.32, Height = -230, Rise = 30, Spread = 260, Color = { 252, 252, 255 } :: { number }, Alpha = 0.35 },
+	Fall = { Every = 0.25, Below = 6, Inset = 10, Up = 0.5, Fade = { Out = 0.35, In = 0.6 }, Hold = 2, Notice = "You fell off the island: back on top." },
 }
 
 -- 8.3 SANDBOX, Roblox badges for the sandbox's milestones (the owner's guide: design/sandbox/BADGES.md).

@@ -1,7 +1,7 @@
 --!strict
--- 8.9 SANDBOX on the map; 9.4 the countryside (design/countryside/plan.py, plan.json): where the map's art stands, as
--- plain numbers, from shared/SandboxMap.luau's map section (tools/countryside/sandboxmap.py writes it from the plan) and
--- its Houses: shared/VillageLooks.luau's houses, the D5, the trees and the fields, shared/CountryLooks.luau's landmarks,
+-- 8.9 SANDBOX on the map; 9.4 the countryside (design/countryside/plan.py, plan.json); 10.6 the floating islands
+-- (design/islands/plan.py, plan.json): where the map's art stands, as plain numbers, from shared/SandboxMap.luau's
+-- ISLANDS section (tools/islands/sandboxmap.py writes it from the plan) and its Houses: shared/VillageLooks.luau's houses, the D5, the trees and the fields, shared/CountryLooks.luau's landmarks,
 -- hedges, fences and the stream. Pure (no Roblox at its top level), deterministic: server/VillageWorld.luau makes the
 -- parts, client/VillageTraffic.luau drives the D5's cars on its lanes, tests/villageworld_test.luau checks it all. Its
 -- numbers are Config.VillageWorld's (and Config.Village's and Config.Country's, the art kits').
@@ -17,12 +17,16 @@
 --                  and the woods' (a jittered grid, Config.Country.Woods), each where treeRule lets its crown stand:
 --                  else moved off its spot (Config.VillageWorld.Trees: Step studs at a time across its line, then
 --                  along it, at most Nudge), else left out
---   The lines      the hedges and fences of SandboxMap.TreeLines (CountryLooks.line; 9.7 the run zones' screen hedges)
---   The streams    SandboxMap.Streams (CountryLooks.stream: its bed and its water; 9.7 only the pieces a zone sees)
+--   The lines      the hedges and fences of SandboxMap.TreeLines (CountryLooks.line; 10.6 every map island's low rim hedge
+--                  on its walls)
+--   The streams    SandboxMap.Streams (CountryLooks.stream: its bed and its water; 10.6 only the pieces on an island:
+--                  the millrace ends at its island's edge, its waterfall a landmark)
 --   The fields     SandboxMap.Fields, a tile each (VillageLooks.field: the ground in its crop's colour, its rows)
 --   The far view   VillageLooks.horizon round SandboxMap.Bounds but its far roofs and church tower (no village on the
 --                  horizon either), the railway going on past them (CountryLooks.farRails); 9.7: none while there are
---                  run zones (SandboxMap.Zones: each ends at its screen hedge)
+--                  run zones (SandboxMap.Zones; 10.6 the sky round the islands)
+-- 10.6 the floating islands (design/islands/plan.py): every piece on the map stands on its island's top
+-- (server/VillageWorld.luau adds SandboxMap.groundAt to its y).
 --
 --   VillageScenery.houses(extra?)    { Placed }: the places to empty but the farmstead (rich): kind (the look drawn),
 --                                    box, yaw, seed, opts, ids, street (extra: their PlanHouses, enter()'s; the same)
@@ -36,11 +40,11 @@
 --   VillageScenery.trees()           { TreeSpot }: kind, x, z, seed, its crown's radius and height, where it is from
 --                                    (a line, "orchard" or a wood's id)
 --   VillageScenery.treeRule(x, z, r) why a crown r wide may not stand there (nil: it may): SandboxScenery.treeRule's
---                                    reasons, then "house", "landmark", "auction" (Keep studs off each), "stream" (its
---                                    crown off the water by Config.Country.Streams.Clear), "clearing" (in a wood's), 9.7
---                                    "zone" (over a run zone's screen hedge), "view" (farther than Config.Runs.Zone.View
---                                    from every zone: nobody would see it)
---   VillageScenery.inView(x, z, grow)   9.7: within Config.Runs.Zone.View + grow studs of a run zone
+--                                    reasons (10.6 "edge": off an island's grass), then "house", "landmark", "auction"
+--                                    (Keep studs off each), "stream" (its crown off the water by Config.Country.Streams
+--                                    .Clear), "clearing" (in a wood's), 9.7 "zone" (10.6 over a map island's walls and
+--                                    their rim hedge)
+--   VillageScenery.onIsland(x, z, grow)   10.6: on an island's top (grown by `grow`)
 --   VillageScenery.lines()           the hedges' and fences' pieces on the map
 --   VillageScenery.streams()         the streams' pieces on the map
 --   VillageScenery.fields()          { FieldTile }: kind, rect, seed
@@ -202,30 +206,21 @@ function VillageScenery.treeRule(x: number, z: number, r: number): string?
 			end
 		end
 	end
-	-- 9.7: a crown never over a run zone's screen hedge (its edge), never beyond every zone's view (nobody sees it)
+	-- 9.7: a crown never over a run zone's edge (10.6: a map island's walls and its rim hedge on them)
 	for _, zone in MAP.Zones do
 		local q = zone.rect
 		local inside = x > q.x0 and x < q.x1 and z > q.z0 and z < q.z1
 		local edge = if inside then math.min(x - q.x0, q.x1 - x, z - q.z0, q.z1 - z) else SandboxScenery.rectDistance(q, x, z)
-		if edge < r + Config.Runs.Zone.Screen.Width then
+		if edge < r + CW.Lines.Hedge.Width then
 			return "zone"
 		end
-	end
-	if not VillageScenery.inView(x, z, 0) then
-		return "view"
 	end
 	return nil
 end
 
--- 9.7: is (x, z) within Config.Runs.Zone.View (+ `grow`) studs of a run zone (SandboxMap.Zones: somebody there may see it)?
-function VillageScenery.inView(x: number, z: number, grow: number): boolean
-	local view = Config.Runs.Zone.View + grow
-	for _, zone in MAP.Zones do
-		if SandboxScenery.rectDistance(zone.rect, x, z) <= view then
-			return true
-		end
-	end
-	return false
+-- 10.6: is (x, z) on an island's top (grown by `grow`)?
+function VillageScenery.onIsland(x: number, z: number, grow: number): boolean
+	return MAP.islandAt(x, z, grow) ~= nil
 end
 
 local TREE_LINES = { windbreak = true, alley = true } -- (the tree lines of trees; the rest, hedges and fences, are lines())
@@ -324,9 +319,8 @@ function VillageScenery.streams(): { VillageLooks.Piece }
 	local out: { VillageLooks.Piece } = {}
 	for n, s in MAP.Streams do
 		for _, p in CountryLooks.stream(s.points, s.width, n) do
-			-- (9.7: only where a run zone sees it: a piece's middle within the view, its half length more)
-			local half = math.max(p.size[1], p.size[3]) / 2
-			if VillageScenery.inView(p.at[1], p.at[3], half) then
+			-- (10.6: only on an island: a piece's middle on its top)
+			if VillageScenery.onIsland(p.at[1], p.at[3], 0) then
 				table.insert(out, p)
 			end
 		end

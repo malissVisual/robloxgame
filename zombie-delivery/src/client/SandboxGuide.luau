@@ -1028,9 +1028,9 @@ local function showWorld(at: Vector3, label: string, px: number, pz: number, wit
 	if metres > G.Near and withPath then -- (10.3: only while the path helps)
 		count = SandboxSteps.route(px, pz, at.X, at.Z, path, G.Direct)
 	end
-	local y = SandboxMap.RoadTop + G.PathLift
 	for i = 1, count do
-		local point = Vector3.new(path[i * 2 - 1], y, path[i * 2])
+		local x, z = path[i * 2 - 1], path[i * 2]
+		local point = Vector3.new(x, SandboxMap.roadAt(x, z) + G.PathLift, z) -- (10.6 over its island's yard)
 		-- (10.3: the first point, your feet, is eased every frame by follow(); written here only when the path lights)
 		if point ~= world.pointAt[i] and (i > 1 or (world.pathOn or 0) == 0) then
 			world.pointAt[i] = point
@@ -1246,7 +1246,7 @@ local function follow(dt: number)
 	end
 	local feet = root.Position
 	local point = world.points[1]
-	local want = Vector3.new(feet.X, SandboxMap.RoadTop + G.PathLift, feet.Z)
+	local want = Vector3.new(feet.X, SandboxMap.roadAt(feet.X, feet.Z) + G.PathLift, feet.Z)
 	local now = point.WorldPosition
 	local step = now:Lerp(want, math.min(1, dt * G.PathFollow))
 	if (step - now).Magnitude > 1e-3 then

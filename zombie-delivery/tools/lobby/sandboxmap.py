@@ -11,7 +11,7 @@ Plots are made from Lobby.plots). Deterministic: the same plan, the same lines.
 What it writes (SandboxMap.Lobby):
   bounds      the lobby's square (the hedge HEDGE studs in from it, invisible walls on it)
   hedge       the hedge's inset
-  far         studs from the bounds to every run zone at least (design/countryside/plan.py checks it)
+  far         studs from the bounds to every other island's walls at least (10.6: design/islands/plan.py checks it)
   plaza       the paved square in the middle
   spawn       where a player appears (a Spot); spawnApart: the players' spawns this far apart across its look
   dispatch    the ZDC dispatch kiosk's foot (a Spot: its front's look)

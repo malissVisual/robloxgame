@@ -48,7 +48,8 @@ local Runtime: any = {
 	marched = 0,
 	tags = {},
 	holstered = 0,
-	floor = 0, -- the floor's height the rays find (the interiors' own: Runtime.interiorFloor near them)
+	floor = 0, -- the floor's height the rays find (the interiors' own: Runtime.interiorFloor near them; 10.6 over an
+	-- island this far over its top: SandboxMap.groundAt, the lobby's at 0, a run zone's up in the sky)
 	-- 7.0 planning
 	seated = {}, -- player → the car they drive (Vehicles.seatedIn)
 	carHits = {}, -- { { car, amount, cause } } what Vehicles.damage took
@@ -322,12 +323,15 @@ local function sightRay(origin: any, direction: any, params: any): any
 end
 Runtime.sightRay = sightRay
 
--- The floor under a point: an interior's (Runtime.interiorFloor within 400 studs of an interior's origin), else 0.
+-- The floor under a point: an interior's (Runtime.interiorFloor within 400 studs of an interior's origin), else
+-- Runtime.floor (10.6 over an island that far over its top: shared/SandboxMap.luau's groundAt less GroundTop).
+local islandMap: any = nil
 workspace.Raycast = function(_, origin: any, direction: any, params: any): any
 	if direction and (math.abs(direction.X) > 1e-6 or math.abs(direction.Z) > 1e-6) then
 		return sightRay(origin, direction, params) -- 9.0
 	end
-	local floor = Runtime.floor
+	islandMap = islandMap or require("./SandboxMap") :: any
+	local floor = Runtime.floor + islandMap.groundAt(origin.X, origin.Z) - islandMap.GroundTop
 	for _, at in Runtime.interiors do
 		if (origin - at.Position).Magnitude < 400 then
 			floor = at.Position.Y

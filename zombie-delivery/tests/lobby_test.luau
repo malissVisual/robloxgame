@@ -5,11 +5,13 @@
 --   * the data: SandboxMap.Lobby is the plan's (LobbyPlan.luau, tests/run_tests.py writes it from plan.json): its
 --     bounds (smaller than 9.7's 480 × 400), its PLAY circle (its radius Config.Runs.Play.Radius, on the plaza, the way
 --     back off it facing it), the Auction House's, the TOP MOVERS board's and the PAINT shop's spots; every run zone far
---     from it (Lobby.far), the plots in it, the spawn on its plaza; a few seconds' walk from the circle to the spawn,
---     every warehouse's door and every shop;
+--     from it (Lobby.far: 10.6 every other island's walls), the plots in it, the spawn on its plaza; a few seconds' walk
+--     from the circle to the spawn, every warehouse's door and every shop; 10.6 its island (SandboxMap.Islands' first)
+--     its bounds and a rim of grass round them, at GroundTop, its walls the bounds, its home the spawn;
 --   * the world the real server/SandboxWorld.luau builds (SandboxWorldServer.luau on tools/perf/world-mock.luau, the
 --     Auction House on): the Lobby model (Persistent) in workspace.Sandbox, every part of it in the lobby's bounds and
---     anchored; the plaza flush with the meadow; the hedge round it and the invisible walls on its bounds; the PLAY
+--     anchored; the plaza flush with the grass; the low hedge round it (10.6: Config.Islands.LobbyHedge, the other
+--     islands seen over it) and the invisible walls on its bounds; the PLAY
 --     circle (its glowing ring, its floor and glow, PLAY on the ground, its four lit posts outside it, the floating sign:
 --     ▶ PLAY, STEP IN TO PLAY; nothing on its ground collides; the map's attribute "[]"); no portals any more; the
 --     Deliveros dispatch (RunDispatch), the PAINT shop's booth (its prompt), the lamps and the trees as the plan has
@@ -57,7 +59,13 @@ end
 -- ── The data ───────────────────────────────────────────────────────────────
 
 do
-	check("SandboxMap.Lobby's bounds and Far the plan's", same(L.bounds, Plan.bounds) and L.far == Plan.far and L.far >= 1000)
+	check("SandboxMap.Lobby's bounds and Far the plan's", same(L.bounds, Plan.bounds) and L.far == Plan.far and L.far >= 250)
+	local island = SandboxMap.Islands[1]
+	local ib = island.rect
+	check("10.6 the lobby's island: the first, its top the bounds and a rim of grass round them at GroundTop, its walls the bounds, its home the spawn",
+		island.id == "lobby" and island.house == nil and island.top == SandboxMap.GroundTop and ib.x0 < L.bounds.x0 and ib.x1 > L.bounds.x1 and ib.z0 < L.bounds.z0
+			and ib.z1 > L.bounds.z1 and same(island.walls, L.bounds) and island.home.x == L.spawn.x and island.home.z == L.spawn.z
+			and SandboxMap.islandAt(L.spawn.x, L.spawn.z) == island and SandboxMap.groundAt(L.play.x, L.play.z) == SandboxMap.GroundTop)
 	local p = L.play
 	check("10.4 …its PLAY circle the plan's (its middle, its radius, the way back); its radius Config.Runs.Play.Radius", p.x == Plan.play.x and p.z == Plan.play.z
 		and p.r == Plan.play.r and p.back.x == Plan.play.back.x and p.back.z == Plan.play.back.z and p.back.yaw == Plan.play.back.yaw and p.r == Config.Runs.Play.Radius
@@ -78,7 +86,7 @@ do
 	for _, z in SandboxMap.Zones do
 		far = math.min(far, distance(z.rect, b))
 	end
-	check(`every run zone out of sight, {L.far} studs and more off the lobby (the nearest {math.floor(far)})`, far >= L.far, far)
+	check(`every run zone (10.6: every other island's walls) {L.far} studs and more off the lobby (the nearest {math.floor(far)})`, far >= L.far, far)
 	local inside = SandboxMap.inLobby(L.spawn.x, L.spawn.z) and not SandboxMap.inLobby(SandboxMap.House.door.x, SandboxMap.House.door.z)
 	for _, plot in SandboxMap.Plots do
 		inside = inside and SandboxMap.inLobby(plot.rect.x0, plot.rect.z0) and SandboxMap.inLobby(plot.rect.x1, plot.rect.z1)
@@ -168,7 +176,7 @@ do
 	check(`every part of it ({#parts}) in the lobby's bounds, anchored`, out == nil and anchored and #parts > 60, out)
 	check(`…a lobby within its share of the map's budget ({#parts} parts, at most 400)`, #parts <= 400, #parts)
 	local plaza = named("Plaza")[1]
-	check("the plaza: its slab on SandboxMap.Lobby.plaza, its top flush with the meadow", plaza ~= nil and math.abs(plaza.y1 - SandboxMap.GroundTop) < EPS
+	check("the plaza: its slab on SandboxMap.Lobby.plaza, its top flush with the grass", plaza ~= nil and math.abs(plaza.y1 - SandboxMap.GroundTop) < EPS
 		and math.abs(plaza.x0 - L.plaza.x0) < 0.01 and math.abs(plaza.x1 - L.plaza.x1) < 0.01 and math.abs(plaza.z0 - L.plaza.z0) < 0.01, plaza and plaza.y1)
 	check("…its fountain where the plan has it", #named("FountainBasin") == 1 and math.abs((named("FountainBasin")[1].x0 + named("FountainBasin")[1].x1) / 2 - L.fountain.x) < 0.01)
 	local hedges, walls = named("LobbyHedge"), named("LobbyWall")
@@ -178,9 +186,9 @@ do
 	end
 	local hedgeOk = #hedges == 4
 	for _, h in hedges do
-		hedgeOk = hedgeOk and h.part.CanCollide and h.y1 - h.y0 >= 4
+		hedgeOk = hedgeOk and h.part.CanCollide and math.abs(h.y1 - h.y0 - Config.Islands.LobbyHedge) < EPS and h.y1 - h.y0 <= 3.5
 	end
-	check("the hedge round it (4 solid rows, Lobby.hedge in) and the invisible walls on its bounds (4, high: a jump over the hedge goes nowhere)", hedgeOk and wallsOk)
+	check("the hedge round it (4 solid rows, Lobby.hedge in; 10.6 low: the other islands seen over it) and the invisible walls on its bounds (4, high: a jump over the hedge goes nowhere)", hedgeOk and wallsOk)
 	check("the plaza's lamps and the lobby's trees as the plan has them", #named("LampPole") == #L.lamps and #named("Trunk") == #L.trees and #L.trees > 0)
 end
 

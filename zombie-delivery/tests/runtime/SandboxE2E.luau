@@ -1449,7 +1449,8 @@ game.IsLoaded = function(): boolean
 end
 
 -- The world's rays: down onto an interior's floor (within 400 studs of a house's slot: its origin's height), else the
--- road (SandboxMap.Roads, RoadTop) or the meadow (GroundTop); sideways and up: nothing.
+-- road (SandboxMap.Roads, RoadTop) or the meadow (GroundTop); 10.6 each on its island (SandboxMap.roadAt, groundAt:
+-- its top; off every island GroundTop, a floor the mock keeps); sideways and up: nothing.
 local interiorOrigins: { any }? = nil
 local function originsOf(): { any }
 	if not interiorOrigins then
@@ -1470,10 +1471,10 @@ E.interiorOrigins = originsOf
 function E.groundY(x: number, z: number): number
 	for _, road in SandboxMapReal.Roads do
 		if x >= road.x0 and x <= road.x1 and z >= road.z0 and z <= road.z1 then
-			return SandboxMapReal.RoadTop
+			return SandboxMapReal.roadAt(x, z)
 		end
 	end
-	return SandboxMapReal.GroundTop
+	return SandboxMapReal.groundAt(x, z)
 end
 function E.interiorAt(at: any): any
 	for _, origin in originsOf() do
@@ -1568,6 +1569,7 @@ E.real = {
 	Loot = true, -- 9.x loot: every piece of the house gets its rarity, stars and value (Moving's hook)
 	RunDanger = true, -- 10.x danger: a run's locks and keys, its vault, its hazards (Runs starts it; Zombies is the fake's)
 	HelperCrew = true, -- 10.1 the helpers' crew (MoveHelper's hooks, the lobby's stands, the Crew remote)
+	IslandFall = true, -- 10.6 the floating islands' fall catch (SandboxBoot starts it after the map)
 }
 E.fakes = {}
 

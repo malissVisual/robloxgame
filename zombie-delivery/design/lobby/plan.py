@@ -15,9 +15,10 @@ Writes, next to this file:
   plan.png    the same seen from above, north up, everything labelled
 
 tools/lobby/sandboxmap.py writes plan.json into shared/SandboxMap.luau (its LOBBY section: SandboxMap.Lobby, and the
-plots SandboxMap.Plots are made from it). The six places to empty are not here: each is a run zone of its own far off
-(design/countryside/plan.py), at least FAR studs from the lobby. Nothing overlaps anything else: check() says.
-Deterministic (no dice).
+plots SandboxMap.Plots are made from it). The six places to empty are not here: 10.6 each is on a floating island of its
+own round the lobby's island (design/islands/plan.py: the lobby island is these bounds and a rim of grass round them),
+its walls at least FAR studs from the lobby's bounds. Nothing overlaps anything else: check() says. Deterministic (no
+dice).
 
     python3 design/lobby/plan.py
 """
@@ -29,8 +30,8 @@ from PIL import Image, ImageDraw, ImageFont
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
-OX, OZ = 1800, 0  # the lobby's middle across (the run zones are west of x 420: design/countryside/plan.py)
-FAR = 1000  # a run zone at least this far from the lobby's bounds (design/countryside/plan.py checks it too)
+OX, OZ = 1800, 0  # the lobby's middle across (10.6 the other islands round it: design/islands/plan.py)
+FAR = 300  # 10.6: every other island's walls at least this far from the lobby's bounds (design/islands/plan.py checks it)
 
 
 def rect(x0, x1, z0, z1):
@@ -354,8 +355,8 @@ def picture(p, sh, path):
         draw.text((lx + 38, y + 2), text, font=font(17), fill=COL["white"])
         y += 30
     y += 10
-    draw.text((lx, y), f"lobby {BOUNDS['x1'] - BOUNDS['x0']} × {BOUNDS['z1'] - BOUNDS['z0']} studs (9.7: 480 × 400); the six run", font=font(16), fill=COL["text2"])
-    draw.text((lx, y + 22), f"zones are {FAR}+ studs west of it (design/countryside/plan.png)", font=font(16), fill=COL["text2"])
+    draw.text((lx, y), f"lobby {BOUNDS['x1'] - BOUNDS['x0']} × {BOUNDS['z1'] - BOUNDS['z0']} studs (9.7: 480 × 400) on its island; the six", font=font(16), fill=COL["text2"])
+    draw.text((lx, y + 22), f"other islands {FAR}+ studs off it (design/islands/plan.png)", font=font(16), fill=COL["text2"])
     bx, by = 30, H - 40
     draw.line([bx, by, bx + 50 * S, by], fill=COL["white"], width=4)
     draw.line([bx, by - 8, bx, by + 8], fill=COL["white"], width=3)

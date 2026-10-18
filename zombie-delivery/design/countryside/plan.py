@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""The countryside instead of the village (the owner: "all the family houses are gone; instead six different spots: by
+"""10.6: REPLACED by design/islands/plan.py (the floating islands: tools/islands/sandboxmap.py writes the map from it). Kept
+as 9.x's record: nothing reads this plan.json any more.
+
+The countryside instead of the village (the owner: "all the family houses are gone; instead six different spots: by
 the pond, on the farm, one house, somewhere else again; no towns, no villages"); 9.7 runs (the owner: "like Dungeon
 Quest: from the lobby you go into a house"): the six places to empty as run zones, the sandbox's map as plain data and a
 picture.
