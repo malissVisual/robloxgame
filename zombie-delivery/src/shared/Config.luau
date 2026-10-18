@@ -14,7 +14,6 @@ Config.Version = "10.6"
 -- (Config.CompanyVan), the only car of the game.
 Config.DataStoreName = "ZombieDelivery_v2"
 Config.StartMoney = 40
-Config.StudioStartMoney = 40 -- a Play test in Studio (no saves) starts like a new player; the admin panel (P) gives money for testing
 Config.AutosaveSeconds = 60
 -- 4.2: a save is locked to the server that plays it (UpdateAsync). A join waits this long for the last server's
 -- leave save before it takes the save over; a lock not refreshed for SaveLockStale seconds is a crashed server's.
@@ -310,23 +309,6 @@ Config.Tutorial = {
 	TourBounceSpeed = 1.6, -- bounces a second
 	TourGap = 8, -- between the target and the arrow's tip
 	TourCaptionWidth = 300, -- the caption box's width
-}
-
--- 3.7: the map you discover (shared/Explore.luau, server/Explore.luau, client/MapView.luau, the minimap in Hud).
-Config.Explore = {
-	Cell = 120, -- the map is a grid of cells this many studs wide; you uncover the ones around you
-	Radius = 180, -- studs around you that are uncovered
-	Every = 1, -- seconds between two checks of where you are
-	PlaceRadius = 70, -- this close to a place (a shop, an employer, a mission place) and it is discovered
-	-- The grid covers Map.Bounds and this much more on every side (the world's walls stand on Map.Bounds).
-	Pad = 60,
-	-- A new player (or a save from before 3.7) starts with the cells over this square around the middle uncovered
-	-- (the safe zone, Config.City.SafeHalf, and a little more; the park, the depot and the shops): nobody starts lost.
-	StartHalf = 240,
-	-- A jump farther than this between two checks is a teleport (the admin, a home spawn): the way between is not
-	-- uncovered. Shorter (a fast car): the cells along the way are.
-	Teleport = 600,
-	Banner = 3, -- seconds the "NEW LOCATION DISCOVERED" banner stays (client/Discovery.luau; shorter while more wait)
 }
 
 -- Who may open the admin panel (P / the ADMIN button, server/Admin.luau): everybody in a Studio Play test, the
@@ -1731,27 +1713,6 @@ Config.Items = {
 	{ id = "jerrycan", name = "Jerry Can", icon = "⛽", price = 35, max = 5, car = true, description = "Car only: +10 L of fuel. Use it next to your car (or in it). The gas stations' kiosks sell it too." },
 } :: { ItemDef }
 
-Config.ItemTuning = {
-	RepairShare = 0.4,
-	NitroTime = 4,
-	NitroMultiplier = 1.6,
-	MolotovRange = 90,
-	MolotovRadius = 13,
-	MolotovTime = 8,
-	MolotovDps = 35,
-	MineTrigger = 9,
-	MineRadius = 18,
-	MineDamage = 320,
-	MineLife = 120,
-	MineMax = 5,
-	UseCooldown = 0.4,
-	BarSlots = 5, -- 6.3: the bottom bar's item slots on a computer (client/Hotbar.luau)
-	-- 6.7, the Energy Drink (server/Items.luau sets the character's EnergyUntil, server time; client/Stamina.luau fills
-	-- the breath when it changes and divides the sprint's drain by EnergyBreath until then)
-	EnergyTime = 30,
-	EnergyBreath = 1.3,
-}
-
 -- 5.4, fuel (shared/FuelMath.luau, server/Fuel.luau, client/FuelGauge.luau). Every car (never a bike or the scooter)
 -- has a tank (CarDef.tank, litres) and burns CarDef.burn litres per 1,000 studs it is driven: the server's Tick measures
 -- the chassis' flat distance while somebody drives it, never while a chauffeur does, and skips a jump of more than
@@ -2472,146 +2433,6 @@ Config.DayNight = {
 	NightRoam = 1.6, -- roaming zombies multiplier at night
 }
 
--- 6.16, light and atmosphere (shared/SkyGrade.luau; drawn on every client: client/Weather.luau, client/SkyFx.luau): the
--- look of every time of day. Looks names a look; Clock says at which hour each one is full (sorted, 0 … 24; after the
--- last the clock wraps round to the first), and in between two looks blend smoothly (smoothstep). Colours are
--- { r, g, b } (0 … 255). A look holds:
---   brightness, exposure     Lighting.Brightness (the sun or the moon) and ExposureCompensation
---   ambient, outdoor         Lighting.Ambient and OutdoorAmbient (the light in the shade, indoors and out)
---   top, bottom              Lighting.ColorShift_Top (the sunlit sides: a golden sun) and ColorShift_Bottom (the bounce)
---   diffuse, specular, soft  Lighting.EnvironmentDiffuseScale, EnvironmentSpecularScale (the sky's light and shine) and
---                            ShadowSoftness
---   tint, saturation, contrast, lift   the colour grade (the ColorCorrection ZombieGrade: TintColor, Saturation,
---                            Contrast, Brightness)
---   bloom, bloomSize, threshold   the bloom: the lamps, the lit windows and the headlights glow at night (a high
---                            threshold by day, so nothing washes out)
---   rays                     the sun rays' intensity (under a clear sky, from a medium graphics quality up)
---   air, decay, density, offset, glare, haze   the atmosphere (it is the fog too: Lighting's Fog* do nothing with an
---                            Atmosphere): Color, Decay, Density, Offset, Glare, Haze
---   clouds                   the clouds' colour
---   blur                     0 … 1 of Blur.Far (the soft blur far away)
---   dust                     0 … 1 of Dust.Rate (the motes floating in the sun)
--- The rain, the fog, the snow, the town's glow at night and the Blood Moon (Config.LiveEvents) blend over it as before.
--- 3.0.1's rule: the night is dark but readable, never so dark a zombie hides in it: ReadableFloor is the least any hour
--- may have (the luma of OutdoorAmbient, Ambient and the tint, 0 … 255; the sun's or the moon's brightness);
--- tests/skygrade_test.luau checks every minute of the day.
-Config.Atmosphere = {
-	Looks = {
-		-- Night: a readable blue night (3.0.1's look: a bright moon, a blue grade, a dark blue haze); the lamps bloom.
-		night = {
-			brightness = 1.5, exposure = 0.05, ambient = { 68, 72, 94 }, outdoor = { 96, 104, 138 },
-			top = { 0, 8, 30 }, bottom = { 4, 6, 14 }, diffuse = 0.3, specular = 0.55, soft = 0.6,
-			tint = { 200, 212, 255 }, saturation = -0.25, contrast = 0.12, lift = 0,
-			bloom = 1, bloomSize = 30, threshold = 1.05, rays = 0,
-			air = { 62, 72, 102 }, decay = { 30, 36, 56 }, density = 0.3, offset = 0.25, glare = 0, haze = 0.7,
-			clouds = { 70, 78, 104 }, blur = 0.6, dust = 0,
-		},
-		-- Dawn, the blue hour before the sun: cool and blue, the lamps still on.
-		dawn = {
-			brightness = 1.45, exposure = 0.1, ambient = { 66, 74, 100 }, outdoor = { 94, 106, 144 },
-			top = { 16, 26, 60 }, bottom = { 6, 10, 22 }, diffuse = 0.4, specular = 0.55, soft = 0.6,
-			tint = { 206, 222, 255 }, saturation = -0.18, contrast = 0.1, lift = 0.01,
-			bloom = 0.85, bloomSize = 28, threshold = 1.1, rays = 0.04,
-			air = { 112, 128, 168 }, decay = { 58, 70, 112 }, density = 0.33, offset = 0.15, glare = 0.3, haze = 1.3,
-			clouds = { 150, 162, 196 }, blur = 1, dust = 0.1,
-		},
-		-- Sunrise: the golden hour, a warm low sun, long soft shadows, rays and dust in the light.
-		sunrise = {
-			brightness = 1.6, exposure = 0.05, ambient = { 84, 74, 72 }, outdoor = { 122, 106, 102 },
-			top = { 120, 70, 30 }, bottom = { 30, 18, 14 }, diffuse = 0.5, specular = 0.65, soft = 0.45,
-			tint = { 255, 226, 198 }, saturation = 0, contrast = 0.14, lift = 0.01,
-			bloom = 0.6, bloomSize = 26, threshold = 1.25, rays = 0.16,
-			air = { 214, 152, 114 }, decay = { 150, 98, 82 }, density = 0.33, offset = 0.08, glare = 1.6, haze = 1.8,
-			clouds = { 255, 208, 172 }, blur = 1, dust = 1,
-		},
-		-- Morning: fresh and clear. 7.1, the Alps: a cool, crisp blue air (the far mountains fade blue), lush colours.
-		morning = {
-			brightness = 1.75, exposure = 0, ambient = { 74, 74, 82 }, outdoor = { 106, 110, 120 },
-			top = { 36, 26, 12 }, bottom = { 10, 10, 10 }, diffuse = 0.55, specular = 0.7, soft = 0.3,
-			tint = { 246, 248, 248 }, saturation = -0.01, contrast = 0.12, lift = 0,
-			bloom = 0.35, bloomSize = 22, threshold = 1.45, rays = 0.06,
-			air = { 182, 202, 226 }, decay = { 116, 138, 172 }, density = 0.26, offset = 0.15, glare = 0.5, haze = 1.25,
-			clouds = { 255, 255, 255 }, blur = 0.8, dust = 0.7,
-		},
-		-- Noon: clean and crisp, true colours, sharp shadows, the least haze. 7.1: the alpine noon: a clear blue air,
-		-- lush, a touch cool.
-		noon = {
-			brightness = 1.8, exposure = -0.05, ambient = { 72, 72, 80 }, outdoor = { 106, 110, 120 },
-			top = { 14, 12, 6 }, bottom = { 8, 8, 8 }, diffuse = 0.6, specular = 0.7, soft = 0.2,
-			tint = { 247, 251, 255 }, saturation = 0.02, contrast = 0.14, lift = 0,
-			bloom = 0.3, bloomSize = 20, threshold = 1.5, rays = 0.03,
-			air = { 178, 200, 228 }, decay = { 118, 142, 178 }, density = 0.24, offset = 0.15, glare = 0.2, haze = 1,
-			clouds = { 255, 255, 255 }, blur = 0.7, dust = 0.5,
-		},
-		-- Afternoon: warming up (7.1: still the clear alpine air, a little warmer).
-		afternoon = {
-			brightness = 1.75, exposure = 0, ambient = { 76, 72, 76 }, outdoor = { 108, 106, 110 },
-			top = { 50, 34, 14 }, bottom = { 12, 10, 8 }, diffuse = 0.55, specular = 0.7, soft = 0.3,
-			tint = { 252, 246, 234 }, saturation = 0.02, contrast = 0.13, lift = 0,
-			bloom = 0.35, bloomSize = 22, threshold = 1.45, rays = 0.06,
-			air = { 196, 204, 214 }, decay = { 128, 136, 150 }, density = 0.26, offset = 0.12, glare = 0.6, haze = 1.25,
-			clouds = { 255, 250, 242 }, blur = 0.8, dust = 0.7,
-		},
-		-- Sunset, the golden hour: the warmest look, an orange haze and the sun's glare, rays and dust in the light.
-		golden = {
-			brightness = 1.65, exposure = 0.05, ambient = { 90, 74, 70 }, outdoor = { 128, 104, 98 },
-			top = { 140, 78, 30 }, bottom = { 34, 18, 14 }, diffuse = 0.5, specular = 0.65, soft = 0.45,
-			tint = { 255, 218, 186 }, saturation = 0.04, contrast = 0.16, lift = 0.01,
-			bloom = 0.65, bloomSize = 26, threshold = 1.2, rays = 0.18,
-			air = { 222, 142, 98 }, decay = { 160, 88, 72 }, density = 0.34, offset = 0.06, glare = 2, haze = 2,
-			clouds = { 255, 192, 152 }, blur = 1, dust = 1,
-		},
-		-- Dusk, the blue hour after the sun: violet and blue, the lamps coming on.
-		dusk = {
-			brightness = 1.45, exposure = 0.1, ambient = { 74, 70, 98 }, outdoor = { 104, 100, 142 },
-			top = { 40, 20, 50 }, bottom = { 10, 8, 20 }, diffuse = 0.4, specular = 0.55, soft = 0.55,
-			tint = { 214, 208, 255 }, saturation = -0.12, contrast = 0.12, lift = 0.01,
-			bloom = 0.9, bloomSize = 28, threshold = 1.08, rays = 0.04,
-			air = { 118, 94, 132 }, decay = { 64, 46, 80 }, density = 0.32, offset = 0.15, glare = 0.5, haze = 1.2,
-			clouds = { 172, 134, 162 }, blur = 0.9, dust = 0.1,
-		},
-	},
-	-- When each look is full (hours; the default Roblox sun rises at about 6:00 and sets at about 18:00).
-	Clock = {
-		{ hour = 4.6, look = "night" },
-		{ hour = 5.5, look = "dawn" },
-		{ hour = 6.5, look = "sunrise" },
-		{ hour = 8.5, look = "morning" },
-		{ hour = 12.5, look = "noon" },
-		{ hour = 16.2, look = "afternoon" },
-		{ hour = 17.7, look = "golden" },
-		{ hour = 18.9, look = "dusk" },
-		{ hour = 20.3, look = "night" },
-	} :: { { hour: number, look: string } },
-	ReadableFloor = { outdoor = 95, ambient = 64, tint = 200, brightness = 1.4 },
-	-- The sky (server/World.luau): the sun's and the moon's size (degrees), the stars (0 … 5000). Optional pictures:
-	-- empty strings keep Roblox's own sky; an "rbxassetid://…" in all six Skybox sides (Bk, Dn, Ft, Lf, Rt, Up), in Sun
-	-- or in Moon sets that one.
-	Sky = {
-		SunSize = 12,
-		MoonSize = 16,
-		Stars = 5000,
-		Skybox = { Bk = "", Dn = "", Ft = "", Lf = "", Rt = "", Up = "" } :: { [string]: string },
-		Sun = "",
-		Moon = "",
-	},
-	-- Roblox's moving clouds (Terrain.Clouds, made on every client): Cover and Density in clear weather, in the rain and
-	-- in a fog (blended with the weather); their colour is the look's. Lite: on a phone or a tablet too (false: none
-	-- there, unless the place has its own). 7.1: fewer, brighter fair-weather clouds over the Alps.
-	Clouds = { Cover = 0.42, Density = 0.45, RainCover = 0.88, RainDensity = 0.85, FogCover = 0.72, FogDensity = 0.75, Lite = true },
-	-- The soft blur far away (a DepthOfFieldEffect): sharp out to Focus + Radius studs, beyond that Far × the look's blur
-	-- (half of it in the rain or the fog: the air blurs already). Never on a phone or a tablet, below graphics quality
-	-- Quality (1 … 10), or while you aim (it fades out over Fade seconds).
-	Blur = { Focus = 200, Radius = 50, Far = 0.12, Quality = 4, Fade = 0.4 },
-	-- Dust in the air by day: tiny slow motes in a Box-stud box around the camera, Rate a second × the look's dust (none
-	-- in the rain, the fog, the snow, at night, or with Reduced Motion); a phone or a tablet Lite of them, fewer at a low
-	-- graphics quality.
-	Dust = { Rate = 7, Lite = 0.4, Box = 44, Size = 0.09, Life = { 7, 11 } :: { number } },
-	-- A soft haze around the street lamps at night: the Count nearest lamps that shine (the 6.13.1 light budget) within
-	-- Range of the camera get a faint glow Size studs across (a phone or a tablet: Lite of them).
-	Halo = { Count = 12, Lite = 0, Range = 160, Size = 7, Transparency = 0.9 },
-}
-
 -- 7.1, the Alps (the owner: "make the map a smaller alpine valley, step by step"; step 1B: mountains and forests, nothing
 -- you play on moves): shared/AlpineLayout.luau lays it out as plain numbers (tests/alpine_test.luau checks it),
 -- server/Alpine.luau builds it once from World.build (tools/alpine-preview draws it).
@@ -2733,96 +2554,6 @@ Config.Alpine = {
 		Colors = { { 245, 245, 238 }, { 250, 208, 60 }, { 170, 110, 210 }, { 222, 64, 72 }, { 92, 140, 230 } } :: { { number } },
 	},
 	Huts = { Count = 4, Gap = 600, Road = { 34, 110 } :: { number } },
-}
-
--- 7.2, the Alps on the maps (client/MapView.luau draws the minimap and the big map, shared/MapStyle.luau works out
--- what from Map and AlpineLayout, tools/phone-ui/mapview.luau checks it): a paper map, the valley green on cream, grey
--- rock and white snow round it, the roads light with a brown edge, the highways amber.
---   Margin     studs of the mountain ring drawn round Map.Bounds on both maps (the minimap sees at most about 300
---              studs from you, and you stay inside the bounds)
---   Colors     { r, g, b }: Paper (round the valley on the big map), Valley, Meadow (the wildflower meadows), Slope
---              (the ring's grass on the minimap), Forest and Trees (a forest band and its tree dots; SnowForest and
---              SnowTrees in the winter), Winter (the snowfield), Rock, Snow, Shadow (the peaks' shadow side), Water,
---              Shore, Ice, Yard, Blocks (by district style), Special, Park, Square, Footbridge, Road, RoadEdge,
---              Highway, Bridge, IceRoad, Fog, Ink / InkSoft / Halo (the captions), Closed (the ROAD CLOSED sign), Hut
---   Peaks      the big map's mountains: a shaded peak with its snow cap for every cone of the ring (the shoulders
---              only east and west), pulled into the margin. Base: where a peak's foot line stands, a share of Margin
---              out from the bounds { front row, back row }: north (the peaks rise up the map, away from the valley),
---              south (up the map, toward it, never into it), side (east and west, at most Side × Margin high, wide
---              enough to overlap into one range, their inner feet at most Into × Margin over the valley's edge);
---              Height: the lowest … the tallest cone's peak, a share of Margin; Cap: a snow cap's share of its peak
---              { least, most } (the winter's peaks: Winter); Shade: the shadow side's transparency; Haze: how far the
---              back row's rock fades toward the paper
---   Relief     the minimap's mountains seen from above: a cone's grassy foot, its rock (from its grass line up) and
---              its snow (from its snow line up) as discs lit from the north-west, each that reaches within Reach
---              studs of the bounds (the minimap sees about 290 from you at its widest); a snow disc smaller than
---              MinSnow studs is left out; Light: the far side of a disc is its colour × (1 - 2 × Light)
---   Forest     the valley's trees (AlpineLayout.forest) binned in Cell × Cell squares; a square with Min trees or
---              more is forest; a row's run of forest squares is one rounded band Overlap × Cell high (the rows melt
---              into each other) with PerCell tree dots a square
---   Meadows    a lighter disc Radius studs round every wildflower patch (AlpineLayout's meadows; Soft its
---              transparency), a flower's dot Flower studs round in it
---   Foothills  the soft green edge round the valley on the big map: studs out from the bounds
---   Altstadt   the old town's label (a placeholder until Map names its villages: Map.Villages) over District's name
---   Wait       seconds a client waits for the server's summary of the ring and the forest (MapStyle.publish, before
---              World.build) before it works them out itself
---   Budget     the most GuiObjects a layer may make on one map (tools/phone-ui/mapview.luau holds them): Peaks (big),
---              Relief (mini), Forest, Meadows (with the huts), Alpine (all of the alpine layers on one map), Mini (7.2
---              review: all of them on the minimap, whose CanvasGroup draws them again on every move); Summary:
---              the most characters the server's summary may have (a StringValue holds 200,000)
-Config.MapStyle = {
-	Margin = 420,
-	Colors = {
-		Paper = { 236, 228, 208 },
-		Valley = { 186, 206, 150 },
-		Meadow = { 208, 224, 166 },
-		Slope = { 146, 164, 114 },
-		Forest = { 118, 152, 98 },
-		Trees = { 70, 108, 64 },
-		SnowForest = { 164, 182, 172 },
-		SnowTrees = { 92, 118, 104 },
-		Winter = { 236, 241, 243 },
-		Rock = { 164, 158, 148 },
-		Snow = { 252, 252, 250 },
-		Shadow = { 52, 56, 66 },
-		Water = { 146, 194, 222 },
-		Shore = { 98, 150, 188 },
-		Ice = { 208, 228, 238 },
-		Yard = { 216, 206, 182 },
-		Blocks = { downtown = { 216, 200, 180 }, harbor = { 204, 198, 188 }, suburbs = { 224, 210, 186 } } :: { [string]: { number } },
-		Special = { 202, 180, 152 },
-		Park = { 150, 192, 118 },
-		Square = { 210, 190, 154 },
-		Footbridge = { 150, 108, 72 },
-		Road = { 252, 250, 244 },
-		RoadEdge = { 136, 122, 104 },
-		Highway = { 244, 198, 96 },
-		Bridge = { 214, 210, 200 },
-		IceRoad = { 226, 238, 244 },
-		Fog = { 92, 100, 112 },
-		Ink = { 62, 54, 44 },
-		InkSoft = { 106, 96, 82 },
-		Halo = { 246, 240, 224 },
-		Closed = { 196, 58, 46 },
-		Hut = { 128, 86, 54 },
-	} :: { [string]: any },
-	Peaks = {
-		Base = { north = { 0.12, 0.4 } :: { number }, south = { 0.62, 0.98 } :: { number }, side = { 0.42, 0.62 } :: { number } },
-		Height = { 0.48, 0.84 } :: { number },
-		Side = 0.6,
-		Into = 0.12,
-		Cap = { 0.2, 0.42 } :: { number },
-		Winter = 0.6,
-		Shade = 0.72,
-		Haze = 0.4,
-	},
-	Relief = { Reach = 300, MinSnow = 10, Light = 0.12 },
-	Forest = { Cell = 48, Min = 2, Overlap = 1.3, PerCell = 2 },
-	Meadows = { Radius = 80, Flower = 10, Soft = 0.3 },
-	Foothills = 120,
-	Altstadt = { Name = "Altstadt", District = "downtown" },
-	Wait = 10,
-	Budget = { Peaks = 330, Relief = 220, Forest = 240, Meadows = 50, Alpine = 600, Mini = 380, Summary = 20000 },
 }
 
 -- 4.6: what a level gives on top of its unlocks (Config.Levels.Rewards).
@@ -2980,52 +2711,6 @@ Config.Skills = {
 	} :: { SkillBranch },
 }
 
--- Traffic (server/Traffic.luau): civilian cars driving the roads and people walking the sidewalks, near the players
--- only (they appear out of sight and disappear far away).
--- 3.9, living streets: more people (many of them standing and chatting in small groups, which costs no walking),
--- walkers who stop at a shop window or for a word with somebody, crosswalks (the only places people cross) and
--- traffic lights at the city's four-way junctions (shared/Crossings.luau: one cycle every client computes itself).
-Config.Traffic = {
-	CarsPerPlayer = 6,
-	MaxCars = 24,
-	PedestriansPerPlayer = 13, -- around one player by day (3.8: 8); at night NightPeople of it
-	MaxPedestrians = 48, -- on the whole server (3.8: 30)
-	NightPeople = 0.4,
-	SpawnMin = 120,
-	SpawnMax = 260,
-	Despawn = 340,
-	CarSpeed = 34,
-	-- 3.10, people on foot: a calm stroll, each their own (studs/s; the legs match: Roblox's walk animation is a pure
-	-- walk below about 5.3, a jog at 8), a run from a zombie, and how a stuck walk ends.
-	WalkSpeed = { 4.4, 5.4 },
-	RunSpeed = 13,
-	StuckAfter = 3, -- seconds without getting closer: the walk is given up (back the other way)
-	StuckLimit = 3, -- walks given up in a row: the person goes, when nobody looks
-	-- Groups: people standing in a loose circle on a sidewalk, talking; after a while they break up and walk off.
-	GroupChance = 0.4, -- share of the new people that come as a group (when there is room for two)
-	GroupSize = { 2, 4 },
-	GroupTime = { 25, 60 }, -- seconds a group stands
-	TalkEvery = { 2.5, 5 }, -- seconds between a group's turns to the speaker / gestures
-	SayChance = 0.3, -- of those turns, a line in a speech bubble
-	-- Walkers stopping.
-	WindowChance = 0.012, -- per half second of walking along a block: stop at a shop window
-	WindowTime = { 3, 7 },
-	MeetChance = 0.35, -- two walkers passing each other stop for a word
-	MeetTime = { 4, 8 },
-	MeetCooldown = 40,
-	-- Crossing the street (only over a crosswalk, next to a junction).
-	CrossChance = 0.28, -- at a corner
-	CrossTime = 6, -- seconds of walk phase still left to step out (the crossing takes about 5)
-	CrossWait = 30, -- seconds waiting at the curb before going on round the block instead
-	CrossGap = 40, -- no lights: no traffic car this close coming toward the crosswalk
-	-- Traffic lights: green for one axis, amber, all red, then the other axis (one cycle = 2 × the three).
-	LightGreen = 12,
-	LightAmber = 3,
-	LightAllRed = 1,
-	StopBack = 7, -- the stop line, this far before the end of a lane (just before the crosswalk)
-	AmberBrake = 20, -- studs/s²: on amber a car stops when it can at this, else drives on
-}
-
 -- 5.5, the city buses (shared/BusLines.luau, server/Buses.luau, server/BusStops.luau, client/BusRide.luau): free
 -- rides on three loops, driven by one timetable from the server's clock (every client works out the same bus).
 -- A line is a closed loop of road-centre corners (Map's grid; -Z is north), driven clockwise on the right-hand lane;
@@ -3038,58 +2723,6 @@ export type BusLineDef = {
 	color: { number },
 	buses: number, -- how many drive the loop, evenly spaced (the wait is at most its loop time / buses)
 	corners: { { number } },
-}
-Config.Bus = {
-	-- 6.3, express lines: fewer stops, farther apart and at the key places, and quicker buses (the bus is for when
-	-- it is too far to walk). The corner speed, the approach and the ramp grew with the speed (the curves stay smooth).
-	Speed = 55, -- studs/s on a straight (5.5: 40)
-	TurnSpeed = 20, -- through a corner (straight over a junction: Speed)
-	Approach = 30, -- studs before and after a corner at the speed between the two
-	Ramp = 2.0, -- seconds from a stop to full speed (and from full speed into a stop)
-	Dwell = 4, -- seconds at every stop, the door open
-	StopGap = 560, -- along the loop, a stop at least this far after the one before (about 4 blocks; 5.5: 250)
-	PickWindow = 200, -- … and within this much more the lane nearest the key places is taken (shared/BusLines.luau)
-	LastGap = 420, -- the last stop round the loop at least this far before the first
-	KeyReach = 230, -- a key place (Map.Landmarks, the districts' middles) draws the stops within this of it
-	NameReach = 140, -- a stop within this of a key place is named after it ("City Clinic"), else after its street
-	StopClear = 18, -- no stop by the kerb within this of a door, a pile, a park, a place or an employer's board
-	MaxWait = 25, -- the longest wait at a stop (the tests hold every line to it)
-	BodyColor = { 226, 228, 222 }, -- the buses' paint; the line's colour is the stripe and the sign
-	Reach = 10, -- the Board prompt's reach at the door
-	NearStop = 25, -- the arrivals card shows within this of a stop
-	HintDistance = 500, -- a foot or bike job's stop farther than this: the HUD may suggest a bus (6.3: long trips only)
-	RouteReach = 420, -- a route walks at most this far (manhattan) to the first stop and from the last
-	RouteSaving = 10, -- seconds the bus must save over walking to be suggested
-	MapBoardReach = 60, -- 6.3: the map board of the nearest stop within this is drawn (client/BusMapBoard.luau)
-	Lines = {
-		{
-			id = 1,
-			name = "Downtown Ring",
-			short = "RING",
-			color = { 205, 45, 45 },
-			buses = 6, -- (6.3: 8; the express loop is quicker, a bus still every ~19 s)
-			corners = { { -504, -504 }, { 504, -504 }, { 504, 504 }, { -504, 504 } },
-		},
-		{
-			id = 2,
-			name = "Downtown Cross",
-			short = "CROSS",
-			color = { 235, 180, 30 },
-			buses = 5, -- (6.3: 7)
-			corners = {
-				{ -72, -360 }, { 72, -360 }, { 72, -72 }, { 360, -72 }, { 360, 72 }, { 72, 72 },
-				{ 72, 360 }, { -72, 360 }, { -72, 72 }, { -360, 72 }, { -360, -72 }, { -72, -72 },
-			},
-		},
-		{
-			id = 3,
-			name = "Suburbs Link",
-			short = "SUBURBS",
-			color = { 50, 120, 220 },
-			buses = 4, -- (6.3: 6)
-			corners = { { -216, 216 }, { 216, 216 }, { 216, 1116 }, { -216, 1116 } },
-		},
-	} :: { BusLineDef },
 }
 
 -- 5.6, ZDC RIDE: free rental e-scooters at docks on the kerbs of Downtown and the Suburbs (shared/RentalDocks.luau
@@ -3129,50 +2762,6 @@ Config.Rental = {
 	SpawnRack = { x = 0, z = 44, slots = 6, pitch = 3.4, name = "Depot Yard" },
 }
 
--- 5.6, zip lines between Downtown's rooftops (shared/ZipLines.luau picks them, server/ZipLines.luau builds them and
--- checks the rides, client/ZipRide.luau rides them): up the start tower's ladder, Zip on its platform, a fast ride over
--- the road to a lower roof across it, down its ladder. 6.10 (the owner: "like a building you climb up by yourself, and
--- onto the zip line you just jump"): the ladders are real trusses the body climbs itself (no Climb prompts any more),
--- the platform's back rail has a gap to walk in through, and a jump on the start platform grabs the trolley.
-Config.ZipLines = {
-	Count = 8, -- cables (6 – 10)
-	MinLength = 120, -- studs along the ground between the two platforms
-	MaxLength = 260,
-	MinDrop = 10, -- the start's roof at least this much higher than the end's
-	MaxSlope = 0.35, -- drop / length at most
-	Spread = 180, -- no two cables' middles closer than this
-	Speed = 55, -- studs / s along the cable
-	Ramp = 0.8, -- seconds from standing to full speed
-	Brake = 12, -- the last studs slow down …
-	EndSpeed = 18, -- … to this
-	Sag = 0.035, -- the cable's sag in the middle, per stud of length
-	CableHeight = 7, -- the cable's ends over the platforms' floors
-	-- the rider's root under the cable (hands up on the trolley's handle). 6.8 review: 3.6 → 3.1, the body about where
-	-- 6.7 hung it (the root moved 0.6 up in it: shared/ZipLines.luau Feet 3.8): the feet 0.1 over the end platform.
-	-- 6.9: Roblox's classic R15 (its feet 3 under the root): 3.9, the feet still 0.1 over it (CableHeight 7)
-	Hang = 3.9,
-	-- 6.8 review: the trolley's handle hangs HandleDrop under the cable; client/ZipRide.luau reaches the hands to it
-	-- (HandSpread apart, the elbows bent: a two-bone reach on the body's own arms) instead of a fixed pose that put them
-	-- 0.9 studs up through the trolley; arms too short to reach it bring it down to the hands. 6.9: 1.55, the classic
-	-- R15's shorter arms (the handle's strap longer, the elbows a little bent; 6.7's body hung 0.35 under the cable)
-	HandleDrop = 1.55,
-	HandSpread = 2.0,
-	Clearance = 3, -- the cable over every roof it crosses (the tests' rule), at least
-	Margin = 9, -- the lines are picked with this much over every roof they cross (the rider's feet clear it)
-	OverStreet = 24, -- the cable over a street, a sidewalk or a lawn (lamps, trees), at least
-	Platform = 7, -- the landing platform's floor (square)
-	RailGap = 3, -- 6.10: the gap in the middle of a platform's back rail (walk in from the roof; the floor 0.5 up)
-	-- the server's check of where a ride starts: this far from the start platform's middle along the ground (6.10: the
-	-- feet from a little under its floor up to GrabRise over it)
-	Reach = 10,
-	PromptReach = 6, -- 6.10: the Zip prompt's, from the start platform's middle: anywhere on it, not from the ladder
-	GrabRise = 8, -- 6.10: a jump there grabs the trolley: the feet up to this over the floor (a whole jump)
-	LadderOver = 0.2, -- 6.10: a ladder's truss ends this far over its roof (its foot sunk into the sidewalk to fit)
-	Cooldown = 3, -- seconds between the end of a ride and the next ride of one player
-	SafeDrop = 6, -- Space lets go only this low over a platform's roof (else it is ignored)
-	Grace = 0.8, -- seconds after a ride's end before the server puts a late rider down at the end
-}
-
 -- 5.7, the interactions at the car's level (shared/InteractPose.luau has the curves; client/Interact.luau lays the
 -- poses on the joints): getting on a bike or a scooter (client/CarBoarding.luau; the server seats you at the move's
 -- end: server/Vehicles.luau), the bus's folding door and the walk to a seat (client/BusRide.luau, server/Buses.luau),
@@ -3209,36 +2798,6 @@ Config.Interact = {
 	RungStep = 1, -- studs climbed per hand-over-hand stroke
 	StepLength = 2.2, -- studs per step of a walk played by a move
 	ZipReach = 0.4, -- seconds: the hands go up to the trolley as a ride starts
-}
-
--- 6.10, the E-Scooter's ride (the owner: "give the scooter better controls"): its handling (client/Drive.luau through
--- shared/ScooterRide.luau, pure: tests/scooter_test.luau). A ZDC RIDE rental rides the same (its own top speed and
--- pull: Config.Rental). The bikes and the cars keep their handling. (6.14.2, the owner: "take the wheelie away, it
--- looks silly": the 6.10 wheelie is gone.)
-Config.Scooter = {
-	-- The steering: CarDef.turn (rad/s) times a share that eases from LowTurn at walking pace down to HighTurn at the
-	-- scooter's top speed (MaxSpeed): quick and precise in the city's corners, calm at full speed (6.0: 2.8 at any speed)
-	-- 6.14.1 (the owner: "a more pleasant ride on the scooter": the steering, the pull and the brake, the camera): 1.15 →
-	-- 0.95 and 0.45 → 0.6, calmer at a middle speed (a 16 studs/s turn about 7 studs round, 6 before) and less lazy at
-	-- the top (about 20 studs round, 25 before)
-	LowTurn = 0.95,
-	HighTurn = 0.6,
-	EaseFrom = 6, -- studs/s: the turn starts easing off from here
-	GripSpeed = 2.5, -- studs/s: from a stand the steering fades in up to this speed (it does not spin on the spot)
-	SteerIn = 4.5, -- the steering goes to the key's full lock at this rate (1/s: about 0.22 s, a tap is a small turn) …
-	SteerOut = 9, -- … and back to the middle at this one (about 0.11 s) (6.14.1: 7 and 12, a key snapped to a sharp turn)
-	Brake = 55, -- studs/s²: S while rolling forward (34 → 0 in about 0.6 s; 6.14.1: 80 threw you over the bar)
-	Coast = 10, -- studs/s²: no key, it rolls on (34 → 0 in about 3.4 s; 6.14.1: 14)
-	-- 6.14.1, the pull (ScooterRide.pull, × the scooter's Accel by its share of the top speed): soft for the first push
-	-- (Start at a stand, all of it from Full), all of it up to Ease, then fading to Top at the top speed: it glides
-	-- into its top speed instead of hitting a wall at it
-	Pull = { Start = 0.7, Full = 0.25, Ease = 0.7, Top = 0.35 },
-	-- 6.14.1, the carve: the way it moves follows its nose at this rate (1/s) instead of at once, a touch of flow in a
-	-- turn (not on ice or snow: their own slide)
-	Carve = 16,
-	Reverse = 0.2, -- of the top speed: S from a stand walks it back
-	LeanMax = 0.2, -- radians (about 11°) the scooter leans into a turn at most (the look only; a bike: 0.16)
-	LeanRate = 0.0075, -- per (rad/s of turning × stud/s of speed)
 }
 
 -- 6.26 (6.24's bikes, now every vehicle of a player: the cars, the vans, the trucks, the bikes, the E-Scooter, ridden
@@ -3299,95 +2858,6 @@ Config.SpawnSpot = {
 	-- buried balls, and a box query sees a part's whole box, a cube some 480 studs wide reaching 4 – 5 studs over
 	-- the meadow; the wheels' rays still stand a car on them). A path that is not there is skipped (the city).
 	Pass = { "Loot", "Animals", "Sandbox.Ground" } :: { string },
-}
-
--- 6.16, driving that feels alive (the owner: "upgrade the visuals and the feel"; only the look and the sound, the
--- driving's physics stay as they are). Accelerations in studs/s² (gravity is 196), speeds in studs/s.
-Config.DriveFeel = {
-	-- The body sways on its springs (shared/Suspension.luau, client/CarSway.luau: the Motor6D "BodyRoll" of a player's
-	-- car, server/Vehicles.luau): it rolls out of a turn, dips its nose on the brake, squats as it pulls away and sinks
-	-- as it lands. A style's Soft share (1 when not listed) scales the angles up and the springs' swing down.
-	Sway = {
-		Roll = 3, -- degrees the body rolls out of a turn …
-		RollAt = 100, -- … at this sideways acceleration (a car on full lock at about 55 studs/s)
-		RollMax = 4.5, -- degrees at most
-		Dive = 2, -- degrees the nose dips on the brake …
-		DiveAt = 60, -- … at this deceleration (a van's full brake is about 65)
-		Squat = 1.3, -- degrees the nose lifts as it pulls away …
-		SquatAt = 30, -- … at this acceleration
-		PitchMax = 3, -- degrees either way at most
-		Sink = 0.12, -- studs the body sinks as it lands …
-		SinkAt = 150, -- … at this upward acceleration
-		HeaveMax = 0.25, -- studs either way at most
-		Frequency = 1.9, -- Hz: how quickly the springs swing
-		Damping = 0.42, -- of the critical damping: under 1 it rocks back once after a hard stop
-		Smooth = 0.08, -- seconds: your own car's accelerations are smoothed over this …
-		SmoothOthers = 0.16, -- … another player's (their speed arrives over the network in steps)
-		Range = 140, -- studs: the cars this close to the camera sway (a phone: DeviceBudget.range)
-		Soft = {
-			muscle = 0.6, rallyvan = 0.75, armored = 0.75, pickup = 0.9, highroof = 1.2, icecream = 1.2, ambulance = 1.15,
-			boxtruck = 1.15, movingtruck = 1.15, livestock = 1.15, fueltruck = 1.15, freighttruck = 1.2, bus = 1.2, monster = 1.15,
-		} :: { [string]: number }, -- (6.16 review: the tall ones 1.3 – 1.4 before: a box truck's roof swung 1 – 1.5 studs)
-	},
-	-- What the tyres throw (shared/DriveFeel.luau tyres, client/TyreFx.luau): dust off grass and dirt, snow spray in
-	-- the winter and on the ice, light smoke on asphalt when they work hard (a hard brake, a sharp fast turn, a slide,
-	-- a hard launch), and skid marks then.
-	Tyres = {
-		Range = 110, -- studs: the cars this close to the camera throw something …
-		Cars = 5, -- … this many of them at most (yours first; a phone: yours only)
-		Dust = { Rate = 28, From = 8, Full = 45 }, -- particles a second per rear wheel, by the speed (From … Full)
-		Snow = { Rate = 36, From = 6, Full = 40 },
-		Smoke = { Rate = 24, From = 0.25 }, -- on asphalt, by the strain, from this strain
-		Brake = { From = 38, Full = 62 }, -- the strain of braking (deceleration) …
-		Corner = { From = 70, Full = 110 }, -- … of a fast turn (sideways acceleration) …
-		Slide = { From = 5, Full = 14 }, -- … of a slide (sideways speed: the ice, the snow) …
-		Launch = { From = 30, Full = 45, Below = 14 }, -- … of a hard launch (acceleration, under Below studs/s)
-		MinSpeed = 14, -- the brake and the turn strain only from this speed
-		Lite = 0.5, -- a phone's share of the particles
-	},
-	-- Skid marks: dark thin strips behind the wheels on asphalt while the strain is at least From; each fades out
-	-- from FadeFrom to Life seconds. Count of them at most (the oldest is used again; a phone: Lite of them).
-	Skids = { From = 0.4, Count = 160, Lite = 0.35, FadeFrom = 4.5, Life = 7.5, Step = 0.8, Length = 3.5, Width = 0.5, Opacity = 0.62 },
-	-- A hard hit (client/CrashFx.luau): your car or a car near you loses at least From of its speed in a blink (Full:
-	-- the hardest); a spark burst of up to Sparks (a phone: half), a metal thunk, and on top of CameraRig's ram shake
-	-- (Config.LivingCity.Camera Ram) a little more, Shake at the hardest. Scraping a wall at Scrape.Speed or more
-	-- throws sparks (Scrape.Rate a second) and trembles the camera a touch (Scrape.Shake a second).
-	Crash = { From = 24, Full = 60, Sparks = 34, Shake = 0.25, Range = 120, Scrape = { Speed = 14, Rate = 70, Shake = 0.5, Reach = 0.9 } },
-	-- The engine's note (client/Sounds.luau, shared/DriveFeel.luau engine): a little gearbox (Gears gears over the top
-	-- speed, Shift of hysteresis), the pitch from Idle at a stand to Top at the top of the last gear, a touch higher on
-	-- the throttle (Load) and lower as it coasts (Coast), the volume by the speed and the throttle. Styles: a style's
-	-- class (a van when not listed). (A bike's freewheel and a scooter's hum stay as they were.)
-	Engine = {
-		Classes = {
-			car = { Idle = 0.8, Top = 1.8, Gears = 5, Volume = 0.52 },
-			van = { Idle = 0.7, Top = 1.5, Gears = 4, Volume = 0.52 },
-			truck = { Idle = 0.52, Top = 1.18, Gears = 5, Volume = 0.58 },
-			monster = { Idle = 0.6, Top = 1.38, Gears = 4, Volume = 0.6 },
-		} :: { [string]: { Idle: number, Top: number, Gears: number, Volume: number } },
-		Styles = {
-			muscle = "car", pickup = "car", rallyvan = "car", boxtruck = "truck", freighttruck = "truck", bus = "truck",
-			movingtruck = "truck", livestock = "truck", fueltruck = "truck", armored = "truck", monster = "monster",
-		} :: { [string]: string },
-		Shift = 0.03, -- of the top speed: a gear changes this far past its edge (no hunting at the edge)
-		Load = 0.05, -- pitch added on the throttle
-		Coast = 0.05, -- pitch taken off without it
-		Rev = 0.55, -- the share of the rev range a held throttle reaches at a stand (stuck, the back open)
-		Follow = 12, -- 1/s: how quickly the sound follows its pitch (a shift is heard as one)
-	},
-	-- Speed lines (client/SpeedLines.luau): thin streaks at the screen's edges from From of the top speed (full at
-	-- Full); a scooter's or a bike's (TwoWheels) from a lower share. Count of them (a phone: Lite of them); none with
-	-- reduced motion.
-	SpeedLines = { From = 0.8, Full = 1.05, TwoFrom = 0.6, TwoFull = 0.95, Count = 16, Lite = 0.5, Opacity = 0.55 },
-}
-
--- 5.6, the alley shortcuts (shared/Shortcuts.luau, built by server/Shortcuts.luau from World's build list): a lit
--- path straight through a Downtown block where two neighbouring lots are open (a lawn or a parking lot), a low fence
--- to hop at each end and a SHORTCUT sign.
-Config.Shortcuts = {
-	Count = 8, -- alleys (6 – 10)
-	Width = 5, -- the path
-	FenceHeight = 2.2, -- low enough to jump
-	Clear = 10, -- no alley's mouth within this of a door, a pile, a park, a cargo spot or a bus stop
 }
 
 -- Crews (server/Crew.luau): invite another player into your job (they ride along or follow, share the pay).
@@ -3492,33 +2962,6 @@ Config.Crew = {
 	Flag = "crewKept",
 }
 
--- 4.5: the admin's test buddies (server/Buddy.luau, shared/BuddyBrain.luau): NPC couriers that follow their owner on
--- foot, ride in the owner's passenger seats, and shoot the zombies, bandits and bandit cars around them. Their kills
--- pay nobody (the economy stays clean). Modes: follow, stay (stand and fight), guard (hold a spot, step out a little
--- toward an enemy, walk back).
-Config.Buddy = {
-	Max = 3, -- buddies per owner
-	Health = 150,
-	RespawnSeconds = 10, -- a fallen buddy comes back near its owner after this
-	Tick = 0.2, -- seconds between the buddies' decisions (one loop for all of them)
-	FollowDistance = 7, -- studs behind the owner (each buddy at its own place round them)
-	Arrive = 2, -- a walking buddy stops this close to its place
-	Restart = 5, -- a standing buddy sets off once its place is this far
-	Speed = 14, -- walk (the players' walk)
-	RunSpeed = 24, -- run (a player's sprint is 28)
-	RunFrom = 18, -- studs from the owner (or its spot) from which it runs
-	TeleportDistance = 150, -- farther than this from the owner (its spot): it appears next to them
-	StuckPath = 1.5, -- seconds without moving while it should: it looks for a way round (PathfindingService)
-	StuckSeconds = 4, -- seconds without moving: it appears at its place
-	BoardReach = 40, -- studs from the owner's car (standing still) from which it gets into a free passenger seat
-	Range = 90, -- studs it shoots (with a clear line)
-	Damage = 10, -- per hit
-	FireEvery = 0.7, -- seconds between shots
-	Accuracy = 0.8, -- hit chance at a standing target (less at a fast one)
-	GuardLeash = 30, -- guard: how far from its spot it steps out toward an enemy
-	GuardCloseIn = 25, -- guard: it steps toward an enemy farther than this (to get it in sight)
-}
-
 -- Real estate (server/Estate.luau): homes, garages and offices you buy with the money you made. A home is where you
 -- spawn and its garage keeps cars; garages add car slots; an office runs your own delivery company
 -- (Config.Business). Every player owns their own copy (saved in the profile): two owners of the same mansion on one
@@ -3566,18 +3009,6 @@ Config.Estate = {
 	} :: { EstateDef },
 }
 
--- Calling your car (server/CarCall.luau): it does not appear out of thin air: a chauffeur drives it to you along
--- the roads from out of sight, parks next to you, gets out, walks away and fades.
-Config.CarCall = {
-	ArriveWithin = 15, -- seconds: about how long a trip should take (how far away the car may start)
-	StuckFor = 10, -- 3.9.1: seconds without getting closer (a red light counts as getting on) before it is rescued
-	MaxTime = 75, -- and the longest a whole trip may take
-	SpawnMin = 110, -- studs from you, along the roads
-	SpawnMax = 200,
-	Speed = 55,
-	DriverFade = 2.5,
-}
-
 -- 3.4, the repair shops (server/Repair.luau, the bays: Map.RepairShops, built by server/World.luau): drive into a
 -- bay, stop and get out; the mechanics take the car (it cannot be driven), and after the time it is as good as new.
 -- The time and the fee grow with the damage (Economy.repairTime / repairFee); the fee is paid at the end, getting
@@ -3593,22 +3024,6 @@ Config.Repair = {
 	StandStill = 1.5, -- seconds the empty car stands in the bay before the mechanics start
 	MaxSpeed = 2, -- studs / s: the car stands
 	WreckedHealth = 0.2, -- a wrecked car comes back with this share of its health
-}
-
--- Your delivery company (server/Business.luau), run from an office computer: hire couriers who make deliveries for
--- you while you play (and, less, while you are away), buy them vans, grow the company. 3.2: the endgame (the first
--- office is level 12 and after Iron Supply), priced like it.
-Config.Business = {
-	CourierCost = 40000, -- hiring one courier
-	CourierPerMinute = 120, -- what one courier earns per minute while you are on the server
-	OfflineShare = 0.4, -- while you are away they earn this share …
-	OfflineHours = 8, -- … for at most this long
-	SafeCap = 500000, -- the company's safe: earnings wait here until you collect them at the office
-	Upgrades = { -- levels multiply the couriers' earnings
-		{ id = "vans", name = "Better vans", description = "+15% per level: faster, safer deliveries", maxLevel = 5, baseCost = 60000, costGrowth = 1.9, perLevel = 0.15 },
-		{ id = "dispatch", name = "Dispatch software", description = "+10% per level: smarter routes", maxLevel = 5, baseCost = 40000, costGrowth = 1.8, perLevel = 0.10 },
-		{ id = "security", name = "Armed escorts", description = "+12% per level: fewer lost loads", maxLevel = 5, baseCost = 80000, costGrowth = 2.0, perLevel = 0.12 },
-	} :: { { id: string, name: string, description: string, maxLevel: number, baseCost: number, costGrowth: number, perLevel: number } },
 }
 
 -- The game's own sounds and music (client/Sounds.luau; the sounds themselves: art/audio/make_audio.py, regions in
@@ -5309,18 +4724,6 @@ Config.Courier = {
 	BagCheck = { After = 3, Far = 4 },
 }
 
--- 6.1, what you hold (the owner's wish: "you choose to hold the pistol or the bag; with cargo in the bag you can only put
--- it down"): fists, the plastic bag or your gun (shared/Holding.luau, server/Hand.luau, the Hand remote; the bottom
--- bar's hand slots, keys 1 / 2 / 3, client/Hotbar.luau). A loaded bag that leaves your hand is set down on the ground
--- with its cargo (server/Cargo.luau), an empty one is stowed.
-Config.Hand = {
-	Cooldown = 0.2, -- seconds between two switches (the server)
-	Predict = 1.5, -- seconds the client shows its own choice before the server's Hand attribute is trusted again
-	BagAhead = 1.3, -- studs in front of your feet (and a little to the left) where a loaded bag is set down
-	BagHold = 0.25, -- seconds: the "Pick up bag" prompt's hold
-	BagReach = 9, -- studs: its reach
-}
-
 -- 6.1, the key hints under the HUD's top buttons (client/KeyHints.luau): a quiet strip of what the keys do now.
 -- 6.5: only the keys of the moment (the hands, E, G, X; the driving keys in a seat), folded to "? KEYS [F1]" after the
 -- first two deliveries.
@@ -5347,26 +4750,6 @@ Config.Goal = {
 	-- 6.12.1 (the owner: "this shows all game long"): "Take a delivery job" and the job board's marker only for a new
 	-- courier, up to this many deliveries; after that, with no job, the card and the marker stay away (J opens the board)
 	HintJobs = 3,
-}
-
--- 6.14, get ready for the mission (the owner: "jobs are the daily work: you grind, you save up for something, and then
--- you can progress in the mission"). shared/Readiness.luau picks the next story mission and what it needs; the phone's
--- NEXT MISSION tile and its READY CHECK (client/ReadyCheck.luau), the HUD's savings line under the cash
--- (client/SavingsLine.luau) and the job result's "to go" line show it.
---   MaxRows     the READY CHECK's rows at most: every required one, then the recommended ones (those not done first)
---   HardTier    a mission of this danger tier or more recommends a vest and a two-handed gun
---   Medkits     medkits worth carrying into any mission (recommended)
---   RepairKits  repair kits worth carrying into a mission you drive (recommended once you own a car)
---   Sound       the sting of the one-time "Ready for …" toast (client/Sounds.luau)
---   LineHeight  px at scale 1: the HUD's savings line, under the cash line (the left column grows by it while it shows)
-Config.Readiness = {
-	MaxRows = 5,
-	HardTier = 3,
-	Medkits = 1,
-	RepairKits = 1,
-	NotGoals = { medkit = true, repair = true, bag = true } :: { [string]: boolean }, -- rows that never become the savings goal
-	Sound = "task_done",
-	LineHeight = 20,
 }
 
 export type JobTypeDef = {
@@ -5908,24 +5291,6 @@ Config.Tasks = {
 -- XP), on the board (and in NEXT UP) for Order.Seconds.
 export type RegularTier = { id: string, name: string, at: number, bonus: number, icon: string }
 
-Config.Regulars = {
-	Tiers = {
-		{ id = "bronze", name = "Bronze", at = 5, bonus = 0.05, icon = "🥉" },
-		{ id = "silver", name = "Silver", at = 15, bonus = 0.1, icon = "🥈" },
-		{ id = "gold", name = "Gold", at = 40, bonus = 0.15, icon = "🥇" },
-		{ id = "platinum", name = "Platinum", at = 100, bonus = 0.2, icon = "💎" },
-	} :: { RegularTier },
-	Cap = 100000,
-	Order = {
-		Tier = 2,
-		Every = 120,
-		Chance = 0.2,
-		Seconds = 300,
-		Pay = 1.5,
-		Xp = 1,
-	},
-}
-
 -- 6.15, LIVE EVENTS (the owner: "events where working is better for earning, e.g. a Blood Moon"): one at a time for
 -- the whole server (server/LiveEvents.luau runs them, shared/LiveEvents.luau holds the rules and the words,
 -- tests/liveevents_test.luau checks them, client/EventBanner.luau shows them). The first one comes First minutes after
@@ -6200,54 +5565,6 @@ Config.UiKit = {
 	Chip = 24,
 	Corner = 12,
 	RowCorner = 10,
-}
-
--- 6.21, the inventory as a clean hotbar (the owner picked redesign B "Clean hotbar + kit"; shared/Inventory.luau holds
--- the pure maths, client/Hotbar.luau and client/BagUi.luau draw it). Px at the HUD's design scale.
---   Tile / Selected       a slot, and the slot in your hand (it lifts by Lift px and grows to Selected px)
---   Gap / PadX / PadY     between the slots, and the frosted tray's padding around them
---   Corner / TrayCorner   the slots' and the tray's corners
---   Pill / PillMin        the count pill at a slot's bottom right corner (its height, its least width), Overhang px out
---   Ring / RingInset      the bag slot's fill ring (its thickness, its inset from the slot's edge)
---   Line / LineGap        the line over the bar (the name of what is in your hand and its count), its gap to the slots
---   TouchMin              a touch screen: the bar shrinks with the HUD (the mock's 62 %), but a slot never under
---                         TouchMin px (6.0.1's 48 px rule for fingers: 67 % of a slot)
---   TouchGap / TouchPad   a touch screen's tighter gaps and padding (the bar fits a 640 px phone between the
---                         thumbstick and JUMP)
-Config.Hotbar = {
-	Tile = 72,
-	Selected = 80,
-	Lift = 12,
-	Gap = 10,
-	PadX = 14,
-	PadY = 10,
-	Corner = 18,
-	TrayCorner = 22,
-	Pill = 22,
-	PillMin = 26,
-	Overhang = 6,
-	Ring = 5,
-	RingInset = 4,
-	Line = 22,
-	LineGap = 6,
-	TouchMin = 48,
-	TouchGap = 6,
-	TouchPad = 7,
-}
-
--- 6.21, the inventory's colours by kind (a row's left edge in BAG & ITEMS; shared/Inventory.luau category): weapons
--- red, medical green, explosives orange, cargo and bags blue, gear grey. Items: a consumable's kind (Config.Items id;
--- else gear). Stack: the cargo tiles on BAG & ITEMS' YOUR BAG card (at most Max tiles of Tile px, Gap px apart).
-Config.Inventory = {
-	Colors = {
-		weapon = { 215, 74, 70 },
-		medical = { 126, 196, 120 },
-		explosive = { 240, 138, 58 },
-		cargo = { 90, 162, 230 },
-		gear = { 154, 163, 174 },
-	} :: { [string]: { number } },
-	Items = { medkit = "medical", energy = "medical", molotov = "explosive", mine = "explosive", repair = "gear", nitro = "gear", jerrycan = "gear" } :: { [string]: string },
-	Stack = { Max = 6, Tile = 46, Gap = 6 },
 }
 
 -- 6.22, every thing in the inventory has a look (the owner: "every thing must look like something, not only an icon"):
@@ -9374,50 +8691,6 @@ Config.Characters = {
 		{ id = "moustache", name = "Moustache" },
 		{ id = "beard", name = "Beard" },
 	} :: { LookOption },
-}
-
--- 9.1, the drive pedals (the owner: "Add a drive pedal to the game … just visible pedals on PC, and on mobile as driving
--- buttons"): GAS (tall and narrow) and BRAKE (wider and shorter) at the lower right while you drive your car
--- (client/DrivePedals.luau, the pure rules shared/PedalRules.luau, the input client/Drive.luau setPedal). On a touch
--- screen they are held to drive (GAS forward; BRAKE brakes, then backs up, as S does; the thumbstick steers); with a
--- keyboard or a gamepad they show your feet (W / S, R2 / L2 part way) and a mouse may hold them too.
---   On             off: no pedals anywhere (the seat, the keys and the thumbstick drive as before)
---   Gas / Brake    { w, h } px at scale 1 (rubber Ribs across each: how many)
---   Gap            px between the two at scale 1; Clear: px they keep from everything else (screen px)
---   Margin         screen px from the screen's edges: Touch at the bottom right of a touch screen, Desk on a computer
---   Touch          a touch screen's scale: the HUD's (Ui.scaleFor) between Min and Max, then Shrink smaller at a time when
---                  no place is clear, while every side stays MinSide px (a finger's: Ui.MinTouch) or more
---   Desk           a computer's: the HUD's scale × Scale (compact), Shrink smaller at a time down to Min
---   TopShare       their top stays under this share of the screen's height (the lower part); ShrinkCost: px of way from
---                  their spot a smaller scale counts as, for each share of the biggest it loses; Weight: in the last
---                  resort (no clear place) covering the touch controls counts this many times a HUD group's px
---   Caption        px at scale 1 under them for a gamepad's R2 / L2 (the platform's picture, else the word)
---   Press          the press drawn (shared/PedalRules.luau look / ease): Depth px down at scale 1 (also the shadow's lip
---                  under the face at rest, which the press closes) and Squash the face's share shorter (it tips away),
---                  Shade the dark veil over it, Accent the red edge's px (resting, pressed), In / Out how fast it goes
---                  down and comes back (a share a second: quick, no bounce)
---   Face           the face's transparency: Rest, Pressed (more solid)
---   Rolling        studs/s: both held, the brake works while the car still rolls faster than this, then it stands
---   Check / Place  s between the looks at the seat, the HUD and the device / at where they go (the HUD's groups move)
-Config.DrivePedals = {
-	On = true,
-	Gas = { 64, 120 },
-	Brake = { 92, 88 },
-	Ribs = { Gas = 6, Brake = 4 },
-	Gap = 12,
-	Clear = 8,
-	Margin = { Touch = 10, Desk = 16 },
-	Touch = { Min = 0.78, Max = 0.92, Shrink = 0.04, MinSide = 44 },
-	Desk = { Scale = 0.62, Min = 0.4, Shrink = 0.06 },
-	TopShare = 0.3,
-	ShrinkCost = 600,
-	Weight = 4,
-	Caption = 18,
-	Press = { Depth = 7, Squash = 0.1, Shade = 0.35, Accent = { 2, 5 }, In = 26, Out = 16 },
-	Face = { Rest = 0.35, Pressed = 0.12 },
-	Rolling = 1.5,
-	Check = 0.1,
-	Place = 0.5,
 }
 
 -- 9.0.1 (the owner: "on the Mac you can't turn with the touchpad at all"): client/CameraRig.luau's free camera turned

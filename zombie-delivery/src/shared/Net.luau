@@ -10,38 +10,24 @@ local NAMES = {
 	"RequestState", -- client → server: send me everything (after loading)
 	"State", -- server → client: money, owned cars / guns, upgrades, stats of the equipped car and gun
 	"SpawnCar", -- client → server: bring my car next to me
-	"RequestOffers", -- client → server: the job board was opened
-	"Offers", -- server → client: ({ { index, stars, cargo, customer, address, distance, pay, time } }, refreshAt, info) 3.7: sorted ★ → ★★★★, index = the offer's id, refreshAt = GetServerTimeNow() of the next offers (pushed then); 4.7: info = { tiers = { { stars, name, fee, rerolled, open, level, licence? } }, streak }
-	"AcceptJob", -- client → server: take offer (index)
-	"CancelJob", -- client → server: give the active job up
 	"Job", -- server → client: the active job ({ … } or nil when none)
-	"DeliveryResult", -- server → client: { success, reason?, payout? }
 	"Fire", -- client → server: a shot at a point (Vector3): the hand gun, out of the window or the car gun; 3.8.2: + the part of a zombie hanging on a car when that is what was aimed at (server/Gun.luau latchedHit)
 	"Tracer", -- server → clients: (from, to, color, shooter userId)
 	"Hit", -- server → client: the shooter's hit marker (position, damage, crit, killed)
 	"Reward", -- server → client: money popped from a kill (position, amount)
 	"Bump", -- server → client: the car hit something heavy, keep this share of the speed
 	"Buy", -- client → server: buy (kind = "car" | "weapon" | "item" | "cargun", id, amount for items)
-	"Equip", -- client → server: equip (kind, id)
 	"Upgrade", -- client → server: next level of an upgrade track (id; 3.5: "stage" = the equipped car's next stage)
 	"Notice", -- server → client: a short toast (text)
 	"Play", -- client → server: PLAY was pressed on the start screen (the car comes now)
-	"UseItem", -- client → server: use a consumable (id, aimed point or nil)
-	"Boost", -- server → client: nitro (seconds, speed multiplier)
-	"OpenShop", -- server → client: a shop prompt was used (shop id, focused item id or nil)
 	"Paint", -- client → server: buy / apply a paint job on the equipped car (paint id)
-	"AcceptEmployer", -- client → server: take a job from the employer whose board you stand at (employer id)
 	"Aiming", -- client → server: aiming on foot or not (the gun arm goes up / down for everybody)
 	"Admin", -- client → server: an admin command (name, argument) — only for admins (server/Admin.luau)
-	"CrewInvite", -- client → server: invite a player into my job (userId); server → client: an invitation (from userId, job name)
-	"CrewAnswer", -- client → server: accept / decline an invitation (from userId, accepted)
-	"CrewState", -- server → client: my crew (owner, members, pay shares) or nil
 	"Leaderboard", -- client → server: send me the board; server → client: the rows (name, level, rank, deliveries, earned)
 	"Estate", -- client → server: (action "buy" | "sell" | "home", estate id); server → client: open the listing (estate id)
 	"Business", -- client → server: (action "hire" | "fire" | "upgrade" | "collect" | "open", arg); server → client: the company state
 	"CarCall", -- server → client: your car is on the way (seconds left, car model) or arrived / failed (nil)
 	"Missions", -- client → server: ("open") or ("start", mission id); server → client: the progress (MissionsState)
-	"CrewBoard", -- client → server: looking for a crew (mission id or "any") or not (nil); server → clients: who is looking
 	"Challenges", -- client → server: ("open") or ("title", title or nil); server → client: ("state", …) or ("unlocked", …)
 	"Garage", -- 3.4: client → server: ("take", car id) or ("refresh"); server → client: the garage window (server/Garages.luau)
 	"Repair", -- 3.4: server → client: a repair started ({ car, shop, seconds, total, fee }) or ended (nil) (server/Repair.luau)
@@ -52,15 +38,10 @@ local NAMES = {
 	"CarDoor", -- 3.10: client → server: ("out") E in a car seat: out of it at your door (server/Vehicles.luau, client/CarBoarding.luau)
 	"Horn", -- 6.12: client → server: () H in the driver's seat; server → clients near it: (car model) its horn (server/Horn.luau, client/SoundScape.luau)
 	"Gear", -- 4.6: client → server: ("buy" | "install" | "remove", gear id) for the equipped car at Wrench Garage (server/Shops.luau)
-	"RerollTier", -- 4.7: client → server: (tier) new ordinary offers of that danger level on my board, for Config.Jobs.Choice.RerollFee × its stars, once per board (server/Jobs.luau)
-	"RoadEvent", -- 4.8: server → client: a road event's card ({ kind = "addon", title, text, pay, endsAt }) or nil to close it; client → server: ("accept" | "decline") the add-on (server/Jobs.luau, client/RoadEventUi.luau)
 	"Kit", -- 5.0: client → server: ("buy", kit id) personal gear at Last Stop Supplies (6.6: a bag at ZDC Bags; server/Shops.luau, Config.Kit)
-	"PhoneHold", -- 5.0: client → server: (holding boolean) the phone window opened / closed; the server shows the phone in your right hand to everybody while you are on foot with your hands free (server/KitWear.luau, the character attribute PhoneHeld)
 	"PutDown", -- 4.2: client → server: () the touch PUT DOWN / LET GO / SET DOWN button: what the G prompt in your hands does (server/Cargo.luau, server/Equipment.luau)
-	"PinOrder", -- 5.2: client → server: (order id or nil) the GPS follows that order of your run (the phone's ORDERS app, server/Jobs.luau)
 	"JobQueue", -- 6.12.8: client → server: ("queue", offer id) | ("addAll") | ("drop", queued id) | ("open"); server → client: ("state", { list = { { id, title, cargo, customer, from, to, pay, mode, stars, time, pieces, why? } }, max }) the NEXT UP queue (server/JobQueue.luau)
 	"Fuel", -- 5.4: client → server: ("tow") the phone's TOW: your empty car to the nearest gas station's pump (server/Fuel.luau)
-	"Bus", -- 5.5: client → server: ("stop") on a city bus: the bell (off at the next stop), or off now while it stands at a stop (server/Buses.luau, client/BusRide.luau)
 	"Zip", -- 5.6: client → server: ("letgo") Space on a zip line, low over a platform's roof (server/ZipLines.luau checks it); 6.10: ("grab", line id) a jump on that line's start platform grabs the trolley (checked as the Zip prompt; the ladders are real trusses, no climbs here any more)
 	"Hand", -- 6.1: client → server: ("fists" | "bag" | "gun") what you hold (keys 1 / 2 / 3, the bottom bar's hand slots); the server decides (server/Hand.luau: the character's Hand and Holstered attributes; a loaded bag that leaves the hand is set down by server/Cargo.luau)
 	"Style", -- 6.12: client → server: ("buy", id) | ("wear", id) | ("unwear", slot) a cosmetic (Config.Cosmetics; server/StyleWear.luau decides, the phone's STYLE app asks; a purchase only at a shop that sells it); server → client: ("open", "courier" | "vehicle") a clerk's "Style" prompt opens the STYLE app on that tab (server/ShopClerks.luau)
