@@ -37,7 +37,7 @@
 -- task.delay + E.fire). E.sent keeps every FireClient: E.messages / E.lastNotice / E.heard read it.
 local Mock = require("./ItemMock")
 local Config = require("./Config")
-Config.Rounds.On = false -- (10.5: the portals' runs here, as before the rounds; tests/rounds_runtime_test.luau turns them on)
+Config.Rounds.On = false -- (10.6: the private lobbies only here; tests/rounds_runtime_test.luau and tests/bothplay_runtime_test.luau turn the rounds on)
 local SandboxMapReal = require("./SandboxMap")
 local SprinterLooks = require("./SprinterLooks")
 local Economy = require("./Economy")
@@ -1564,7 +1564,8 @@ E.real = {
 	VillageWorld = true, -- 8.9: Jinočany's village on the map (SandboxWorld builds it)
 	FixtureMesh = true, -- 8.9.1: the houses' fixtures in the owner's Blender model (no import here: the parts' look)
 	SaveSlots = true, -- 10.1: the save slots (E.join picks slot 1 on the start screen: CONTINUE)
-	LobbyWorld = true, Runs = true, -- 9.7: the lobby (SandboxWorld builds it) and the runs (the portals' pads, the parties)
+	LobbyWorld = true, Runs = true, -- 9.7: the lobby (SandboxWorld builds it) and the runs
+	Parties = true, -- 10.4: the PLAY circle's party lobbies (Runs starts them; a lobby's START begins a run)
 	Loot = true, -- 9.x loot: every piece of the house gets its rarity, stars and value (Moving's hook)
 	RunDanger = true, -- 10.x danger: a run's locks and keys, its vault, its hazards (Runs starts it; Zombies is the fake's)
 	HelperCrew = true, -- 10.1 the helpers' crew (MoveHelper's hooks, the lobby's stands, the Crew remote)

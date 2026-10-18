@@ -1,30 +1,23 @@
 --!strict
 -- 9.7 RUNS (the owner: "like Dungeon Quest: from the lobby you go into a house, alone, with friends or with Danny. In
 -- the house you carry loot into the truck standing right at the house. When you leave, the loot is taken to your
--- warehouse in the lobby on its own"; Config.Runs, the rules shared/RunRules.luau, the client client/RunUi.luau). The
--- lobby's six portals (shared/SandboxMap.luau Lobby.portals, server/LobbyWorld.luau builds them) start the runs; a run
--- is a sandbox move of one house (server/Moving.luau: Moving.startRun, its hooks in the block "9.7 RUNS").
---   * The pads: every Config.Runs.Every s the server looks who stands on each portal's pad (on foot, alive, in no run,
---     not on a jump back). The first one on an empty pad is the host and starts its countdown (Countdown s); whoever
---     steps on joins the line, whoever steps off leaves it (the host's place goes to the next). The host picks the
---     difficulty (the Runs remote's "difficulty": only one open to them, RunRules.isOpen with their save's
---     runUnlocked; a new host keeps it when it is open to them, else the hardest open one under it). The pad's sign
---     says its state (WALK ONTO THE PAD, STARTING IN 7 · 2/4, IN USE) and its glow its colour (Config.Runs.Portal); the
---     players on it get the pad panel ({ kind = "pad", … }). When the countdown ends the first MaxParty on it go.
---   * A portal whose house is in a run already shows IN USE: nobody joins its pad (they hear so once).
---   * 10.x the map (read-only, for client/SandboxMapUi.luau's lobby): each portal model's attributes RunState ("free",
---     "wait": counting down, "use": in a run), RunEndsAt (the countdown's end), RunWho (who is on the pad, else the
---     run's party) and RunDifficulty, written in the same look as its sign, only when they change.
---   * The start: the host's van is parked at the house's curb (Moving.parkVan: server/SandboxBoot.luau's, repaired),
---     not drivable (its model's Config.Runs.Truck.Attribute: client/CarVisuals.luau shows no Drive / Ride along, its
---     seats Disabled), the party is the run's (Crew.members and Crew.ownerOf are wrapped: a run's party is its host's
---     crew, nobody else's crew counts in the sandbox), Moving.startRun starts the move (its contract's difficulty, the
---     house's clock × the difficulty's time; the inside's RunDifficulty attribute is Moving's), the map's house model
---     gets the attribute RunDifficulty too (traps, zombies and the loot's rarity read it: a later worker's), the truck
---     gets its prompts (the host's "Finish the run", the others' "Vote to finish") and everybody fades over to the
---     house's front yard (SandboxMap.Zones' arrive, Apart studs across), its door before them. The host's helper is
---     the move's (server/MoveHelper.luau: he waits by the truck at the house and goes with the run; 10.1 free, the
---     host's pick of their crew: server/HelperCrew.luau, which also traps a helper in some runs' houses to rescue).
+-- warehouse in the lobby on its own"; Config.Runs, the rules shared/RunRules.luau, the client client/RunUi.luau). 10.4:
+-- the lobby's PLAY circle and its party lobbies start the runs (server/Parties.luau, shared/PartyRules.luau: Runs.start
+-- starts them; the six portals and their pads are gone); a run is a sandbox move of one house (server/Moving.luau:
+-- Moving.startRun, its hooks in the block "9.7 RUNS").
+--   * The start (Runs.begin: a party lobby's countdown over, server/Parties.luau; the admin's): the host's van is parked
+--     at the house's curb (Moving.parkVan: server/SandboxBoot.luau's, repaired), not drivable (its model's
+--     Config.Runs.Truck.Attribute: client/CarVisuals.luau shows no Drive / Ride along, its seats Disabled), the party
+--     is the run's (Crew.members and Crew.ownerOf are wrapped: a run's party is its host's crew, nobody else's crew
+--     counts in the sandbox), Moving.startRun starts the move (its contract's difficulty, the house's clock × the
+--     difficulty's time; the inside's RunDifficulty attribute is Moving's), the map's house model gets the attribute
+--     RunDifficulty too (traps and the loot's rarity read it), the truck gets its prompts (the host's "Finish the run",
+--     the others' "Vote to finish") and everybody fades over to the house's front yard (SandboxMap.Zones' arrive, Apart
+--     studs across), its door before them, from wherever they waited in the lobby. The host's helper is the move's
+--     (server/MoveHelper.luau: he waits by the truck at the house and goes with the run; 10.1 free, the host's pick of
+--     their crew: server/HelperCrew.luau, which also traps a helper in some runs' houses to rescue).
+--   * One run in a house at a time, and 10.6 never the quick round's house (Runs.houseBusy, RunRules.houseBusy: the
+--     PLAY panel shows the house busy, a lobby cannot pick it or start there).
 --   * In the run: FINISH (the host: the truck's prompt, the move's panel) ends it; so does everybody else's vote
 --     (RunRules.voteDone over the party but the host); the clock ends it too (Moving's tick). LEAVE THE RUN (the Runs
 --     remote's "leave": the move's list) takes one player back alone (their loaded pieces still count at the end); the
@@ -32,48 +25,69 @@
 --   * The end (Moving.onRunEnd): what was in the truck went into the stock of whoever loaded it (Moving's SB.unloadAll);
 --     each player gets the results card ({ kind = "result", … }: the pieces, their rarity, who got them, the value,
 --     yours), a run done or late opens the next difficulty for those still in it (RunRules.unlock: the save's
---     runUnlocked, saved soon; { kind = "unlocked" }); EndHold s later everybody fades back to the lobby by the portal
---     they came from (its `back` spot: just off its pad, facing the plaza: never on it, that would start a run again),
---     the van goes, the house's RunDifficulty is cleared.
+--     runUnlocked, saved soon; { kind = "unlocked" }); EndHold s later everybody fades back to the lobby beside the
+--     PLAY circle (Lobby.play.back: just south of it, facing it, Apart studs across: never in it), the van goes, the
+--     house's RunDifficulty is cleared.
 --
---   Runs.start()                       the pads' loop, the remote, the wraps, the dispatch's and the truck's prompts
---   Runs.begin(house, party, difficulty, admin?)   a run now (the pad's end, the admin's): an error text or nil
+--   Runs.start()                       the remote, the wraps, the dispatch's and the truck's prompts; 10.4 the party
+--                                      lobbies (server/Parties.luau's start); 10.5 the rounds' loop
+--   Runs.begin(house, party, difficulty, admin?)   a run now (a lobby's start, the admin's): an error text or nil
 --   Runs.finish(player)                the host's FINISH (true when a run ended)
---   Runs.vote(player) / Runs.leave(player)   a party member's vote to finish / leaving the run alone
---   Runs.runOf(player)                 the run a player is in (host or party) or nil: { host, house, difficulty, party }
---   Runs.padOf(house)                  a portal's pad (RunRules.Pad) or nil
---   Runs.inUse(house)                  a run in that house now?
+--   Runs.vote(player) / Runs.leave(player)   a party member's vote to finish / leaving the run (or the round) alone
+--   Runs.runOf(player)                 the run a player is in (host or party) or nil: { host, house, difficulty, party,
+--                                      round? }
+--   Runs.inUse(house)                  a run in that house now (a lobby's or the round's)?
+--   Runs.houseBusy(house) -> why?      10.6: why a house takes no lobby's run now ("round": the quick round's place, its
+--                                      countdown, its round or its ride back; "run": a run in it), else nil
+--   Runs.list()                        10.4: the runs now ({ house, difficulty, host, party, round? }: the map's IN A RUN)
+--   Runs.free(player) -> root?         10.4: their body's root while they are free to stand in the PLAY circle and go
+--                                      (alive, on foot, in no run or move, not on a jump), else nil
+--   Runs.openOf(player) -> n           10.4: the difficulties open to them (their save's runUnlocked)
 --   Runs.admin(player, what, arg?, admin?)   the admin panel's SANDBOX tab (`player` its TARGET): "start" (a house: a run
 --                                      for `player` alone, at the difficulty `admin` picked, locks ignored) | "difficulty"
---                                      (its id) | "end" (`player`'s run) → what to say
---   Runs.step()                        one look at the pads (the loop's; the tests')
+--                                      (its id) | "end" (`player`'s run) | 10.5 "round" (the countdown's round now; 10.6
+--                                      `player` queued first) → what to say
 -- 10.4 the ride (the owner: "there is no driving the car any more, so every time you go to a place, an animation of
 -- you driving there"): before every jump to a house and back to the lobby, each player gets { kind = "ride", to, back,
--- difficulty?, party?, seconds } (Config.Runs.Ride): client/RideUi.luau shows the van on its way over the fade.
+-- difficulty?, party?, round?, seconds } (Config.Runs.Ride): client/RideUi.luau shows the van on its way over the fade.
 -- 10.x danger (server/RunDanger.luau: the locks and keys, the vault, the hazards, the zombies, the bat): started with the
 -- runs (Runs.start); the results card's `danger` ({ vault = true / false / nil: none, stopped = zombies killed }) is
 -- RunDanger.result's (the blocks marked "10.x danger"). 10.5: no zombies, no bat (Config.Runs.Danger).
 -- 10.5 ROUNDS (Config.Rounds.On; the owner: "16 people on one server … a round starts at one place, everybody runs
 -- there, everyone has their own car, what you carry off to it quickly is yours … not teams"; the rules
--- shared/RoundRules.luau, the client client/RoundUi.luau; the block "10.5 ROUNDS" below): the portals' pads do nothing,
--- one round at a time for the whole server instead.
---   * The countdown (Wait s) runs in the lobby while somebody is in the game (the player attribute InGame: PLAY,
---     server/SandboxBoot.luau); the next place is picked as it starts (never the last one again) and its difficulty
---     (Config.Rounds.Difficulties, at random): the portals' signs and the map say where (its portal NEXT ROUND HERE).
---   * The start: everybody in the game and free (alive, on no move, not on a jump) goes. Each player's own van is
---     parked at the house (RoundRules.parking: side by side at its curb and in rows behind it, the spots with
---     something solid in the way last), locked as a run's truck, its back open, its owner's name over it (its model's
---     attribute RoundVan = their UserId) and its Load prompt (E, only they see it: MoveOnly). The run is the host's
---     (the first player's) Moving.startRun with the round's clock (Seconds): its contract's `round` (server/Moving.luau
---     "10.5 ROUNDS": no move truck, no helper, no FINISH). Everybody rides there (10.4) and lands in rows by the door.
+-- shared/RoundRules.luau, the client client/RoundUi.luau; the block "10.5 ROUNDS" below): one round at a time for the
+-- whole server. 10.6 BOTH IN PLAY (the owner: "Both in the PLAY circle"): the rounds are the PLAY panel's QUICK ROUND,
+-- beside its PRIVATE LOBBY (server/Parties.luau): nobody goes on one before they join its queue there.
+--   * The queue (Runs.queue: the Party remote's { kind = "round", on }, in the PLAY circle; LEAVE QUEUE in the panel or
+--     on the banner, the Runs remote's { kind = "queue", on = false }, anywhere): nobody in a private lobby, nobody
+--     twice; LEAVE THE ROUND, leaving the game or (Config.Rounds.Stay false) the round's end take you out of it.
+--   * The countdown (Wait s) runs in the lobby while somebody is in the queue (none: no round, "idle"); the next place
+--     is picked as it starts (RoundRules.places: no run in it, no private lobby holding it when another is free, never
+--     the last one again; then RoundRules.pick) and its difficulty (Config.Rounds.Difficulties, at random): the banner,
+--     the PLAY panel and the map say where (the PLAY circle model's attributes RoundPhase, RoundHouse, RoundDifficulty,
+--     RoundEndsAt, RoundQueued, RoundMovers: client/SandboxMapData.luau). From then on that house is the round's
+--     (Runs.houseBusy "round") until everybody is back.
+--   * The start: everybody queued and free (alive, on no move, not on a jump) goes. Each player's own van is parked at
+--     the house (RoundRules.parking: side by side at its curb and in rows behind it, the spots with something solid in
+--     the way last), locked as a run's truck, its back open, its owner's name over it (its model's attribute RoundVan =
+--     their UserId) and its Load prompt (E, only they see it: MoveOnly). The run is the host's (the first player's)
+--     Moving.startRun with the round's clock (Seconds): its contract's `round` (server/Moving.luau "10.5 ROUNDS": no
+--     move truck, no helper, no FINISH). Everybody rides there (10.4) and lands in rows by the door.
 --   * In the round: Load at your own van while you carry something (Moving.claim): it is yours at once, into your
 --     warehouse's stock; everybody in the round hears it ({ kind = "claim", … }: the feed) and sees the table
 --     ({ kind = "round", … }: RoundUi's). LEAVE (the list's: the Runs remote's "leave") takes you back alone (your van
---     goes); the host leaving hands the round's move over (Moving.handOver), it never ends it.
+--     goes, you are out of the queue); the host leaving hands the round's move over (Moving.handOver), it never ends it.
 --   * The end: the clock (Moving's tick ends the run): the results card ranks everybody in it (RoundRules.ranking: its
---     `round`), Results s later everybody rides back to the lobby, the vans go, the next countdown starts.
---   Runs.round()                       the round's state now (the tests'): { phase, endsAt, house, difficulty, run?, vans }
---   Runs.roundStep()                   one look at the round (Runs.step's while Config.Rounds.On)
+--     `round`), Results s later everybody rides back to the lobby, the vans go, the next countdown starts (somebody
+--     still queued).
+--   Runs.queue(player, on) -> why?     10.6: into the queue (on) or out of it; why not (a PartyRules.why code) or nil
+--   Runs.queued(player) -> bool        10.6: in the queue?
+--   Runs.roundOf(player?) -> view?     10.6: the quick round for the PLAY panel (server/Parties.luau's view; nil: rounds
+--                                      off): { phase, endsAt, house, name, difficulty, queued, mine, inRound, movers,
+--                                      seconds } (no player: nobody's, the circle's sign)
+--   Runs.round()                       the round's state now (the tests'): { phase, endsAt, house, difficulty, run?, vans,
+--                                      queue }
+--   Runs.roundStep()                   one look at the round (the loop's; the tests')
 -- 10.6 SNATCHING (Config.Rounds.Tug; the owner: "you can take it out of somebody's hands, but not so that you could just
 -- take it … not somebody waiting at your car"; the rules shared/TugRules.luau, the client client/TugUi.luau; the block
 -- "10.6 snatching" below): in a round every carrier wears a Snatch prompt (E held, the others in the round see it: its
@@ -119,24 +133,20 @@ type Run = {
 	round: boolean?, -- 10.5 rounds: the server's round (no host's FINISH, no votes)
 }
 local remote: RemoteEvent? = nil
-local pads: { [string]: RunRules.Pad } = {}
 local runs: { [string]: Run } = {} -- by house
 local runOf: { [Player]: Run } = {} -- every party member's
-local away: { [Player]: number } = {} -- on a jump (os.clock until): no pad, no join
-local padKey: { [Player]: string } = {} -- the last pad view sent ("" none)
-local signs: { [string]: { status: TextLabel?, pad: BasePart?, model: Instance? } } = {}
-local signText: { [string]: string } = {}
-local shownState: { [string]: string } = {} -- 10.x the map: the portal's attributes as last written (a key)
-local inUseSaid: { [Player]: string } = {}
+local away: { [Player]: number } = {} -- on a jump (os.clock until): not free (10.4: the PLAY circle ignores them)
 local adminPick: { [Player]: string } = {}
 local started = false
 -- 10.5 rounds (the block "10.5 ROUNDS" below: its functions): the server's one round, in one table (the -O0 registers)
---   phase    "idle" (nobody in the game) | "wait" (the countdown) | "play" (the round) | "over" (its results, the ride back)
+--   phase    "idle" (nobody queued) | "wait" (the countdown) | "play" (the round) | "over" (its results, the ride back)
 --   endsAt   the server's time the phase ends (wait: the start; play: the round's clock; over: the next countdown)
---   house, difficulty   the next round's (wait) or this one's (play); last: the round before's house
+--   house, difficulty   the next round's (wait) or this one's (play, over); last: the round before's house
 --   run      this round's run (play); vans / prompts: each player's van at the house and its Load prompt
 --   came     everybody who came ({ id, name }, the order they came); pieces: what they loaded ({ to, value })
 --   sent     the last round view sent to each player (a key: only what changed goes)
+--   queue    10.6: who is in the queue (the PLAY panel's QUICK ROUND), the order they joined; shown: the PLAY circle's
+--            round attributes as last written (a key)
 local Round = {
 	phase = "idle",
 	endsAt = 0,
@@ -149,6 +159,8 @@ local Round = {
 	came = {} :: { { id: number, name: string } },
 	pieces = {} :: { { to: number, value: number } },
 	sent = {} :: { [Player]: string },
+	queue = {} :: { Player },
+	shown = "",
 	-- 10.6 snatching: the tugs (by id, and each one's by player), the Snatch prompts on the carriers, when each carrier
 	-- picked up what they hold (spot, at), until when somebody is stunned, when somebody last tried to snatch and was last
 	-- tugged at
@@ -195,75 +207,6 @@ local function moving(): any
 	return require(Server.Moving)
 end
 
-local function nameOf(house: string): string
-	local h = SandboxMap.house(house)
-	return if h then h.name else house
-end
-
--- ── The portals' signs and glow ────────────────────────────────────────────
-
-local function findSigns()
-	local world = workspace:FindFirstChild("Sandbox")
-	local lobby = world and world:FindFirstChild("Lobby")
-	local folder = lobby and lobby:FindFirstChild("Portals")
-	if not folder then
-		return
-	end
-	for _, model in folder:GetChildren() do
-		local house = model:GetAttribute("RunPortal")
-		if type(house) == "string" then
-			local sign = model:FindFirstChild("GateSign")
-			local gui = sign and sign:FindFirstChild("Words")
-			local status = gui and gui:FindFirstChild("Status")
-			local pad = model:FindFirstChild("RunPad")
-			signs[house] = {
-				status = if status and status:IsA("TextLabel") then status else nil,
-				pad = if pad and pad:IsA("BasePart") then pad else nil,
-				model = model,
-			}
-		end
-	end
-end
-
-local function paint(house: string, text: string, color: { number })
-	local key = `{text}|{color[1]}`
-	if signText[house] == key then
-		return
-	end
-	signText[house] = key
-	local found = signs[house]
-	if not found then
-		return
-	end
-	local c = Color3.fromRGB(color[1], color[2], color[3])
-	if found.status then
-		found.status.Text = text
-		found.status.TextColor3 = c
-	end
-	if found.pad then
-		found.pad.Color = c
-	end
-end
-
--- 10.x the map (client/SandboxMapUi.luau, read-only): the portal model's attributes RunState ("free" | "wait": a
--- countdown | "use": a run in its house), RunEndsAt (the countdown's end, the server's time), RunWho (who is on the pad,
--- or the run's party: display names, comma-joined) and RunDifficulty (the pad's pick, the run's): written only when
--- they change.
-local function publish(house: string, state: string, endsAt: number?, who: { string }, difficulty: string?)
-	local names = table.concat(who, ", ")
-	local key = `{state}|{endsAt or ""}|{names}|{difficulty or ""}`
-	local found = signs[house]
-	local model = found and found.model
-	if not model or shownState[house] == key then
-		return
-	end
-	shownState[house] = key
-	model:SetAttribute("RunState", state)
-	model:SetAttribute("RunEndsAt", endsAt)
-	model:SetAttribute("RunWho", if names ~= "" then names else nil)
-	model:SetAttribute("RunDifficulty", difficulty)
-end
-
 -- The map's house model of a place (its attribute SandboxHouse), nil when none.
 local function houseModel(house: string): Instance?
 	local world = workspace:FindFirstChild("Sandbox")
@@ -276,6 +219,13 @@ local function houseModel(house: string): Instance?
 		end
 	end
 	return nil
+end
+
+-- 10.6: why `house` takes no new run now (RunRules.houseBusy: the quick round's place, or a run in it), else nil.
+function Runs.houseBusy(house: string): string?
+	return RunRules.houseBusy(house, function(id: string): boolean
+		return runs[id] ~= nil
+	end, if Config.Rounds.On then { house = Round.house, phase = Round.phase } else nil)
 end
 
 -- ── The jumps (a fade, the move, the fade in) ──────────────────────────────
@@ -300,7 +250,7 @@ local function jump(player: Player, frame: CFrame)
 		if player.Parent then
 			fades:FireClient(player, "fade", "in", R.Fade.In, { at = frame.Position, look = frame.LookVector, dark = 0.1, wait = 2, near = 8 })
 		end
-		away[player] = os.clock() + 1.5 -- (a moment on the pad they land on before it counts)
+		away[player] = os.clock() + 1.5 -- (a moment where they land before it counts)
 	end)
 end
 
@@ -340,60 +290,23 @@ local function ride(player: Player, to: string, back: boolean, run: Run?)
 	})
 end
 
-local function backTo(house: string, players: { Player }, round: boolean?)
-	local portal = SandboxMap.portal(house)
-	if round then -- (10.5 rounds: the plaza's spawn, in rows: never a portal's pad)
+-- 10.4: back beside the PLAY circle (Lobby.play.back: just south of it, facing it; never in it). `house` the run's.
+-- 10.5 rounds: the plaza's spawn, in rows (RoundRules.spread: the many of a round), never in the circle either.
+local function backTo(_house: string, players: { Player }, round: boolean?)
+	if round then
 		for n, spot in RoundRules.spread(L.spawn, #players, Config.Rounds.Spread) do
 			ride(players[n], R.Ride.Home, true, nil)
 			jump(players[n], SandboxMap.cframe(spot))
 		end
 		return
 	end
-	local spot = if portal then portal.back else L.spawn
-	for n, frame in spread(spot, #players) do
-		ride(players[n], R.Ride.Home, true, nil) -- 10.4
+	for n, frame in spread(L.play.back, #players) do
+		ride(players[n], R.Ride.Home, true, nil) -- 10.4 the ride home
 		jump(players[n], frame)
 	end
 end
 
 -- ── The views ──────────────────────────────────────────────────────────────
-
-local function partyNames(list: { number }): { string }
-	local out: { string } = {}
-	for _, id in list do
-		local p = Players:GetPlayerByUserId(id)
-		table.insert(out, if p then p.DisplayName else "?")
-	end
-	return out
-end
-
-local function padView(house: string, pad: RunRules.Pad, player: Player): { [string]: any }
-	local host = if pad.host then Players:GetPlayerByUserId(pad.host) else nil
-	local open: { string } = {}
-	local count = if host then openOf(host) else R.Open
-	for _, def in RunRules.list() do
-		if RunRules.isOpen(count, def.id) then
-			table.insert(open, def.id)
-		end
-	end
-	local line = RunRules.party(pad, #pad.order)
-	return {
-		kind = "pad",
-		house = house,
-		name = nameOf(house),
-		endsAt = pad.endsAt,
-		left = RunRules.left(pad, workspace:GetServerTimeNow()),
-		host = pad.host,
-		hostName = if host then host.DisplayName else "",
-		party = partyNames(line),
-		going = math.min(#line, R.MaxParty),
-		max = R.MaxParty,
-		difficulty = pad.difficulty,
-		open = open,
-		mine = host == player,
-		place = table.find(pad.order, player.UserId) or 0,
-	}
-end
 
 local function runView(run: Run, player: Player): { [string]: any }
 	local votes = 0
@@ -413,6 +326,7 @@ local function runView(run: Run, player: Player): { [string]: any }
 		members = #run.party,
 		votes = votes,
 		voted = run.votes[player.UserId] == true,
+		round = run.round == true, -- (10.5 rounds)
 	}
 end
 
@@ -492,7 +406,10 @@ function Runs.begin(house: string, party: { Player }, difficulty: string, admin:
 	if not H or not zone or not host then
 		return "No such house."
 	end
-	if runs[house] then
+	local taken = Runs.houseBusy(house) -- 10.6: never the quick round's house
+	if taken == "round" then
+		return `{H.name} is the quick round's place right now: try another house.`
+	elseif taken then
 		return `{H.name} is in use: try another house.`
 	end
 	for _, p in party do
@@ -518,6 +435,7 @@ function Runs.begin(house: string, party: { Player }, difficulty: string, admin:
 	runs[house] = run
 	for _, p in party do
 		runOf[p] = run
+		Runs.queue(p, false) -- (10.6: a run of their own: out of the quick round's queue)
 	end
 	local failed = moving().startRun(host, house, pick)
 	if failed then
@@ -532,8 +450,6 @@ function Runs.begin(house: string, party: { Player }, difficulty: string, admin:
 	truckPrompts(run, car)
 	for n, frame in spread(zone.arrive, #party) do
 		local p = party[n]
-		padKey[p] = ""
-		send(p, { kind = "pad" })
 		ride(p, H.name, false, run) -- 10.4: the van on its way there, over the fade
 		jump(p, frame)
 	end
@@ -590,6 +506,9 @@ function Runs.leave(player: Player)
 	if not run or run.ended then
 		return
 	end
+	if run.round then
+		Runs.queue(player, false) -- (10.6: leaving the round is leaving its queue too)
+	end
 	if run.host == player and run.round then -- 10.5 rounds: the round's move goes over to the next player in it
 		local heir: Player? = nil
 		for _, p in run.party do
@@ -615,7 +534,7 @@ function Runs.leave(player: Player)
 	table.insert(run.gone, player)
 	send(player, { kind = "run" })
 	say(player, if run.round
-		then "🚪 You leave the round: back to the lobby. What you loaded is in your warehouse already."
+		then "🚪 You leave the round (and its queue): back to the lobby. What you loaded is in your warehouse already."
 		else "🚪 You leave the run: back to the lobby. What you loaded still goes to your warehouse at its end.")
 	for _, member in run.party do
 		say(member, `🚪 {player.DisplayName} left the {if run.round then "round" else "run"}.`)
@@ -718,7 +637,8 @@ local function onEnd(host: Player, facts: { [string]: any })
 			opened = opened,
 			openedName = if opened then (RunRules.def(opened) :: any).name else nil,
 			danger = danger, -- 10.x danger
-			round = if ranking then { ranking = ranking, place = (RoundRules.rankOf(ranking, p.UserId) or { place = 0 }).place, players = #ranking } else nil, -- 10.5
+			round = if ranking then { ranking = ranking, place = (RoundRules.rankOf(ranking, p.UserId) or { place = 0 }).place, players = #ranking,
+				queued = Runs.queued(p) } else nil, -- 10.5 (10.6: still in the queue: the next one comes)
 		})
 		if opened then
 			send(p, { kind = "unlocked", id = opened, name = (RunRules.def(opened) :: any).name })
@@ -759,26 +679,34 @@ end
 
 local Q = Config.Rounds
 
--- Pressed PLAY (the attribute InGame: server/SandboxBoot.luau), loaded, alive, on no move and no jump: goes on the round.
+-- The private lobby `player` is in (server/Parties.luau), nil none.
+function Round.lobbyOf(player: Player): any
+	local ok, lobby = pcall(function(): any
+		return require(Server.Parties).lobbyOf(player)
+	end)
+	return if ok then lobby else nil
+end
+
+-- 10.6: queued (the PLAY panel's QUICK ROUND), loaded, alive, on no move and no jump, in no lobby: goes on the round.
 function Round.ready(player: Player): boolean
-	if player:GetAttribute("InGame") ~= true or runOf[player] or (away[player] and os.clock() < away[player]) then
+	if not table.find(Round.queue, player) or runOf[player] or (away[player] and os.clock() < away[player]) then
 		return false
 	end
-	return PlayerData.get(player) ~= nil and rootOf(player) ~= nil and moving().busy(player) == nil
+	return PlayerData.get(player) ~= nil and rootOf(player) ~= nil and moving().busy(player) == nil and Round.lobbyOf(player) == nil
 end
 
--- How many are in the game (pressed PLAY).
-function Round.inGame(): number
-	local n = 0
-	for _, p in Players:GetPlayers() do
-		if p:GetAttribute("InGame") == true then
-			n += 1
+-- How many are in the queue (10.6: who joined it in the PLAY panel; gone from the game: out).
+function Round.queued(): number
+	for n = #Round.queue, 1, -1 do
+		if not Round.queue[n].Parent then
+			table.remove(Round.queue, n)
 		end
 	end
-	return n
+	return #Round.queue
 end
 
--- The countdown to the next round: its place (never the last one again) and difficulty.
+-- The countdown to the next round: its place (RoundRules.places: no run in it, no private lobby's when another is
+-- free, never the last one again) and difficulty. No place free: none yet, a look again in a moment.
 function Round.plan(now: number)
 	local ids: { string } = {}
 	for _, h in SandboxMap.Houses do
@@ -786,9 +714,53 @@ function Round.plan(now: number)
 			table.insert(ids, h.id)
 		end
 	end
-	Round.house = RoundRules.pick(ids, Round.last, math.random())
+	local held: { [string]: boolean } = {}
+	pcall(function()
+		for _, lobby in require(Server.Parties).lobbies() do
+			held[lobby.house] = true
+		end
+	end)
+	local places = RoundRules.places(ids, Round.last, function(id: string): boolean
+		return RunRules.houseBusy(id, function(house: string): boolean
+			return runs[house] ~= nil
+		end, nil) ~= nil
+	end, function(id: string): boolean
+		return held[id] == true
+	end)
+	Round.house = RoundRules.pick(places, Round.last, math.random())
 	Round.difficulty = RoundRules.difficulty(Q.Difficulties, math.random())
-	Round.phase, Round.endsAt = "wait", now + Q.Wait
+	Round.phase, Round.endsAt = "wait", now + (if Round.house then Q.Wait else math.min(Q.Wait, 5))
+end
+
+-- 10.6: into the quick round's queue (on) or out of it: why not (a PartyRules.why code) or nil.
+function Runs.queue(player: Player, on: boolean): string?
+	local at = table.find(Round.queue, player)
+	if not on then
+		if not at then
+			return "notQueued"
+		end
+		table.remove(Round.queue, at)
+		Round.sent[player] = nil
+		return nil
+	elseif not Q.On then
+		return "roundOff"
+	elseif at then
+		return nil -- (in it already)
+	elseif runOf[player] then
+		return "inRun"
+	elseif Round.lobbyOf(player) then
+		return "inLobby"
+	end
+	table.insert(Round.queue, player)
+	Round.sent[player] = nil
+	if Round.phase == "idle" then
+		Round.plan(workspace:GetServerTimeNow())
+	end
+	return nil
+end
+
+function Runs.queued(player: Player): boolean
+	return table.find(Round.queue, player) ~= nil
 end
 
 -- Is a van's spot clear (nothing solid in the box over it: a tree, a fence, a wall; the players and the cars aside)?
@@ -1257,7 +1229,6 @@ function Round.begin(house: string, players: { Player }, difficulty: string): st
 	end
 	for n, spot in RoundRules.spread(zone.arrive, #going, Q.Spread) do
 		local p = going[n]
-		padKey[p] = ""
 		ride(p, H.name, false, run) -- 10.4: the van on its way there, over the fade
 		jump(p, SandboxMap.cframe(spot))
 	end
@@ -1276,7 +1247,8 @@ function Round.ranking(list: { { [string]: any } }): { RoundRules.Rank }
 	return RoundRules.ranking(pieces, Round.came)
 end
 
--- The round ended (onEnd): its results, then the next countdown once everybody is back.
+-- The round ended (onEnd): its results, then the next countdown once everybody is back (10.6: Stay false: its players
+-- out of the queue).
 function Round.over(run: Run?)
 	Round.phase = "over"
 	Round.endsAt = workspace:GetServerTimeNow() + Q.Results + R.Fade.Out + 1
@@ -1287,6 +1259,11 @@ function Round.over(run: Run?)
 		prompt:Destroy()
 	end
 	table.clear(Round.prompts)
+	if run and not Q.Stay then
+		for _, p in run.party do
+			Runs.queue(p, false)
+		end
+	end
 end
 
 -- What RoundUi shows a player now: the phase and its clock, the place, the table's top rows and theirs.
@@ -1307,8 +1284,9 @@ function Round.view(player: Player, rows: { RoundRules.Rank }): { [string]: any 
 		name = if H then H.name else nil,
 		difficulty = Round.difficulty,
 		inRound = run ~= nil and runOf[player] == run,
-		players = if run then #run.party else Round.inGame(),
-		ready = player:GetAttribute("InGame") == true,
+		players = if run then #run.party else #Round.queue,
+		queued = #Round.queue, -- 10.6
+		ready = Runs.queued(player), -- (10.6: in the queue)
 		top = top,
 		mine = if mine then { place = mine.place, count = mine.count, value = mine.value } else nil,
 	}
@@ -1320,9 +1298,9 @@ function Round.broadcast()
 	for _, player in Players:GetPlayers() do
 		local view = Round.view(player, rows)
 		local mine = view.mine
-		local key = `{view.phase}|{view.endsAt}|{view.house}|{view.inRound}|{view.players}|{view.ready}|{if mine then `{mine.place},{mine.count},{mine.value}` else ""}|{#rows}`
+		local key = `{view.phase}|{view.endsAt}|{view.house}|{view.inRound}|{view.players}|{view.queued}|{view.ready}|{if mine then `{mine.place},{mine.count},{mine.value}` else ""}|{#rows}`
 		for _, row in view.top do
-			key ..= `|{row.name},{row.count},{row.value}`
+			key ..= `|{row.name},{row.place},{row.count},{row.value}`
 		end
 		if Round.sent[player] ~= key then
 			Round.sent[player] = key
@@ -1331,34 +1309,39 @@ function Round.broadcast()
 	end
 end
 
--- The portals' signs and the map in rounds: the round's place says so, the others that rounds need no pad.
-function Round.signs(now: number)
+-- 10.6 the map (client/SandboxMapData.luau, read-only; the portals' signs are gone): the PLAY circle model's attributes
+-- RoundPhase, RoundHouse, RoundDifficulty, RoundEndsAt, RoundQueued and RoundMovers, written only when they change.
+function Round.publish()
+	local world = workspace:FindFirstChild("Sandbox")
+	local lobby = world and world:FindFirstChild("Lobby")
+	local circle = lobby and lobby:FindFirstChild("PlayCircle")
 	local run = Round.run
-	for _, portal in L.portals do
-		local house = portal.house
-		if Round.phase == "wait" and house == Round.house then
-			paint(house, `NEXT ROUND HERE · {RoundRules.clock(Round.endsAt - now)}`, R.Portal.Waiting)
-			publish(house, "wait", Round.endsAt, {}, Round.difficulty)
-		elseif run and house == run.house then
-			paint(house, `ROUND ON · {RoundRules.clock(Round.endsAt - now)}`, R.Portal.InUse)
-			publish(house, "use", nil, { `{#run.party} movers` }, run.difficulty)
-		else
-			paint(house, "ROUNDS · WAIT IN THE LOBBY", R.Portal.Free)
-			publish(house, "free", nil, {}, nil)
-		end
+	local phase = if Q.On then Round.phase else "off"
+	local movers = if run then #run.party else 0
+	local key = `{phase}|{Round.house}|{Round.difficulty}|{Round.endsAt}|{#Round.queue}|{movers}`
+	if not circle or Round.shown == key then
+		return
 	end
+	Round.shown = key
+	circle:SetAttribute("RoundPhase", phase)
+	circle:SetAttribute("RoundHouse", Round.house)
+	circle:SetAttribute("RoundDifficulty", Round.difficulty)
+	circle:SetAttribute("RoundEndsAt", if Round.phase ~= "idle" then Round.endsAt else nil)
+	circle:SetAttribute("RoundQueued", #Round.queue)
+	circle:SetAttribute("RoundMovers", movers)
 end
 
 function Runs.roundStep()
 	local now = workspace:GetServerTimeNow()
+	local count = Round.queued()
 	if Round.phase == "idle" or Round.phase == "wait" then
-		if Round.inGame() == 0 then
-			Round.phase, Round.house = "idle", nil
-		elseif Round.phase == "idle" then
-			Round.plan(now)
+		if not Q.On or count == 0 then
+			Round.phase, Round.house, Round.difficulty = "idle", nil, nil
+		elseif Round.phase == "idle" or (Round.house == nil and now >= Round.endsAt) then
+			Round.plan(now) -- (no place free before: a look again)
 		elseif now >= Round.endsAt then
 			local going: { Player } = {}
-			for _, p in Players:GetPlayers() do
+			for _, p in Round.queue do
 				if Round.ready(p) then
 					table.insert(going, p)
 				end
@@ -1393,20 +1376,47 @@ function Runs.roundStep()
 			Round.grabStep(run, now) -- 10.6 snatching
 		end
 	elseif Round.phase == "over" and now >= Round.endsAt then
-		Round.plan(now)
+		if count > 0 and Q.On then
+			Round.plan(now)
+		else
+			Round.phase, Round.house, Round.difficulty = "idle", nil, nil
+		end
 	end
-	Round.signs(now)
-	Round.broadcast()
+	Round.publish()
+	if Q.On then
+		Round.broadcast()
+	end
 end
 
 function Runs.round(): { [string]: any }
-	return { phase = Round.phase, endsAt = Round.endsAt, house = Round.house, difficulty = Round.difficulty, run = Round.run, vans = Round.vans, prompts = Round.prompts, pieces = Round.pieces }
+	return { phase = Round.phase, endsAt = Round.endsAt, house = Round.house, difficulty = Round.difficulty, run = Round.run, vans = Round.vans, prompts = Round.prompts,
+		pieces = Round.pieces, queue = table.clone(Round.queue) }
 end
 
--- ── The pads ───────────────────────────────────────────────────────────────
+-- 10.6: the quick round as the PLAY panel shows it (server/Parties.luau's view), nil while the rounds are off.
+function Runs.roundOf(player: Player?): { [string]: any }?
+	if not Q.On then
+		return nil
+	end
+	local H = if Round.house then SandboxMap.house(Round.house) else nil
+	local run = Round.run
+	return {
+		phase = Round.phase,
+		endsAt = if Round.phase ~= "idle" then Round.endsAt else nil,
+		house = Round.house,
+		name = if H then H.name else nil,
+		difficulty = Round.difficulty,
+		queued = #Round.queue,
+		mine = player ~= nil and Runs.queued(player),
+		inRound = player ~= nil and run ~= nil and runOf[player] == run,
+		movers = if run then #run.party else 0,
+		seconds = Q.Seconds,
+	}
+end
 
--- Is this player free to stand on a pad (in no run, alive, on foot, not on a jump)?
-local function free(player: Player): BasePart?
+-- ── Free to go (10.4: server/Parties.luau's PLAY circle and its runs) ───────
+
+function Runs.free(player: Player): BasePart?
 	if runOf[player] or (away[player] and os.clock() < away[player]) then
 		return nil
 	end
@@ -1425,107 +1435,8 @@ local function free(player: Player): BasePart?
 	return root
 end
 
-local function onPad(root: BasePart, pad: SandboxMap.Rect): boolean
-	local at = root.Position
-	return at.X >= pad.x0 and at.X <= pad.x1 and at.Z >= pad.z0 and at.Z <= pad.z1 and at.Y >= SandboxMap.GroundTop - 2 and at.Y <= SandboxMap.GroundTop + R.PadHeight
-end
-
-function Runs.step()
-	if Config.Rounds.On then
-		Runs.roundStep() -- 10.5 rounds: no pads
-		return
-	end
-	local now = workspace:GetServerTimeNow()
-	local standing: { [Player]: string } = {}
-	local roots: { [Player]: BasePart } = {}
-	for _, player in Players:GetPlayers() do
-		local root = free(player)
-		if root then
-			roots[player] = root
-		end
-	end
-	for _, portal in L.portals do
-		local house = portal.house
-		local here: { number } = {}
-		for player, root in roots do
-			if onPad(root, portal.pad) then
-				if runs[house] then
-					if inUseSaid[player] ~= house then
-						inUseSaid[player] = house
-						say(player, `⛔ {portal.name} is in use: try another house.`)
-					end
-				else
-					standing[player] = house
-					table.insert(here, player.UserId)
-				end
-			elseif inUseSaid[player] == house then
-				inUseSaid[player] = nil
-			end
-		end
-		table.sort(here) -- (newcomers in one look: a stable order)
-		local pad = pads[house] or RunRules.newPad()
-		pads[house] = pad
-		local run = runs[house]
-		if run then
-			RunRules.padStep(pad, {}, now, R.Countdown)
-			paint(house, "IN USE · A RUN IS ON", R.Portal.InUse)
-			local party: { string } = {}
-			for _, member in run.party do
-				table.insert(party, member.DisplayName)
-			end
-			publish(house, "use", nil, party, run.difficulty) -- (10.x the map)
-			continue
-		end
-		local hostBefore = pad.host
-		RunRules.padStep(pad, here, now, R.Countdown)
-		if pad.host and pad.host ~= hostBefore then
-			local host = Players:GetPlayerByUserId(pad.host)
-			pad.difficulty = RunRules.choose(if host then openOf(host) else R.Open, pad.difficulty)
-		end
-		if #pad.order == 0 then
-			paint(house, "WALK ONTO THE PAD", R.Portal.Free)
-			publish(house, "free", nil, {}, nil) -- (10.x the map)
-		else
-			paint(house, `STARTING IN {RunRules.left(pad, now)} · {math.min(#pad.order, R.MaxParty)}/{R.MaxParty}`, R.Portal.Waiting)
-			publish(house, "wait", pad.endsAt, partyNames(pad.order), pad.difficulty)
-		end
-		if RunRules.due(pad, now) then
-			local ids = RunRules.party(pad, R.MaxParty)
-			local difficulty = pad.difficulty
-			pads[house] = RunRules.newPad()
-			local party: { Player } = {}
-			for _, id in ids do
-				local p = Players:GetPlayerByUserId(id)
-				if p then
-					table.insert(party, p)
-				end
-			end
-			if #party > 0 then
-				local err = Runs.begin(house, party, difficulty)
-				if err then
-					for _, p in party do
-						say(p, `⛔ The run could not start: {err}`)
-					end
-				end
-			end
-		end
-	end
-	-- the pad panels: to whoever stands on a pad (a view when it changed), none to whoever stepped off
-	for _, player in Players:GetPlayers() do
-		local house = standing[player]
-		local pad = if house then pads[house] else nil
-		if house and pad and #pad.order > 0 and not runOf[player] then
-			local view = padView(house, pad, player)
-			local key = `{house}|{view.left}|{view.host}|{view.difficulty}|{table.concat(view.party, ",")}|{table.concat(view.open, ",")}`
-			if padKey[player] ~= key then
-				padKey[player] = key
-				send(player, view)
-			end
-		elseif padKey[player] ~= nil and padKey[player] ~= "" then
-			padKey[player] = ""
-			send(player, { kind = "pad" })
-		end
-	end
+function Runs.openOf(player: Player): number
+	return openOf(player)
 end
 
 -- ── The remote ─────────────────────────────────────────────────────────────
@@ -1540,39 +1451,41 @@ local function onRequest(player: Player, message: any)
 		if run then
 			send(player, runView(run, player))
 		end
-		padKey[player] = nil
 		Round.sent[player] = nil -- (10.5 rounds: the round's view again at the next look)
-	elseif kind == "difficulty" then
-		for house, pad in pads do
-			if pad.host == player.UserId and not runs[house] then
-				if RunRules.isOpen(openOf(player), message.id) then
-					pad.difficulty = RunRules.clean(message.id)
-					padKey[player] = nil
-				else
-					say(player, "🔒 Finish a run at the difficulty before it to open that one.")
-				end
-			end
-		end
 	elseif kind == "vote" then
 		Runs.vote(player)
 	elseif kind == "leave" then
 		Runs.leave(player)
+	elseif kind == "queue" and message.on ~= true then -- 10.6: the banner's LEAVE QUEUE (joining is the PLAY panel's)
+		if Runs.queue(player, false) == nil then
+			say(player, "⚡ You left the QUICK ROUND queue. Step into PLAY to join it again.")
+		end
+		Round.broadcast()
 	end
 end
 
 -- ── Queries, the admin ─────────────────────────────────────────────────────
 
-function Runs.runOf(player: Player): { host: Player, house: string, difficulty: string, party: { Player } }?
+function Runs.runOf(player: Player): { host: Player, house: string, difficulty: string, party: { Player }, round: boolean? }?
 	local run = runOf[player]
-	return if run then { host = run.host, house = run.house, difficulty = run.difficulty, party = table.clone(run.party) } else nil
-end
-
-function Runs.padOf(house: string): RunRules.Pad?
-	return pads[house]
+	return if run then { host = run.host, house = run.house, difficulty = run.difficulty, party = table.clone(run.party), round = run.round } else nil
 end
 
 function Runs.inUse(house: string): boolean
 	return runs[house] ~= nil
+end
+
+function Runs.list(): { { house: string, difficulty: string, host: Player, party: { Player }, round: boolean? } }
+	local out = {}
+	for house, run in runs do
+		if not run.ended then
+			table.insert(out, { house = house, difficulty = run.difficulty, host = run.host, party = table.clone(run.party), round = run.round })
+		end
+	end
+	table.sort(out, function(a, b)
+		return a.house < b.house
+	end)
+	return out
 end
 
 function Runs.admin(player: Player, what: string, arg: string?, admin: Player?): string
@@ -1593,11 +1506,15 @@ function Runs.admin(player: Player, what: string, arg: string?, admin: Player?):
 		local pick = adminPick[by] or R.Default
 		local err = Runs.begin(house, { player }, pick, true)
 		return if err then `ADMIN: {err}` else `ADMIN: a run at {h.name} ({string.upper((RunRules.def(pick) :: any).name)}) started for you.`
-	elseif what == "round" then -- 10.5 rounds: the countdown over now
+	elseif what == "round" then -- 10.5 rounds: the countdown over now (10.6: the TARGET queued first)
 		if not Config.Rounds.On then
 			return "ADMIN: rounds are off (Config.Rounds.On)."
+		end
+		local why = Runs.queue(player, true)
+		if why then
+			return `ADMIN: {player.DisplayName} can't join the queue ({why}).`
 		elseif Round.phase ~= "wait" then
-			return "ADMIN: no countdown now."
+			return "ADMIN: no countdown now (a round is on)."
 		end
 		Round.endsAt = workspace:GetServerTimeNow()
 		return "ADMIN: the round starts now."
@@ -1641,7 +1558,6 @@ function Runs.start()
 	end
 	started = true
 	remote = Net.get("Runs")
-	findSigns()
 	wrapCrew()
 	moving().onRunEnd(onEnd)
 	moving().roundVan = function(player: Player): any -- 10.5 rounds: a new body stands by your own van
@@ -1679,18 +1595,14 @@ function Runs.start()
 			if d:IsA("BasePart") and d:GetAttribute("RunDispatch") == true then
 				local prompt = Instance.new("ProximityPrompt")
 				prompt.Name = "DispatchPrompt"
-				prompt.ActionText = if Config.Rounds.On then "How rounds work" else "How runs work"
+				prompt.ActionText = "How runs work"
 				prompt.ObjectText = "DELIVEROS DISPATCH"
 				prompt.KeyboardKeyCode = Enum.KeyCode.E
 				prompt.HoldDuration = 0
 				prompt.MaxActivationDistance = 12
 				prompt.RequiresLineOfSight = false
 				prompt.Triggered:Connect(function(player: Player)
-					if Config.Rounds.On then -- 10.5 rounds
-						say(player, `🏁 Every round everybody rides to one house, each to their own van. Grab the loot, carry it to YOUR van and Load it: it is yours at once. {RoundRules.clock(Config.Rounds.Seconds)} on the clock, the most value wins. The next round starts by itself: wait here.`)
-					else
-						say(player, `🏠 Walk onto a house's glowing pad: in {R.Countdown} s everybody on it goes in ({R.MaxParty} at most). The first on it picks the difficulty. Carry the loot into the truck at the door, FINISH at the truck (or beat the clock): it all comes home to your warehouse.`)
-					end
+					say(player, `▶ Step into the glowing PLAY circle. {if Config.Rounds.On then `QUICK ROUND: join the queue, everybody in it rides to one house, each to their own van: what you load is yours at once, {RoundRules.clock(Config.Rounds.Seconds)} on the clock, the most value wins. ` else ""}PRIVATE LOBBY: CREATE A LOBBY (a house, a difficulty, public or friends only) or JOIN one ({R.MaxParty} at most); everybody READY, the host presses START, carry the loot into the truck at the door and FINISH there: it all comes home to your warehouse.`)
 				end)
 				prompt.Parent = d
 			end
@@ -1707,7 +1619,8 @@ function Runs.start()
 			run.votes[player.UserId] = nil
 			sendRun(run)
 		end
-		away[player], padKey[player], inUseSaid[player], adminPick[player] = nil, nil, nil, nil
+		away[player], adminPick[player] = nil, nil
+		Runs.queue(player, false) -- (10.6)
 		Round.dropVan(player) -- (10.5 rounds)
 		Round.sent[player] = nil
 		local tug = Round.tugOf[player] -- (10.6: a tug with them is off)
@@ -1717,11 +1630,18 @@ function Runs.start()
 		Round.dropGrab(player)
 		Round.since[player], Round.stunned[player], Round.tried[player], Round.targeted[player] = nil, nil, nil, nil
 	end)
-	task.spawn(function()
+	-- 10.4: the PLAY circle's party lobbies (they start the runs: Runs.begin)
+	local started, why = pcall(function()
+		require(Server.Parties).start(Runs)
+	end)
+	if not started then
+		warn(`[Runs] the party lobbies did not start: {why}`)
+	end
+	task.spawn(function() -- 10.5 rounds: the round's loop (10.6: the queue's countdown, the round, its end)
 		while true do
-			task.wait(R.Every)
-			local ok, err = pcall(Runs.step :: any)
-			if not ok then
+			task.wait(Config.Rounds.Every)
+			local stepped, err = pcall(Runs.roundStep :: any)
+			if not stepped then
 				warn(`[Runs] {err}`)
 			end
 		end

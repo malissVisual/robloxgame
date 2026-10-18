@@ -75,6 +75,22 @@
 --                                              loop runs it every Config.Collection.Tick s)
 --   Collection.start()                         the remote, joining and leaving, the payout loop
 --
+-- 10.4 THE WAREHOUSE IN TWO (Config.Showroom; the rules shared/CollectionRules.luau): the collection HALL's stands
+-- (1 … Collection.stands) and the SHOWROOM's (Config.Showroom.Base + 1 … + Collection.showStands). Only the hall's pieces
+-- earn (× the hall's Bonus: the tree's Hall spotlights, Room sets, Collector's corner; idle, IdleShare + its Night
+-- watchman); a showroom piece is on sale: it sells for × Collection.showFactor (SellBonus × the tree's Sales pitch), the
+-- visitors offer for it (server/VisitorOffers.luau), other players buy it (FOR SALE signs and offers, only in the
+-- showroom: setSale and transfer refuse a hall piece; a piece moved into the hall loses its sign).
+--   Collection.display(player, uid, stand)     a hall or a showroom stand (a piece on show elsewhere moves there: from the
+--                                              showroom into the hall, its FOR SALE sign comes down)
+--   Collection.place(player, uid, area)        PUT IN THE HALL ("hall") / SHOW FOR SALE ("show"): onto the first free
+--                                              stand of that area it fits (the hall's small stands before its big ones)
+--                                              → ok, why, the stand
+--   Collection.showStands(player)              the showroom stands they have; Collection.isOpen(player, stand) one of
+--                                              theirs? Collection.bonus(player) the hall's Bonus (boost: its `all`);
+--                                              Collection.showFactor(player) × a showroom price
+--   the remote: client → server { kind = "place", uid, area }; server → client { kind = "placed", uid, area, stand };
+--   the state's showStands, showBase and sets (the hall's room sets)
 -- The "Collection" remote (Config.Robust.Limits.Collection requests a second; every input checked):
 --   client → server   { kind = "display", uid, stand } | { kind = "undisplay", uid } | { kind = "sell", uid } |
 --                     { kind = "state" }; a refusal comes back as a Notice (its why)
@@ -207,6 +223,24 @@ local function standsOf(player: Player): number
 	return Rules.standsFor(PlayerData.get(player))
 end
 
+-- 10.4: the showroom's stands the player has (their warehouse level's own and the tree's Showroom stands).
+local function showOf(player: Player): number
+	return Rules.showStandsFor(PlayerData.get(player))
+end
+
+-- 10.4: × a showroom piece's price for the player (Config.Showroom.SellBonus, the tree's Sales pitch).
+local function showFactorOf(player: Player): number
+	return Rules.showFactor(PlayerData.get(player))
+end
+
+-- 10.4: the share of their hall's income an idle player's stands pay (Config.Collection.IdleShare + the tree's Night
+-- watchman), 0 … 1.
+local function idleShareOf(player: Player): number
+	local profile = PlayerData.get(player)
+	local extra = UpgradeRules.effect(if profile then profile.sandboxUpgrades else nil, "idleShare")
+	return math.clamp(Config.Collection.IdleShare + extra, 0, 1)
+end
+
 -- 8.3: the player's warehouse level (1 … 5: their ZDC Warehouse upgrade; no save yet: the garage): whose stands are
 -- big and small (WarehouseLayout.fits, count).
 local function levelOf(player: Player): number
@@ -230,9 +264,11 @@ local function fitsFor(player: Player): (number, string) -> boolean
 	end
 end
 
--- 8.1: the player's income × (their Showroom lights).
-local function boostOf(player: Player): number
-	return Rules.boost(PlayerData.get(player))
+-- 8.1: the player's income × (their Showroom lights). 10.4: their hall's Bonus (the Hall spotlights, the room sets of
+-- what stands in the hall now, the Collector's corner on an Epic or Legendary piece).
+local function boostOf(player: Player): Rules.Bonus
+	local profile = PlayerData.get(player)
+	return Rules.bonus(profile, if profile then profile.collection.entries else nil)
 end
 
 -- 8.3: the player's market now (today's hot and cold kinds, their demand; nil: no save yet).
@@ -261,8 +297,13 @@ local function isStand(stand: any, count: number): boolean
 	return finite(stand) and stand == math.floor(stand) and stand >= 1 and stand <= count
 end
 
--- What the pieces on show earn a minute (only on the stands the warehouse has; 8.1: × the lights; 8.3: × the market's)
--- and how much of it the hot kinds earn.
+-- 10.4: one of the player's stands (the hall's 1 … standsOf, the showroom's Base + 1 … Base + showOf)?
+local function isOpen(player: Player, stand: any): boolean
+	return Rules.open(PlayerData.get(player), stand)
+end
+
+-- What the pieces on show earn a minute (only on the stands the warehouse has; 8.1: × the lights; 8.3: × the market's;
+-- 10.4: only the hall's, × its Bonus) and how much of it the hot kinds earn.
 local function rate(player: Player, collection: Rules.Saved): (number, number)
 	local housed = Collection.hasWarehouse
 	if housed and not housed(player) then
@@ -274,7 +315,7 @@ local function rate(player: Player, collection: Rules.Saved): (number, number)
 	local total, hot = 0, 0
 	for _, entry in collection.entries do
 		local stand = entry.stand
-		if stand ~= nil and stand >= 1 and stand <= stands then
+		if stand ~= nil and stand >= 1 and stand <= stands then -- (10.4: a showroom number is past every hall stand)
 			local earns = Rules.income(entry, boost, market)
 			total += earns
 			if Market.tag(market, entry.item) == "hot" then
@@ -299,7 +340,7 @@ local function settle(player: Player)
 	-- 8.3 economy, AFK: the stretch of it past IdleAfter without activity counts at IdleShare
 	local C = Config.Collection
 	local idle = math.clamp(now - (meter.active + C.IdleAfter), 0, seconds)
-	local counted = seconds - idle + idle * math.clamp(C.IdleShare, 0, 1)
+	local counted = seconds - idle + idle * idleShareOf(player) -- (10.4: + the tree's Night watchman)
 	meter.carry += total * counted / 60
 	meter.hot += hot * counted / 60
 end
@@ -308,7 +349,7 @@ end
 local function shareOf(player: Player): number
 	local meter = meters[player]
 	local C = Config.Collection
-	return if meter and os.clock() - meter.active >= C.IdleAfter then math.clamp(C.IdleShare, 0, 1) else 1
+	return if meter and os.clock() - meter.active >= C.IdleAfter then idleShareOf(player) else 1
 end
 
 -- Pays the whole dollars counted (the cents stay for the next payout).
@@ -336,8 +377,9 @@ local function sendState(player: Player)
 	local stock = table.create(#collection.entries)
 	local boost = boostOf(player)
 	local market = marketOf(player)
+	local show = showFactorOf(player)
 	for _, entry in collection.entries do
-		table.insert(stock, Rules.view(entry, boost, market))
+		table.insert(stock, Rules.view(entry, boost, market, show))
 	end
 	local profile = PlayerData.get(player)
 	local wait: number? = if profile then Market.nextChange(profile.market, marketDay, os.time()) else nil
@@ -350,7 +392,17 @@ local function sendState(player: Player)
 	if meter then
 		meter.idle = share < 1
 	end
-	remote:FireClient(player, { kind = "state", stock = stock, income = cents((rate(player, collection))), stands = standsOf(player), market = market, idle = if share < 1 then share else nil })
+	remote:FireClient(player, {
+		kind = "state",
+		stock = stock,
+		income = cents((rate(player, collection))),
+		stands = standsOf(player),
+		market = market,
+		idle = if share < 1 then share else nil,
+		showStands = showOf(player), -- 10.4: the showroom's stands (Base + 1 … Base + showStands)
+		showBase = Rules.ShowBase,
+		sets = boost.sets, -- 10.4: the room sets in the hall (the tree's Room sets)
+	})
 end
 
 -- The state goes out once at the frame's end, however many changes it had (a van unloaded: one push).
@@ -480,8 +532,8 @@ function Collection.display(player: Player, uid: string, stand: number): (boolea
 	if housed and not housed(player) then
 		return false, NO_WAREHOUSE
 	end
-	if not isStand(stand, standsOf(player)) then
-		return false, "There's no such display stand."
+	if not isOpen(player, stand) then
+		return false, if Rules.isShow(stand) then "There's no such showroom stand: the upgrade tree's Showroom stands add more." else "There's no such display stand."
 	end
 	if entry.stand == stand then
 		return true, nil
@@ -489,6 +541,9 @@ function Collection.display(player: Player, uid: string, stand: number): (boolea
 	local def = Rules.defOf(entry.item)
 	local level = levelOf(player)
 	if def and not WarehouseLayout.fits(stand, def.size, level) then
+		if Rules.isShow(stand) then
+			return false, `Your {entry.name} is too big for showroom stand {stand - Rules.ShowBase}: put it in the hall.`
+		end
 		return false, `Your {entry.name} is too big for small stand {stand}: show it on stands 1 – {WarehouseLayout.count(level)}.`
 	end
 	for _, other in collection.entries do
@@ -498,9 +553,83 @@ function Collection.display(player: Player, uid: string, stand: number): (boolea
 	end
 	settle(player)
 	entry.stand = stand
+	if not Rules.isShow(stand) then
+		entry.sale = nil -- (10.4: a FOR SALE sign is the showroom's: into the hall it comes down)
+	end
 	PlayerData.track("event", player, "CollectionDisplayed", math.floor(Rules.income(entry, boostOf(player), marketOf(player)) + 0.5), Rules.pieceRarity(entry))
 	changed(player)
 	return true, nil
+end
+
+-- 10.4: the free stand of an area ("hall" or "show") a piece of `item` goes on: the first that fits, the small ones
+-- before the big ones in the hall (the big stay for the big pieces); nil, why: none free or none it fits.
+local function freeStand(player: Player, collection: Rules.Saved, area: string, item: string, except: string?): (number?, string?)
+	local taken: { [number]: boolean } = {}
+	for _, other in collection.entries do
+		if other.stand ~= nil and other.uid ~= except then
+			taken[other.stand] = true
+		end
+	end
+	local level = levelOf(player)
+	local def = Rules.defOf(item)
+	local numbers: { number } = {}
+	if area == "show" then
+		for k = 1, showOf(player) do
+			table.insert(numbers, Rules.ShowBase + k)
+		end
+	else
+		local stands = standsOf(player)
+		local big = math.min(stands, WarehouseLayout.count(level))
+		for i = big + 1, stands do -- (the small ones first)
+			table.insert(numbers, i)
+		end
+		for i = 1, big do
+			table.insert(numbers, i)
+		end
+	end
+	local any = false
+	for _, stand in numbers do
+		if not taken[stand] then
+			any = true
+			if def == nil or WarehouseLayout.fits(stand, def.size, level) then
+				return stand, nil
+			end
+		end
+	end
+	if area == "show" then
+		if #numbers == 0 then
+			return nil, "Your warehouse has no showroom stand yet."
+		end
+		return nil, if any then "It's too big for your showroom's stands: put it in the hall." else "Every showroom stand already shows a piece: take one down or sell it first."
+	end
+	return nil, if any then "It's too big for your free hall stands." else "Every hall stand already shows a piece: take one down first."
+end
+
+function Collection.place(player: Player, uid: string, area: any): (boolean, string?, number?)
+	local collection = collectionOf(player)
+	if not collection then
+		return false, "Your save isn't loaded yet.", nil
+	end
+	if area ~= "hall" and area ~= "show" then
+		return false, "Put it in the hall or show it for sale.", nil
+	end
+	local entry = find(collection, uid)
+	if not entry then
+		return false, "That piece isn't in your stock.", nil
+	end
+	local housed = Collection.hasWarehouse
+	if housed and not housed(player) then
+		return false, NO_WAREHOUSE, nil
+	end
+	if Rules.area(entry.stand) == area then
+		return true, nil, entry.stand
+	end
+	local stand, why = freeStand(player, collection, area, entry.item, entry.uid)
+	if not stand then
+		return false, why, nil
+	end
+	local ok, refused = Collection.display(player, entry.uid, stand)
+	return ok, refused, if ok then stand else nil
 end
 
 function Collection.undisplay(player: Player, uid: string): (boolean, string?)
@@ -533,7 +662,7 @@ function Collection.sell(player: Player, uid: string, expect: number?): (number?
 		return nil, "That piece isn't in your stock."
 	end
 	local market = marketOf(player)
-	local price = Rules.sell(entry, market) -- (8.3: the market's price)
+	local price = Rules.sell(entry, market, showFactorOf(player)) -- (8.3: the market's price; 10.4 × the showroom's)
 	if expect ~= nil and price < expect then -- (8.3 review: only a price that fell: one that rose is paid, never refused)
 		sendState(player) -- (8.3: the prices moved since the client asked: it sees them now)
 		return nil, `The market moved: your {entry.name} sells for {Market.money(price)} now.`
@@ -592,8 +721,8 @@ function Collection.setSale(player: Player, uid: string, price: number?): (boole
 	if price ~= nil and Rules.saleOf(price) == nil then
 		return false, "That's no price."
 	end
-	if price ~= nil and entry.stand == nil then
-		return false, `Put your {entry.name} on show first: a FOR SALE sign stands on its stand.`
+	if price ~= nil and not Rules.isShow(entry.stand) then
+		return false, `Show your {entry.name} for sale first: a FOR SALE sign stands in the showroom.`
 	end
 	if entry.sale == price then
 		return true, nil
@@ -634,7 +763,7 @@ function Collection.transfer(seller: Player, buyer: Player, uid: string, stand: 
 		return refusal("gone", "That piece isn't on show any more.")
 	end
 	local entry, index = find(from, uid)
-	if not entry or not index or entry.stand == nil or entry.stand ~= stand then
+	if not entry or not index or entry.stand == nil or entry.stand ~= stand or not Rules.isShow(stand) then -- (10.4: the showroom's only)
 		return refusal("gone", "That piece isn't on show there any more.")
 	end
 	if #to.entries >= Config.Collection.MaxStock then
@@ -710,7 +839,23 @@ function Collection.stands(player: Player): number
 end
 
 function Collection.boost(player: Player): number
+	return boostOf(player).all
+end
+
+function Collection.bonus(player: Player): Rules.Bonus
 	return boostOf(player)
+end
+
+function Collection.showStands(player: Player): number
+	return showOf(player)
+end
+
+function Collection.showFactor(player: Player): number
+	return showFactorOf(player)
+end
+
+function Collection.isOpen(player: Player, stand: number): boolean
+	return isOpen(player, stand)
 end
 
 function Collection.market(player: Player): Market.View?
@@ -725,13 +870,13 @@ function Collection.upgrade(player: Player, apply: () -> ()): number
 	settle(player) -- (what the stands earned up to now, at the old rates)
 	apply()
 	local collection = collectionOf(player)
-	local moved = if collection then Rules.fitStands(collection, standsOf(player), fitsFor(player)) else 0
+	local moved = if collection then Rules.fitStands(collection, standsOf(player), fitsFor(player), showOf(player)) else 0
 	changed(player)
 	return moved
 end
 
 function Collection.openPicker(player: Player, stand: number)
-	if not collectionOf(player) or not isStand(stand, standsOf(player)) then
+	if not collectionOf(player) or not isOpen(player, stand) then
 		return
 	end
 	sendState(player) -- (the picker lists the stock as it is now)
@@ -1042,7 +1187,7 @@ local function joined(player: Player)
 		return
 	end
 	meters[player] = { at = os.clock(), carry = 0, hot = 0, active = os.clock(), idle = false, pos = nil }
-	Rules.fitStands(collection, standsOf(player), fitsFor(player))
+	Rules.fitStands(collection, standsOf(player), fitsFor(player), showOf(player))
 	changed(player)
 end
 
@@ -1075,6 +1220,12 @@ local function onRemote(player: Player, message: any)
 		ok, why = Collection.display(player, message.uid, message.stand)
 	elseif kind == "undisplay" then
 		ok, why = Collection.undisplay(player, message.uid)
+	elseif kind == "place" then -- 10.4: PUT IN THE HALL / SHOW FOR SALE (the first free stand of that area)
+		local stand: number? = nil
+		ok, why, stand = Collection.place(player, message.uid, message.area)
+		if ok and stand then
+			remote:FireClient(player, { kind = "placed", uid = message.uid, area = Rules.area(stand), stand = stand })
+		end
 	elseif kind == "sell" then
 		local money: number? = nil
 		money, why = Collection.sell(player, message.uid, expected(message.expect))

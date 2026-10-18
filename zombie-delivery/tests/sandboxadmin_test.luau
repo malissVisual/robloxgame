@@ -167,15 +167,13 @@ check("Config.Warehouse.Stands: a count, a list, or none", SandboxAdmin.standCou
 -- SHOW ZONES ---------------------------------------------------------------------------------------------------------
 
 local zones = SandboxAdmin.zones()
-local pads, curbs = 0, 0
+local plays, curbs = 0, 0
 local off2: { string } = {}
 for _, zone in zones do
-	if zone.kind == "pad" then
-		pads += 1
-		local portal = SandboxMap.Lobby.portals[pads]
-		local pad = portal and portal.pad
-		if zone.shape ~= "box" or not pad or zone.x ~= (pad.x0 + pad.x1) / 2 or zone.z ~= (pad.z0 + pad.z1) / 2 or zone.sx ~= pad.x1 - pad.x0
-			or not string.find(zone.label, string.upper(portal.name), 1, true) then
+	if zone.kind == "play" then
+		plays += 1
+		local play = SandboxMap.Lobby.play
+		if zone.shape ~= "circle" or zone.x ~= play.x or zone.z ~= play.z or zone.r ~= play.r or not string.find(zone.label, "PLAY", 1, true) then
 			table.insert(off2, zone.label)
 		end
 	elseif zone.kind == "curb" then
@@ -189,10 +187,10 @@ for _, zone in zones do
 		end
 	end
 end
-check("SHOW ZONES: 9.7 every portal's pad (six, each named), every place's curb at its spot (six, each named)", pads == #SandboxMap.Lobby.portals
+check("SHOW ZONES: 10.4 the PLAY circle (a circle, its radius), every place's curb at its spot (six, each named)", plays == 1
 	and curbs == #SandboxMap.Houses and curbs == 6 and #off2 == 0, table.concat(off2, ", "))
-check("…the farmstead's says its van's nose is north, the Pond Cabin's east", string.find(zones[#SandboxMap.Lobby.portals + 1].label, "nose north", 1, true) ~= nil
-	and string.find(zones[#SandboxMap.Lobby.portals + 2].label, "nose east", 1, true) ~= nil, zones[#SandboxMap.Lobby.portals + 2].label)
+check("…the farmstead's says its van's nose is north, the Pond Cabin's east", string.find(zones[2].label, "nose north", 1, true) ~= nil
+	and string.find(zones[3].label, "nose east", 1, true) ~= nil, zones[3].label)
 
 -- The rate limit -----------------------------------------------------------------------------------------------------
 

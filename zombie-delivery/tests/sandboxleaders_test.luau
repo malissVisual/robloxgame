@@ -193,8 +193,10 @@ end
 do
 	local own = SandboxMap.Lobby.shops.leaders.spot
 	local plaza = SandboxMap.Lobby.plaza
-	check("9.7: the spot: the lobby's (SandboxMap.Lobby.shops.leaders), just west of its plaza", spot.x == own.x and spot.z == own.z and spot.yaw == own.yaw
-		and SandboxMap.inLobby(spot.x, spot.z) and spot.x < plaza.x0 and plaza.x0 - spot.x < 60 and spot.z > plaza.z0 and spot.z < plaza.z1, `{spot.x}, {spot.z}`)
+	local play = SandboxMap.Lobby.play
+	check("9.7: the spot: the lobby's (SandboxMap.Lobby.shops.leaders); 10.4 on the plaza west of the PLAY circle, a few seconds from it", spot.x == own.x and spot.z == own.z
+		and spot.yaw == own.yaw and SandboxMap.inLobby(spot.x, spot.z) and spot.x > plaza.x0 and spot.x < play.x - play.r and spot.z > plaza.z0 and spot.z < plaza.z1
+		and math.sqrt((spot.x - play.x) ^ 2 + (spot.z - play.z) ^ 2) / Config.Movement.Walk < 10, `{spot.x}, {spot.z}`)
 	local lx, lz = Rules.look(spot)
 	local cx, cz = SandboxMap.Lobby.spawn.x, SandboxMap.Lobby.spawn.z
 	local tx, tz = cx - spot.x, cz - spot.z
@@ -218,10 +220,8 @@ do
 	for _, plot in SandboxMap.Plots do
 		table.insert(keep, { name = `plot {plot.id}`, rect = plot.rect, by = C.Plot })
 	end
-	for _, portal in L.portals do
-		table.insert(keep, { name = `{portal.house}'s portal`, rect = portal.foot, by = margin })
-		table.insert(keep, { name = `{portal.house}'s pad`, rect = portal.pad, by = margin })
-	end
+	local play = L.play -- (10.4: the PLAY circle, and room round it to walk in)
+	table.insert(keep, { name = "the PLAY circle", rect = { x0 = play.x - play.r, x1 = play.x + play.r, z0 = play.z - play.r, z1 = play.z + play.r }, by = margin })
 	local d = L.dispatch
 	table.insert(keep, { name = "the dispatch", rect = { x0 = d.x - 4, x1 = d.x + 4, z0 = d.z - 3, z1 = d.z + 3 }, by = margin })
 	table.insert(keep, { name = "the paint shop", rect = L.shops.paint.rect, by = margin })
@@ -252,7 +252,7 @@ do
 			why = `on a mound at {x}, {z}`
 		end
 	end
-	check("the board's footprint: inside the lobby's hedge, clear of the plots, the portals and their pads, the dispatch, the paint shop, the Auction House, the plaza, the lamps and the trees, on flat meadow", why == nil, why)
+	check("the board's footprint: inside the lobby's hedge, clear of the plots, the PLAY circle, the dispatch, the paint shop, the Auction House, the plaza, the lamps and the trees, on flat meadow", why == nil, why)
 	check("…and it stands on the meadow's top", spot.y == SandboxMap.GroundTop)
 end
 
@@ -288,7 +288,7 @@ do
 	local hit: string? = nil
 	local seen = 0
 	for _, d in world:GetDescendants() do
-		if d:IsA("BasePart") and d.Name ~= "Meadow" and d.Name ~= "Mound" then
+		if d:IsA("BasePart") and d.Name ~= "Meadow" and d.Name ~= "Mound" and d.Name ~= "Plaza" then -- (10.4: it stands on the plaza's paving)
 			seen += 1
 			local size = d.Size
 			local x, _, z, r00, r01, r02, _, _, _, r20, r21, r22 = d.CFrame:GetComponents()
@@ -299,7 +299,7 @@ do
 			end
 		end
 	end
-	check(`nothing the map builds stands within 1.5 studs of the board's footprint, only meadow under it ({seen} parts looked at)`, hit == nil and seen > 300, hit)
+	check(`nothing the map builds stands within 1.5 studs of the board's footprint, only meadow or the plaza's paving under it ({seen} parts looked at)`, hit == nil and seen > 300, hit)
 end
 
 if failures == 0 then

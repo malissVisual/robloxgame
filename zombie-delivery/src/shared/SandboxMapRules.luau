@@ -3,8 +3,8 @@
 -- and its corner minimap, the pure part (no Roblox: tests/sandboxmaprules_test.luau). client/SandboxMapData.luau reads
 -- the world with it, client/SandboxMapDraw.luau draws with it, client/SandboxMapUi.luau (the big map) and
 -- client/SandboxMiniMap.luau (the minimap) lay themselves out with it; server/HouseInterior.luau publishes a run's
--- floor plan with it (the interior model's attribute MapPlan) and server/Runs.luau its portals' state (the portal
--- models' attributes: RunState, RunEndsAt, RunWho, RunDifficulty).
+-- floor plan with it (the interior model's attribute MapPlan); 10.4 server/Parties.luau publishes the PLAY circle's
+-- lobbies and the runs (the PLAY circle model's attribute Config.Runs.Party.Attribute: shared/PartyRules.luau's entries).
 --
 --   The plan's code (one short string on the interior model, written once per interior):
 --     SandboxMapRules.encode(plan, origin) -> string    a shared/HouseLayout.luau plan (its box, rooms, doorways, the
@@ -40,11 +40,20 @@
 --     SandboxMapRules.pulses(rarity, state) -> bool    an uncarried piece of Epic and up (on the floor, not in hands)
 --     SandboxMapRules.rank(rarity) -> n                its tier's rank (Config.Collection; unknown: 1)
 --   Words:
---     SandboxMapRules.portal(state, endsAt, now, who, difficulty, form?) -> (line, tone)   a portal's state line
---                                                      ("FREE · WALK ONTO THE PAD", "STARTING IN 7 · Ann, Bob", "IN USE ·
---                                                      HARD · Ann"; form "row", a narrow column's: "FREE" for the first;
---                                                      "short", a small map's: "FREE", "STARTING IN 7", "IN USE · HARD")
---                                                      and its tone ("free" | "wait" | "use")
+--     SandboxMapRules.lobbyLine(entry) -> (top, bottom, tone)   10.4: a row of the OPEN LOBBIES list (a PartyRules
+--                                                      entry): "ANN · THE OLD MILL" over "NORMAL · 2/4 · FRIENDS ONLY"
+--                                                      (tone "open"; full: "… · FULL", "full"), "STARTING · HARD · 3/4"
+--                                                      ("starting"); a run: "THE POND CABIN" over "IN A RUN · HARD · Bob,
+--                                                      Cid" ("run")
+--     SandboxMapRules.playLine(entries) -> (line, tone)   10.4: the PLAY circle's line on the map: "STARTING"
+--                                                      ("starting"), "2 OPEN LOBBIES" ("open"), "STEP IN" ("free")
+--     SandboxMapRules.roundLine(round, now) -> (top, bottom, tone)   10.6 both in PLAY: the side column's QUICK ROUND row
+--                                                      (`round`: client/SandboxMapData.luau's, the PLAY circle's Round…
+--                                                      attributes; `now` the server's time): "⚡ THE OLD MILL" over "NEXT ·
+--                                                      HARD · 0:42 · 3 QUEUED" ("starting"), the round on ("ON · 3:12
+--                                                      LEFT · 5 MOVERS", "run"), over ("full"), nobody queued ("⚡ QUICK
+--                                                      ROUND" over "NOBODY QUEUED · STEP INTO PLAY", "free"); nil: none
+--                                                      ("off")
 --     SandboxMapRules.names(list, most) -> string      "Ann, Bob +2"
 --     SandboxMapRules.clock(seconds) -> "m:ss"
 --   Layout (px under Roblox's top bar):
@@ -448,27 +457,76 @@ function SandboxMapRules.clock(seconds: number): string
 	return string.format("%d:%02d", s // 60, s % 60)
 end
 
-function SandboxMapRules.portal(state: any, endsAt: any, now: number, who: any, difficulty: any, form: string?): (string, string)
-	-- (form: "long", the default; "row": FREE without how to start; "short": no names either)
-	local people = if type(who) == "string" and who ~= "" and form ~= "short" then who else nil
-	if form ~= nil and form ~= "long" and state ~= "use" and state ~= "wait" then
-		return "FREE", "free"
-	end
-	if state == "use" then
-		local name = if type(difficulty) == "string" and difficulty ~= "" then string.upper(difficulty) else nil
-		local parts = { "IN USE" }
-		if name then
-			table.insert(parts, name)
+-- 10.4: a difficulty's name in capitals (an unknown one: the default's)
+local function difficultyName(id: any): string
+	for _, def in Config.Runs.Difficulties do
+		if def.id == id then
+			return string.upper(def.name)
 		end
-		if people then
-			table.insert(parts, people)
-		end
-		return table.concat(parts, " · "), "use"
-	elseif state == "wait" then
-		local left = if finite(endsAt) then math.max(0, math.ceil(endsAt - now)) else 0
-		return `STARTING IN {left}{if people then " · " .. people else ""}`, "wait"
 	end
-	return "FREE · WALK ONTO THE PAD", "free"
+	for _, def in Config.Runs.Difficulties do
+		if def.id == Config.Runs.Default then
+			return string.upper(def.name)
+		end
+	end
+	return "NORMAL"
+end
+
+function SandboxMapRules.lobbyLine(entry: any): (string, string, string)
+	if type(entry) ~= "table" then
+		return "", "", "open"
+	end
+	local house = SandboxMap.house(entry.house)
+	local place = string.upper(if house then house.name else tostring(entry.house or "?"))
+	local difficulty = difficultyName(entry.difficulty)
+	if entry.state == "run" then
+		local who = if type(entry.who) == "string" and entry.who ~= "" then ` · {entry.who}` else ""
+		return place, `IN A RUN · {difficulty}{who}`, "run"
+	end
+	local n = tonumber(entry.n) or 0
+	local most = tonumber(entry.max) or Config.Runs.MaxParty
+	local top = `{string.upper(tostring(entry.host or "?"))} · {place}`
+	if entry.state == "starting" then
+		return top, `STARTING · {difficulty} · {n}/{most}`, "starting"
+	end
+	local full = entry.state == "full"
+	return top, `{difficulty} · {n}/{most}{if entry.friends == true then " · FRIENDS ONLY" else ""}{if full then " · FULL" else ""}`, if full then "full" else "open"
+end
+
+function SandboxMapRules.roundLine(round: any, now: number): (string, string, string)
+	if type(round) ~= "table" or type(round.phase) ~= "string" or round.phase == "off" then
+		return "", "", "off"
+	end
+	local house = SandboxMap.house(round.house)
+	local top = if house then `⚡ {string.upper(house.name)}` else "⚡ QUICK ROUND"
+	local queued = `{math.max(0, math.floor(tonumber(round.queued) or 0))} QUEUED`
+	local left = if type(round.endsAt) == "number" then SandboxMapRules.clock(round.endsAt - now) else "–:––"
+	if round.phase == "wait" and house then
+		return top, `NEXT · {difficultyName(round.difficulty)} · {left} · {queued}`, "starting"
+	elseif round.phase == "wait" then
+		return top, `WAITING FOR A FREE HOUSE · {queued}`, "starting"
+	elseif round.phase == "play" then
+		return top, `ON · {left} LEFT · {math.max(0, math.floor(tonumber(round.movers) or 0))} MOVERS`, "run"
+	elseif round.phase == "over" then
+		return top, `OVER · THE NEXT ONE IS COMING`, "full"
+	end
+	return "⚡ QUICK ROUND", "NOBODY QUEUED · STEP INTO PLAY", "free"
+end
+
+function SandboxMapRules.playLine(entries: { any }): (string, string)
+	local open, starting = 0, false
+	for _, e in entries do
+		if type(e) == "table" and e.state ~= "run" then
+			open += 1
+			starting = starting or e.state == "starting"
+		end
+	end
+	if starting then
+		return "STARTING", "starting"
+	elseif open > 0 then
+		return `{open} OPEN LOBB{if open == 1 then "Y" else "IES"}`, "open"
+	end
+	return "STEP IN", "free"
 end
 
 -- ── Layout ───────────────────────────────────────────────────────────────────

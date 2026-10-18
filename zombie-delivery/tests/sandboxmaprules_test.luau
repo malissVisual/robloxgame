@@ -6,7 +6,7 @@
 -- frame (the door at 0, 0, out of it is -Z, the truck's curb straight out in front, its asphalt in the strip, pinned to
 -- the strip's edge); the frames (the lobby fitted into a phone's and a big screen's map, north up, east right; a house
 -- with its front door at the bottom, never a mirror image; following you; a ▲'s heading); the fog's rules (seen within
--- See studs with nothing between, shown until carried out, Epic and up pulse while loose); the portal's words; the
+-- See studs with nothing between, shown until carried out, Epic and up pulse while loose); 10.4 the lobbies' words; the
 -- window's layout on phones and computers; the minimap's corner kept clear of the HUD, shrunk, else none; the sandbox
 -- houses' plan kinds all different (the client finds a run's inside by its kind); SandboxPad's "map" action (M, L2, a
 -- tap). Run with tests/run_tests.py.
@@ -207,7 +207,7 @@ do
 	local sx, sy = Rules.toMap(f, 1800, 150)
 	local ex, ey = Rules.toMap(f, 2000, 0)
 	local wx, wy = Rules.toMap(f, 1600, 0)
-	check("… north up, east right (the plots at the top, the Orchard Cottage's portal at the right)", ny < sy and ex > wx and near(nx, sx) and near(ey, wy))
+	check("… north up, east right (the plots at the top, the PAINT shop right of the PLAY circle)", ny < sy and ex > wx and near(nx, sx) and near(ey, wy))
 	check("… a ▲'s heading: north 0°, east 90°, south 180°, west -90°", near(Rules.heading(f, 0, -1), 0, 1e-6) and near(Rules.heading(f, 1, 0), 90, 1e-6)
 		and near(math.abs(Rules.heading(f, 0, 1)), 180, 1e-6) and near(Rules.heading(f, -1, 0), -90, 1e-6))
 	local plan = Rules.decode(Rules.encode(HouseLayout.plan(9, "house"), { x = 0, y = 0, z = 0, yaw = 0 })) :: Rules.Plan
@@ -246,21 +246,42 @@ end
 -- ── Words ────────────────────────────────────────────────────────────────────
 
 do
-	local line, tone = Rules.portal("free", nil, 100, nil, nil)
-	check("a free portal: FREE · WALK ONTO THE PAD", line == "FREE · WALK ONTO THE PAD" and tone == "free")
-	line, tone = Rules.portal("wait", 106.2, 100, "Ann, Bob", "Normal")
-	check("… counting down, who is on the pad: STARTING IN 7 · Ann, Bob", line == "STARTING IN 7 · Ann, Bob" and tone == "wait", line)
-	line = Rules.portal("wait", 90, 100, nil, nil)
-	check("… a countdown over: STARTING IN 0", line == "STARTING IN 0", line)
-	line, tone = Rules.portal("use", nil, 100, "Ann, Bob", "Hard")
-	check("… in a run: IN USE · HARD · Ann, Bob", line == "IN USE · HARD · Ann, Bob" and tone == "use", line)
-	check("… a run without words: IN USE; junk: free", Rules.portal("use", nil, 0, "", nil) == "IN USE" and select(2, Rules.portal("odd", nil, 0, nil, nil)) == "free")
-	check("… a narrow column's row: FREE alone, the rest as long", Rules.portal("free", nil, 0, nil, nil, "row") == "FREE"
-		and Rules.portal("wait", 106.2, 100, "Ann, Bob", nil, "row") == "STARTING IN 7 · Ann, Bob" and Rules.portal("use", nil, 0, "Ann", "Hard", "row") == "IN USE · HARD · Ann")
-	check("… a small map's short line: no names", Rules.portal("free", nil, 0, "Ann", nil, "short") == "FREE"
-		and Rules.portal("wait", 106.2, 100, "Ann, Bob", nil, "short") == "STARTING IN 7" and Rules.portal("use", nil, 0, "Ann", "Hard", "short") == "IN USE · HARD")
+	-- 10.4 the OPEN LOBBIES rows (PartyRules' entries: the PLAY circle's attribute)
+	local top, bottom, tone = Rules.lobbyLine({ host = "Ann", house = "old_mill", difficulty = "normal", n = 2, max = 4, friends = false, state = "open" })
+	check("an open lobby: ANN · THE OLD MILL over NORMAL · 2/4 (open)", top == "ANN · THE OLD MILL" and bottom == "NORMAL · 2/4" and tone == "open", `{top} / {bottom}`)
+	top, bottom, tone = Rules.lobbyLine({ host = "Bob", house = "pond_cabin", difficulty = "hard", n = 4, max = 4, friends = true, state = "full" })
+	check("… full, friends only: HARD · 4/4 · FRIENDS ONLY · FULL (full)", top == "BOB · THE POND CABIN" and bottom == "HARD · 4/4 · FRIENDS ONLY · FULL" and tone == "full", bottom)
+	top, bottom, tone = Rules.lobbyLine({ host = "Cid", house = "lone_house", difficulty = "insane", n = 3, max = 4, friends = false, state = "starting" })
+	check("… counting down: STARTING · INSANE · 3/4 (starting)", bottom == "STARTING · INSANE · 3/4" and tone == "starting", bottom)
+	top, bottom, tone = Rules.lobbyLine({ host = "Dee", house = "forest_lodge", difficulty = "nightmare", n = 2, max = 4, friends = false, state = "run", who = "Dee, Eve" })
+	check("a run: THE FOREST LODGE over IN A RUN · NIGHTMARE · Dee, Eve (run)", top == "THE FOREST LODGE" and bottom == "IN A RUN · NIGHTMARE · Dee, Eve" and tone == "run", bottom)
+	top, bottom = Rules.lobbyLine({ host = "Eve", house = "nowhere", difficulty = "odd", state = "open" })
+	check("… junk: an unknown house as it is, an unknown difficulty the default's, 0/4", top == "EVE · NOWHERE" and bottom == "NORMAL · 0/4", bottom)
+	check("… not a table: nothing", Rules.lobbyLine(nil) == "")
+	local line
+	line, tone = Rules.playLine({})
+	check("the PLAY circle's line: STEP IN (no lobby)", line == "STEP IN" and tone == "free")
+	line, tone = Rules.playLine({ { state = "open" }, { state = "full" }, { state = "run" } })
+	check("… 2 OPEN LOBBIES (a run is no lobby)", line == "2 OPEN LOBBIES" and tone == "open", line)
+	check("… 1 OPEN LOBBY", Rules.playLine({ { state = "open" } }) == "1 OPEN LOBBY")
+	line, tone = Rules.playLine({ { state = "open" }, { state = "starting" } })
+	check("… one counting down: STARTING", line == "STARTING" and tone == "starting")
 	check("names: the first few, +n for the rest", Rules.names({ "A", "B", "C", "D", "E" }, 3) == "A, B, C +2" and Rules.names({ "A" }, 3) == "A" and Rules.names({}, 3) == "")
 	check("the clock: m:ss", Rules.clock(463) == "7:43" and Rules.clock(59.6) == "1:00" and Rules.clock(-5) == "0:00")
+	-- 10.6 both in PLAY: the side column's QUICK ROUND row (the PLAY circle's Round… attributes)
+	top, bottom, tone = Rules.roundLine({ phase = "wait", house = "old_mill", difficulty = "hard", endsAt = 1042, queued = 3 }, 1000)
+	check("10.6 the QUICK ROUND row: ⚡ THE OLD MILL over NEXT · HARD · 0:42 · 3 QUEUED (starting)", top == "⚡ THE OLD MILL"
+		and bottom == "NEXT · HARD · 0:42 · 3 QUEUED" and tone == "starting", `{top} / {bottom}`)
+	top, bottom, tone = Rules.roundLine({ phase = "play", house = "pond_cabin", difficulty = "insane", endsAt = 1192, queued = 0, movers = 5 }, 1000)
+	check("… the round on: ON · 3:12 LEFT · 5 MOVERS (run)", top == "⚡ THE POND CABIN" and bottom == "ON · 3:12 LEFT · 5 MOVERS" and tone == "run", bottom)
+	top, bottom, tone = Rules.roundLine({ phase = "over", house = "pond_cabin", queued = 2, endsAt = 1009 }, 1000)
+	check("… over: the next one is coming (full)", string.find(bottom, "THE NEXT ONE IS COMING", 1, true) ~= nil and tone == "full", bottom)
+	top, bottom, tone = Rules.roundLine({ phase = "idle", queued = 0 }, 1000)
+	check("… nobody queued: STEP INTO PLAY (free)", top == "⚡ QUICK ROUND" and bottom == "NOBODY QUEUED · STEP INTO PLAY" and tone == "free", bottom)
+	top, bottom, tone = Rules.roundLine({ phase = "wait", queued = 4 }, 1000)
+	check("… no house free yet: WAITING FOR A FREE HOUSE", bottom == "WAITING FOR A FREE HOUSE · 4 QUEUED" and tone == "starting", bottom)
+	check("NEG. … none, the rounds off, junk: no row (off)", select(3, Rules.roundLine(nil, 0)) == "off" and select(3, Rules.roundLine({ phase = "off" }, 0)) == "off"
+		and select(3, Rules.roundLine(5, 0)) == "off")
 end
 
 -- ── Layout ───────────────────────────────────────────────────────────────────

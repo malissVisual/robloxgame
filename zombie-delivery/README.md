@@ -2,10 +2,13 @@
 
 > **8.0 SANDBOX (the game the owner tests now).** With `Config.Sandbox.On = true` (the default) the server builds a
 > test world instead of the city (`shared/SandboxMap.luau`, `server/SandboxWorld.luau`). **Since 10.0 a small lobby
-> like Dungeon Quest** (`design/lobby/`, `server/LobbyWorld.luau`: the plaza, the four warehouses, the shops and six
-> portals) from which a party goes into a house to empty at a chosen difficulty (`server/Runs.luau`, see the 10.0 note
-> below; its pieces wear their rarity's outline and stars; **since 10.5 one round for the whole server at a time instead,
-> everybody loading into their own van: the 10.5 note**); the houses stand in their own fenced run zones of the
+> like Dungeon Quest** (`design/lobby/`, `server/LobbyWorld.luau`: the plaza, the four warehouses, the shops and, since
+> 10.7, one PLAY circle where you make a party lobby) from which a party goes into a house to empty at a chosen
+> difficulty (`server/Runs.luau`, see the 10.0 note
+> below; its pieces wear their rarity's outline and stars; **since 10.7 the PLAY circle offers a QUICK ROUND too (10.5's
+> rounds with 10.6's snatching), one round at a time for everybody in its queue, each loading into their own van: the
+> 10.5 – 10.7 notes**); the houses stand in
+> their own fenced run zones of the
 > 9.0 countryside: since 9.0 **open countryside**
 > (`design/countryside/`; 8.9: the village of Jinočany, 8.0 – 8.8: an alpine meadow with one road) with **six places to
 > empty**, each on its own country lane (`SandboxMap.Houses`, a contract each in `Config.Moving.Sandbox.Houses`; every
@@ -403,6 +406,44 @@
 > keeps it or takes it (into their hands, protected for 3 s), the loser stands stunned 1.5 s, the round's feed tells
 > everybody ("🤼 Bob snatched … from Ann!", "💪 Ann held on to …"). A snatcher tries again only after 4 s; nobody loads
 > while in a tug or stunned; a piece carried in two can't be snatched.
+>
+> **10.7** (the owner: "make the map smaller, and on it just one circle where you stand, like PLAY, and you create a
+> lobby"; "a really huge and nice, well thought-out upgrade tree … and split the warehouse: an exhibition for selling,
+> and something for making money"). **One PLAY circle, party lobbies.** The lobby is smaller (456 × 226 studs: the four
+> warehouses along the north edge, the plaza in front of them) and in its middle one big glowing **PLAY** circle in
+> place of the six portals. Step into it and the PLAY panel opens (`client/PlayUi.luau`, `server/Parties.luau`,
+> `shared/PartyRules.luau`, `Config.Runs.Play`): CREATE A LOBBY (a house, greyed out while it is in a run or another
+> lobby holds it; a difficulty you have opened; public or friends only) or JOIN one of the open lobbies (host, house,
+> difficulty, n/4). In a lobby everybody presses READY; the host can change the house or the difficulty, kick, and
+> press START: 5 seconds, then the run (and the ride) as before. You can walk around while you wait (a bar at the top
+> opens the panel again); only LEAVE takes you out, and the lobby closes when its host leaves. After a run the party
+> lands beside the circle. The big map shows the circle and its OPEN LOBBIES and IN A RUN lists, and the guide says
+> "Step into PLAY to start a run". **The warehouse in two.** Every level has a **SHOWROOM** by the door (blue carpet,
+> its plinths S1, S2 …): what stands there is for sale (visitors look and make offers, VIP buyers pay more for the rare
+> ones, players buy it or make an offer, a FOR SALE sign), and it sells for more (× 1.2) but earns nothing a minute.
+> Behind it the **COLLECTION HALL** earns every minute and nothing in it is for sale (`Config.Showroom`,
+> `CollectionRules`, `WarehouseLayout`, `Collection.place`). The STOCK list and the picker say 🏛 HALL or 🏷 FOR SALE;
+> pieces already on stands stay in the hall. **The upgrade tree** at the UPGRADES desk (`client/UpgradeUi.luau`,
+> `shared/UpgradeRules.luau`, `Config.SandboxUpgrades`): the warehouse's five tiers as its trunk and branches for LOOKS
+> (fresh paint, a gold sign), the HALL (spotlights, night watchman, Collector's corner, room sets), the SHOWROOM
+> (stands, shop window, sales pitch, VIP buyers), RUNS (engine, overtime, spare keys, lucky finds) and the CREW (Danny,
+> pads & helmets, first aid, running shoes, good doctors); each node needs its parents and a warehouse tier; drag,
+> zoom, tap a node for its details and BUY, on a phone too. Old saves keep their levels (`upgradeTreeKept`).
+>
+> **10.7** (the owner: "Both in the PLAY circle"): **both in PLAY.** Step into the PLAY circle and the PLAY panel offers
+> two choices side by side (`client/PlayUi.luau`, `server/Parties.luau`). **QUICK ROUND** (the 10.5 rounds, with
+> 10.6's snatching: the Snatch prompts and the tugs work in every quick round): ⚡ JOIN THE QUEUE. Nobody is queued by
+> the start screen's PLAY any more, and while nobody is queued no round runs. The banner (`client/RoundUi.luau`, 10.6's
+> wider look, its words scaled to fit), the panel, the PLAY circle's sign and the big map's QUICK ROUND line name the
+> next round's place, its difficulty, the countdown and how many are queued (there are no portals); LEAVE QUEUE on the
+> banner or in the panel takes you out, and so does LEAVE THE ROUND; after a round you stay queued for the next one
+> (`Config.Rounds.Stay`). **PRIVATE LOBBY** (the party lobbies above): CREATE A LOBBY or JOIN one, READY, START, the
+> co-op run with Danny and the crew, the pieces' results card and the difficulty unlocks, as before. You are in the
+> queue or in a lobby, never both. One shared check keeps them apart (`RunRules.houseBusy`, `Runs.houseBusy`): the quick
+> round's place is busy for the lobbies from its countdown until everybody has ridden back (its house card says QUICK
+> ROUND), and the round picks a house no lobby run is in (and none a lobby holds while another is free:
+> `RoundRules.places`). `Config.Rounds.On = false` hides the QUICK ROUND (the lobbies only). The guide says "Step into
+> PLAY to start" (queued: "In the QUICK ROUND queue: the next round starts by itself"). No zombies anywhere.
 
 The active Roblox game in this repository (Merge Blades is preserved in `../archive/merge-blades`). **You run a delivery company** in a world
 gone wrong: take a job, carry the cargo to your vehicle with your own hands (or lead the horses on a rope), drive it

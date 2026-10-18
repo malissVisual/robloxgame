@@ -106,7 +106,19 @@ for _, id in SandboxHints.Ids do
 end
 
 -- ── 8.9: the 8.5 – 8.7 features ─────────────────────────────────────────────
-check("8.9: the new hints are ours (orders, visit, price, deal), after the 8.3 ones", table.concat(SandboxHints.Ids, ",") == "book,tasks,fill,orders,visit,price,deal")
+check("8.9: the new hints are ours (orders, visit, price, deal), after the 8.3 ones; 10.4 the lobby's last", table.concat(SandboxHints.Ids, ",") == "book,tasks,fill,orders,visit,price,deal,lobby")
+check("10.4 lobby: \"👥 In a lobby you can walk anywhere: only LEAVE takes you out.\" on every device", SandboxHints.text("lobby", "keys") == "👥 In a lobby you can walk anywhere: only LEAVE takes you out."
+	and SandboxHints.text("lobby", "pad") == SandboxHints.text("lobby", "keys") and SandboxHints.text("lobby", "touch") == SandboxHints.text("lobby", "keys"))
+do
+	local q = SandboxHints.new()
+	check("10.4 lobby: offered once, shown after Delay, never again", SandboxHints.offer(q, "lobby", 0) and SandboxHints.take(q, H.Delay, false) == "lobby"
+		and not SandboxHints.offer(q, "lobby", 100))
+	local q2 = SandboxHints.new()
+	SandboxHints.offer(q2, "lobby", 0)
+	check("…back in the circle (or out of the lobby) before its turn: dropped, not seen", SandboxHints.take(q2, H.Delay, false, function(id: string): boolean
+		return id ~= "lobby"
+	end) == nil and not SandboxHints.seen(q2, "lobby"))
+end
 check("8.9 Config: a look at your clipboard and where you stand at most every few seconds; the sign's hint from 3 pieces on show", H.Look > 0 and H.Look <= 3
 	and H.PriceShown == 3)
 check("8.9: trading between players is on (Config.PlayerTrade.On): the trade's hints may come", SandboxHints.tradeOn() == (Config.PlayerTrade.On == true) and SandboxHints.tradeOn())

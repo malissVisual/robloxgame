@@ -41,8 +41,8 @@
 --             farmstead's (SandboxWorld.walkIn: SandboxDoor, unseen, no collision; its two leaves; the walls less a dark
 --             hall behind it; the plinth, where it has one, no longer solid), its name on its mailbox.
 --             server/Moving.luau finds each house's FrontDoor by its model's SandboxHouse.
---   Lobby     9.7 runs (server/LobbyWorld.luau): the lobby's plaza, fountain, hedge, lamps, trees, the six house
---             portals and their pads, the ZDC dispatch kiosk and the PAINT shop (9.7: the street lamps and the signpost
+--   Lobby     9.7 runs (server/LobbyWorld.luau): the lobby's plaza, fountain, hedge, lamps, trees, 10.4 its PLAY
+--             circle, the Deliveros dispatch kiosk and the PAINT shop (9.7: the street lamps and the signpost
 --             are gone with Pražská)
 --   Village   9.4 the countryside (server/VillageWorld.luau): the places' surroundings, the trees, hedges, fences and
 --             the stream in Atomic chunks; the D5 in the Persistent model "Motorway", the railway in "Railway"; the far
@@ -92,7 +92,7 @@ local SandboxScenery = require(Shared.SandboxScenery)
 local VillageScenery = require(Shared.VillageScenery) -- 9.4: the places to empty in their looks
 
 local HouseMesh = require(script.Parent.HouseMesh) -- 8.1: the owner's Blender house (design/blender-house)
-local LobbyWorld = require(script.Parent.LobbyWorld) -- 9.7: the lobby's plaza, portals, dispatch and PAINT shop
+local LobbyWorld = require(script.Parent.LobbyWorld) -- 9.7: the lobby's plaza, dispatch and PAINT shop; 10.4 its PLAY circle
 local VillageWorld = require(script.Parent.VillageWorld) -- 9.4: the countryside, the D5, the railway and the far view
 
 local SandboxWorld = {}
@@ -807,7 +807,7 @@ function SandboxWorld.build(): Folder
 	ground(world)
 	roads(world)
 	house(world)
-	LobbyWorld.build(world) -- 9.7: the lobby (its plaza, portals, dispatch and PAINT shop)
+	LobbyWorld.build(world) -- 9.7: the lobby (its plaza, dispatch and PAINT shop; 10.4 its PLAY circle)
 	local village = VillageWorld.build(world) -- 9.4: the countryside, its fields and lawns, the D5, the railway, the far view
 	for _, placed in VillageScenery.houses() do -- (the five other places to empty, each in its look)
 		if SandboxWorld.villageHouse(world, placed) then

@@ -70,7 +70,8 @@ VISUAL = re.compile(r"^(Floor|WallBack|WallWest|WallEast|WallSlope(West|East)|Wa
                     r"Corner(Front|Back)(West|East)|DoorRail(West|East)|Bollard(West|East)|DoorCurtain|DoorBar|DoorHood|"
                     r"ZdcSign|Beam\d+|Post\d+(West|East)|Lamp\d+|LampGlow\d+)$")
 KEEP = re.compile(r"^(OwnerSign|StockBoard|UpgradeSign|Stand\d+|StandTop\d+|Plate\d+|Terminal\w+|Spot\d+\w*|"
-                  r"SpotText\d+|Receiving\w+|AisleLine\w+|Bay\w+)$")
+                  r"SpotText\d+|Receiving\w+|AisleLine\w+|Bay\w+|"
+                  r"ShowCarpet\d+|ShowFloorText\d+|HallFloorText\d+|(Show|Hall)Sign\d+(Wire(West|East))?)$")  # (10.4: the showroom and the hall)
 WALLS = ("WallBack", "WallWest", "WallEast", "WallFrontWest", "WallFrontEast", "Header")
 ROOFS = re.compile(r"^Roof(West|East)?$")
 # The model's roof itself (its underside is rebuilt exactly below): its export box is only a box round a turned slab.

@@ -4,6 +4,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## In progress
 <!-- who · task · files · since -->
+- Claude (integration branch) · 10.7: QUICK ROUND and PRIVATE LOBBY both in the PLAY circle (main's 10.6 snatching merged in: it works in the QUICK ROUND); touches Runs, Parties, PlayUi, RoundUi, RunUi · 18. 10. 2026
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->

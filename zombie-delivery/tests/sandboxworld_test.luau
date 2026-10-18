@@ -383,10 +383,9 @@ do
 	table.insert(areas, { name = "the path from the curb to the door", rect = { x0 = SandboxScenery.Path.x0, x1 = SandboxScenery.Path.x1, z0 = SandboxScenery.Path.z0, z1 = HOUSE.door.z - 0.01 } })
 	local d = HOUSE.door
 	table.insert(areas, { name = "the front door's way", rect = { x0 = d.x - 2.5, x1 = d.x + 2.5, z0 = d.z - 5, z1 = d.z - 0.01 } })
-	-- 9.7 runs: every portal's pad (a party stands there) and every zone's arrival spot (somebody lands there)
-	for _, portal in SandboxMap.Lobby.portals do
-		table.insert(areas, { name = `{portal.name}'s pad`, rect = portal.pad })
-	end
+	-- every zone's arrival spot (somebody lands there); 10.4 the PLAY circle (a party gathers there; 9.7: the portals'
+	-- pads): its own check below (a circle)
+	local play = SandboxMap.Lobby.play
 	for _, zone in SandboxMap.Zones do
 		local a = zone.arrive
 		table.insert(areas, { name = `{zone.id}'s arrival`, rect = { x0 = a.x - 6, x1 = a.x + 6, z0 = a.z - 6, z1 = a.z + 6 }, top = 8 })
@@ -430,7 +429,18 @@ do
 			end
 		end
 	end
-	check("nothing that collides on the yards, the plots, the path to the door, the doors' ways, 9.7 the portals' pads or the zones' arrival spots", blocked == nil and barrier == nil, blocked)
+	check("nothing that collides on the yards, the plots, the path to the door, the doors' ways or the zones' arrival spots", blocked == nil and barrier == nil, blocked)
+	local inPlay: string? = nil
+	for _, b in boxes do
+		if not b.far and b.part.CanCollide and b.y1 > GROUND + 0.05 and b.y0 < 14 then
+			local dx = math.max(b.x0 - play.x, 0, play.x - b.x1)
+			local dz = math.max(b.z0 - play.z, 0, play.z - b.z1)
+			if dx * dx + dz * dz < play.r * play.r then
+				inPlay = `{b.name} at {math.floor(b.x0)}, {math.floor(b.z0)}`
+			end
+		end
+	end
+	check("10.4 nothing that collides in the PLAY circle (its lit posts outside its ring): you walk in from every side", inPlay == nil, inPlay)
 	check("no floor (asphalt, shoulder, pad, meadow, lawn, field) rises over RoadTop", floorHigh == nil, floorHigh)
 	local pads = named("Pad")
 	local padOk = #pads == #SandboxMap.Plots

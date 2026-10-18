@@ -1,24 +1,22 @@
 --!strict
--- 9.7 RUNS, the client (server/Runs.luau decides everything; Config.Runs; the rules shared/RunRules.luau): the pad panel
--- while you stand on a portal's pad and the run's results card. Presentation only: the Runs remote asks.
---   * The pad panel (a computer's top centre under the HUD's top row; a touch screen's top right): the house's name, its countdown and how many go ("STARTING IN
---     7 S · 2/4"), who is on the pad in their order (the host first), and the difficulty: the host picks it on a row of
---     five buttons (the ones not open yet 🔒: a tap says how to open them; the one picked lit in its colour; the
---     Runs remote's { kind = "difficulty", id }), everybody else reads it ("NORMAL · Ann picks"). Gone when you step
---     off the pad or the run starts. On a phone at Config.Runs.Panel.TouchScale at least, its buttons a finger's size.
+-- 9.7 RUNS, the client (server/Runs.luau decides everything; Config.Runs; the rules shared/RunRules.luau): the run's
+-- results card; 10.4 the PLAY panel at the lobby's PLAY circle and the party lobby's bar (client/PlayUi.luau, started
+-- here: the six portals' pad panel is gone). Presentation only: the Runs and Party remotes ask.
 --   * The results card (the middle of the screen, over the game, until OK or ESC): how the run ended, the pieces that
 --     went home (each with its rarity's colour stripe and stars, ★ common … ★★★★★ legendary, its value and whose
 --     warehouse it went to; the best first, the rest in a list that scrolls), the total value, yours, a difficulty
 --     that opened ("🔓 HARD is open"). On a phone it fits the screen (the list scrolls). 10.x danger: a line for the
 --     run's danger when it had any (the result's `danger`, server/RunDanger.luau: "🗝 VAULT OPENED ✓ · 🧟 ZOMBIES
 --     STOPPED: 7"). 10.5 rounds (the result's `round`: its ranking, your place): ROUND OVER, your place ("🥇 YOU: 1ST
---     OF 6"), yours, and everybody's row in place of the pieces (place, name, pieces, value; yours lit).
---   RunUi.start()     the remote, the screen
---   RunUi.pad()       the pad you stand on now ({ house, mine, … }: the server's view) or nil (client/SandboxGuide.luau)
+--     OF 6"), yours, and everybody's row in place of the pieces (place, name, pieces, value; yours lit); a lobby run's
+--     card stays the pieces' (10.6: both start in the PLAY panel).
+--   RunUi.start()     the remote, the screen; 10.4 PlayUi.start
+--   RunUi.play()      10.4: the PLAY view now (client/PlayUi.luau's: { circle, lobby?, lobbies, houses, round, … }) or nil
+--   RunUi.lobby()     10.4: your party lobby now ({ house, mine, members, endsAt, … }) or nil (client/SandboxGuide.luau)
 --   RunUi.run()       the run you are in now ({ house, mine, … }) or nil
---   RunUi.isOpen()    the results card is open (it frees the mouse: Main's windowOpen)
---   RunUi.close()     closes the results card (ESC: Main's Hud.onCloseWindows)
---   RunUi.onOpen      set by Main: called when the card opens (one window at a time)
+--   RunUi.isOpen()    the results card or the PLAY panel is open (a window: it frees the mouse, Main's windowOpen)
+--   RunUi.close()     closes the results card and the PLAY panel (ESC: Main's Hud.onCloseWindows)
+--   RunUi.onOpen      set by Main: called when the card or the PLAY panel opens (one window at a time)
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -29,6 +27,7 @@ local Net = require(Shared.Net)
 local RunRules = require(Shared.RunRules)
 local Theme = require(script.Parent.Theme)
 local Ui = require(script.Parent.Ui)
+local PlayUi = require(script.Parent.PlayUi) -- 10.4: the PLAY panel and the lobby bar
 
 local RunUi = {}
 
@@ -37,17 +36,11 @@ local K = Theme.Contract
 local GOLD = Color3.fromRGB(255, 206, 92)
 local MONEY = Color3.fromRGB(140, 220, 120)
 local ROW = 30 -- px: a piece's row on the card
-local BUTTON = 56 -- px: a difficulty button's height (a finger's size at the touch scale)
-local OK = 56 -- px: the results card's OK (the same)
-local PANEL_TOP = 120 -- px: the pad panel's top on a computer (under the HUD's top row of chips and key hints)
+local OK = 56 -- px: the results card's OK (a finger's size at the touch scale)
 
-local remote: RemoteEvent? = nil
 local gui: ScreenGui? = nil
-local panel: Frame? = nil
 local card: Frame? = nil
-local padView: { [string]: any }? = nil
 local runView: { [string]: any }? = nil
-local padKey = ""
 
 RunUi.onOpen = nil :: (() -> ())?
 
@@ -58,7 +51,7 @@ end
 local function scaleNow(): number
 	local s = Ui.screenScale()
 	if Ui.touchLayout() then
-		s = math.max(s, R.Panel.TouchScale)
+		s = math.max(s, R.Result.TouchScale)
 	end
 	return math.min(s, 1)
 end
@@ -95,115 +88,6 @@ local function label(parent: Instance, name: string, text: string, size: UDim2, 
 	return made
 end
 
-local function send(message: { [string]: any })
-	local r = remote
-	if r then
-		r:FireServer(message)
-	end
-end
-
--- ── The pad panel ──────────────────────────────────────────────────────────
-
-local function closePanel()
-	if panel then
-		panel:Destroy()
-		panel = nil
-	end
-	padKey = ""
-end
-
-local function drawPanel(view: { [string]: any })
-	local root = screenGui()
-	if not root then
-		return
-	end
-	local key = `{view.house}|{view.left}|{view.hostName}|{view.difficulty}|{table.concat(view.party or {}, ",")}|{table.concat(view.open or {}, ",")}|{view.mine}`
-	if panel and key == padKey then
-		return
-	end
-	padKey = key
-	if panel then
-		panel:Destroy()
-	end
-	local W = math.max(R.Panel.Width, 420)
-	local mine = view.mine == true
-	local H = 12 + 24 + 20 + 34 + (if mine then BUTTON + 8 else 22) + 10
-	-- (a computer: the top centre under the HUD's top row, the guide's line stepping aside while the panel shows; a touch
-	-- screen: the top right, clear of the HUD's money and chips at the left and of the touch buttons under it)
-	local touch = Ui.touchLayout()
-	local frame = Ui.make("Frame", {
-		Name = "PadPanel",
-		Size = UDim2.fromOffset(W, H),
-		Position = if touch then UDim2.new(1, -16, 0, 8) else UDim2.new(0.5, 0, 0, PANEL_TOP),
-		AnchorPoint = if touch then Vector2.new(1, 0) else Vector2.new(0.5, 0),
-		BackgroundColor3 = K.charcoal,
-		BackgroundTransparency = 0.08,
-		BorderSizePixel = 0,
-	}, root)
-	Ui.make("UIScale", { Name = "Scale", Scale = scaleNow() }, frame)
-	Ui.corner(frame, 10)
-	Ui.stroke(frame, rgb(R.Portal.Waiting), 2)
-	panel = frame
-	label(frame, "Title", `🏡 {string.upper(tostring(view.name or ""))}`, UDim2.new(1, -24, 0, 24), { Position = UDim2.fromOffset(12, 10), Font = Theme.HeadingFont, TextSize = 18 })
-	local going = tonumber(view.going) or 0
-	label(frame, "Countdown", `STARTING IN {tonumber(view.left) or 0} S · {going}/{tonumber(view.max) or R.MaxParty} GOING`, UDim2.new(1, -24, 0, 18),
-		{ Position = UDim2.fromOffset(12, 36), Font = Theme.HeadingFont, TextSize = 14, TextColor3 = rgb(R.Portal.Waiting) })
-	local names = view.party or {}
-	local line = {}
-	for n, name in names do
-		table.insert(line, if n == 1 then `{name} (host)` elseif n > (tonumber(view.max) or R.MaxParty) then `{name} (waits)` else tostring(name))
-	end
-	label(frame, "Party", table.concat(line, " · "), UDim2.new(1, -24, 0, 30), { Position = UDim2.fromOffset(12, 56), TextSize = 12, TextColor3 = K.secondary, TextWrapped = true, TextYAlignment = Enum.TextYAlignment.Top })
-	local picked = RunRules.def(view.difficulty) or (RunRules.def(R.Default) :: Config.RunDifficulty)
-	if not mine then
-		label(frame, "Difficulty", `{string.upper(picked.name)} · {view.hostName} picks the difficulty`, UDim2.new(1, -24, 0, 18),
-			{ Position = UDim2.fromOffset(12, 90), Font = Theme.HeadingFont, TextSize = 13, TextColor3 = rgb(picked.color) })
-		return
-	end
-	local row = Ui.make("Frame", { Name = "Difficulties", Size = UDim2.new(1, -24, 0, BUTTON), Position = UDim2.fromOffset(12, 90), BackgroundTransparency = 1 }, frame)
-	local list = RunRules.list()
-	local gap = 4
-	local each = (W - 24 - gap * (#list - 1)) / #list
-	local open: { [string]: boolean } = {}
-	for _, id in view.open or {} do
-		open[id] = true
-	end
-	for n, def in list do
-		local isOpen = open[def.id] == true
-		local isPicked = def.id == picked.id
-		local button = Ui.make("TextButton", {
-			Name = `Difficulty_{def.id}`,
-			Text = if isOpen then string.upper(def.name) else `🔒 {string.upper(def.name)}`,
-			Size = UDim2.fromOffset(each, BUTTON),
-			Position = UDim2.fromOffset((n - 1) * (each + gap), 0),
-			BackgroundColor3 = if isPicked then rgb(def.color) else K.row,
-			BackgroundTransparency = if isOpen then 0 else 0.4,
-			AutoButtonColor = isOpen,
-			Font = Theme.HeadingFont,
-			TextSize = 11,
-			TextWrapped = not isOpen,
-			TextColor3 = if isPicked then K.charcoal elseif isOpen then rgb(def.color) else K.secondary,
-		}, row)
-		Ui.corner(button, 6)
-		button.Activated:Connect(function()
-			if isOpen then
-				send({ kind = "difficulty", id = def.id })
-			else
-				local before = list[n - 1]
-				local old = frame:FindFirstChild("Locked")
-				if old then
-					old:Destroy()
-				end
-				local toast = label(frame, "Locked", `🔒 Finish a run at {if before then string.upper(before.name) else "the one before"} to open {string.upper(def.name)}`,
-					UDim2.new(1, -24, 0, 16), { Position = UDim2.new(0, 12, 1, 4), TextSize = 12, TextColor3 = GOLD, TextWrapped = true })
-				task.delay(3, function()
-					toast:Destroy()
-				end)
-			end
-		end)
-	end
-end
-
 -- ── The results card ───────────────────────────────────────────────────────
 
 local HEAD: { [string]: string } = { done = "RUN COMPLETE", late = "TIME'S UP", cancelled = "RUN CALLED OFF", failed = "NOTHING CAME HOME" }
@@ -221,6 +105,7 @@ function RunUi.close()
 		card:Destroy()
 		card = nil
 	end
+	PlayUi.close() -- (10.4: the PLAY panel too; its bar stays)
 end
 
 -- 10.x danger: the results card's danger line (the result's `danger`: vault true / false / nil, stopped), nil none.
@@ -384,28 +269,21 @@ local function onMessage(message: any)
 		return
 	end
 	local kind = message.kind
-	if kind == "pad" then
-		if message.house == nil then
-			padView = nil
-			closePanel()
-		else
-			padView = message
-			drawPanel(message)
-		end
-	elseif kind == "run" then
+	if kind == "run" then
 		runView = if message.house ~= nil then message else nil
-		if runView then
-			padView = nil
-			closePanel()
-		end
 	elseif kind == "result" then
 		runView = nil
 		showResult(message)
 	end
 end
 
-function RunUi.pad(): { [string]: any }?
-	return padView
+function RunUi.play(): { [string]: any }?
+	return PlayUi.view()
+end
+
+function RunUi.lobby(): { [string]: any }?
+	local view = PlayUi.view()
+	return if view then view.lobby else nil
 end
 
 function RunUi.run(): { [string]: any }?
@@ -413,7 +291,7 @@ function RunUi.run(): { [string]: any }?
 end
 
 function RunUi.isOpen(): boolean
-	return card ~= nil
+	return card ~= nil or PlayUi.isOpen()
 end
 
 function RunUi.start()
@@ -421,22 +299,27 @@ function RunUi.start()
 		return
 	end
 	local r = Net.get("Runs")
-	remote = r
 	r.OnClientEvent:Connect(onMessage)
-	-- (a resize: the panel and the card at the new scale)
+	-- (a resize: the card at the new scale; the PLAY panel follows its own)
 	local camera = workspace.CurrentCamera
 	if camera then
 		camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
-			local S = scaleNow()
-			for _, frame in { panel, card } do
-				local scale = if frame then frame:FindFirstChild("Scale") else nil
-				if scale and scale:IsA("UIScale") then
-					scale.Scale = S
-				end
+			local open = card
+			local scale = if open then open:FindFirstChild("Scale") else nil
+			if scale and scale:IsA("UIScale") then
+				scale.Scale = scaleNow()
 			end
 		end)
 	end
 	r:FireServer({ kind = "state" })
+	-- 10.4 the PLAY panel (its window is this one: opening it closes the others)
+	PlayUi.onOpen = function()
+		local hook = RunUi.onOpen
+		if hook then
+			pcall(hook)
+		end
+	end
+	PlayUi.start()
 end
 
 return RunUi

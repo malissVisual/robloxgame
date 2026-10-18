@@ -23,6 +23,10 @@
 --   * Offers: once a visitor at most, at a stop, by its kind's chance, only while the owner is in the hall on foot
 --     within Offer.Reach studs and VisitorOffers.ready (no offer open, Every s apart). The answer comes back through
 --     VisitorOffers.onClosed: a line ("Pleasure doing business!"), and after a sale the box and the way out.
+-- 10.4 (the warehouse in two, Config.Showroom): the visitors come for the SHOWROOM: only its pieces draw them (a
+-- warehouse whose showroom shows nothing gets none) and only its stands are looked at; the collection hall's podiums
+-- are only in their way. The owner's upgrade tree: Shop window (visitorRate) divides the waits between groups, VIP
+-- buyers (vip) lets the VIP kind (Config.Showroom.Vip: Kind, Weight) come too.
 -- One loop for every visitor, every hall and the offers' clocks (Config.Visitors.Tick s); Config.Visitors.On false: the
 -- visitors there leave, none come. Nothing is done frame by frame.
 --
@@ -49,6 +53,7 @@ local Collection = require(script.Parent.Collection)
 local SandboxPlots = require(script.Parent.SandboxPlots)
 local Warehouse = require(script.Parent.Warehouse)
 local Offers = require(script.Parent.VisitorOffers)
+local Upgrades = require(script.Parent.Upgrades) -- 10.4: the tree's Shop window and VIP buyers
 
 local Visitors = {}
 
@@ -143,13 +148,21 @@ local function siteOf(plot: SandboxMap.Plot, level: number?): SandboxMap.Plot
 	return if level then WarehouseLayout.site(plot, level) or plot else plot
 end
 
--- The hall's numbers (WarehouseLayout's, at the warehouse's level) with its first `stands` podiums.
-local function hallOf(plot: SandboxMap.Plot, stands: number, level: number?): Rules.Hall
+-- The hall's numbers (WarehouseLayout's, at the warehouse's level) with its first `stands` podiums (10.4: and its
+-- first `show` showroom plinths: every one there is in the way, only the showroom's are looked at).
+local function hallOf(plot: SandboxMap.Plot, stands: number, level: number?, show: number?): Rules.Hall
 	local site = siteOf(plot, level)
 	local inside = WarehouseLayout.inside(site)
 	local door = WarehouseLayout.door(site)
 	local podiums: { Rules.Podium } = {}
+	local numbers: { number } = {}
 	for i = 1, stands do
+		table.insert(numbers, i)
+	end
+	for k = 1, show or 0 do
+		table.insert(numbers, WarehouseLayout.ShowBase + k)
+	end
+	for _, i in numbers do
 		local s = WarehouseLayout.stand(site, i)
 		if s then
 			table.insert(podiums, { index = i, x = s.x, z = s.z, sx = s.sx, sz = s.sz, yaw = s.yaw })
@@ -175,16 +188,18 @@ local function planOf(id: number): Plan
 	return plan :: Plan
 end
 
--- The pieces on show in the owner's warehouse now (stand → piece), looked at again after their collection changed.
-local function shownOf(plan: Plan, owner: Player, stands: number): { [number]: CollectionRules.Entry }
+-- The pieces on show in the owner's SHOWROOM now (stand → piece; 10.4: the collection hall's are not for sale: no
+-- visitor looks at them), looked at again after their collection changed.
+local function shownOf(plan: Plan, owner: Player, show: number): { [number]: CollectionRules.Entry }
 	local shown = plan.shown
 	if shown then
 		return shown
 	end
 	local fresh: { [number]: CollectionRules.Entry } = {}
+	local base = WarehouseLayout.ShowBase
 	for _, entry in Collection.stock(owner) do
 		local stand = entry.stand
-		if stand ~= nil and stand >= 1 and stand <= stands then
+		if stand ~= nil and stand > base and stand <= base + show then
 			fresh[stand] = entry
 		end
 	end
@@ -344,7 +359,7 @@ local function pickStand(v: Visitor, plan: Plan, feet: { Vector3 }, from: Rules.
 		end
 	end
 	local options: { number } = {}
-	for stand in shownOf(plan, v.owner, Collection.stands(v.owner)) do
+	for stand in shownOf(plan, v.owner, Collection.showStands(v.owner)) do
 		if not v.seen[stand] and not taken[stand] then
 			table.insert(options, stand)
 		end
@@ -400,7 +415,7 @@ end
 local function arrive(v: Visitor, now: number, feet: { Vector3 })
 	local plan = plans[v.plot]
 	local stand, spot = v.stand, v.spot
-	local entry = if plan and stand then shownOf(plan, v.owner, Collection.stands(v.owner))[stand] else nil
+	local entry = if plan and stand then shownOf(plan, v.owner, Collection.showStands(v.owner))[stand] else nil
 	if not entry or not spot or not stand then
 		nextStop(v, feet) -- (the piece went while it walked there)
 		return
@@ -463,7 +478,8 @@ local function spawnOne(plot: SandboxMap.Plot, plan: Plan, owner: Player, now: n
 	end
 	local side = if roll() < 0.5 then -1 else 1
 	local door = Rules.doorway(hall, side)
-	local kind = Rules.pickKind(roll())
+	-- (10.4: the tree's VIP buyers: the VIP kind comes too, Config.Showroom.Vip.Weight)
+	local kind = Rules.pickKind(roll(), if Upgrades.effect(owner, "vip") >= 1 then { [Config.Showroom.Vip.Kind] = Config.Showroom.Vip.Weight } else nil)
 	local name = Rules.pickName(kind, roll())
 	local v: Visitor = {
 		id = nextId + 1,
@@ -517,10 +533,11 @@ local function plotStep(plot: SandboxMap.Plot, now: number, feet: { Vector3 })
 	end
 	local level = levelOf(plot.id)
 	local stands = if owner and owner.Parent then Collection.stands(owner) else 0
-	local key = `{level or 0}:{stands}`
+	local show = if owner and owner.Parent then Collection.showStands(owner) else 0 -- 10.4: the showroom's
+	local key = `{level or 0}:{stands}:{show}`
 	if plan.key ~= key then
 		plan.key, plan.level, plan.shown = key, level, nil
-		plan.hall = hallOf(plot, stands, level)
+		plan.hall = hallOf(plot, stands, level, show)
 		rebuilt(plot, plan) -- (the visitors still there on the new hall's ways)
 	end
 	if not T.On or not owner or not owner.Parent then
@@ -528,13 +545,15 @@ local function plotStep(plot: SandboxMap.Plot, now: number, feet: { Vector3 })
 		return
 	end
 	local near = ownerNear(owner, plot, level)
-	if next(shownOf(plan, owner, stands)) == nil then
+	if next(shownOf(plan, owner, show)) == nil then
 		plan.due, plan.near = nil, near
 		table.clear(plan.queue)
 		return
 	end
+	-- 10.4: the tree's Shop window brings them more often (its rate divides the waits)
+	local rate = math.max(0.25, Upgrades.effect(owner, "visitorRate"))
 	if plan.due == nil or (near and not plan.near) then
-		local wait = if near then Rules.between(T.FirstWait, roll()) else Rules.gap(false, roll())
+		local wait = (if near then Rules.between(T.FirstWait, roll()) else Rules.gap(false, roll())) / rate
 		local soon = math.max(now + wait, (plan.last or -math.huge) + T.NearEvery[1]) -- (an owner in and out: not a group each time)
 		plan.due = if plan.due then math.min(plan.due :: number, soon) else soon
 	end
@@ -548,7 +567,7 @@ local function plotStep(plot: SandboxMap.Plot, now: number, feet: { Vector3 })
 		for k = 0, math.min(room, Rules.groupSize(roll())) - 1 do
 			table.insert(plan.queue, now + k * T.Stagger)
 		end
-		plan.due, plan.last = now + Rules.gap(near, roll()), now
+		plan.due, plan.last = now + Rules.gap(near, roll()) / rate, now
 	end
 end
 

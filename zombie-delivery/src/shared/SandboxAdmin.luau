@@ -32,8 +32,8 @@
 --   SandboxAdmin.standPlan(stock, stands)   FILL STANDS: { uid, stand } for the stock's pieces not on show (in
 --                                           stock order), each on the next free stand of 1 … stands
 --   SandboxAdmin.standCount(warehouse)      Config.Warehouse's Stands (a count, or a list of stands), 0 without it
---   SandboxAdmin.zones()                    SHOW ZONES' fixed marks (shared/SandboxMap.luau): 9.7 each portal's pad
---                                           (the lobby's) and the houses' curbs (the truck's footprint at the spot:
+--   SandboxAdmin.zones()                    SHOW ZONES' fixed marks (shared/SandboxMap.luau): 10.4 the lobby's PLAY
+--                                           circle (where a party gathers) and the houses' curbs (the truck's footprint at the spot:
 --                                           every place to empty's, SandboxMap.Houses' order, its name on it)
 --   SandboxAdmin.runHouse(id) / runDifficulty(id)   9.7: the house a "run_<house>" button starts, the difficulty a
 --                                           "rundiff_<id>" button picks (nil: not such a button)
@@ -46,7 +46,7 @@ export type Group = { id: string, name: string, hint: string }
 export type Action = { id: string, group: string, label: string, color: string }
 export type Pick = { item: string, variant: number, condition: number }
 export type Zone = {
-	kind: string, -- "pad" (9.7: a portal's pad) | "curb"
+	kind: string, -- "play" (10.4: the PLAY circle) | "curb"
 	label: string,
 	shape: string, -- "circle" (r) | "box" (sx, sy, sz, turned by yaw)
 	x: number,
@@ -79,7 +79,7 @@ SandboxAdmin.Groups = {
 	{
 		id = "debug",
 		name = "Debug",
-		hint = "SHOW ZONES (only on your screen): the portals' pads, the houses' curbs (the truck's spot), the display stands and every van's cargo bay.",
+		hint = "SHOW ZONES (only on your screen): the PLAY circle, the houses' curbs (the truck's spot), the display stands and every van's cargo bay.",
 	},
 	{
 		id = "upgrades",
@@ -216,22 +216,20 @@ end
 
 function SandboxAdmin.zones(): { Zone }
 	local list: { Zone } = {}
-	for _, portal in SandboxMap.Lobby.portals do -- (9.7: the pads players stand on to go in)
-		local pad = portal.pad
-		table.insert(list, {
-			kind = "pad",
-			label = `PAD · {string.upper(portal.name)}`,
-			shape = "box",
-			x = (pad.x0 + pad.x1) / 2,
-			y = SandboxMap.GroundTop,
-			z = (pad.z0 + pad.z1) / 2,
-			yaw = 0,
-			r = 0,
-			sx = pad.x1 - pad.x0,
-			sy = 0.3,
-			sz = pad.z1 - pad.z0,
-		})
-	end
+	local play = SandboxMap.Lobby.play -- (10.4: where a party gathers: the PLAY panel opens in it)
+	table.insert(list, {
+		kind = "play",
+		label = "PLAY · step in: the PLAY panel",
+		shape = "circle",
+		x = play.x,
+		y = SandboxMap.GroundTop,
+		z = play.z,
+		yaw = 0,
+		r = play.r,
+		sx = 0,
+		sy = 0,
+		sz = 0,
+	})
 	local NOSE = { [0] = "north", [90] = "west", [180] = "south", [270] = "east" } :: { [number]: string }
 	for _, house in SandboxMap.Houses do -- (every place to empty's curb, the farmstead's first)
 		local curb = house.curb

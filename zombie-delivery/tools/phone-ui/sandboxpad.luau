@@ -256,12 +256,14 @@ upgrades.OnClientEvent:Fire({ kind = "state", levels = UpgradeRules.full(), mone
 upgrades.OnClientEvent:Fire({ kind = "open" })
 local upGui = all(M.gui, function(o) return o.Name == "UpgradeShade" end)[1]
 local upFrame = upGui and named(upGui, "Upgrades")
-local maxes = all(upFrame, function(o) return o.Name == "Max" end)
-local reachable = #maxes > 0
-for _, max in maxes do
-	reachable = reachable and max.Selectable == true
+-- (10.4, the tree: every node and tier a button the selection reaches, the canvas scrolls to it; the details' MAX)
+local nodes = all(upFrame, function(o) return string.match(o.Name, "^Node_") ~= nil or string.match(o.Name, "^Tier_%d$") ~= nil end)
+local reachable = #nodes > 0 and named(upFrame, "Max") ~= nil and named(upFrame, "Max").Selectable == true
+for _, made in nodes do
+	reachable = reachable and made.ClassName == "TextButton" and made.Selectable ~= false
 end
-check("the UPGRADES window: kept inside it, every maxed row selectable (its list scrolls to it), ✕ selected", stopsAtEdges(upFrame) and reachable and M.focus == named(upFrame, "Close"))
+check("the UPGRADES window: kept inside it, every node of the tree selectable (its canvas scrolls to it), the trunk's top tier selected (every node bought)",
+	stopsAtEdges(upFrame) and reachable and M.focus == named(upFrame, "Tier_5"), M.focus and M.focus.Name)
 key("ButtonB")
 check("… B closes it", not UpgradeUi.isOpen())
 

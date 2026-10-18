@@ -4642,7 +4642,7 @@ local function finishMove(player: Player)
 	finish(s, if c.late > 0 then "timeout" else "deliver", if c.out > 0 then "Finished: what was still in the van stayed behind" else done)
 end
 
--- ── 9.7 RUNS (server/Runs.luau: the lobby's portals; Config.Runs, shared/RunRules.luau) ───────────────────────────
+-- ── 9.7 RUNS (server/Runs.luau: 10.4 the PLAY circle's lobbies; Config.Runs, shared/RunRules.luau) ───────────────────────────
 -- A run is a sandbox move whose contract has a difficulty: one house, its party the host's (Runs wraps Crew.members and
 -- Crew.ownerOf), its truck the host's van parked at the house's curb (Runs parks it there before Moving.startRun: no
 -- driving). Nothing is unloaded at a plot: at the run's end (the host's FINISH, the party's vote, the clock, GIVE UP,
@@ -4827,6 +4827,9 @@ function Moving.startRun(host: Player, house: string, difficulty: string, round:
 	made.seed = seed :: number
 	made.difficulty = RunRules.clean(difficulty)
 	made.time = if round then round else RunRules.time(if own then own.Time else (base.time or T.Time), made.difficulty)
+	if not round then -- 10.4: the host's upgrade tree's Overtime (10.5 rounds: everybody's clock the same)
+		made.time = math.floor((made.time :: number) * require(Shared.UpgradeRules).effect((PlayerData.get(host) or {} :: any).sandboxUpgrades, "runClock") + 0.5)
+	end
 	made.hordeAt = if T.Sandbox.Horde and not round then T.Sandbox.HordeAt else 0
 	made.round = if round then true else nil
 	MoveLobby.close(host, nil)
@@ -5934,7 +5937,7 @@ function Moving.start()
 	folder = made
 	if SB.on then
 		-- 8.0 SANDBOX: the houses (no Marge, no Walt; six houses: six, a contract and a site each), no Wall, no dressing,
-		-- no soldier; 9.7 runs: no board on the plots (the lobby's portals start the runs: server/Runs.luau)
+		-- no soldier; 9.7 runs: no board on the plots (the PLAY circle's lobbies start the runs: server/Parties.luau)
 		for _, h in SandboxMap.Houses do
 			local house = SB.newContract(h)
 			SB.contracts[house.id] = house

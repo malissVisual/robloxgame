@@ -1,10 +1,16 @@
 --!strict
 -- 10.5 ROUNDS (Config.Rounds; the owner: "16 people on one server … a round starts at one place, everybody runs there,
 -- everyone has their own car, what you carry off to it quickly is yours … not teams"): the rules of a round, pure (no
--- Roblox: tests/roundrules_test.luau). server/Runs.luau runs the rounds with them, client/RoundUi.luau shows them.
+-- Roblox: tests/roundrules_test.luau). server/Runs.luau runs the rounds with them, client/RoundUi.luau shows them. 10.6
+-- both in PLAY: the rounds are the PLAY panel's QUICK ROUND (its queue), beside the private lobbies' runs (places).
 --
 --   RoundRules.pick(ids, last, roll) -> id?       the next round's place: one of `ids` (in order) by `roll` (0 … 1), never
 --                                                 `last` again when there is another one
+--   RoundRules.places(ids, last, busy, held) -> { id }   10.6 both in PLAY: where the next round may go (then pick): the
+--                                                 places of `ids` no run is in (busy(id): a private lobby's run or a
+--                                                 round's, RunRules.houseBusy's "run"), the ones no private lobby holds
+--                                                 (held(id): its house kept for it) and not `last` first, then any not
+--                                                 `last`, then `last` itself; none free: empty (the round waits for one)
 --   RoundRules.difficulty(list, roll) -> id       a round's difficulty: one of `list` by `roll` (none: Config.Runs.Default)
 --   RoundRules.ranking(pieces, players) -> { Rank }   the round's table: every player in it (`players`: { id, name }, the
 --                                                 order they came) with the pieces they took (`pieces`: { to, value }),
@@ -44,6 +50,27 @@ function RoundRules.pick(ids: { string }, last: string?, roll: number): string?
 	end
 	local n = math.clamp(math.floor(roll * #list) + 1, 1, #list)
 	return list[n]
+end
+
+function RoundRules.places(ids: { string }, last: string?, busy: (string) -> boolean, held: (string) -> boolean): { string }
+	local tiers: { { string } } = { {}, {}, {} }
+	for _, id in ids do
+		if not busy(id) then
+			if id ~= last and not held(id) then
+				table.insert(tiers[1], id)
+			end
+			if id ~= last then
+				table.insert(tiers[2], id)
+			end
+			table.insert(tiers[3], id)
+		end
+	end
+	for _, list in tiers do
+		if #list > 0 then
+			return list
+		end
+	end
+	return {}
 end
 
 function RoundRules.difficulty(list: { string }, roll: number): string

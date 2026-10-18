@@ -3,10 +3,14 @@
 -- round on your screen. Presentation only: the Runs remote's { kind = "round", … } and { kind = "claim", … }.
 --   * Where: everything kept clear of the HUD (SandboxHud's money and chips, Hud's groups, the touch controls, the move's
 --     panel and what else holds the top's middle: client/TopBlocks.luau, the corner map, Roblox's player list).
---   * The lobby's banner (the top's middle, under what holds it there): the countdown to the next
---     round and its difficulty ("NEXT ROUND IN 0:42 · HARD"), under it the place, how many are in the game and what to
---     do; while a round is on without you, where and how long ("ROUND ON AT THE OLD MILL · 3:12"); after one, that the
---     next one is coming. Nothing before you press PLAY.
+--   * The lobby's banner (the top's middle, under what holds it there): the countdown to the next round, its place and
+--     difficulty ("NEXT QUICK ROUND · 0:42" over "THE OLD MILL · HARD"), how many are in the queue and what to do;
+--     while a round is on without you, where and how long ("QUICK ROUND · 3:12 LEFT" over "ON AT THE OLD MILL"); after
+--     one, that the next one is coming. 10.6 both in PLAY: only while you are in the queue (the PLAY panel's QUICK
+--     ROUND: the view's `ready`), never while the PLAY panel is open (it says the same); its LEAVE QUEUE (the Runs
+--     remote's { kind = "queue", on = false }) takes you out. On a phone at Config.Rounds.Banner.TouchScale at least
+--     (LEAVE QUEUE a finger's size). 10.6 snatching's look: wider (up to 560 px; a small phone's narrower, so that it
+--     stays high and clear of the HUD), its words scaled to fit, never cut (a long place's name).
 --   * In the round: the table at the screen's left (its first Config.Rounds.Top rows: place, name, pieces, value; your
 --     row lit, and under them when you are further down) and the feed under it (who took what: yours in gold, the
 --     latest on top, each for FEED s; 10.6 the snatches too: "🤼 Bob snatched … from Ann!", "💪 Ann held on to …"). The
@@ -37,13 +41,15 @@ local Q = Config.Rounds
 local K = Theme.Contract
 local GOLD = Color3.fromRGB(255, 206, 92)
 local MONEY = Color3.fromRGB(140, 220, 120)
-local BANNER_W, BANNER_H = 560, 58 -- px at scale 1
+local BANNER_W, BANNER_H = 560, 64 -- px at scale 1 (10.6: LEAVE QUEUE at its right; wide for a long place's name)
+local BANNER_FITS = { 560, 480, 400 } -- px at scale 1: its widths, the highest spot clear of the HUD wins (a small phone: narrower)
+local LEAVE_W = 64 -- px at scale 1: LEAVE QUEUE (64 × 56: a finger's size at the touch scale)
 local BOARD_W, ROW = 236, 22
 local FEED, FEED_MAX = 6, 4 -- s a feed line shows, lines at most
 local TICK = 5 -- the countdown's last seconds tick
 local MEDAL = { "🥇", "🥈", "🥉" }
 local GAP = 10 -- px between what it keeps clear of and it
-local CHIP_GUIS = { SandboxHud = "MoneyBlock", SandboxTasksChip = "", SandboxMiniMap = "MiniMap" } -- (the HUD's chips, the corner map)
+local CHIP_GUIS = { SandboxHud = "MoneyBlock", SandboxTasksChip = "", SandboxMiniMap = "MiniMap", PlayUi = "PlayBar" } -- (the HUD's chips, the corner map; 10.6 the PLAY bar)
 local HUD_GROUPS = { "LeftStack", "TopStack", "HudButtons", "RightStack", "Hint", "BottomBar", "KeyHints" } -- (client/Hud.luau's)
 
 local player = Players.LocalPlayer
@@ -65,6 +71,15 @@ end
 
 local function scaleNow(): number
 	return math.min(Ui.screenScale(), 1)
+end
+
+-- 10.6: the banner's scale: a phone's Banner.TouchScale at least (LEAVE QUEUE a finger's size), never past 1.
+local function bannerScale(): number
+	local s = Ui.screenScale()
+	if Ui.touchLayout() then
+		s = math.max(s, Q.Banner.TouchScale)
+	end
+	return math.min(s, 1)
 end
 
 local function text(parent: Instance, name: string, props: { [string]: any }): TextLabel
@@ -103,16 +118,27 @@ local function build(): ScreenGui?
 		BorderSizePixel = 0,
 		Visible = false,
 	}, root)
-	Ui.make("UIScale", { Name = "Scale", Scale = scaleNow() }, b)
+	Ui.make("UIScale", { Name = "Scale", Scale = bannerScale() }, b)
 	Ui.corner(b, 10)
 	Ui.stroke(b, GOLD, 1.5)
-	-- (its words scaled to fit, never cut: a long place's name, a phone)
-	local title = text(b, "Title", { Size = UDim2.new(1, -20, 0, 24), Position = UDim2.fromOffset(10, 5), Font = Theme.HeadingFont, TextSize = 18, TextColor3 = GOLD,
-		TextXAlignment = Enum.TextXAlignment.Center, TextScaled = true, TextTruncate = Enum.TextTruncate.None })
-	Ui.make("UITextSizeConstraint", { MaxTextSize = 18, MinTextSize = 10 }, title)
-	local line = text(b, "Line", { Size = UDim2.new(1, -20, 0, 16), Position = UDim2.fromOffset(10, 33), TextSize = 12, TextColor3 = K.secondary,
-		TextXAlignment = Enum.TextXAlignment.Center, TextScaled = true, TextTruncate = Enum.TextTruncate.None })
+	-- (its words scaled to fit, never cut: a long place's name, a phone; they and LEAVE QUEUE follow its width, layout's)
+	local wordsOff = -(LEAVE_W + 28) -- (their width: the banner's less LEAVE QUEUE and the margins)
+	local kicker = text(b, "Kicker", { Size = UDim2.new(1, wordsOff, 0, 14), Position = UDim2.fromOffset(12, 5), Font = Theme.HeadingFont, TextSize = 11, TextColor3 = K.secondary,
+		TextScaled = true, TextTruncate = Enum.TextTruncate.None })
+	Ui.make("UITextSizeConstraint", { MaxTextSize = 11, MinTextSize = 8 }, kicker)
+	local title = text(b, "Title", { Size = UDim2.new(1, wordsOff, 0, 22), Position = UDim2.fromOffset(12, 19), Font = Theme.HeadingFont, TextSize = 16, TextColor3 = GOLD,
+		TextScaled = true, TextTruncate = Enum.TextTruncate.None })
+	Ui.make("UITextSizeConstraint", { MaxTextSize = 16, MinTextSize = 10 }, title)
+	local line = text(b, "Line", { Size = UDim2.new(1, wordsOff, 0, 16), Position = UDim2.fromOffset(12, 43), TextSize = 12, TextColor3 = K.secondary,
+		TextScaled = true, TextTruncate = Enum.TextTruncate.None })
 	Ui.make("UITextSizeConstraint", { MaxTextSize = 12, MinTextSize = 8 }, line)
+	local leave = Ui.make("TextButton", { Name = "Leave", Text = "LEAVE QUEUE", Size = UDim2.fromOffset(LEAVE_W, 56), Position = UDim2.new(1, -LEAVE_W - 4, 0, 4),
+		BackgroundColor3 = K.charcoal, AutoButtonColor = true, Font = Theme.HeadingFont, TextSize = 12, TextColor3 = K.red, TextWrapped = true }, b)
+	Ui.corner(leave, 8)
+	Ui.stroke(leave, K.red, 1)
+	leave.Activated:Connect(function() -- 10.6: out of the quick round's queue (the server says so)
+		Net.get("Runs"):FireServer({ kind = "queue", on = false })
+	end)
 	banner = b
 	local t = Ui.make("Frame", {
 		Name = "Board",
@@ -146,17 +172,28 @@ local function difficultyName(id: any): string
 	return if def then string.upper(def.name) else ""
 end
 
-local function bannerText(v: { [string]: any }, left: number): (string?, string)
-	local name = tostring(v.name or "")
-	if v.phase == "wait" then
-		local count = tonumber(v.players) or 0
-		return `NEXT ROUND IN {RoundRules.clock(left)} · {difficultyName(v.difficulty)}`, `{name} · {count} in the game · load the loot into YOUR van: it's yours`
+-- The banner's words now: (title?, line, kicker); no title: no banner.
+local function bannerText(v: { [string]: any }, left: number): (string?, string, string)
+	local name = string.upper(tostring(v.name or ""))
+	local count = tonumber(v.queued) or tonumber(v.players) or 0
+	if v.phase == "wait" and v.name then
+		return `{name} · {difficultyName(v.difficulty)}`, `{count} queued · your own van: what you load is yours`, `NEXT QUICK ROUND · {RoundRules.clock(left)}`
+	elseif v.phase == "wait" then
+		return "WAITING FOR A FREE HOUSE", `{count} queued · every house is in use right now`, "NEXT QUICK ROUND"
 	elseif v.phase == "play" and v.inRound ~= true then
-		return `ROUND ON · {RoundRules.clock(left)}`, `{name} · you go in the next one: wait here in the lobby`
+		return `ON AT {name}`, "You go in the next one: walk around meanwhile", `QUICK ROUND · {RoundRules.clock(left)} LEFT`
 	elseif v.phase == "over" and v.inRound ~= true then
-		return "ROUND OVER", "The next one is coming: stay in the lobby"
+		return "THE NEXT ONE IS COMING", "You are still in the queue", "QUICK ROUND OVER"
 	end
-	return nil, ""
+	return nil, "", ""
+end
+
+-- 10.6: the PLAY panel open (it shows the quick round itself): no banner.
+local function panelOpen(): boolean
+	local ok, open = pcall(function(): any
+		return require(script.Parent.PlayUi).isOpen()
+	end)
+	return ok and open == true
 end
 
 -- ── The table and the feed ─────────────────────────────────────────────────
@@ -347,11 +384,20 @@ local function layout(root: ScreenGui, S: number)
 	local list = blockers(origin, W, H, S)
 	local b = banner
 	if b and b.Visible then
-		local w, h = BANNER_W * S, BANNER_H * S
-		local spot = slide(W / 2 - w / 2, GAP, w, h, H, list)
-		if spot then
+		local BS = bannerScale()
+		local h = BANNER_H * BS
+		local best: TouchLayout.Box?, bestW = nil, BANNER_W
+		for _, bw in BANNER_FITS do -- (the highest spot wins, the wider on a tie: wide on a big screen, narrower on a small phone)
+			local w = bw * BS
+			local spot = slide(W / 2 - w / 2, GAP, w, h, H, list)
+			if spot and (not best or spot.y0 < best.y0 - 0.5) then
+				best, bestW = spot, bw
+			end
+		end
+		if best then
+			b.Size = UDim2.fromOffset(bestW, BANNER_H)
 			b.AnchorPoint = Vector2.new(0, 0)
-			b.Position = UDim2.fromOffset(math.floor(spot.x0 + 0.5), math.floor(spot.y0 + 0.5))
+			b.Position = UDim2.fromOffset(math.floor(best.x0 + 0.5), math.floor(best.y0 + 0.5))
 		end
 	end
 	local t, f = board, feed
@@ -383,20 +429,22 @@ local function refresh()
 	local S = scaleNow()
 	for _, frame in { banner, board, feed } :: { Frame? } do
 		local scale = frame and frame:FindFirstChild("Scale")
-		if scale and scale:IsA("UIScale") and scale.Scale ~= S then
-			scale.Scale = S
+		local want = if frame == banner then bannerScale() else S
+		if scale and scale:IsA("UIScale") and scale.Scale ~= want then
+			scale.Scale = want
 		end
 	end
 	local now = workspace:GetServerTimeNow()
 	local left = (tonumber(v.endsAt) or now) - now
-	local title, line = bannerText(v, left)
+	local title, line, kicker = bannerText(v, left)
 	local b = banner
 	if b then
-		b.Visible = v.ready == true and title ~= nil
-		local head, foot = b:FindFirstChild("Title"), b:FindFirstChild("Line")
-		if title and head and foot and head:IsA("TextLabel") and foot:IsA("TextLabel") then
+		b.Visible = v.ready == true and title ~= nil and not panelOpen()
+		local head, foot, top = b:FindFirstChild("Title"), b:FindFirstChild("Line"), b:FindFirstChild("Kicker")
+		if title and head and foot and top and head:IsA("TextLabel") and foot:IsA("TextLabel") and top:IsA("TextLabel") then
 			head.Text = title
 			foot.Text = line
+			top.Text = kicker
 		end
 	end
 	if v.phase == "wait" and v.ready == true then

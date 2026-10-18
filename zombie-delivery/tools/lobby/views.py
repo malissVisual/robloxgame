@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """9.7 the lobby (design/lobby/plan.py): 3D views of the lobby for the owner (design/lobby/view-*.png), from the game's
-own code, without Roblox.
+own code, without Roblox. 10.4: the smaller lobby, its one PLAY circle in the plaza (no portals).
 
 The real server code builds the world on tools/perf/world-mock.luau (tools/sandbox-map/render.py's export: the map with
-the lobby, server/LobbyWorld.luau's plaza, portals, dispatch and PAINT shop, the kiosks, the warehouses, the TOP MOVERS
+the lobby, server/LobbyWorld.luau's plaza, PLAY circle, dispatch and PAINT shop, the kiosks, the warehouses, the TOP MOVERS
 board) and tools/village/render.mjs draws each view with three.js in headless Chromium (tools/village/render.html: a warm
-afternoon, a perspective camera, soft shadows, a light haze). The parts look only: no signs' words, no Blender imports.
+afternoon, a perspective camera, soft shadows, a light haze). The parts look only: no signs' words (the word PLAY over the
+circle is a BillboardGui: not drawn; the one on its floor is), no Blender imports.
 
     NODE_PATH=/opt/node22/lib/node_modules python3 zombie-delivery/tools/lobby/views.py <luau> <three.module.min.js> [--out DIR]
 
@@ -33,13 +34,13 @@ BOUNDS = json.loads((GAME / "design" / "lobby" / "plan.json").read_text(encoding
 OX, OZ = (BOUNDS["x0"] + BOUNDS["x1"]) / 2, (BOUNDS["z0"] + BOUNDS["z1"]) / 2
 
 # The views: name, caption, the camera (from, to: studs from the lobby's middle, y up), its fov.
-VIEWS = [
-    ("view-overview", "The lobby from the south: the plaza, the six portals, the four plots and their warehouses", (0, 260, 430), (0, 0, -20), 55),
-    ("view-plaza", "From the spawn: the fountain, the two south portals (the farmstead and the lone house)", (0, 26, -20), (0, 4, 180), 62),
-    ("view-west", "The west portals: the Pond Cabin and the Old Mill, their pads glowing", (-100, 34, 48), (-205, 6, 48), 58),
-    ("view-portal", "A portal close: its gate, the facade behind it, the sign and the glowing pad", (-80, 16, 128), (-108, 7, 172), 55),
-    ("view-plots", "The four plots along the north edge, the ZDC dispatch kiosk in front", (0, 50, 70), (0, 6, -110), 60),
-    ("view-paint", "The east side: the PAINT shop's booth, the forest lodge's and the orchard's portals", (130, 30, 40), (206, 4, -20), 58),
+VIEWS = [  # (10.4: the PLAY circle at (0, 59) from the middle, the spawn at (0, 95), the plots' front walls at z -18)
+    ("view-overview", "The lobby from the south: the plaza with the PLAY circle, the four plots and their warehouses", (0, 210, 330), (0, 0, -10), 55),
+    ("view-plaza", "From the spawn: the PLAY circle in the plaza, the plots behind it", (0, 14, 108), (0, 3, 40), 62),
+    ("view-play", "The PLAY circle close: its glowing ring, PLAY written on its floor, its four lit posts", (26, 11, 86), (0, 2, 59), 55),
+    ("view-plots", "The four plots along the north edge, the DISPATCH kiosk and the PLAY circle in front", (0, 50, 105), (0, 6, -70), 60),
+    ("view-west", "The west side: the fountain, the TOP MOVERS board and the DISPATCH kiosk", (-40, 28, 100), (-150, 4, 58), 58),
+    ("view-paint", "The east side: the PAINT shop's booth by plots 3 and 4 (the Auction House east of it is not in this export)", (20, 28, 100), (100, 4, 55), 58),
 ]
 
 

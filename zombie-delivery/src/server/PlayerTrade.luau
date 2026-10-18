@@ -2,7 +2,8 @@
 -- 8.7 SANDBOX, trading between players (the owner: "I'd like customers to be players too … I want selling to make
 -- sense"; Config.PlayerTrade's numbers, shared/PlayerTradeRules.luau's rules). The server decides everything: the
 -- client only asks through the "PlayerTrade" remote and the stands' prompts (server/Warehouse.luau: Warehouse.onTrade,
--- set by server/SandboxBoot.luau to PlayerTrade.prompt).
+-- set by server/SandboxBoot.luau to PlayerTrade.prompt). 10.4: only the SHOWROOM's pieces are for sale (Config.Showroom:
+-- its stands' prompts, a FOR SALE sign, an offer and a purchase); the collection hall's earn and are nobody's to buy.
 --   * An offer: another player's "Make an offer" at one of your pieces on show sends them the composer
 --     ({ kind = "compose" }: the piece, its value, its $ a minute in THEIR warehouse, whether it is new in THEIR book, the
 --     bounds); its SEND makes the offer (PlayerTrade.offer): checked (both here with their saves, not yourself, a
@@ -143,7 +144,7 @@ end
 
 -- The player's piece on stand `stand` (a copy), nil for none.
 local function pieceOn(player: Player, stand: any): Entry?
-	if not finite(stand) then
+	if not finite(stand) or not CollectionRules.isShow(stand) then -- (10.4: only the showroom's pieces are for sale)
 		return nil
 	end
 	for _, entry in Collection.stock(player) do
@@ -461,7 +462,7 @@ function PlayerTrade.offer(buyer: Player, seller: Player, uid: any, stand: any, 
 		return nil, why
 	end
 	local entry = pieceOf(seller, uid)
-	if not entry or entry.stand == nil or entry.stand ~= stand then
+	if not entry or entry.stand == nil or entry.stand ~= stand or not CollectionRules.isShow(entry.stand) then -- (10.4: the showroom's)
 		return nil, "That piece isn't on show there any more."
 	end
 	local value = Rules.value(entry)
@@ -572,8 +573,8 @@ function PlayerTrade.setPrice(owner: Player, uid: any, price: any): (boolean, st
 		end
 		return ok, why
 	end
-	if entry.stand == nil then
-		return false, `Put your {entry.name} on show first: a FOR SALE sign stands on its stand.`
+	if not CollectionRules.isShow(entry.stand) then -- (10.4: a sign is the showroom's)
+		return false, `Show your {entry.name} for sale first: a FOR SALE sign stands in the showroom.`
 	end
 	local value = Rules.value(entry)
 	local fine, bad = Rules.check(price, value)
@@ -620,7 +621,7 @@ function PlayerTrade.buy(buyer: Player, seller: Player, uid: any, stand: any, pr
 		return nil, why
 	end
 	local entry = pieceOf(seller, uid)
-	if not entry or entry.stand == nil or entry.stand ~= stand then
+	if not entry or entry.stand == nil or entry.stand ~= stand or not CollectionRules.isShow(entry.stand) then -- (10.4: the showroom's)
 		return nil, "That piece isn't on show there any more."
 	end
 	local sale = entry.sale

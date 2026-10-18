@@ -6,7 +6,7 @@
 -- made (Position, Size, AnchorPoint, UIScale) to measure where each piece sits, then checks: the hint line at the top in
 -- the middle, on the screen, clear of the money, the move's panel, Danny's strip, Roblox's player list and the touch
 -- buttons, readable on a phone, its ✕ a finger's size; every row of the owner's table with its words and its 3D target
--- (9.7: the nearest portal's pad, the run house's door, the truck's back, the nearest empty stand), a straight path;
+-- (10.4: the lobby's PLAY circle, the run house's door, the truck's back, the nearest empty stand), a straight path;
 -- a step done once goes quiet; the ✕ and a held G; the 💡 chip on a phone; nothing made loop after loop; no warnings. 8.0.1: one arrow: the move's HUD (client/MovingHud.luau) sets no GPS
 -- in the sandbox (no waypoint, so none of client/Hud.luau's GPS ring, beacon, label or toasts) beside the guide's.
 -- 8.3 keys (shared/SandboxPad.luau, client/PadGlyph.luau): the line's words for the device used now: a computer's
@@ -19,10 +19,10 @@
 -- the PAINT shop (9.7: the lobby's booth); the line placed as above; nothing while the screen is covered, SoftGap after;
 -- the ✕ on one dismisses it alone (the guide stays on); a window opened, a purchase or SoftSeconds on the screen: done;
 -- a run wins; the ring makes nothing loop after loop.
--- 9.7 runs (no contract board, nobody drives): "Walk to a portal: step onto a house's glowing pad" (the chevron over
--- the nearest portal's pad, its house's name), quiet on a pad (client/RunUi.luau's panel says it: the host's "pick", the
--- others' "waitPad"), the run's front door, "Carry the loot out to the truck", "Load the truck", "Finish or beat the
--- clock" (the truck's back), the stock on show, "Walk into another house for more!" (the nearest portal).
+-- 9.7 runs (no contract board, nobody drives): 10.4 "Step into PLAY to start" (10.6: a quick round or a lobby; the
+-- chevron over the lobby's PLAY circle, PLAY on it), quiet in a party lobby (client/PlayUi.luau's panel and bar say it: the host's "lobbyHost", the
+-- others' "lobbyWait"), the run's front door, "Carry the loot out to the truck", "Load the truck", "Finish or beat the
+-- clock" (the truck's back), the stock on show, "Step into PLAY for another run!" (the PLAY circle).
 -- 8.4, Danny's steps (SandboxSteps.danny) at the same three sizes (10.1: no "Hire Danny" step: he is free, with you
 -- from the start; outside his list says nothing yet): 8.5 "Take out your clipboard (Q) and pick a
 -- piece for Danny" in the house (10.1 the crew's helper's name: "… for Zip") ("(tap 📋)" on a phone, "(R1)" with a gamepad; with the clipboard out "Pick a piece to
@@ -249,7 +249,7 @@ end
 local Config = require("./Config")
 local G = Config.SandboxGuide
 G.HideHold, G.OffNote = 0.05, 0.05 -- (the waits short: the check's own clock is the real one)
-Config.Rounds.On = false -- (10.5: the portals' flow here; the rounds' words are tests/sandboxsteps_test.luau's)
+Config.Rounds.On = false -- (10.6: the lobbies' flow here; the quick round's words, in its queue and in a round, are tests/sandboxsteps_test.luau's)
 local TouchLayout = require("./TouchLayout")
 local MoveLayout = require("./MoveLayout")
 local SandboxSteps = require("./SandboxSteps")
@@ -399,24 +399,13 @@ local function shown()
 	return hint.Visible and words.TextTransparency == 0
 end
 
--- ── No run: walk to a portal (9.7: the lobby's) ─────────────────────────────
--- (the nearest portal's pad from where you stand, as the guide finds it)
-local function nearestPad(x, z)
-	local best, bestD = nil, math.huge
-	for _, portal in SandboxMap.Lobby.portals do
-		local mx, mz = (portal.pad.x0 + portal.pad.x1) / 2, (portal.pad.z0 + portal.pad.z1) / 2
-		local d = (mx - x) ^ 2 + (mz - z) ^ 2
-		if d < bestD then
-			best, bestD = portal, d
-		end
-	end
-	return best, (best.pad.x0 + best.pad.x1) / 2, (best.pad.z0 + best.pad.z1) / 2
-end
+-- ── No run: step into PLAY (10.4: the lobby's one PLAY circle) ─────────────
+local PLAY = SandboxMap.Lobby.play
 tick()
 local moneyBox = box(money)
 local b = hintBox()
-local PORTAL_WORDS = "Walk to a portal: step onto a house's glowing pad"
-check("no run: \"Walk to a portal: step onto a house's glowing pad\" (9.7: no contract board)", SandboxGuide.step() == "portal" and words.Text == PORTAL_WORDS and shown(), words.Text)
+local PLAY_WORDS = "Step into PLAY to start"
+check("no run: \"Step into PLAY to start\" (9.7: no contract board; 10.4 no portals; 10.6 a quick round or a lobby)", SandboxGuide.step() == "play" and words.Text == PLAY_WORDS and shown(), words.Text)
 check("… the hint line at the top in the middle, on the screen", inside(b) and math.abs((b.x0 + b.x1) / 2 - M.width / 2) < 1 and b.y0 < 30, show(b))
 check("… clear of the money at the top left", not overlap(b, moneyBox), `{show(b)} / {show(moneyBox)}`)
 check("… clear of the touch buttons", clearOfTouch(b))
@@ -424,9 +413,8 @@ check("… readable on a phone (its scale at least Config.SandboxGuide.TouchScal
 local cb = closeBox()
 check("… its ✕ a finger's size, on the screen, clear of the money", cb.x1 - cb.x0 >= 44 - 0.01 and cb.y1 - cb.y0 >= 44 - 0.01 and inside(cb) and not overlap(cb, moneyBox), show(cb))
 check("a top block (\"SandboxGuide\"): the others keep clear of it", require("./TopBlocks").get("SandboxGuide") == hint)
-local portal, px, pz = nearestPad(plot.spawn.x, plot.spawn.z)
-check("the 3D guide: the chevron over the nearest portal's pad, its house's name and distance on it", marker.Enabled and at(px, pz)
-	and string.find(tag.Text, "^" .. string.upper(portal.name) .. " · %d+ m$") ~= nil, tag.Text)
+check("the 3D guide: the chevron over the PLAY circle's middle, \"PLAY · n m\" on it", marker.Enabled and at(PLAY.x, PLAY.z)
+	and string.find(tag.Text, "^PLAY · %d+ m$") ~= nil, tag.Text)
 check("… a straight path in the lobby (one beam: no road to follow)", lit() == 1, lit())
 screen(false)
 moneyBox = box(money)
@@ -453,23 +441,28 @@ check("… then the line fades; on a phone the 💡 chip a finger's size in its 
 chip.Activated:Fire()
 tick()
 check("… a tap on 💡 brings it back (the step not done: its words and target again)", SandboxGuide.enabled() and not chip.Visible and shown() and closeButton.Visible
-	and words.Text == PORTAL_WORDS and marker.Enabled)
+	and words.Text == PLAY_WORDS and marker.Enabled)
 
--- ── 9.7 on a portal's pad: its panel (client/RunUi.luau) says it, the line steps aside ──
+-- ── 10.4 in a party lobby: its panel and bar (client/PlayUi.luau) say it, the line steps aside ──
 local RunUi = require("./RunUi")
 RunUi.start()
-local runsRemote = M.remotes.Runs
-runsRemote.OnClientEvent:Fire({ kind = "pad", house = portal.house, name = portal.name, left = 8, host = M.player.UserId, hostName = "Courier", party = { "Courier" },
-	going = 1, max = 4, difficulty = "normal", open = { "easy", "normal" }, mine = true, place = 1 })
+local partyRemote = M.remotes.Party
+local function partyView(mine, circle)
+	return { kind = "play", circle = circle, me = M.player.UserId, open = { "easy", "normal" }, houses = {}, lobbies = {},
+		lobby = { id = 3, host = if mine then M.player.UserId else 99, hostName = if mine then "Courier" else "Ann", mine = mine, house = "sandbox_house",
+			name = "The Old Farmstead", difficulty = "normal", friends = false, max = 4, ready = 0, open = { "easy", "normal" }, canStart = false,
+			members = { { id = M.player.UserId, name = "Courier", ready = false, host = mine } } } }
+end
+partyRemote.OnClientEvent:Fire(partyView(true, true))
 tick()
-check("9.7 on a pad, its host: the step \"pick\" (the portal step done), no line: the pad panel says it", SandboxGuide.step() == "pick" and not hint.Visible and not marker.Enabled)
-runsRemote.OnClientEvent:Fire({ kind = "pad", house = portal.house, name = portal.name, left = 6, host = 99, hostName = "Ann", party = { "Ann", "Courier" },
-	going = 2, max = 4, difficulty = "normal", open = { "easy", "normal" }, mine = false, place = 2 })
+check("10.4 in a lobby, its host: the step \"lobbyHost\" (the PLAY step done), no line: the PLAY panel says it", SandboxGuide.step() == "lobbyHost" and not hint.Visible and not marker.Enabled)
+RunUi.close()
+partyRemote.OnClientEvent:Fire(partyView(false, false))
 tick()
-check("… on another's pad: \"waitPad\", no line either", SandboxGuide.step() == "waitPad" and not hint.Visible)
-runsRemote.OnClientEvent:Fire({ kind = "pad" })
+check("… in another's lobby, away from the circle: \"lobbyWait\", no line either (the lobby bar says it)", SandboxGuide.step() == "lobbyWait" and not hint.Visible)
+partyRemote.OnClientEvent:Fire({ kind = "play", circle = false })
 tick()
-check("… off the pad: the portal step done (quiet)", SandboxGuide.step() == "portal" and not hint.Visible and not marker.Enabled)
+check("… out of the lobby: the PLAY step done (quiet)", SandboxGuide.step() == "play" and not hint.Visible and not marker.Enabled)
 
 -- ── The planning: LAUNCH ────────────────────────────────────────────────────
 lobby.OnClientEvent:Fire("lobby", { mine = true, members = {}, canLaunch = true })
@@ -593,7 +586,7 @@ stand(SandboxMap.House.curb.x + 6, SandboxMap.House.curb.z)
 tick()
 check("… out again, the truck loaded: finish still said (not done before the run's end)", SandboxGuide.step() == "finish" and shown())
 
--- ── No run: the stock on show, the portals ─────────────────────────────────
+-- ── No run: the stock on show, the PLAY circle ─────────────────────────────
 moving.OnClientEvent:Fire("state", nil)
 stand(plot.door.x, plot.door.z + 6)
 collection.OnClientEvent:Fire({ kind = "state", stock = {
@@ -627,10 +620,9 @@ collection.OnClientEvent:Fire({ kind = "state", stock = {
 	{ uid = "a", item = "sofa", stand = 1 }, { uid = "b", item = "lamp", stand = 3 }, { uid = "c", item = "vase", stand = 2 },
 }, income = 9, stands = 3 })
 tick()
-check("pieces on show: \"Your pieces earn money while you play. Walk into another house for more!\"", SandboxGuide.step() == "earn" and shown()
-	and words.Text == "Your pieces earn money while you play. Walk into another house for more!", words.Text)
-local p2, qx, qz = nearestPad(plot.door.x, plot.door.z + 6)
-check("… the chevron on the nearest portal's pad", at(qx, qz) and string.find(tag.Text, string.upper(p2.name), 1, true) ~= nil, tag.Text)
+check("pieces on show: \"Your pieces earn money while you play. Step into PLAY for another run!\"", SandboxGuide.step() == "earn" and shown()
+	and words.Text == "Your pieces earn money while you play. Step into PLAY for another run!", words.Text)
+check("… the chevron on the PLAY circle", at(PLAY.x, PLAY.z) and string.find(tag.Text, "PLAY", 1, true) ~= nil, tag.Text)
 for _ = 1, math.ceil(G.InfoSeconds / G.Every) + 1 do
 	tick()
 end
@@ -829,8 +821,8 @@ check("the STOCK list opened (it shows the 🔥 tags): the market found, the rin
 coveredNow, windowNow = false, nil
 wait(G.SoftGap + 0.02)
 tick()
-check("… then another upgrade in reach (8.3 economy: all three $1,500, the window's order first): \"💡 New upgrade in reach: Showroom lights at the UPGRADES desk ($1,500)\" (the desk again)", SandboxGuide.step() == "upgrade"
-	and words.Text == "💡 New upgrade in reach: Showroom lights at the UPGRADES desk ($1,500)" and shown() and at(desk2.x, desk2.z), words.Text)
+check("… then another upgrade in reach (8.3 economy: the first nodes $1,500, the tree's order first): \"💡 New upgrade in reach: Hall spotlights at the UPGRADES desk ($1,500)\" (the desk again)", SandboxGuide.step() == "upgrade"
+	and words.Text == "💡 New upgrade in reach: Hall spotlights at the UPGRADES desk ($1,500)" and shown() and at(desk2.x, desk2.z), words.Text)
 local soft = G.SoftSeconds
 G.SoftSeconds = 1
 for _ = 1, math.ceil(1 / G.Every) + 1 do
