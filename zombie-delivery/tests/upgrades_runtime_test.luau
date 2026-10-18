@@ -96,7 +96,7 @@ local function save80(cash: number): any
 	return {
 		money = cash, xp = 0, deliveries = 3, tutorial = true, phone = true, starterKit = true, vestKit = true,
 		noPacks = true, noJacket = true, noShoes = true, perGameBags = true, vanOnly = true, carStages = true,
-		vanStages = true, xpCurve = Config.Levels.Curve, cars = { [Config.CompanyVan.Car] = true }, car = Config.CompanyVan.Car,
+		vanStages = true, xpCurve = 2, cars = { zdcvan = true }, car = "zdcvan",
 		collectionKept = true, collection = { entries = {}, nextUid = 1 }, sandboxUpgrades = { stands = 4, lights = 5 },
 	}
 end

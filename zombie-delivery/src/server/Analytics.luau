@@ -14,7 +14,6 @@
 --   economy      "Cash": every PlayerData.addMoney / spend with its reason (PlayerData.onMoney; the SKU is the item's
 --                id), and the money that moves past them (the "money" hook). Kill rewards and the like are summed a
 --                player and sent every BatchSeconds and when they leave.
---   progression  "DriverLevel": every level completed (a level-up from 3 to 4 completes 3; a kill's XP).
 --   custom       AnalyticsPlan.Events: DeathOnJob (SandboxBoot: the "died" hook, on a run), SessionLength (on leave),
 --                ServerError and ClientError; 8.2: the moves, the grip checks and the collectibles
 --                (server/SandboxAnalytics.luau: the "event" hook, with up to three fields).
@@ -34,7 +33,6 @@ local StarterPlayer = game:GetService("StarterPlayer")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
-local Levels = require(Shared.Levels)
 local Net = require(Shared.Net)
 local Plan = require(Shared.AnalyticsPlan)
 local PlayerData = require(script.Parent.PlayerData)
@@ -58,7 +56,7 @@ type Onboarding = { reached: number, done: number }
 
 local joined: { [Player]: number } = {} -- os.clock() of the join (SessionLength); only players in the game
 local left: { [Player]: boolean } = setmetatable({}, { __mode = "k" }) :: any -- who left: nothing is kept for them again
-local levels: { [Player]: number } = {} -- the driver level last seen (nil until the save loaded)
+local seen: { [Player]: boolean } = {} -- the loaded save seen (its first PlayerData.Changed: Joined)
 local onboarding: { [Player]: Onboarding } = {}
 local early: { [Player]: { number } } = {} -- onboarding steps reached before the save loaded
 local batches: { [Player]: { [string]: number } } = {} -- reason → the money summed (signed) since the last flush
@@ -177,8 +175,7 @@ local function onboard(player: Player, name: string)
 	logSteps(player, profile, state)
 end
 
--- PlayerData.Changed: the save loaded (Joined, and the steps that waited), a level-up (DriverLevel), and a step that
--- was over the budget before.
+-- PlayerData.Changed: the save loaded (Joined, and the steps that waited), and a step that was over the budget before.
 local function onChanged(player: Player)
 	local profile = PlayerData.get(player)
 	if not profile or not live(player) then
@@ -187,10 +184,8 @@ local function onChanged(player: Player)
 	if not joined[player] then
 		joined[player] = os.clock() -- (the save loaded before this module heard of the join)
 	end
-	local level = Levels.levelFor(profile.xp)
-	local before = levels[player]
-	levels[player] = level
-	if before == nil then
+	if not seen[player] then
+		seen[player] = true
 		onboard(player, "Joined")
 		local waiting = early[player]
 		early[player] = nil
@@ -198,12 +193,6 @@ local function onChanged(player: Player)
 			for _, step in waiting do
 				onboard(player, Steps[step].name)
 			end
-		end
-	elseif level > before then
-		for _, done in Plan.levelUps(before, level) do
-			send("progression", `DriverLevel {done} Complete`, function()
-				AnalyticsService:LogProgressionEvent(player, Plan.Paths.Level, Enum.AnalyticsProgressionType.Complete, done, `Level {done}`)
-			end)
 		end
 	end
 	local state = onboardingOf(player, profile)
@@ -359,7 +348,7 @@ end)
 local function forget(player: Player)
 	left[player] = true
 	joined[player] = nil
-	levels[player] = nil
+	seen[player] = nil
 	onboarding[player] = nil
 	early[player] = nil
 	batches[player] = nil

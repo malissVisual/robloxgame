@@ -126,8 +126,8 @@ local function newPlayer(name: string, plot: number?): any
 	plotOf[player] = plot
 	profiles[player] = {
 		money = Config.Sandbox.StartMoney,
-		car = Config.CompanyVan.Car,
-		cars = { [Config.CompanyVan.Car] = true, citybike = true }, -- (an old save's bike: ownVan drops it)
+		car = "zdcvan",
+		cars = { zdcvan = true, citybike = true }, -- (an old save's bike: ownVan drops it)
 		carHealth = {},
 	}
 	E.fire("Players.PlayerAdded", player)

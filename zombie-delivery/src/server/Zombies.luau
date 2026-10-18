@@ -748,10 +748,6 @@ local function kill(z: Zombie, killer: Player?, push: Vector3?, cause: string?, 
 			profile.kills += 1
 		end
 		PlayerData.addMoney(killer, z.def.reward, "KillReward")
-		local xp = z.def.xp -- 6.24: the special ones' XP
-		if xp and xp > 0 then
-			PlayerData.addXp(killer, xp)
-		end
 		rewardRemote:FireClient(killer, z.root.Position + Vector3.new(0, 4, 0), z.def.reward)
 		Zombies.onKill(killer, z)
 		local onKillInfo = Zombies.onKillInfo
@@ -1520,22 +1516,15 @@ end
 -- tier and level; nil: the lowest level in the server).
 function Zombies.pickKind(kinds: { [string]: number }, at: Vector3?, owner: Player?): string
 	local tier: number? = nil
-	local level: number? = nil
 	if owner then
 		local ok, value = pcall(Zombies.tierOf, owner)
 		tier = if ok and type(value) == "number" then value else nil
-		level = PlayerData.level(owner)
-	else
-		for _, player in Players:GetPlayers() do
-			local each = PlayerData.level(player)
-			level = if level then math.min(level :: number, each) else each
-		end
 	end
 	local distance = if at then Vector3.new(at.X - DEPOT.X, 0, at.Z - DEPOT.Z).Magnitude else nil
 	local weights = Kinds.weights(kinds, {
 		night = DayNight.nightFactor(),
 		danger = Kinds.danger(tier, distance),
-		level = level,
+		level = nil, -- (10.6: no levels: no level rule)
 		bloodMoon = false, -- (the city's live events' Blood Moon went)
 	})
 	local kind = Economy.pickKind(weights, rng:NextNumber())

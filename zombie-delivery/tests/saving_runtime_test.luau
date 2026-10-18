@@ -148,7 +148,7 @@ local function save83(cash: number): any
 	return {
 		money = cash, xp = 0, deliveries = 3, tutorial = true, phone = true, starterKit = true, vestKit = true,
 		noPacks = true, noJacket = true, noShoes = true, perGameBags = true, vanOnly = true, carStages = true,
-		vanStages = true, xpCurve = Config.Levels.Curve, cars = { [Config.CompanyVan.Car] = true }, car = Config.CompanyVan.Car,
+		vanStages = true, xpCurve = 2, cars = { zdcvan = true }, car = "zdcvan",
 		collectionKept = true, collection = { entries = { { uid = "1-1", item = "sofa", variant = 1, condition = 0.9, name = "Sofa", stand = 1, got = 1 } }, nextUid = 2 },
 		collectionBookKept = true, collectionBook = { sofa = { n = 1, best = 0.9 } }, collectionBookPaid = {},
 		sandboxUpgradesKept = true, warehouseLevelKept = true, sandboxUpgrades = { warehouse = 1, lights = 1 }, -- (level 2: the Workshop)
@@ -534,7 +534,7 @@ check("… the keys this version knows are its own (character, sandboxHouse: the
 	and m1.sandboxHouse == nil and m1.money == 5001 and m1.sandboxMoves == 4 and m1.sandboxMovesKept == true)
 check("10.6: … the city's fields of the save written back as they were (tutorial, phone, the guns)", m1.tutorial == true and m1.phone == true and same(m1.weapons, { pistol = true }))
 check("10.6: … the city's flags on it (xpCurve, carStages, vanStages, vestKit, starterKit, noPacks, noJacket, noShoes, perGameBags, vanOnly)",
-	m1.xpCurve == Config.Levels.Curve and m1.carStages == true and m1.vanStages == true and m1.vestKit == true and m1.starterKit == true and m1.noPacks == true
+	m1.xpCurve == 2 and m1.carStages == true and m1.vanStages == true and m1.vestKit == true and m1.starterKit == true and m1.noPacks == true
 	and m1.noJacket == true and m1.noShoes == true and m1.perGameBags == true and m1.vanOnly == true)
 check("… the newer server's `rewards` keys kept too, the level's \"warehouse:\" key this one's", m1.rewards["visit:sofa"] == true and m1.rewards["warehouse:1"] == true)
 PlayerData.addMoney(M, Config.SandboxUpgrades.List.warehouse.prices[2], "Admin") -- (8.3 economy: the Storehouse's price)
@@ -565,7 +565,7 @@ E.leave(N)
 check("a lock-only record: no key kept from it but its own (a new player's save)", E.saves.Player_213.money == Config.Sandbox.StartMoney and E.saves.Player_213.lock == nil)
 local ned = E.saves.Player_213
 check("10.6: a new player's save: the city's flags on it, no city field (no guns, no kit, no tutorial)", ned.vanOnly == true and ned.starterKit == true and ned.vestKit == true
-	and ned.perGameBags == true and ned.xpCurve == Config.Levels.Curve and ned.weapons == nil and ned.kit == nil and ned.tutorial == nil and ned.collectionKept == true)
+	and ned.perGameBags == true and ned.xpCurve == 2 and ned.weapons == nil and ned.kit == nil and ned.tutorial == nil and ned.collectionKept == true)
 
 -- ── 8.4 review: through an older (8.2) server, the paint and the moves come back from `rewards` ───────────
 local paintSave = save83(2000)
