@@ -6,17 +6,17 @@
 -- are. Every module plays by name: Sounds.play(name, volume?, pitch?) (2D) and Sounds.playAt(name, position, …) (3D, at
 -- most Config.Audio.MaxVoices at once); Sounds.has(name) says whether a sound plays now.
 --
--- Music: "menu" on the start screen, then "day" (or "night" while the workspace attribute Night is set); the loops
--- crossfade (Config.Audio).
--- Effects heard here: the hits of the run's bat (the Hit remote, server/CloseCombat.luau: a hit, a kill, a headshot,
--- each with its soft tick, Config.Shots.Marker.Ticks), explosions (a bloater), the money a kill pays (the Reward
--- remote's soft coin), money that went down (a purchase), a server's notice (8.9: unless a sound of its own answers it:
--- Sounds.answered, Config.Soundscape.NoticeWait), a piece picked up and put down (7.1: a move's piece has its own,
--- client/MoveSounds.luau), your van's load, a knock at a door and its creak (a character's Gesture "knock"), the ding of
--- a jump far away (a run's fade), every Ui.button's soft click (Ui.onClick). The world's sounds (the footsteps by surface, the van's back, the countryside's ambience) are
--- client/SoundScape.luau's; the moves' client/MoveSounds.luau's; the sandbox's stands, till and trades
--- client/SandboxSounds.luau's; the zombies' voices client/ZombieLife.luau's; the start screen's, the character
--- creator's and the ride's their own modules' (by name).
+-- Music: "menu" on the start screen, then "day" (10.6: the game's light is a fixed afternoon, so never the city's
+-- "night"); the loops crossfade (Config.Audio).
+-- Effects heard here: money that went down (a purchase), a server's notice (8.9: unless a sound of its own answers it:
+-- Sounds.answered, Config.Soundscape.NoticeWait), the ding of a jump far away (a run's fade), every Ui.button's soft
+-- click (Ui.onClick); while the danger has zombies in a run (none since 10.5: Config.Runs.Danger) the hits of the run's
+-- bat (the Hit remote, server/CloseCombat.luau: a hit, a kill, a headshot, each with its soft tick), explosions (a
+-- bloater) and the money a kill pays (the Reward remote's soft coin). The world's sounds (the footsteps by surface, the
+-- van's back, the countryside's ambience) are client/SoundScape.luau's; the moves' (a piece picked up, put down,
+-- loaded) client/MoveSounds.luau's; the sandbox's stands, till and trades client/SandboxSounds.luau's; the zombies'
+-- voices client/ZombieLife.luau's; the start screen's, the character creator's and the ride's their own modules' (by
+-- name). 10.6: the city's cargo, its car's load and the couriers' knocks at doors are gone.
 -- The N key cycles: everything on → music off → all off (Sounds.cycle; Sounds.notify says it).
 
 local Players = game:GetService("Players")
@@ -253,7 +253,7 @@ local function pickMusic()
 		setMusic("menu")
 		return
 	end
-	setMusic(if workspace:GetAttribute("Night") == true then "night" else "day")
+	setMusic("day")
 end
 
 -- The start screen is over (Main's play()).
@@ -281,10 +281,18 @@ end
 
 -- ── Listening ─────────────────────────────────────────────────────────────
 
--- The run's bat: a hit, a kill, a headshot (the Hit remote, server/CloseCombat.luau), each with its soft tick under it
--- (Config.Shots.Marker.Ticks: a sound of the sheet pitched up; a headshot's brighter). Explosions where they are.
+-- The soft tick under a hit's own sound: a sound of the sheet, its volume, its pitch (a headshot's brighter); one tick
+-- in TICK_GAP s unless a better hit comes (the city's guns' numbers, Config.Shots.Marker's, kept for the bat).
+local TICKS: { [string]: { any } } = {
+	hit = { "ui_click", 0.3, 1.8 },
+	kill = { "ui_click", 0.45, 1.35 },
+	head = { "ding", 0.22, 2.2 },
+}
+local TICK_GAP = 0.05
+
+-- The run's bat: a hit, a kill, a headshot (the Hit remote, server/CloseCombat.luau), each with its soft tick under it.
+-- Explosions where they are.
 local function listenHits()
-	local ticks = Config.Shots.Marker
 	local RANK: { [string]: number } = { hit = 1, kill = 2, head = 3 }
 	local tickAt, tickRank = -math.huge, 0
 	Net.get("Hit").OnClientEvent:Connect(function(_position: Vector3, _damage: number, crit: boolean, killed: any)
@@ -298,8 +306,8 @@ local function listenHits()
 		end
 		local kind = if crit then "head" elseif dead then "kill" else "hit"
 		local now = os.clock()
-		local tick = ticks.Ticks[kind]
-		if tick and (now - tickAt >= ticks.TickGap or RANK[kind] > tickRank) then
+		local tick = TICKS[kind]
+		if tick and (now - tickAt >= TICK_GAP or RANK[kind] > tickRank) then
 			tickAt, tickRank = now, RANK[kind]
 			play(tick[1], tick[2], tick[3])
 		end
@@ -355,70 +363,6 @@ local function listenGame()
 	end
 end
 
--- Your cargo: picked up, put down, loaded into your car.
-local function listenCargo()
-	local lastLoad = 0
-	local function watchCar(car: Instance)
-		if not car:IsA("Model") or car:GetAttribute("OwnerId") ~= player.UserId then
-			return
-		end
-		local count = car:GetAttribute("CargoCount") or 0
-		car:GetAttributeChangedSignal("CargoCount"):Connect(function()
-			local now = car:GetAttribute("CargoCount") or 0
-			if type(now) == "number" and type(count) == "number" and now > count then
-				lastLoad = os.clock()
-				play("load", 0.75)
-			end
-			count = now
-		end)
-	end
-	task.spawn(function()
-		local cars = workspace:WaitForChild("Cars", 60)
-		if not cars then
-			return
-		end
-		for _, car in cars:GetChildren() do
-			watchCar(car)
-		end
-		cars.ChildAdded:Connect(function(car)
-			task.wait() -- its attributes are set before it is parented, but give them a frame
-			watchCar(car)
-		end)
-	end)
-	local function watchCharacter(character: Model)
-		local carrying = character:GetAttribute("Carrying")
-		-- 7.1: a move's piece (MoveCarry, set and cleared with Carrying) has its own sounds (client/MoveSounds.luau)
-		local moveAt = -math.huge
-		character:GetAttributeChangedSignal("MoveCarry"):Connect(function()
-			moveAt = os.clock()
-		end)
-		local function moving(): boolean
-			return character:GetAttribute("MoveCarry") ~= nil or os.clock() - moveAt < 0.6
-		end
-		character:GetAttributeChangedSignal("Carrying"):Connect(function()
-			local now = character:GetAttribute("Carrying")
-			if now ~= nil and carrying == nil then
-				task.delay(0.05, function() -- (MoveCarry comes right after Carrying)
-					if not moving() then
-						play("pickup", 0.7)
-					end
-				end)
-			elseif now == nil and carrying ~= nil then
-				task.delay(0.25, function()
-					if os.clock() - lastLoad > 0.5 and not moving() then
-						play("putdown", 0.7)
-					end
-				end)
-			end
-			carrying = now
-		end)
-	end
-	if player.Character then
-		watchCharacter(player.Character)
-	end
-	player.CharacterAdded:Connect(watchCharacter)
-end
-
 -- ── The world's loops, the knocks, the ding ─────────────────────────────────
 
 -- 6.12: the footsteps (5.7: yours by speed) and the ambience (5.7: the hum and the wind) moved to
@@ -432,39 +376,6 @@ local function make(name: string, parent: Instance?, looped: boolean): Sound?
 		return nil
 	end
 	return makeSound(asset, range, looped, effectsGroup, parent or effectsGroup)
-end
-
--- 5.7: a knock at a door (anybody's character, its Gesture "knock" from server/Npcs.luau Npcs.act) and, when the door
--- opens (GestureDoor), its creak a moment later.
-local function listenKnocks()
-	local function watchCharacter(character: Model)
-		character:GetAttributeChangedSignal("GestureAt"):Connect(function()
-			if character:GetAttribute("Gesture") ~= "knock" then
-				return
-			end
-			local root = character:FindFirstChild("HumanoidRootPart") :: BasePart?
-			if not root then
-				return
-			end
-			local at = root.Position + root.CFrame.LookVector * 1.5
-			playAt("knock", at, JUICE.KnockVolume, 1, 80)
-			if character:GetAttribute("GestureDoor") == true then
-				task.delay(JUICE.DoorDelay, function()
-					playAt("door_creak", at, JUICE.DoorVolume, 1, 80)
-				end)
-			end
-		end)
-	end
-	local function watchPlayer(other: Player)
-		if other.Character then
-			watchCharacter(other.Character)
-		end
-		other.CharacterAdded:Connect(watchCharacter)
-	end
-	for _, other in Players:GetPlayers() do
-		watchPlayer(other)
-	end
-	Players.PlayerAdded:Connect(watchPlayer)
 end
 
 -- (6.16: the zombies' groans are client/ZombieLife.luau's: the nearest few, each its own voice)
@@ -519,8 +430,6 @@ function Sounds.start()
 	end)
 	listenHits()
 	listenGame()
-	listenCargo()
-	listenKnocks()
 	pickMusic()
 	-- 6.12: the footsteps, the splashes, the doors, the horn and the ambience (client/SoundScape.luau)
 	SoundScape.start({
