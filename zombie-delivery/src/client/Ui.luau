@@ -26,8 +26,7 @@
 --
 -- 5.8, the courier phone's marks (design/phone-ui/) for every window:
 --   Ui.brand(parent, size?, props?) -> Frame   the company's mark: the red square and the "DELIVEROS" wordmark (8.9: was ZDC).
---   Ui.glyph(slot, id, size?)   draws the phone's white line glyph `id` (PhoneContract: "board", "missions", "garage",
---       "estate", "bank", "crew", "top", "career", "settings", "shop", "bag", "orders", "map", "messages"; "" clears).
+--   Ui.glyph(slot, id, size?)   draws the white line glyph `id` (PhoneContract: "map", "settings"; "" clears).
 --   Ui.glyphFor(icon?) -> string   the glyph id for a window's emoji icon ("" when none fits).
 --   Ui.heading(parent, title, options?) -> Heading   one header line: [■ ZDC] | [glyph] TITLE in caps.
 --       options: { glyph: string?, brand: boolean?, textSize: number?, height: number? };
@@ -63,10 +62,8 @@
 -- margins around it, so its hit area is at least 44 × 44 screen pixels (the drawing stays compact).
 
 local GuiService = game:GetService("GuiService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
-local Icons = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Icons"))
 local Theme = require(script.Parent.Theme)
 local Ui = {}
 Ui.Colors = Theme.Colors
@@ -744,39 +741,6 @@ function Ui.chip(parent: Instance, text: string, color: Color3?, textColor: Colo
 	return chip
 end
 
--- An icon from the icon set (shared/Icons.luau): an ImageLabel when its asset id is filled in, else a label with the
--- emoji / text fallback (what the interface always showed). props go to whichever it is: the Text* and Font ones only
--- to the fallback label, the Image* and ScaleType ones only to the image (ImageColor3 tints the white icon; white
--- when not given), the rest (Position, AnchorPoint, LayoutOrder, ZIndex, ...) to both.
-function Ui.icon(parent: Instance, iconName: string?, fallback: string, size: UDim2, props: { [string]: any }?): GuiObject
-	local id = Icons.get(iconName)
-	local given: { [string]: any } = props or {}
-	if not id then
-		local textProps: { [string]: any } = {}
-		for key, value in given do
-			if string.sub(key, 1, 5) ~= "Image" and key ~= "ScaleType" then
-				textProps[key] = value
-			end
-		end
-		return Ui.label(parent, fallback, size, textProps)
-	end
-	local image = Ui.make("ImageLabel", {
-		Name = iconName,
-		Size = size,
-		BackgroundTransparency = 1,
-		BorderSizePixel = 0,
-		Image = id,
-		ScaleType = Enum.ScaleType.Fit,
-		ImageColor3 = Color3.new(1, 1, 1),
-	}, parent)
-	for key, value in given do
-		if string.sub(key, 1, 4) ~= "Text" and key ~= "Font" and key ~= "RichText" then
-			image[key] = value
-		end
-	end
-	return image
-end
-
 -- A thin square bar: `color` on a dark track.
 function Ui.bar(parent: Instance, size: UDim2, color: Color3): (any, any)
 	local back = Ui.make("Frame", { Size = size, BackgroundColor3 = K.track, BorderSizePixel = 0 }, parent)
@@ -977,28 +941,11 @@ function Ui.brand(parent: Instance, size: number?, props: { [string]: any }?): a
 	return frame
 end
 
--- The phone's app glyph (client/PhoneContract's GLYPHS) for the icons the windows pass to Ui.window: "" for none.
+-- The line glyph (client/PhoneContract's GLYPHS) for the icons the windows pass to Ui.window: "" for none.
 local ICON_GLYPHS: { [string]: string } = {
-	["📋"] = "board",
-	["💼"] = "board",
-	["🎯"] = "missions",
-	["🅿"] = "garage",
-	["🚗"] = "garage",
-	["🏠"] = "estate",
-	["🏢"] = "bank",
-	["🏦"] = "bank",
-	["👥"] = "crew",
-	["🏆"] = "top",
-	["🎖"] = "career",
-	["🛠"] = "settings",
+	["🛠"] = "settings", -- the admin panel
 	["⚙"] = "settings",
-	["🏪"] = "shop",
-	["🛒"] = "shop",
-	["🎒"] = "bag",
-	["🛍"] = "bag", -- 6.6: the bag (no backpacks any more)
-	["📦"] = "orders",
 	["🗺"] = "map",
-	["💬"] = "messages",
 }
 
 -- The line glyph id for a window's `icon` (an emoji, with or without its emoji variation selector), "" if none fits.
@@ -1014,7 +961,7 @@ end
 -- is drawn (both have loaded by then), through a plain Instance so the analyzer sees no require cycle.
 local glyphKit: any = nil
 
--- Draws the phone's white line glyph `id` ("board", "missions", "garage", "map" ...; "" clears it) centred in `slot`,
+-- Draws the white line glyph `id` ("map", "settings"; "" clears it) centred in `slot`,
 -- `size` px (default: the slot's width less 4). Replaces what the slot held; the slot's "Glyph" attribute names it.
 function Ui.glyph(slot: GuiObject, id: string, size: number?)
 	for _, child in slot:GetChildren() do
@@ -1115,9 +1062,8 @@ Ui.WindowHeader = 78 -- px at scale 1: the header over the content
 Ui.WindowFooter = 40 -- px at scale 1: the footer under it
 
 export type WindowOptions = {
-	-- The header's line glyph (a PhoneContract id: "board", "missions", "garage", "estate", "bank", "crew", "top",
-	-- "career", "settings", "shop", "bag", "orders", "map", "messages"; "" for none). Default: the one that matches
-	-- `icon` (Ui.glyphFor), which also follows a later chrome.icon.Text (the shop, the result).
+	-- The header's line glyph (a PhoneContract id: "map", "settings"; "" for none). Default: the one that matches
+	-- `icon` (Ui.glyphFor), which also follows a later chrome.icon.Text.
 	glyph: string?,
 	brand: boolean?, -- the ZDC mark at the left of the header (default true)
 }
@@ -1164,8 +1110,8 @@ local function shown(object: GuiObject): boolean
 	return false
 end
 
--- A charcoal window: see the top of this file. `icon` (an Icons name or an emoji) is kept in a hidden badge for the
--- callers that still reach it (chrome.icon) and picks the header's line glyph (options.glyph overrides it).
+-- A charcoal window: see the top of this file. `icon` (an emoji) is kept in a hidden badge for the callers that still
+-- reach it (chrome.icon) and picks the header's line glyph (options.glyph overrides it).
 function Ui.window(parent: Instance, title: string, subtitle: string, icon: string?, size: UDim2?, options: WindowOptions?): (any, any, WindowChrome)
 	local o: WindowOptions = options or {}
 	local frame = Ui.make("Frame", {
@@ -1197,17 +1143,16 @@ function Ui.window(parent: Instance, title: string, subtitle: string, icon: stri
 		BorderSizePixel = 0,
 	}, header)
 	local badge = Ui.make("Frame", { Name = "Badge", Size = UDim2.fromOffset(24, 24), BackgroundTransparency = 1, Visible = false }, header)
-	local iconObject = Ui.icon(badge, icon, icon or "", UDim2.fromOffset(24, 24), {
+	local iconObject = Ui.label(badge, icon or "", UDim2.fromOffset(24, 24), {
 		TextSize = 18,
 		TextXAlignment = Enum.TextXAlignment.Center,
 		TextColor3 = K.secondary,
-		ImageColor3 = K.secondary,
 	})
 	local heading = Ui.heading(header, title, { glyph = o.glyph or Ui.glyphFor(icon), brand = o.brand, textSize = 20, height = 30 })
 	heading.frame.Size = UDim2.new(1, -(24 + 64), 0, 30) -- (the ✕ and a gap on the right)
 	heading.frame.Position = UDim2.fromOffset(24, 11)
 	local titleLabel = heading.title
-	-- The glyph follows the icon a caller sets later (the shop's kind, the result's ⚠), unless options.glyph pinned it.
+	-- The glyph follows the icon a caller sets later (chrome.icon.Text), unless options.glyph pinned it.
 	if o.glyph == nil and iconObject:IsA("TextLabel") then
 		local label = iconObject :: TextLabel
 		label:GetPropertyChangedSignal("Text"):Connect(function()

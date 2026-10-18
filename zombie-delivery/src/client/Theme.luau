@@ -9,9 +9,6 @@
 -- PRIMARY action (a red face, white caps, square: Ui.button(..., Theme.Contract.red), HudContract.button "primary");
 -- Theme.Colors.red stays the danger meaning (a dark face with a red hint), one step apart so Theme.soft tells them
 -- apart. The last pastel Postage tokens (violet, sage, hatch) are contract tokens now.
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Icons = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Icons"))
-
 local Theme = {}
 
 -- 3.7+, the contract UI: compact white type over the world, a localized charcoal scrim or window surface, fine grey
@@ -132,13 +129,6 @@ Theme.Font = Enum.Font.GothamMedium
 Theme.HeadingFont = Enum.Font.GothamBold
 Theme.DisplayFont = Enum.Font.GothamBold -- 3.8: no Black weight; titles are bold with restraint
 Theme.MonoFont = Enum.Font.GothamMedium -- 3.8: numbers stay in the Gotham family (timers, payouts, "3 / 4 slots")
-
--- Optional Roblox assets. Empty IDs keep the live city flyover and native wordmark.
--- The ids are pasted in shared/Icons.luau (zombie_delivery_logo, menu_background), the one place for every picture.
-Theme.Images = {
-	logo = Icons.get("zombie_delivery_logo") or "",
-	menuBackground = Icons.get("menu_background") or "",
-}
 
 local function linear(v: number): number
 	return if v <= 0.04045 then v / 12.92 else ((v + 0.055) / 1.055) ^ 2.4

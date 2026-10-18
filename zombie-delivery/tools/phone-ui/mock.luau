@@ -199,13 +199,7 @@ function M.P.button(parent,value,size,kind,fn)
 end
 function M.P.dot(parent,props) return M.Ui.label(parent,"",M.UDim2.fromOffset(14,14),props) end
 function M.P.tag(parent,value) return M.Ui.label(parent,value,M.UDim2.fromOffset(100,20)) end
--- 6.21: an icon (no uploaded ids here: the emoji as a label, like Ui.icon without its picture) and the contract's
--- colours (HudContract).
-function M.Ui.icon(parent,iconName,fallback,size,props)
-	local made=M.make("TextLabel",{Name="Icon",Text=fallback,Size=size,BackgroundTransparency=1},parent)
-	for key,value in props or {} do if string.sub(key,1,5)~="Image" then made[key]=value end end
-	return made
-end
+-- 6.21: the contract's colours (HudContract).
 for key,value in {ink={242,242,240},ink2={196,199,203},line={133,139,147},red={215,74,70},good={126,196,120},warn={228,170,82},surface={20,23,28},raised={32,36,42}} do
 	M.P[key]=M.Color3.fromRGB(unpack(value))
 end

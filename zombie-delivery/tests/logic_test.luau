@@ -1001,7 +1001,6 @@ end)())
 
 -- Zombie Delivery 3.0: the missions' fifteen new places ------------------------------------------------------------
 
-local Icons = require("./Icons")
 local TOWN_PLACES = { "pharmacy", "market", "warehouse", "firestation", "police", "cityhall" }
 local YARD_PLACES = { "airfield", "powerplant", "waterworks", "lab", "prison", "lighthouse", "trainyard", "camp", "stadium" }
 local function yardById(id: string): Map.Area?
@@ -1352,7 +1351,7 @@ check("the mission places are reachable by road from the depot, both ways", (fun
 	end
 	return true
 end)())
-check("the mission places are landmarks with an icon, by their road", (function()
+check("the mission places are landmarks, by their road", (function()
 	local found: { [string]: Map.Landmark } = {}
 	for _, landmark in Map.Landmarks do
 		found[landmark.id] = landmark
@@ -1360,9 +1359,8 @@ check("the mission places are landmarks with an icon, by their road", (function(
 	for _, list in { TOWN_PLACES, YARD_PLACES } do
 		for _, id in list do
 			local landmark = found[id]
-			local icon = Icons.landmark(id)
 			if not landmark or landmark.kind ~= "place" or landmark.icon == "" or #landmark.description < 20
-				or distanceToRoad(landmark.x, landmark.z) > 45 or not icon or Icons.Ids[icon] == nil then
+				or distanceToRoad(landmark.x, landmark.z) > 45 then
 				print("  bad landmark:", id)
 				return false
 			end

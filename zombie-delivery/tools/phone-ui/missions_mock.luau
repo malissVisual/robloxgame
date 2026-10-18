@@ -285,9 +285,6 @@ function Ui.window(parent, title, subtitle, _, size)
 	end)
 	return window, content, chrome
 end
-function Ui.icon(parent, _, fallback, size, props)
-	return Ui.label(parent, fallback, size, props)
-end
 function Ui.dashes(parent, _, _, c, size, position)
 	return M.make("Frame", { Size = size, Position = position, BackgroundColor3 = c }, parent)
 end

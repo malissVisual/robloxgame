@@ -9,7 +9,7 @@ import glob, json, os, re, shutil, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SHARED = os.path.join(os.path.dirname(HERE), "src", "shared")
-PURE = ("Config", "ZombieKinds", "Economy", "Map", "Roads", "Icons", "Levels", "SoundSheet", "Cast", "NpcLooks", "Missions", "Melee", "Boarding", "Career", "Transport", "KitFit", "Deliveries", "Residents", "Gestures", "RunCycle", "BodyMotion", "AvatarLook", "Tasks", "SoundPlan", "StyleLooks", "AnalyticsPlan", "RenderBudget", "OutlinePick", "ZombieStyle", "CarUpright", "SpawnSpot", "Gait", "MovingRules", "MoveHelperBrain", "MoveRoles", "CarryGrip", "ChaletLooks", "SandboxMap", "SandboxAdmin", "CollectionRules", "SandboxSteps", "WarehouseLayout", "SprinterLooks")
+PURE = ("Config", "ZombieKinds", "Economy", "Map", "Roads", "Levels", "SoundSheet", "Cast", "NpcLooks", "Missions", "Melee", "Boarding", "Career", "Transport", "KitFit", "Deliveries", "Residents", "Gestures", "RunCycle", "BodyMotion", "AvatarLook", "Tasks", "SoundPlan", "StyleLooks", "AnalyticsPlan", "RenderBudget", "OutlinePick", "ZombieStyle", "CarUpright", "SpawnSpot", "Gait", "MovingRules", "MoveHelperBrain", "MoveRoles", "CarryGrip", "ChaletLooks", "SandboxMap", "SandboxAdmin", "CollectionRules", "SandboxSteps", "WarehouseLayout", "SprinterLooks")
 PURE += ("SandboxScenery",)  # 8.0 sandbox, the map (tests/sandboxworld_test.luau)
 PURE += ("PairCarry",)  # 8.1 carrying in two: the leader's steering (tests/paircarry_test.luau)
 PURE += ("UpgradeRules",)  # 8.1 sandbox, the upgrades (tests/upgrades_test.luau)
