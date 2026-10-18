@@ -306,7 +306,6 @@ MoveHelperHud.start()
 SandboxGuide.start()
 local moving = M.remotes.Moving
 local collection = M.remotes.Collection
-local lobby = M.remotes.MoveLobby
 check("it asks for the collection's state ({ kind = \"state\" }) and the move's", collection ~= nil and (function()
 	for _, entry in M.sent do
 		if entry.name == "Collection" and type(entry.args[1]) == "table" and entry.args[1].kind == "state" then
@@ -450,14 +449,8 @@ runsRemote.OnClientEvent:Fire({ kind = "pad" })
 tick()
 check("… off the pad: the portal step done (quiet)", SandboxGuide.step() == "portal" and not hint.Visible and not marker.Enabled)
 
--- ── The planning: LAUNCH ────────────────────────────────────────────────────
-lobby.OnClientEvent:Fire("lobby", { mine = true, members = {}, canLaunch = true })
-tick()
-check("the planning open: \"Press LAUNCH to start the move\" (no 3D target: the planning's card)", SandboxGuide.step() == "plan" and shown() and not marker.Enabled, words.Text)
-lobby.OnClientEvent:Fire("lobby", { mine = false, members = {} })
-tick()
-check("… a crew's planning: the owner launches", SandboxGuide.step() == "planCrew" and shown(), words.Text)
-lobby.OnClientEvent:Fire("lobby", nil)
+-- ── 10.6: no move's planning lobby (gone since 9.7): the guide listens to no MoveLobby remote ──
+check("10.6: no planning lobby: the guide never asks for the MoveLobby remote (no LAUNCH step)", M.remotes.MoveLobby == nil)
 
 -- ── A run: in the house's front yard, the door; the line under the move's panel ──
 local zone = SandboxMap.zone(SandboxMap.House.id)
@@ -725,7 +718,6 @@ local function onScreenClear(what)
 	check(`… {what}: the line at the top in the middle, on the screen, clear of the money{if M.touch then ", the touch buttons (its ✕ a finger's size)" else " and the player list"}`, ok, show(hb))
 end
 moving.OnClientEvent:Fire("state", nil)
-lobby.OnClientEvent:Fire("lobby", nil)
 stand(plot.door.x, plot.door.z + 6)
 attribute(Config.SandboxUpgrades.WarehouseAttribute, 2)
 local growTo = Config.SandboxUpgrades.List.warehouse.prices[2] -- (the Storehouse's price, 8.3 economy: Config's; $200 more in hand)

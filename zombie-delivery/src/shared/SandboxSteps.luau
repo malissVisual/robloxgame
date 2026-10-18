@@ -14,7 +14,6 @@
 --   atHouse       you stand (or drive) at the house (SandboxSteps.atHouse: the move's)
 --   house         the move's place (the Moving state's `contract`: a SandboxMap.Houses id; nil: the farmstead)
 --   seated        you sit in a vehicle
---   planning      the move's planning lobby is open (the MoveLobby remote's "lobby"); planningMine: yours (LAUNCH)
 --   stock         your pieces in the stock, not on show (the Collection remote's "state")
 --   shown         your pieces on show on a display stand
 --   freeStands    the empty display stands (nil: not known, taken as some)
@@ -24,7 +23,7 @@
 --   hot           the name of a hot piece (today's market) in your stock; hotCount how many; hotSold a hot kind sold
 --                 today (the market's demand); day the market's day (the Collection remote's state: its market)
 --   painted       something of the PAINT shop is yours (the VanPaint remote's state: owned)
---   vanHome       9.7: you are in the lobby (no run, no planning): the PAINT shop's booth is there
+--   vanHome       9.7: you are in the lobby (no run): the PAINT shop's booth is there
 --   window        the sandbox window open now (its client module's name: "UpgradeUi", "WarehouseUi", "VanPaintUi", …)
 --   covered       something covers the screen (client/SandboxHintsUi.luau isCovered: a grip check, the move's cards,
 --                 a sandbox window, Danny's card, the start screen)
@@ -45,7 +44,6 @@
 --   carrying, outside                   load      "Load the truck: walk in or E at its back"              the truck's back
 --   the truck has things, the run is on finish    "Finish or beat the clock: FINISH at the truck …"       the truck's back
 --   a run, outside, nothing loaded      door      "Walk in through the front door"                        its door
---   no move, the planning open          plan      "Press LAUNCH to start the move" / the crew waits       (no target)
 --   on a portal's pad, the host         pick      "Pick a difficulty: the run starts when the clock runs out" (no target)
 --   on a portal's pad                   waitPad   "Stay on the pad: the run starts in a moment"           (no target)
 --   no move, pieces in the stock        show      "Put your pieces on show: E at an empty stand"          a free stand
@@ -79,7 +77,7 @@
 --   SandboxSteps.nearestShown(x, z, spots, taken) -> index?  8.9: the nearest stand with a piece on show (taken[i])
 --
 -- 8.3, the soft steps: what 8.3 added, each said at its moment and never nagging (SandboxSteps.choose). The core loop
--- always wins: a run (in the house, carrying, the truck loaded), the planning, a portal's pad, and a core step not
+-- always wins: a run (in the house, carrying, the truck loaded), a portal's pad, and a core step not
 -- done yet (walk to a portal, put your pieces on show); only `earn` (it only says something) gives way. Nothing soft while
 -- something covers the screen (a grip check, the move's result card, a sandbox window, the start screen: `covered`) or
 -- while something else talks (a first-time hint, shared/SandboxHints.luau busy; a soft step just ended: `hush`). The
@@ -118,7 +116,7 @@
 -- to him"): two steps of the move (10.1: the third, "Hire Danny", is gone with the hire), each said once as a soft step is
 -- (SoftSeconds at most, its ✕ dismisses it, SoftGap after the one before; never while something covers the screen, his
 -- card too, or something else talks). In a move the first that fits and is not done comes before the move's own step
--- (SandboxSteps.decide with `done`; he only comes with a move: nothing before LAUNCH). None while you sit in a vehicle,
+-- (SandboxSteps.decide with `done`; he only comes with a move: nothing before it). None while you sit in a vehicle,
 -- carry a piece or wait for him. The order (SandboxSteps.Danny):
 --   lift   hired, one of the move's two-person pieces near you (heavyNear)
 --          "Heavy piece: press Lift and wait for Danny"                          (the hint only)
@@ -155,8 +153,6 @@ export type State = {
 	delivered: number,
 	atHouse: boolean,
 	seated: boolean,
-	planning: boolean,
-	planningMine: boolean,
 	stock: number,
 	shown: number,
 	freeStands: number?,
@@ -230,8 +226,6 @@ SandboxSteps.Steps = {
 	portal = step("portal", "Walk to a portal: step onto a house's glowing pad", "portal", false, false),
 	pick = step("pick", "Pick a difficulty: the run starts when the clock runs out", nil, false, false),
 	waitPad = step("waitPad", "Stay on the pad: the run starts in a moment", nil, false, false),
-	plan = step("plan", "Press LAUNCH to start the move", nil, false, false),
-	planCrew = step("planCrew", "Get ready: the move's owner presses LAUNCH", nil, false, false),
 	door = step("door", "Walk in through the front door", "door", false, false), -- (8.1 walk-in doors: no E)
 	inside = step("inside", "Carry the loot out to the truck (E to pick up)", nil, false, false),
 	load = step("load", "Load the truck: walk in or E at its back", "van", false, false),
@@ -259,7 +253,7 @@ SandboxSteps.Steps = {
 } :: { [string]: Step }
 
 -- 8.3: the soft steps in their order (the first that fits shows). 8.9: sell last (after every step before it; never in a
--- move or its planning, as every soft step).
+-- move, as every soft step).
 SandboxSteps.Soft = { "grow", "hot", "upgrade", "paint", "sell" } :: { string }
 
 -- 8.4: Danny's steps in their order (the first that fits and is not done shows, before the move's own step; 10.1 no
@@ -290,9 +284,6 @@ function SandboxSteps.decide(s: State, done: { [string]: boolean }?): Step
 		end
 		return S.door
 	end
-	if s.planning then
-		return if s.planningMine then S.plan else S.planCrew -- (8.4: no Danny yet: he comes with the move)
-	end
 	if s.pad == true then -- 9.7 runs: on a portal's pad
 		return if s.padHost == true then S.pick else S.waitPad
 	end
@@ -315,13 +306,11 @@ end
 -- when they go up (a piece loaded, a trip unloaded, a piece put on show), so what a save or a crew brought along before
 -- you looked does not.
 function SandboxSteps.doneBy(s: State, done: { [string]: boolean }, last: Last)
-	if s.move or s.planning or s.pad == true then
+	if s.move or s.pad == true then
 		done.portal = true -- (9.7 runs: on a pad, or in the run)
 		done.roundWait = if s.move then true else done.roundWait -- (10.5 rounds: been in one: the banner says the rest)
 	end
 	if s.move then
-		done.plan = true
-		done.planCrew = true
 		done.pick = true
 		done.waitPad = true
 		if s.inside then
@@ -533,12 +522,12 @@ local function fits(id: string, s: State): boolean
 	return false
 end
 
--- The step now: the core loop's while it has something to do (a move, the planning, a core step not done yet; `earn`,
+-- The step now: the core loop's while it has something to do (a move, a core step not done yet; `earn`,
 -- which only says something, gives way), else the first soft step that fits and is not done (none while the screen is
 -- covered or something else talks), else the core's (quiet). 8.4: in a move Danny's step first (decide's).
 function SandboxSteps.choose(s: State, done: { [string]: boolean }): Step
 	local core = SandboxSteps.decide(s, done)
-	if s.move or s.planning or (done[core.id] ~= true and not core.info) or s.covered or s.hush then
+	if s.move or (done[core.id] ~= true and not core.info) or s.covered or s.hush then
 		return core
 	end
 	for _, id in SandboxSteps.Soft do
