@@ -46,7 +46,7 @@ end
 -- ── The owner's table, row by row (9.7 runs: the lobby's words, no driving) ─
 do
 	local step = SandboxSteps.decide(state({}))
-	check("10.4 no run: step into PLAY (the PLAY circle)", step.id == "play" and step.hint == "Step into PLAY to start a run" and step.target == "play"
+	check("10.4 no run: step into PLAY (the PLAY circle; 10.6: \"Step into PLAY to start\": a quick round or a lobby)", step.id == "play" and step.hint == "Step into PLAY to start" and step.target == "play"
 		and not step.nav, show(step))
 	step = SandboxSteps.decide(state({ lobby = true, lobbyHost = true }))
 	check("10.4 in a lobby, its host: READY, then START (no 3D target: the panel and its bar)", step.id == "lobbyHost" and step.target == nil
@@ -74,6 +74,28 @@ do
 		and string.find(step.hint, "Finish or beat the clock", 1, true) == 1 and step.target == "van" and not step.nav, show(step))
 	step = SandboxSteps.decide(state({ move = true, vanLoad = 2, inside = true }))
 	check("… back in the house: carry more out", step.id == "inside", show(step))
+	-- 10.5 rounds: your own van, no FINISH, no portal in the lobby
+	step = SandboxSteps.decide(state({ round = true, move = true, inside = true }))
+	check("10.5 a round, in the house: carry it out to YOUR van", step.id == "roundIn" and string.find(step.hint, "YOUR van", 1, true) ~= nil, show(step))
+	step = SandboxSteps.decide(state({ round = true, move = true, carrying = true }))
+	check("… carrying outside: load it into YOUR van (its back)", step.id == "roundLoad" and step.target == "van", show(step))
+	step = SandboxSteps.decide(state({ round = true, move = true }))
+	check("… empty-handed outside: in through the door (never FINISH)", step.id == "door", show(step))
+	step = SandboxSteps.decide(state({ queued = true }))
+	check("10.6 … in the quick round's queue, in the lobby: the next round starts by itself (no target)", step.id == "roundWait" and step.target == nil
+		and string.find(step.hint, "QUICK ROUND queue", 1, true) ~= nil, show(step))
+	step = SandboxSteps.decide(state({ queued = true, shown = 3 }))
+	check("… queued, pieces on show: they earn, the next round brings more (no target)", step.id == "roundEarn" and step.target == nil and step.info, show(step))
+	step = SandboxSteps.decide(state({ round = true }))
+	check("10.6 … a round's flag with no move (not queued): step into PLAY", step.id == "play", show(step))
+	step = SandboxSteps.decide(state({ queued = true, stock = 3 }))
+	check("… queued with pieces in the stock: on show first (the queue waits by itself)", step.id == "show", show(step))
+	local doneRound: { [string]: boolean } = {}
+	SandboxSteps.doneBy(state({ round = true, move = true }), doneRound, {} :: any)
+	check("… been in a round: the lobby's wait done (the banner says the rest)", doneRound.roundWait == true)
+	local doneQueue: { [string]: boolean } = {}
+	SandboxSteps.doneBy(state({ queued = true }), doneQueue, {} :: any)
+	check("10.6 … in the queue: the PLAY step done (the queue is PLAY's), its wait not yet", doneQueue.play == true and doneQueue.roundWait == nil)
 	step = SandboxSteps.decide(state({ stock = 3 }))
 	check("stock has pieces, no run: put them on show (an empty stand)", step.id == "show" and step.hint == "Put your pieces on show: E at an empty stand" and step.target == "stand", show(step))
 	step = SandboxSteps.decide(state({ stock = 3, freeStands = 2, shown = 1 }))

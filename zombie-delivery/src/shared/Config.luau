@@ -5801,8 +5801,8 @@ Config.Robust = {
 		PlayerTrade = 4, -- 8.7: the PlayerTrade remote's offer / answer / price / buy (server/PlayerTrade.luau)
 		TradeOffer = 0.2, -- 8.7: and a new offer to a player on top: one every 5 s at most (no offer spam)
 		Slots = 4, -- 10.1: the Slots remote's list / play / new (the start screen's save slots: server/SaveSlots.luau)
-		Runs = 4, -- 9.7: the Runs remote's state / vote / leave (the run: server/Runs.luau)
-		Party = 6, -- 10.4: the Party remote's state / create / join / leave / ready / house / difficulty / kick / start / cancel (server/Parties.luau)
+		Runs = 4, -- 9.7: the Runs remote's state / vote / leave (the run: server/Runs.luau; 10.6 the banner's queue)
+		Party = 6, -- 10.4: the Party remote's state / create / join / leave / ready / house / difficulty / kick / start / cancel (server/Parties.luau; 10.6 round)
 		Crew = 4, -- 10.1: the Crew remote's state / pick / discharge (the CREW window: server/HelperCrew.luau)
 	},
 }
@@ -6547,7 +6547,7 @@ Config.Moving = {
 			hordeAt = 3.5 * 60,
 			pay = 1.25,
 		},
-	} :: { { id: string, name: string, client: string, icon: string, home: string?, place: string?, seed: number, kind: string, blurb: string, time: number?, hordeAt: number?, pay: number?, difficulty: string? } },
+	} :: { { id: string, name: string, client: string, icon: string, home: string?, place: string?, seed: number, kind: string, blurb: string, time: number?, hordeAt: number?, pay: number?, difficulty: string?, round: boolean? } },
 	Sites = {
 		farm = {
 			House = { At = { 45, -84 } :: { number }, Size = { 26, 10, 16 } :: { number } },
@@ -7619,14 +7619,17 @@ Config.Collection = {
 --                  on a phone: its buttons a finger's size)
 --   Result         the results card: Width, Rows (pieces listed at most; the rest summed up), TouchScale
 -- The Runs remote (Config.Robust.Limits.Runs): client → server { kind = "state" } | { kind = "vote" } (to finish) |
--- { kind = "leave" } (out of your run alone); server → client { kind = "run", ... } | { kind = "run" } (not in a run),
--- { kind = "result", ... } (the results card), { kind = "unlocked", id } (a difficulty opened). 10.x danger: server →
+-- { kind = "leave" } (out of your run alone) | 10.6 { kind = "queue", on = false } (the round's banner's LEAVE QUEUE);
+-- server → client { kind = "run", ... } | { kind = "run" } (not in a run), { kind = "result", ... } (the results card;
+-- 10.5 a round's with its `round` ranking), { kind = "unlocked", id } (a difficulty opened), 10.5 { kind = "round", ... }
+-- and { kind = "claim", ... } (the quick round: client/RoundUi.luau), { kind = "ride", ... }. 10.x danger: server →
 -- client { kind = "danger", ... } (the run's keys, vault, zombies and its events: client/RunDangerUi.luau).
 -- 10.4 the Party remote (Config.Robust.Limits.Party): client → server { kind = "state" } | { kind = "create", house,
 -- difficulty, friends } | { kind = "join", id } | { kind = "leave" } | { kind = "ready", on } | { kind = "house", id }
 -- | { kind = "difficulty", id } | { kind = "kick", id } | { kind = "start" } | { kind = "cancel" } (the last four the
--- host's); server → client { kind = "play", circle, houses, open, lobbies, lobby? } (you in the circle or in a lobby:
--- server/Parties.luau's view) | { kind = "play" } (neither).
+-- host's) | 10.6 { kind = "round", on } (the QUICK ROUND's queue: JOIN in the circle, LEAVE anywhere); server → client
+-- { kind = "play", circle, houses, open, lobbies, lobby?, round? } (you in the circle or in a lobby: server/Parties.luau's
+-- view; round: the quick round, server/Runs.luau's Runs.roundOf) | { kind = "play" } (neither).
 -- 10.x DANGER (the owner: "both: on the easier difficulties only a timer and traps, on the harder ones zombies too ... it
 -- has to be designed to be fun"; the pure rules shared/DangerRules.luau, tests/danger_test.luau; the server
 -- server/RunDanger.luau, tests/danger_runtime_test.luau; the HUD client/RunDangerUi.luau):
@@ -7729,11 +7732,11 @@ Config.Runs = {
 	Danger = {
 		easy = { Locks = 1, Vault = 0, Legendary = 0, Creak = 2, Puddle = 1, Plaster = 0, Harm = 1, Inside = 0, Yard = 0, Wave = 0, Speed = 1, Boss = false, Weapon = false, Kinds = {} },
 		normal = { Locks = 1, Vault = 1, Legendary = 0, Creak = 2, Puddle = 2, Plaster = 1, Harm = 1.15, Inside = 0, Yard = 0, Wave = 0, Speed = 1, Boss = false, Weapon = false, Kinds = {} },
-		hard = { Locks = 2, Vault = 1, Legendary = 0, Creak = 3, Puddle = 2, Plaster = 2, Harm = 1.3, Inside = 3, Yard = 3, Wave = 0, Speed = 1, Boss = false, Weapon = true, Kinds = { walker = 1 } },
-		insane = { Locks = 2, Vault = 2, Legendary = 0, Creak = 3, Puddle = 3, Plaster = 3, Harm = 1.45, Inside = 5, Yard = 4, Wave = 8, Speed = 1.2, Boss = false, Weapon = true,
-			Kinds = { walker = 0.65, runner = 0.25, bloater = 0.1 } },
-		nightmare = { Locks = 2, Vault = 2, Legendary = 0.35, Creak = 4, Puddle = 3, Plaster = 4, Harm = 1.6, Inside = 7, Yard = 6, Wave = 12, Speed = 1.3, Boss = true, Weapon = true,
-			Kinds = { walker = 0.5, runner = 0.25, brute = 0.15, bloater = 0.1 } },
+		-- (10.5 the owner: "zombies I don't want in the game at all": none at any difficulty, no bat, no boss; the zombies'
+		-- code stays: tests/danger_runtime_test.luau turns them on for itself)
+		hard = { Locks = 2, Vault = 1, Legendary = 0, Creak = 3, Puddle = 2, Plaster = 2, Harm = 1.3, Inside = 0, Yard = 0, Wave = 0, Speed = 1, Boss = false, Weapon = false, Kinds = {} },
+		insane = { Locks = 2, Vault = 2, Legendary = 0, Creak = 3, Puddle = 3, Plaster = 3, Harm = 1.45, Inside = 0, Yard = 0, Wave = 0, Speed = 1, Boss = false, Weapon = false, Kinds = {} },
+		nightmare = { Locks = 2, Vault = 2, Legendary = 0.35, Creak = 4, Puddle = 3, Plaster = 4, Harm = 1.6, Inside = 0, Yard = 0, Wave = 0, Speed = 1, Boss = false, Weapon = false, Kinds = {} },
 	} :: { [string]: RunDanger },
 	Locks = { Hold = 0.5, Reach = 8, Lift = 1, Swing = 0.7, Open = 100, Leaf = { 104, 70, 44 } :: { number }, Iron = { 58, 58, 64 } :: { number }, Brass = { 214, 170, 70 } :: { number } },
 	Search = {
@@ -7778,6 +7781,48 @@ Config.Runs = {
 	},
 	Weapon = { Kind = "bat", Name = "Bat" },
 	DangerHud = { Width = 360, Event = 4, Banner = 3.2, Every = 0.2, Hint = 10, TouchScale = 0.8 },
+}
+
+-- 10.5 ROUNDS (the owner: "16 people on one server … a round starts at one place, everybody runs there, everyone has
+-- their own car, what you carry off to it quickly is yours … not teams"): the lobby's portals give way to one round for
+-- the whole server at a time (server/Runs.luau's round loop, its rules shared/RoundRules.luau, the client
+-- client/RoundUi.luau). A countdown in the lobby (the next place named), then everybody in the game rides there, every
+-- player's own van parked at its curb; whatever you carry to YOUR van and load is yours at once (into your warehouse's
+-- stock); the clock ends it, the results card ranks everybody, the ride back, the next countdown.
+-- 10.6 BOTH IN PLAY (the owner: "Both in the PLAY circle"): the rounds are the PLAY panel's QUICK ROUND beside its
+-- PRIVATE LOBBY (the party lobbies, Config.Runs.Party): nobody goes on a round before they join its queue there (in the
+-- PLAY circle; LEAVE QUEUE in the panel or on the banner takes them out), no queue no round; a round and a lobby's run
+-- never share a house (RunRules.houseBusy).
+--   On            the rounds (false: no QUICK ROUND in the PLAY panel, only the private lobbies)
+--   Wait          s of the countdown in the lobby (it runs while somebody is in the queue)
+--   Stay          10.6: after a round its players stay in the queue for the next one (false: out of it, PLAY again)
+--   Banner        10.6: the lobby's banner (client/RoundUi.luau): TouchScale (its least scale on a phone: LEAVE QUEUE a
+--                 finger's size)
+--   Seconds       a round's clock
+--   Difficulties  a round's difficulty, one at random (its locks, vault and floor hazards: Config.Runs.Danger; its loot:
+--                 Config.Loot); never a zombie since 10.5
+--   Park          the vans at the place: Across studs apart side by side (a Sprinter with its mirrors is Width wide,
+--                 Length long), the rows Along apart behind the curb's (the way its nose looks), Cols × Rows spots
+--                 looked at, Margin off the zone's edge; Height the box over each spot looked through for anything solid
+--                 in the way (a tree, a fence: the spot is skipped)
+--   Reach         the Load prompt at your van's back (only you see it)
+--   Spread        where the players land: PerRow abreast Apart apart, each row Back nearer the door
+--   Results       s the results card shows before the ride back
+--   Top           the HUD's live table: its first Top rows (yours under them when you are further down)
+--   Every         s between the loop's looks
+Config.Rounds = {
+	On = true,
+	Wait = 45,
+	Stay = true,
+	Banner = { TouchScale = 0.8 },
+	Seconds = 300,
+	Difficulties = { "normal", "hard", "insane" } :: { string },
+	Park = { Across = 13, Along = 28, Cols = 17, Rows = 5, Margin = 10, Width = 9.6, Length = 22, Height = 8 },
+	Reach = 10,
+	Spread = { PerRow = 8, Apart = 3.5, Back = 3 },
+	Results = 8,
+	Top = 5,
+	Every = 0.25,
 }
 
 -- 9.x LOOT (the owner: "like Dungeon Quest: you go into a house and you get loot there ... outlines with their own colour

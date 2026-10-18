@@ -32,7 +32,8 @@
 --     outside the house (server/Moving.luau respawnAt);
 --   * PLAY (the Play remote): 9.7 runs: no van in the lobby (your truck, Config.Sandbox.Van, is parked at a run's house
 --     when the run starts: server/Runs.luau); it is your only vehicle (profile.car; no bike, no dealer). Marge's first
---     day is off (no Tutorial);
+--     day is off (no Tutorial). 10.5 rounds: the player attribute InGame (in the game now; 10.6 the quick round's queue is
+--     the PLAY panel's QUICK ROUND, server/Runs.luau Runs.queue: nobody is queued by PLAY);
 --   * CAR (the SpawnCar remote → Vehicles.callCar): 9.7 runs: in a run your truck comes back to its house's curb (when
 --     it was lost); in the lobby no van comes (said so). No chauffeur and no repair bay: every van parked here comes
 --     repaired. A forced spawn (an admin's: Vehicles.homeGarage) and Vehicles.placeNear (you in the driver's seat)
@@ -282,6 +283,7 @@ local function remotes(queueState: (Player) -> ())
 			return
 		end
 		playing[player] = true
+		player:SetAttribute("InGame", true) -- 10.5: in the game now (10.6: no queue by it: the PLAY panel's QUICK ROUND queues)
 		local slots = Server:FindFirstChild("SaveSlots") -- 10.1: a PLAY with no slot picked (an old client): the slot saved last
 		if slots and slots:IsA("ModuleScript") then
 			local picked, why = pcall(function()

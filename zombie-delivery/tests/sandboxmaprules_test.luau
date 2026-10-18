@@ -268,6 +268,20 @@ do
 	check("… one counting down: STARTING", line == "STARTING" and tone == "starting")
 	check("names: the first few, +n for the rest", Rules.names({ "A", "B", "C", "D", "E" }, 3) == "A, B, C +2" and Rules.names({ "A" }, 3) == "A" and Rules.names({}, 3) == "")
 	check("the clock: m:ss", Rules.clock(463) == "7:43" and Rules.clock(59.6) == "1:00" and Rules.clock(-5) == "0:00")
+	-- 10.6 both in PLAY: the side column's QUICK ROUND row (the PLAY circle's Round… attributes)
+	top, bottom, tone = Rules.roundLine({ phase = "wait", house = "old_mill", difficulty = "hard", endsAt = 1042, queued = 3 }, 1000)
+	check("10.6 the QUICK ROUND row: ⚡ THE OLD MILL over NEXT · HARD · 0:42 · 3 QUEUED (starting)", top == "⚡ THE OLD MILL"
+		and bottom == "NEXT · HARD · 0:42 · 3 QUEUED" and tone == "starting", `{top} / {bottom}`)
+	top, bottom, tone = Rules.roundLine({ phase = "play", house = "pond_cabin", difficulty = "insane", endsAt = 1192, queued = 0, movers = 5 }, 1000)
+	check("… the round on: ON · 3:12 LEFT · 5 MOVERS (run)", top == "⚡ THE POND CABIN" and bottom == "ON · 3:12 LEFT · 5 MOVERS" and tone == "run", bottom)
+	top, bottom, tone = Rules.roundLine({ phase = "over", house = "pond_cabin", queued = 2, endsAt = 1009 }, 1000)
+	check("… over: the next one is coming (full)", string.find(bottom, "THE NEXT ONE IS COMING", 1, true) ~= nil and tone == "full", bottom)
+	top, bottom, tone = Rules.roundLine({ phase = "idle", queued = 0 }, 1000)
+	check("… nobody queued: STEP INTO PLAY (free)", top == "⚡ QUICK ROUND" and bottom == "NOBODY QUEUED · STEP INTO PLAY" and tone == "free", bottom)
+	top, bottom, tone = Rules.roundLine({ phase = "wait", queued = 4 }, 1000)
+	check("… no house free yet: WAITING FOR A FREE HOUSE", bottom == "WAITING FOR A FREE HOUSE · 4 QUEUED" and tone == "starting", bottom)
+	check("NEG. … none, the rounds off, junk: no row (off)", select(3, Rules.roundLine(nil, 0)) == "off" and select(3, Rules.roundLine({ phase = "off" }, 0)) == "off"
+		and select(3, Rules.roundLine(5, 0)) == "off")
 end
 
 -- ── Layout ───────────────────────────────────────────────────────────────────

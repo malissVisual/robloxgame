@@ -13,7 +13,8 @@
 --   * M opens it (a window: its onOpen ran), M again, B, the ✕, the shade, SandboxMapUi.close() (ESC) close it; L2 with
 --     a gamepad on foot opens it, not while carrying or in a seat;
 --   * the lobby: on the screen, its map and its side column (10.4: the PLAY row; OPEN LOBBIES, a row a lobby: its host
---     and house over its difficulty, n/4, FRIENDS ONLY, FULL, STARTING; IN A RUN, a row a run: its house over its
+--     and house over its difficulty, n/4, FRIENDS ONLY, FULL, STARTING; 10.6 the QUICK ROUND row under PLAY: its next
+--     place, its difficulty, the countdown, how many are queued; IN A RUN, a row a run: its house over its
 --     difficulty and party; a finger's size on a phone), the plaza, the hedge, the plots (yours YOUR WAREHOUSE in gold,
 --     its UPGRADES desk), PAINT, TOP MOVERS, DISPATCH, the PLAY circle (▶ PLAY over its line, its ring amber while a
 --     lobby counts down), Ann's dot and name, you a ▲ turned your way; every label in the map, none on another, its
@@ -416,6 +417,10 @@ playModel:SetAttribute(Config.Runs.Party.Attribute, PartyRules.encode({
 	{ host = "Evangelina Longname", house = "orchard_cottage", difficulty = "nightmare", n = 4, max = 4, friends = false, state = "full" },
 	{ host = "Cid", house = "sandbox_house", difficulty = "hard", n = 2, max = 4, friends = false, state = "run", who = "Cid, Dee" },
 }))
+-- 10.6 both in PLAY: the quick round's attributes on the circle (server/Runs.luau's): its next place, the countdown, 3 queued
+for key, value in { RoundPhase = "wait", RoundHouse = "lone_house", RoundDifficulty = "insane", RoundEndsAt = M.now + 42, RoundQueued = 3, RoundMovers = 0 } do
+	playModel:SetAttribute(key, value)
+end
 
 local SCREENS = { { true, 844, 354, "a phone (844 × 390)", "844x390" }, { true, 667, 339, "a small phone (667 × 375)", "667x375" },
 	{ false, 1280, 764, "a computer (1280 × 800)", "1280x800" }, { false, 1920, 1044, "a big screen (1920 × 1080)", "1920x1080" } }
@@ -466,7 +471,11 @@ local function lobbyChecks(label)
 			and rows[4].top.Text == "THE OLD FARMSTEAD" and rows[4].bottom.Text == "IN A RUN · HARD · Cid, Dee" and not rows[5].row.Visible
 			and shown(named(side, "OpenTitle")) and shown(named(side, "RunsTitle")) and not shown(named(side, "None")),
 		rows and `{rows[1].top.Text} / {rows[1].bottom.Text} / {rows[2].bottom.Text} / {rows[3].bottom.Text} / {rows[4].top.Text} / {rows[4].bottom.Text}`)
-	local order = { play.row, named(side, "OpenTitle"), rows[1].row, rows[2].row, rows[3].row, named(side, "RunsTitle"), rows[4].row, named(side, "LegendTitle") }
+	local quick = parts.quick
+	check(`{label}: … 10.6 the QUICK ROUND row under PLAY: its next place, the countdown, 3 queued`, quick ~= nil and quick.row.Visible
+		and quick.top.Text == "⚡ THE LONE HOUSE" and quick.bottom.Text == "NEXT · INSANE · 0:42 · 3 QUEUED" and shown(named(side, "QuickTitle")),
+		quick and `{quick.top.Text} / {quick.bottom.Text}`)
+	local order = { play.row, named(side, "QuickTitle"), quick.row, named(side, "OpenTitle"), rows[1].row, rows[2].row, rows[3].row, named(side, "RunsTitle"), rows[4].row, named(side, "LegendTitle") }
 	local stacked = nil
 	for n = 2, #order do
 		if box(order[n]).y0 < box(order[n - 1]).y1 - 0.01 then

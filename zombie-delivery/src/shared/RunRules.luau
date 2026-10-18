@@ -19,6 +19,12 @@
 --                                    (nil: none new)
 --   RunRules.choose(count, want) -> id   the difficulty a host gets: `want` when open, else the hardest open one under
 --                                    it (10.4: a party lobby's host's pick: shared/PartyRules.luau)
+--   RunRules.houseBusy(house, inRun, round?) -> why?   10.6 both in PLAY (the quick round and the private lobbies): the
+--                                    one check of a house both use (server/Runs.luau's Runs.houseBusy): why it takes no
+--                                    new run now, else nil: "round" (`round` { house, phase }: the quick round counts down
+--                                    to it, plays there or rides back from it: phase "wait", "play" or "over"; a lobby
+--                                    picks another house) or "run" (inRun(house): a run is in it, a lobby's or the
+--                                    round's; the round's own pick passes no `round`, so it takes a house no run uses)
 --
 -- In a run:
 --   RunRules.voteDone(votes, members) -> bool   everybody in the run (still there) asked to FINISH
@@ -95,6 +101,19 @@ function RunRules.choose(count: number, want: any): string
 	local n = RunRules.index(want) or (RunRules.index(R.Default) :: number)
 	local open = math.clamp(count, R.Open, #LIST)
 	return LIST[math.min(n, open)].id
+end
+
+function RunRules.houseBusy(house: any, inRun: (string) -> boolean, round: { house: string?, phase: string }?): string?
+	if type(house) ~= "string" then
+		return nil
+	end
+	if round and round.house == house and (round.phase == "wait" or round.phase == "play" or round.phase == "over") then
+		return "round"
+	end
+	if inRun(house) then
+		return "run"
+	end
+	return nil
 end
 
 -- ── In a run ───────────────────────────────────────────────────────────────

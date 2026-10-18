@@ -229,6 +229,33 @@ do
 		and e.n == 1 and e.max == R.MaxParty and e.friends and e.state == "open")
 end
 
+-- ── 10.6 both in PLAY: the quick round's place is busy for a lobby (Runs.houseBusy's "round") ──────────────────
+do
+	local book = PartyRules.newBook()
+	local roundAt = "old_mill"
+	local both = function(house: string): string?
+		return if house == roundAt then "round" elseif house == "lone_house" then "run" else nil
+	end
+	check("10.6 busyWhy: \"round\", \"run\" (true too), nil", PartyRules.busyWhy(both, "old_mill") == "round" and PartyRules.busyWhy(both, "lone_house") == "run"
+		and PartyRules.busyWhy(busy, "lone_house") == "run" and PartyRules.busyWhy(both, "pond_cabin") == nil)
+	check("…houseState: the quick round's place \"round\", a run's \"run\", the rest free", PartyRules.houseState(book, "old_mill", both) == "round"
+		and PartyRules.houseState(book, "lone_house", both) == "run" and PartyRules.houseState(book, "pond_cabin", both) == "free")
+	local refused, why = PartyRules.create(book, ANN, "old_mill", "normal", false, R.Open, both, 10)
+	check("NEG. …CREATE on the quick round's place: refused (round), its words name it", refused == nil and why == "round"
+		and PartyRules.why(why, "old_mill") == "The Old Mill is the quick round's place right now: pick another house.", why)
+	local lobby = (PartyRules.create(book, ANN, "pond_cabin", "normal", false, R.Open, both, 11)) :: PartyRules.Lobby
+	check("NEG. …CHANGE HOUSE to it: refused, the lobby keeps its house", lobby ~= nil and PartyRules.setHouse(book, ANN, "old_mill", both) == "round" and lobby.house == "pond_cabin")
+	PartyRules.ready(book, ANN, true)
+	roundAt = "pond_cabin" -- (the round picked the lobby's house after all: no other was free)
+	local ok, whyNot = PartyRules.canStart(lobby, both)
+	check("NEG. …the round's place becomes the lobby's house: START refused (round), no countdown", not ok and whyNot == "round"
+		and PartyRules.start(book, ANN, both, 12) == "round" and lobby.endsAt == nil)
+	roundAt = "old_mill"
+	check("…the round gone elsewhere: START goes", PartyRules.start(book, ANN, both, 13) == nil and lobby.endsAt ~= nil)
+	check("…the queue's words: queued (LEAVE THE QUEUE first), notQueued, inRun, roundOff", string.find(PartyRules.why("queued"), "LEAVE THE QUEUE first", 1, true) ~= nil
+		and PartyRules.why("notQueued") ~= "That did not work." and PartyRules.why("inRun") ~= "That did not work." and PartyRules.why("roundOff") ~= "That did not work.")
+end
+
 if failures == 0 then
 	print("ALL CHECKS PASSED")
 else

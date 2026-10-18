@@ -37,6 +37,7 @@
 -- task.delay + E.fire). E.sent keeps every FireClient: E.messages / E.lastNotice / E.heard read it.
 local Mock = require("./ItemMock")
 local Config = require("./Config")
+Config.Rounds.On = false -- (10.6: the private lobbies only here; tests/rounds_runtime_test.luau and tests/bothplay_runtime_test.luau turn the rounds on)
 local SandboxMapReal = require("./SandboxMap")
 local SprinterLooks = require("./SprinterLooks")
 local Economy = require("./Economy")

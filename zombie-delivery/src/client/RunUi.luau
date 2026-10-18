@@ -7,9 +7,11 @@
 --     warehouse it went to; the best first, the rest in a list that scrolls), the total value, yours, a difficulty
 --     that opened ("🔓 HARD is open"). On a phone it fits the screen (the list scrolls). 10.x danger: a line for the
 --     run's danger when it had any (the result's `danger`, server/RunDanger.luau: "🗝 VAULT OPENED ✓ · 🧟 ZOMBIES
---     STOPPED: 7").
+--     STOPPED: 7"). 10.5 rounds (the result's `round`: its ranking, your place): ROUND OVER, your place ("🥇 YOU: 1ST
+--     OF 6"), yours, and everybody's row in place of the pieces (place, name, pieces, value; yours lit); a lobby run's
+--     card stays the pieces' (10.6: both start in the PLAY panel).
 --   RunUi.start()     the remote, the screen; 10.4 PlayUi.start
---   RunUi.play()      10.4: the PLAY view now (client/PlayUi.luau's: { circle, lobby?, lobbies, houses, … }) or nil
+--   RunUi.play()      10.4: the PLAY view now (client/PlayUi.luau's: { circle, lobby?, lobbies, houses, round, … }) or nil
 --   RunUi.lobby()     10.4: your party lobby now ({ house, mine, members, endsAt, … }) or nil (client/SandboxGuide.luau)
 --   RunUi.run()       the run you are in now ({ house, mine, … }) or nil
 --   RunUi.isOpen()    the results card or the PLAY panel is open (a window: it frees the mouse, Main's windowOpen)
@@ -89,6 +91,14 @@ end
 -- ── The results card ───────────────────────────────────────────────────────
 
 local HEAD: { [string]: string } = { done = "RUN COMPLETE", late = "TIME'S UP", cancelled = "RUN CALLED OFF", failed = "NOTHING CAME HOME" }
+local MEDAL = { "🥇", "🥈", "🥉" } -- 10.5 rounds: the table's first three
+
+-- 10.5 rounds: 1st, 2nd, 3rd, 4th …
+local function ordinal(n: number): string
+	local tens, ones = n % 100, n % 10
+	local suffix = if tens >= 11 and tens <= 13 then "th" elseif ones == 1 then "st" elseif ones == 2 then "nd" elseif ones == 3 then "rd" else "th"
+	return `{n}{suffix}`
+end
 
 function RunUi.close()
 	if card then
@@ -135,7 +145,9 @@ local function showResult(r: { [string]: any })
 	local camera = workspace.CurrentCamera
 	local screenH = if camera then camera.ViewportSize.Y - 36 else 600
 	local W = R.Result.Width
-	local pieces = if type(r.pieces) == "table" then r.pieces else {}
+	local round = if type(r.round) == "table" then r.round else nil -- 10.5 rounds: the table in place of the pieces
+	local ranking = if round and type(round.ranking) == "table" then round.ranking else nil
+	local pieces = if ranking then ranking elseif type(r.pieces) == "table" then r.pieces else {}
 	local def = RunRules.def(r.difficulty)
 	local opened = type(r.openedName) == "string"
 	local danger = dangerText(r.danger) -- 10.x danger
@@ -156,18 +168,21 @@ local function showResult(r: { [string]: any })
 	}, root)
 	Ui.make("UIScale", { Name = "Scale", Scale = S }, frame)
 	Ui.corner(frame, 12)
-	local good = r.phase == "done" or r.phase == "late"
+	local good = r.phase == "done" or r.phase == "late" or round ~= nil
 	Ui.stroke(frame, if good then K.good else K.red, 2)
 	card = frame
 	local y = 12
-	label(frame, "Head", `{HEAD[r.phase] or "RUN OVER"} · {string.upper(tostring(r.name or ""))} · {if def then string.upper(def.name) else ""}`, UDim2.new(1, -24, 0, 20),
+	label(frame, "Head", `{if round then "ROUND OVER" else HEAD[r.phase] or "RUN OVER"} · {string.upper(tostring(r.name or ""))} · {if def then string.upper(def.name) else ""}`, UDim2.new(1, -24, 0, 20),
 		{ Position = UDim2.fromOffset(12, y), Font = Theme.HeadingFont, TextSize = 14, TextColor3 = if good then K.good else K.red, TextTruncate = Enum.TextTruncate.AtEnd })
 	y += 22
 	label(frame, "Why", tostring(r.why or ""), UDim2.new(1, -24, 0, 32), { Position = UDim2.fromOffset(12, y), TextSize = 12, TextColor3 = K.secondary, TextWrapped = true, TextYAlignment = Enum.TextYAlignment.Top })
 	y += 34
 	local count, value = tonumber(r.count) or 0, tonumber(r.value) or 0
-	label(frame, "Total", `{count} PIECE{if count == 1 then "" else "S"} HOME · {Ui.money(value)}`, UDim2.new(1, -24, 0, 28),
-		{ Position = UDim2.fromOffset(12, y), Font = Theme.HeadingFont, TextSize = 22, TextColor3 = MONEY, TextXAlignment = Enum.TextXAlignment.Center })
+	local place = if round then tonumber(round.place) or 0 else 0
+	label(frame, "Total", if round
+		then (if place > 0 then `{MEDAL[place] or "🏁"} YOU: {string.upper(ordinal(place))} OF {tonumber(round.players) or 0}` else "🏁 THE ROUND")
+		else `{count} PIECE{if count == 1 then "" else "S"} HOME · {Ui.money(value)}`, UDim2.new(1, -24, 0, 28),
+		{ Position = UDim2.fromOffset(12, y), Font = Theme.HeadingFont, TextSize = 22, TextColor3 = if round then GOLD else MONEY, TextXAlignment = Enum.TextXAlignment.Center })
 	y += 30
 	local mine, mineValue = tonumber(r.mine) or 0, tonumber(r.mineValue) or 0
 	label(frame, "Yours", `YOURS: {mine} · {Ui.money(mineValue)} → your warehouse`, UDim2.new(1, -24, 0, 18),
@@ -188,7 +203,24 @@ local function showResult(r: { [string]: any })
 		CanvasSize = UDim2.fromOffset(0, #pieces * ROW),
 	}, frame)
 	local me = tonumber(r.me)
-	for n, piece in pieces do
+	for n, row in (if ranking then ranking else {}) :: { any } do -- 10.5 rounds: everybody's row, the most value first
+		local rowFrame = Ui.make("Frame", {
+			Name = `Rank{n}`,
+			Size = UDim2.new(1, -6, 0, ROW - 4),
+			Position = UDim2.fromOffset(0, (n - 1) * ROW),
+			BackgroundColor3 = if row.id == me then K.raised else K.row,
+			BorderSizePixel = 0,
+		}, list)
+		Ui.corner(rowFrame, 5)
+		local at = tonumber(row.place) or n
+		label(rowFrame, "Place", MEDAL[at] or `{at}.`, UDim2.fromOffset(34, ROW - 4), { Position = UDim2.fromOffset(8, 0), Font = Theme.HeadingFont, TextSize = 13, TextColor3 = GOLD })
+		label(rowFrame, "Name", tostring(row.name or ""), UDim2.new(1, -190, 0, ROW - 4),
+			{ Position = UDim2.fromOffset(44, 0), Font = if row.id == me then Theme.HeadingFont else Theme.Font, TextSize = 12, TextTruncate = Enum.TextTruncate.AtEnd, TextColor3 = if row.id == me then GOLD else K.text })
+		label(rowFrame, "Count", `📦 {tonumber(row.count) or 0}`, UDim2.fromOffset(60, ROW - 4), { Position = UDim2.new(1, -142, 0, 0), TextSize = 11, TextColor3 = K.secondary })
+		label(rowFrame, "Value", Ui.money(tonumber(row.value) or 0), UDim2.fromOffset(64, ROW - 4),
+			{ Position = UDim2.new(1, -70, 0, 0), Font = Theme.HeadingFont, TextSize = 12, TextColor3 = MONEY, TextXAlignment = Enum.TextXAlignment.Right })
+	end
+	for n, piece in (if ranking then {} else pieces) :: { any } do
 		local tier, rank = tierOf(piece.rarity)
 		local c = rgb(tier.color)
 		local rowFrame = Ui.make("Frame", {

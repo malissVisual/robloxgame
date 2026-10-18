@@ -24,6 +24,15 @@
 --     who), PartyRules.encode, written only when it changes; its ring, posts and glow in Play.Waiting while a lobby
 --     counts down (else Play.Free) and its sign's Status line ("STEP IN TO PLAY", "2 OPEN LOBBIES · STEP IN",
 --     "STARTING IN 3 · THE OLD MILL").
+--   * 10.6 BOTH IN PLAY (the owner: "Both in the PLAY circle"): the PLAY view's `round` (server/Runs.luau's
+--     Runs.roundOf: the quick round's phase, its next or current place, difficulty, clock, how many are queued, you
+--     queued or not; nil while Config.Rounds.On is false) and the Party remote's { kind = "round", on }: JOIN THE QUEUE
+--     (in the circle only, in no lobby: Runs.queue) or LEAVE THE QUEUE (anywhere). Somebody queued makes or joins no
+--     lobby ("queued": LEAVE THE QUEUE first). A house is busy for a lobby (Runs.houseBusy, RunRules.houseBusy: the
+--     one check the rounds use too) while a run is in it or it is the quick round's place (its countdown, its round,
+--     its ride back): the house cards say QUICK ROUND, CREATE / CHANGE HOUSE / START refuse it. The map's IN A RUN
+--     lists the lobbies' runs only (the round has its own line: Runs' attributes on the circle); the circle's sign
+--     names the next round ("QUICK ROUND IN 0:42 · THE OLD MILL") when no lobby counts down.
 --
 --   Parties.start(runs)              the remote, the loop (once; `runs`: server/Runs.luau)
 --   Parties.step()                   one look (the loop's; the tests')
@@ -85,8 +94,10 @@ local function houseName(house: string): string
 	return if h then h.name else house
 end
 
-local function busy(house: string): boolean
-	return runs ~= nil and runs.inUse(house) == true
+-- 10.6: why a house takes no lobby's run now ("round": the quick round's place; "run": a run in it), nil free
+-- (server/Runs.luau's Runs.houseBusy: RunRules.houseBusy, the one check both use).
+local function busy(house: string): string?
+	return if runs then runs.houseBusy(house) else nil
 end
 
 local function openOf(player: Player): number
@@ -204,7 +215,7 @@ function Parties.viewOf(player: Player): { [string]: any }?
 			by = nameOf(holder.host)
 		elseif state == "run" and runs then
 			for _, run in runs.list() do
-				if run.house == h.id then
+				if run.house == h.id and not run.round then
 					by = run.host.DisplayName
 				end
 			end
@@ -236,7 +247,8 @@ function Parties.viewOf(player: Player): { [string]: any }?
 			mine = lobby == mine,
 		})
 	end
-	return { kind = "play", circle = here, me = id, open = open, houses = houses, lobbies = lobbies, lobby = if mine then lobbyView(mine, player) else nil }
+	return { kind = "play", circle = here, me = id, open = open, houses = houses, lobbies = lobbies, lobby = if mine then lobbyView(mine, player) else nil,
+		round = if runs then runs.roundOf(player) else nil } -- (10.6: the quick round, the panel's QUICK ROUND)
 end
 
 -- A view as one string (a key: is it the one sent last?), its fields sorted.
@@ -306,6 +318,9 @@ local function publish()
 	end
 	if runs then
 		for _, run in runs.list() do
+			if run.round then
+				continue -- (10.6: the quick round has its own line on the map: Runs' attributes on the circle)
+			end
 			local who: { string } = {}
 			for _, p in run.party do
 				table.insert(who, p.DisplayName)
@@ -320,7 +335,10 @@ local function publish()
 		model:SetAttribute(PA.Attribute, text)
 	end
 	local open = #book.lobbies
+	local round = if runs then runs.roundOf(nil) else nil -- (10.6: the quick round's next place)
+	local upcoming = round and round.phase == "wait" and round.house and round.endsAt
 	local line = if starting then `STARTING IN {PartyRules.left(starting, now())} · {string.upper(houseName(starting.house))}`
+		elseif upcoming then `QUICK ROUND IN {RunRules.clock(math.max(0, round.endsAt - now()))} · {string.upper(houseName(round.house))}`
 		elseif open > 0 then `{open} OPEN LOBB{if open == 1 then "Y" else "IES"} · STEP IN`
 		else "STEP IN TO PLAY"
 	local color = if starting then PL.Waiting else PL.Free
@@ -434,6 +452,8 @@ local function onRequest(player: Player, message: any)
 		house = if type(message.house) == "string" then message.house else nil
 		if not inCircleNow(player) then
 			why = "circle"
+		elseif runs.queued(player) then
+			why = "queued" -- (10.6: the quick round's queue first)
 		else
 			local lobby, refused = PartyRules.create(book, id, message.house, message.difficulty, message.friends, openOf(player), busy, now())
 			why = refused
@@ -451,6 +471,8 @@ local function onRequest(player: Player, message: any)
 			why = "circle"
 		elseif not lobby then
 			why = "gone"
+		elseif runs.queued(player) then
+			why = "queued" -- (10.6)
 		else
 			local friend = lobby.host == id or not lobby.friends or askFriend(lobby.host, id) -- (it may wait: join checks again)
 			local joined, refused = PartyRules.join(book, message.id, id, friend, now())
@@ -491,6 +513,18 @@ local function onRequest(player: Player, message: any)
 		end
 	elseif kind == "cancel" then
 		why = PartyRules.cancel(book, id)
+	elseif kind == "round" then -- 10.6 the QUICK ROUND: JOIN THE QUEUE (in the circle) / LEAVE THE QUEUE (anywhere)
+		if message.on == true and not inCircleNow(player) then
+			why = "circle"
+		else
+			why = runs.queue(player, message.on == true)
+			if why == nil then
+				local round = runs.roundOf(player)
+				say(player, if message.on ~= true then "⚡ You left the QUICK ROUND queue."
+					elseif round and round.phase == "play" then "⚡ You are in the QUICK ROUND queue: a round is on, you go in the next one. Walk around while you wait."
+					else "⚡ You are in the QUICK ROUND queue: the banner counts down to the next round. Walk around while you wait.")
+			end
+		end
 	else
 		return
 	end

@@ -19,12 +19,23 @@
 --     house, the difficulty, the players and who is READY, STARTING IN 3, and OPEN. A computer's top centre under the
 --     HUD's top row, a touch screen's top right (where the 9.7 pad panel stood). Walking away keeps you in the lobby.
 --   * The circle's glow breathes (its PlayGlow part, Play.Pulse s a breath: a tween on this screen only).
+--   * 10.6 BOTH IN PLAY (the owner: "Both in the PLAY circle"; the view's `round`: server/Runs.luau's quick round, nil
+--     while Config.Rounds.On is false: the screens above as they were). The home screen is the two choices side by side:
+--       QUICK ROUND (the left, in gold): what it is (everybody in the queue rides to one house, each to their own van,
+--         what you load is yours), the next round's place with its little picture, its difficulty, the countdown and
+--         how many are queued (or the round on, or none yet), its rules, ⚡ JOIN THE QUEUE ({ kind = "round", on =
+--         true });
+--       PRIVATE LOBBY (the right): ＋ CREATE A LOBBY, how it works, the open lobbies to JOIN as before.
+--     In the queue (the view's round.mine) the home screen is the queue's ("queue"): ✓ YOU ARE IN THE QUEUE, the next
+--     round and its countdown, LEAVE THE QUEUE ({ kind = "round", on = false }; the banner's too, client/RoundUi.luau);
+--     CREATE and JOIN wait (leave the queue first). A house card of the quick round's place says QUICK ROUND.
 --   PlayUi.start()           the remote, the screen (client/RunUi.luau's start)
---   PlayUi.view()            the server's view now ({ circle, lobby?, lobbies, houses, … }) or nil (client/SandboxGuide.luau)
+--   PlayUi.view()            the server's view now ({ circle, lobby?, lobbies, houses, round?, … }) or nil
+--                            (client/SandboxGuide.luau)
 --   PlayUi.isOpen()          the panel is open (a window: RunUi.isOpen)
 --   PlayUi.close()           shuts the panel (ESC, another window)
 --   PlayUi.open()            opens it (the bar's OPEN)
---   PlayUi.screen()          which screen shows: "home" | "create" | "lobby" | "house" (the checks)
+--   PlayUi.screen()          which screen shows: "home" | "queue" (10.6) | "create" | "lobby" | "house" (the checks)
 --   PlayUi.onOpen            set by client/RunUi.luau: called when the panel opens (one window at a time)
 
 local Players = game:GetService("Players")
@@ -35,6 +46,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Net = require(Shared.Net)
 local RunRules = require(Shared.RunRules)
+local RoundRules = require(Shared.RoundRules) -- 10.6: the quick round's clock
 local Theme = require(script.Parent.Theme)
 local Ui = require(script.Parent.Ui)
 
@@ -55,10 +67,10 @@ local BAR_TOP = 120 -- px: the bar's top on a computer (under the HUD's top row 
 
 local remote: RemoteEvent? = nil
 local gui: ScreenGui? = nil
-local ui: { [string]: any } = {} -- panel, bar, the countdown labels
+local ui: { [string]: any } = {} -- panel, bar, the countdown labels (10.6: quick, the quick round's line)
 local state = {
 	view = nil :: { [string]: any }?,
-	screen = "home", -- "home" | "create" | "lobby" | "house"
+	screen = "home", -- "home" | "queue" (10.6: in the quick round's queue) | "create" | "lobby" | "house"
 	shut = false, -- ✕ / ESC in the circle: shut until you step out and in again (or OPEN)
 	open = false, -- OPEN on the bar: the panel shows wherever you are (in a lobby)
 	was = false, -- in the circle at the view before
@@ -279,6 +291,8 @@ local function houseCards(parent: Instance, view: { [string]: any }, x: number, 
 		local status, tone = "FREE", K.good
 		if h.mine == true then
 			status, tone = "YOUR LOBBY'S", GOLD
+		elseif h.state == "round" then
+			status, tone = "QUICK ROUND", GOLD -- (10.6: the quick round's place)
 		elseif h.state == "run" then
 			status, tone = `IN A RUN{if h.by then " · " .. string.upper(h.by) else ""}`, K.red
 		elseif h.state == "lobby" then
@@ -340,6 +354,106 @@ local function homeScreen(panel: Frame, view: { [string]: any })
 			send({ kind = "join", id = l.id })
 		end else nil)
 		join.TextSize = if joinable then 15 else 11
+	end
+end
+
+-- 10.6: the quick round's lines now: (kicker, place, info): what it is now ("NEXT ROUND"), its place, its difficulty
+-- and the clock (or the round on, over, none yet).
+local function quickLines(round: { [string]: any }): (string, string, string)
+	local name = string.upper(tostring(round.name or ""))
+	local left = if type(round.endsAt) == "number" then RoundRules.clock(round.endsAt - now()) else ""
+	if round.phase == "wait" and round.house then
+		return "NEXT ROUND", name, `{difficultyName(round.difficulty)} · STARTS IN {left}`
+	elseif round.phase == "wait" then
+		return "NEXT ROUND", "WAITING FOR A FREE HOUSE", "EVERY HOUSE IS IN USE"
+	elseif round.phase == "play" then
+		return "ROUND ON", name, `{left} LEFT · {tonumber(round.movers) or 0} MOVERS`
+	elseif round.phase == "over" then
+		return "ROUND OVER", name, "THE NEXT ONE IS COMING"
+	end
+	return "NO ROUND YET", "JOIN: A COUNTDOWN STARTS", `{RoundRules.clock(Config.Rounds.Wait)}, THEN EVERYBODY RIDES`
+end
+
+-- 10.6 BOTH IN PLAY: the home screen's two choices (QUICK ROUND, PRIVATE LOBBY); in the queue, the queue's.
+local function bothScreen(panel: Frame, view: { [string]: any }, round: { [string]: any })
+	local W, H = PN.Width, PN.Height
+	local queued = round.mine == true
+	-- the left: the quick round
+	local cardW, cardH = 280, H - 70 - 12
+	local quick = Ui.make("Frame", { Name = "Quick", Position = UDim2.fromOffset(16, 70), Size = UDim2.fromOffset(cardW, cardH), BackgroundColor3 = K.row, BorderSizePixel = 0, ZIndex = 3 }, panel)
+	Ui.corner(quick, 10)
+	Ui.stroke(quick, GOLD, if queued then 2 else 1)
+	local inner = cardW - 24
+	label(quick, "QuickTitle", if queued then "✓ YOU ARE IN THE QUEUE" else "⚡ QUICK ROUND", 12, 10, inner, 24, 18, GOLD, true, true)
+	wrapped(quick, "QuickLine", if queued then "The next round takes you by itself. Walk around while you wait: the banner at the top counts down."
+		else "Everybody in the queue rides to one house, each to their own van. What you load is yours at once.", 12, 40, inner, 62, 13, K.text)
+	if round.house then
+		picture(quick, round.house, 12, 106, 44)
+	end
+	local textX = if round.house then 64 else 12
+	local kicker, place, info = quickLines(round)
+	label(quick, "QuickKicker", kicker, textX, 106, cardW - textX - 12, 16, 11, K.secondary, true, true)
+	label(quick, "QuickPlace", place, textX, 124, cardW - textX - 12, 20, 13, K.text, true, true)
+	ui.quick = label(quick, "QuickInfo", info, 12, 156, inner, 18, 12, if round.phase == "wait" then GOLD else K.secondary, true, true)
+	label(quick, "QuickCount", `{tonumber(round.queued) or 0} IN THE QUEUE`, 12, 176, inner, 16, 12, K.secondary, false, true)
+	wrapped(quick, "QuickRules", `• {RoundRules.clock(tonumber(round.seconds) or Config.Rounds.Seconds)}, the most value wins\n• No helpers, no FINISH\n• LEAVE THE ROUND any time`,
+		12, 198, inner, 50, 12, K.secondary)
+	local go = button(quick, "Queue", if queued then "LEAVE THE QUEUE" else "⚡ JOIN THE QUEUE", 12, cardH - 12 - BUTTON, inner, BUTTON, if queued then K.charcoal else GOLD,
+		if queued then K.red else K.charcoal, function()
+			send({ kind = "round", on = not queued })
+		end)
+	go.TextSize = 15
+	if queued then
+		Ui.stroke(go, K.red, 1)
+	end
+	-- the right: the private lobbies (they wait while you are in the queue)
+	local x, w = 312, W - 328
+	label(panel, "LobbyTitle", "👥 PRIVATE LOBBY", x, 70, w, 20, 14, K.text, true)
+	local create = button(panel, "Create", "", x, 94, w, BUTTON, if queued then K.track else K.raised, K.text, if queued then nil else function()
+		state.house, state.difficulty, state.friends = nil, nil, false -- (each new lobby: public until picked)
+		goTo("create")
+	end)
+	if not queued then
+		Ui.stroke(create, BLUE, 2)
+	end
+	label(create, "Title", "＋ CREATE A LOBBY", 0, 8, w, 22, 16, if queued then K.secondary else K.text, true).TextXAlignment = Enum.TextXAlignment.Center
+	label(create, "Line1", "Your house, your difficulty, your friends", 0, 32, w, 16, 12, K.secondary).TextXAlignment = Enum.TextXAlignment.Center
+	label(panel, "How", if queued then "In the queue: LEAVE THE QUEUE to make or join a lobby"
+		else `Up to {R.MaxParty} · everybody READY · the host STARTs · Danny comes`, x, 156, w, 18, 12, if queued then GOLD else K.secondary, false, true)
+	local rows: { { [string]: any } } = {}
+	for _, l in view.lobbies or {} do
+		if l.mine ~= true then
+			table.insert(rows, l)
+		end
+	end
+	label(panel, "ListTitle", `OPEN LOBBIES · {#rows}`, x, 180, w, 18, 13, K.text, true)
+	local top = 202
+	local list = Ui.make("ScrollingFrame", {
+		Name = "Lobbies",
+		Position = UDim2.fromOffset(x, top),
+		Size = UDim2.fromOffset(w, H - top - 12),
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		ScrollBarThickness = 4,
+		CanvasSize = UDim2.fromOffset(0, #rows * 72),
+		ZIndex = 3,
+	}, panel)
+	local rowW = w - 8
+	if #rows == 0 then
+		wrapped(list, "Empty", "No open lobbies yet. Create one: your friends can join it here.", 8, 8, rowW - 16, 40, 13, K.secondary)
+	end
+	for n, l in rows do
+		local row = Ui.make("Frame", { Name = `Lobby_{l.id}`, Position = UDim2.fromOffset(0, (n - 1) * 72), Size = UDim2.fromOffset(rowW, 64), BackgroundColor3 = K.row, BorderSizePixel = 0, ZIndex = 3 }, list)
+		Ui.corner(row, 8)
+		picture(row, l.house, 8, 8, 48)
+		label(row, "Host", `{string.upper(tostring(l.hostName))}'S LOBBY`, 64, 8, rowW - 64 - 112, 22, 14, K.text, true, true)
+		label(row, "Info", `{if l.friends then "👥 " else ""}{l.name} · {difficultyName(l.difficulty)} · {l.n}/{l.max}`, 64, 34, rowW - 64 - 112, 20, 12, K.secondary, false, true)
+		local joinable = l.state == "open" and not queued
+		local text = if l.state == "full" then "FULL" elseif l.state == "starting" then "STARTING" else "JOIN"
+		local join = button(row, "Join", text, rowW - 104, 4, 96, BUTTON, if joinable then K.good else K.track, K.charcoal, if joinable then function()
+			send({ kind = "join", id = l.id })
+		end else nil)
+		join.TextSize = if l.state == "open" then 15 else 11
 	end
 end
 
@@ -476,6 +590,7 @@ local function closePanel()
 		ui.panel:Destroy()
 		ui.panel = nil
 		ui.line = nil
+		ui.quick = nil
 	end
 	state.key = ""
 end
@@ -506,6 +621,10 @@ drawPanel = function()
 		table.insert(parts, `{h.id}:{h.state}:{h.by}`)
 	end
 	table.insert(parts, table.concat(view.open or {}, ","))
+	local round = view.round -- (10.6: the quick round)
+	if type(round) == "table" then
+		table.insert(parts, `R{round.phase}:{round.house}:{round.difficulty}:{round.endsAt}:{round.queued}:{round.mine}:{round.movers}`)
+	end
 	if lobby then
 		table.insert(parts, `L{lobby.id}:{lobby.house}:{lobby.difficulty}:{lobby.friends}:{lobby.endsAt}:{lobby.canStart}:{lobby.why}:{table.concat(lobby.open or {}, ",")}`)
 		for _, m in lobby.members or {} do
@@ -538,9 +657,12 @@ drawPanel = function()
 	ui.panel = panel
 	-- the header: ▶ PLAY, what this screen is, ‹ BACK or LEAVE LOBBY, ✕
 	label(panel, "Title", "▶ PLAY", 16, 10, 120, 40, 26, BLUE, true)
+	local both = type(round) == "table" -- (10.6: QUICK ROUND beside PRIVATE LOBBY)
 	local subtitle = if state.screen == "create" then "CREATE A LOBBY"
 		elseif lobby and state.screen == "house" then "YOUR LOBBY · ITS HOUSE"
 		elseif lobby then (if lobby.mine then "YOUR LOBBY" else `{string.upper(tostring(lobby.hostName))}'S LOBBY`)
+		elseif both and state.screen == "queue" then "QUICK ROUND · IN THE QUEUE"
+		elseif both then "QUICK ROUND OR PRIVATE LOBBY"
 		else "OPEN LOBBIES"
 	label(panel, "Subtitle", subtitle, 136, 20, W - 136 - 62 - 160, 22, 15, K.secondary, true, true)
 	local close = button(panel, "Close", "✕", W - 62, 3, BUTTON, BUTTON, K.charcoal, K.text, shutPanel)
@@ -567,6 +689,8 @@ drawPanel = function()
 		end
 	elseif state.screen == "create" then
 		createScreen(panel, view)
+	elseif both then
+		bothScreen(panel, view, round)
 	else
 		homeScreen(panel, view)
 	end
@@ -575,7 +699,8 @@ drawPanel = function()
 		if hook then
 			pcall(hook)
 		end
-		local main = panel:FindFirstChild("Create") or panel:FindFirstChild("Ready") or close
+		local quick = panel:FindFirstChild("Quick")
+		local main = (if quick then quick:FindFirstChild("Queue") else nil) or panel:FindFirstChild("Create") or panel:FindFirstChild("Ready") or close
 		pcall(Ui.gamepadFocus, main :: any)
 	end
 end
@@ -591,7 +716,9 @@ local function drawBar()
 	end
 	local lobby = view.lobby
 	local touch = Ui.touchLayout()
-	local key = if lobby then `L{lobby.id}:{lobby.house}:{lobby.difficulty}:{lobby.endsAt}:{#(lobby.members or {})}:{lobby.ready}:{lobby.canStart}:{touch}` else `circle:{touch}`
+	local round = view.round
+	local queued = type(round) == "table" and round.mine == true -- (10.6)
+	local key = if lobby then `L{lobby.id}:{lobby.house}:{lobby.difficulty}:{lobby.endsAt}:{#(lobby.members or {})}:{lobby.ready}:{lobby.canStart}:{touch}` else `circle:{touch}:{type(round) == "table"}:{queued}`
 	if ui.bar and key == state.barKey then
 		return
 	end
@@ -618,7 +745,8 @@ local function drawBar()
 		ui.barLine = label(bar, "Line", "", 62, 36, W - 62 - 100, 20, 12, K.secondary, true, true)
 	else
 		label(bar, "House", "▶ PLAY", 14, 10, W - 14 - 100, 22, 16, BLUE, true, true)
-		label(bar, "Line", "CREATE A LOBBY OR JOIN ONE", 14, 36, W - 14 - 100, 20, 12, K.secondary, true, true)
+		label(bar, "Line", if queued then "IN THE QUICK ROUND QUEUE" elseif type(round) == "table" then "QUICK ROUND OR A PRIVATE LOBBY" else "CREATE A LOBBY OR JOIN ONE",
+			14, 36, W - 14 - 100, 20, 12, if queued then GOLD else K.secondary, true, true)
 	end
 	local open = button(bar, "Open", "OPEN", W - 92, 6, 84, BUTTON, BLUE, K.charcoal, openPanel)
 	open.TextSize = 15
@@ -626,6 +754,14 @@ end
 
 -- The countdown's lines (the panel's and the bar's) every few tenths while a lobby counts down.
 local function tick()
+	local round = state.view and state.view.round
+	local quick = ui.quick
+	if type(round) == "table" and quick and quick.Parent then -- (10.6: the quick round's clock)
+		local _, _, info = quickLines(round)
+		if quick.Text ~= info then
+			quick.Text = info
+		end
+	end
 	local lobby = state.view and state.view.lobby
 	if not lobby then
 		return
@@ -650,7 +786,10 @@ local function startTicking()
 		while state.ticking do
 			task.wait(0.2)
 			local lobby = state.view and state.view.lobby
-			if not lobby or type(lobby.endsAt) ~= "number" then
+			local round = state.view and state.view.round
+			local counting = lobby and type(lobby.endsAt) == "number"
+			local clock = type(round) == "table" and type(round.endsAt) == "number" and ui.quick ~= nil -- (10.6)
+			if not counting and not clock then
 				state.ticking = false
 				break
 			end
@@ -676,7 +815,7 @@ refresh = function()
 		drawBar()
 	end
 	tick()
-	if view.lobby and type(view.lobby.endsAt) == "number" then
+	if (view.lobby and type(view.lobby.endsAt) == "number") or (type(view.round) == "table" and type(view.round.endsAt) == "number" and ui.quick) then
 		startTicking()
 	end
 end
@@ -701,7 +840,7 @@ local function onMessage(message: any)
 	local had = state.view and state.view.lobby
 	state.view = message
 	if message.lobby then
-		if state.screen == "home" or state.screen == "create" then
+		if state.screen == "home" or state.screen == "create" or state.screen == "queue" then
 			state.screen = "lobby"
 		end
 		if not message.lobby.mine and state.screen == "house" then
@@ -716,6 +855,12 @@ local function onMessage(message: any)
 		end
 		if not circle then
 			state.open = false
+		end
+		local queued = type(message.round) == "table" and message.round.mine == true -- 10.6: in the quick round's queue
+		if queued and state.screen == "home" then
+			state.screen = "queue"
+		elseif not queued and state.screen == "queue" then
+			state.screen = "home"
 		end
 	end
 	refresh()

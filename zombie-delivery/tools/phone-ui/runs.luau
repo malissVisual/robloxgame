@@ -281,6 +281,77 @@ do
 	holder:Destroy()
 end
 
+-- ── 10.5 rounds: the round's results card (its ranking), RoundUi's banner and table ────────────────────────────
+do
+	local ranking = {}
+	local NAMES = { "Ann", "Bartholomew", "Cid", "Dee", "Eve", "Fay", "Gus", "Hal", "Ivy", "Jon", "Kim", "Lou", "Max", "Ned", "Oli", "Pam" }
+	for n, name in NAMES do
+		table.insert(ranking, { id = n, name = name, count = 17 - n, value = 9000 - n * 400, place = n })
+	end
+	local ROUND = table.clone(RESULT)
+	ROUND.why, ROUND.opened, ROUND.openedName, ROUND.danger, ROUND.me = "Time's up: what you loaded is in your warehouse", nil, nil, nil, 3
+	ROUND.round = { ranking = ranking, place = 3, players = #ranking }
+	local RoundUi = require("./RoundUi")
+	Config.Rounds.On = true
+	RoundUi.start()
+	local WAIT = { kind = "round", phase = "wait", endsAt = (M.now or 0) + 42, house = "orchard_cottage", name = "The Orchard Cottage", difficulty = "insane",
+		inRound = false, players = 16, ready = true, top = {}, mine = nil }
+	local top = {}
+	for n = 1, Config.Rounds.Top do
+		table.insert(top, { name = NAMES[n], count = 17 - n, value = 9000 - n * 400, place = n, me = false })
+	end
+	local PLAY = { kind = "round", phase = "play", endsAt = 300, house = "orchard_cottage", name = "The Orchard Cottage", difficulty = "insane", inRound = true,
+		players = 16, ready = true, top = top, mine = { place = 9, count = 4, value = 1200 } }
+	for _, s in { { true, 844, 354, "a phone (844 × 390)" }, { true, 667, 339, "a small phone (667 × 375)" }, { false, 1280, 764, "a computer (1280 × 800)" },
+		{ false, 1920, 1044, "a big screen (1920 × 1080)" } } do
+		screen(s[1], s[2], s[3])
+		local label = s[4]
+		remote.OnClientEvent:Fire(ROUND)
+		M.flush()
+		local card = M.gui:FindFirstChild("RunUi"):FindFirstChild("RunResult")
+		check(`{label}: 10.5 the round's results card, whole on the screen, its words fit`, card ~= nil and inside(box(card)) and #badTexts(card) == 0,
+			card and (badTexts(card)[1] or show(box(card))))
+		local list = named(card, "Pieces")
+		check(`{label}: … everybody's row (16) in a list that scrolls, the first three's medals, yours lit`, list ~= nil and list.CanvasSize.Y.Offset == 16 * 30
+			and named(named(list, "Rank1"), "Place").Text == "🥇" and named(named(list, "Rank3"), "Name").Font == M.MTheme.HeadingFont and named(list, "Piece1") == nil)
+		check(`{label}: … ROUND OVER, your place ("YOU: 3RD OF 16")`, string.find(named(card, "Head").Text, "ROUND OVER", 1, true) ~= nil
+			and string.find(named(card, "Total").Text, "YOU: 3RD OF 16", 1, true) ~= nil and named(card, "Unlocked") == nil)
+		if M.touch then
+			check(`{label}: … OK a finger's size`, #smallButtons(card) == 0, smallButtons(card)[1])
+		end
+		RunUi.close()
+		remote.OnClientEvent:Fire(WAIT)
+		M.flush()
+		local gui = M.gui:FindFirstChild("RoundUi")
+		local banner = named(gui, "Banner")
+		check(`{label}: the lobby's banner: on the screen, its words fit, the place, its difficulty and the countdown`, banner ~= nil and banner.Visible and inside(box(banner))
+			and #badTexts(banner) == 0 and string.find(named(banner, "Title").Text, "THE ORCHARD COTTAGE · INSANE", 1, true) ~= nil, banner and (badTexts(banner)[1] or show(box(banner))))
+		for name, other in blocks() do
+			check(`{label}: … clear of {name}`, not overlap(box(banner), other), `{show(box(banner))} on {show(other)}`)
+		end
+		remote.OnClientEvent:Fire(PLAY)
+		M.flush()
+		local board = named(gui, "Board")
+		check(`{label}: in the round: the banner gone, the table on the screen (its top {Config.Rounds.Top} and your row: 9th), its words fit`, not banner.Visible and board.Visible
+			and inside(box(board)) and #badTexts(board) == 0 and #board:GetChildren() >= Config.Rounds.Top + 2, board and (badTexts(board)[1] or show(box(board))))
+		for name, other in blocks() do
+			check(`{label}: … clear of {name}`, not overlap(box(board), other), `{show(box(board))} on {show(other)}`)
+		end
+		remote.OnClientEvent:Fire({ kind = "claim", by = "Bartholomew", mine = false, name = "Grandfather Clock", icon = "🕰", rarity = "legendary", value = 2400 })
+		remote.OnClientEvent:Fire({ kind = "claim", by = "Cid", mine = true, name = "Rocking Horse", icon = "🐴", rarity = "rare", value = 450 })
+		M.flush()
+		local feed = named(gui, "Feed")
+		check(`{label}: … the feed under it: the latest first (yours), on the screen`, feed.Visible and inside(box(feed))
+			and string.find(named(feed, "Line1").Text, "Rocking Horse is yours", 1, true) ~= nil and string.find(named(feed, "Line2").Text, "Bartholomew took", 1, true) ~= nil,
+			feed and show(box(feed)))
+		for name, other in blocks() do
+			check(`{label}: … the feed clear of {name}`, not overlap(box(feed), other), `{show(box(feed))} on {show(other)}`)
+		end
+		remote.OnClientEvent:Fire(WAIT)
+		M.flush()
+	end
+end
+
 -- a resize while both are up: their scale follows
 screen(true, 844, 354)
 remote.OnClientEvent:Fire(RESULT)

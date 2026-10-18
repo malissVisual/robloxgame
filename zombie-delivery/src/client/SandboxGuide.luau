@@ -403,7 +403,8 @@ end
 -- The van the move fills (yours, or on a crew the owner's: the player attribute MoveWith): looked up at most once a
 -- second, kept while it stays.
 local function van(): Model?
-	local owner = if move and not mine and type(player:GetAttribute("MoveWith")) == "number" then player:GetAttribute("MoveWith") else player.UserId
+	local round = move and type(move.run) == "table" and move.run.round == true -- (10.5 rounds: always your own van)
+	local owner = if move and not mine and not round and type(player:GetAttribute("MoveWith")) == "number" then player:GetAttribute("MoveWith") else player.UserId
 	local known = world.van
 	if known and known.Parent and known:GetAttribute("OwnerId") == owner then
 		return known
@@ -1090,6 +1091,14 @@ local function look()
 	end)
 	state.lobby = type(lobby) == "table" and not state.move
 	state.lobbyHost = state.lobby == true and lobby.mine == true
+	-- 10.5 rounds: your move a quick round's (their words: your own van, no FINISH); 10.6 both in PLAY: in its queue
+	-- (the PLAY panel's QUICK ROUND: client/RoundUi.luau's view, its `ready`)
+	state.round = move ~= nil and type(move.run) == "table" and move.run.round == true
+	local round: any = nil
+	pcall(function()
+		round = (require(script.Parent.RoundUi) :: any).view()
+	end)
+	state.queued = not state.move and not state.lobby and type(round) == "table" and round.ready == true
 	state.hush = asks and (os.clock() < softAfter or ask(nil, "busy") == true) -- (a first-time hint talks)
 	SandboxSteps.doneBy(state, done, last)
 	local step = SandboxSteps.choose(state, done)

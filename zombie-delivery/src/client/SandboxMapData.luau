@@ -26,6 +26,9 @@
 --   SandboxMapData.locate(place, at) -> (x, z, where)   a world point in the place's studs; where "lobby" | "house" |
 --                                              "yard" | "zone" (in the run's zone, off the strip) | nil (not there)
 --   SandboxMapData.people(place) / loot(place) / dangers(place) / truck(place) / status(place) / lobbies() / plots()
+--   SandboxMapData.round() -> Round?   10.6 both in PLAY: the quick round (server/Runs.luau's attributes on the PLAY
+--                                      circle's model: RoundPhase, RoundHouse, RoundDifficulty, RoundEndsAt, RoundQueued,
+--                                      RoundMovers) or nil (none written, the rounds off)
 --   SandboxMapData.look()                      one look of the fog (the loop's; the checks')
 --   SandboxMapData.seen(model) -> boolean      seen in this interior
 
@@ -440,6 +443,25 @@ function SandboxMapData.lobbies(): { PartyRules.Entry }
 	local lobby = world and world:FindFirstChild("Lobby")
 	local circle = lobby and lobby:FindFirstChild("PlayCircle")
 	return PartyRules.decode(if circle then circle:GetAttribute(Config.Runs.Party.Attribute) else nil)
+end
+
+-- 10.6: the quick round (the PLAY circle's Round… attributes, server/Runs.luau's), nil none.
+function SandboxMapData.round(): { [string]: any }?
+	local world = workspace:FindFirstChild("Sandbox")
+	local lobby = world and world:FindFirstChild("Lobby")
+	local circle = lobby and lobby:FindFirstChild("PlayCircle")
+	local phase = if circle then circle:GetAttribute("RoundPhase") else nil
+	if not circle or type(phase) ~= "string" or phase == "off" then
+		return nil
+	end
+	return {
+		phase = phase,
+		house = circle:GetAttribute("RoundHouse"),
+		difficulty = circle:GetAttribute("RoundDifficulty"),
+		endsAt = circle:GetAttribute("RoundEndsAt"),
+		queued = circle:GetAttribute("RoundQueued"),
+		movers = circle:GetAttribute("RoundMovers"),
+	}
 end
 
 function SandboxMapData.plots(): { PlotView }

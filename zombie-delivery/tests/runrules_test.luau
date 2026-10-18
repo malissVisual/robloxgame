@@ -130,6 +130,24 @@ do
 		and #R.Play.Free == 3 and #R.Play.Waiting == 3 and (R :: any).Portal == nil and (R :: any).Countdown == nil)
 end
 
+-- ── 10.6 both in PLAY: one "house busy" check (RunRules.houseBusy) for the lobbies and the quick round ────────────
+do
+	local inRun = function(house: string): boolean
+		return house == "pond_cabin"
+	end
+	local waiting = { house = "old_mill", phase = "wait" }
+	check("10.6 houseBusy: the quick round's place while it counts down to it: \"round\" (a lobby picks another)", RunRules.houseBusy("old_mill", inRun, waiting) == "round")
+	check("…while it plays there and while it rides back (over): \"round\" too", RunRules.houseBusy("old_mill", inRun, { house = "old_mill", phase = "play" }) == "round"
+		and RunRules.houseBusy("old_mill", inRun, { house = "old_mill", phase = "over" }) == "round")
+	check("…a house a run is in (a lobby's or the round's): \"run\"; any other: free (nil)", RunRules.houseBusy("pond_cabin", inRun, waiting) == "run"
+		and RunRules.houseBusy("lone_house", inRun, waiting) == nil)
+	check("…nobody queued (idle) or the rounds off (no round): the place is nobody's", RunRules.houseBusy("old_mill", inRun, { house = "old_mill", phase = "idle" }) == nil
+		and RunRules.houseBusy("old_mill", inRun, nil) == nil)
+	check("…the round's own pick (no round given) sees only the runs: never a house a lobby's run is in", RunRules.houseBusy("pond_cabin", inRun, nil) == "run"
+		and RunRules.houseBusy("old_mill", inRun, nil) == nil)
+	check("NEG. …junk (no house, a number): nil, no error", RunRules.houseBusy(nil, inRun, waiting) == nil and RunRules.houseBusy(5, inRun, waiting) == nil)
+end
+
 if failures == 0 then
 	print("ALL CHECKS PASSED")
 else

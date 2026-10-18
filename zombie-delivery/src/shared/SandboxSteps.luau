@@ -50,7 +50,11 @@
 --   in a lobby                          lobbyWait "In a lobby: press READY, the host starts the run"      (no target)
 --   no move, pieces in the stock        show      "Put your pieces on show: E at an empty stand"          a free stand
 --   no move, pieces on show             earn      "Your pieces earn money while you play. …"              the PLAY circle
---   no move                             play      "Step into PLAY to start a run"                         the PLAY circle
+--   no move                             play      "Step into PLAY to start"                               the PLAY circle
+-- 10.5 rounds (the state's `round`: your move is a quick round's): in the house roundIn "Carry the loot out to YOUR van
+-- …", carrying outside roundLoad "Load it into YOUR van: E at its back" (your own van's back); no FINISH step. 10.6 both
+-- in PLAY (the state's `queued`: in the quick round's queue, the PLAY panel's QUICK ROUND): in the lobby roundWait "In
+-- the QUICK ROUND queue: the next round starts by itself" in place of play (and roundEarn in place of earn).
 --
 -- Done once, a step stays quiet for the session (SandboxSteps.doneBy: what the player did, seen this session: a count
 -- that went up, not one a save brought along; `earn` only says something, so the client counts it done after
@@ -145,6 +149,8 @@ export type State = {
 	move: boolean,
 	lobby: boolean?, -- 10.4: in a party lobby (lobbyHost: its host)
 	lobbyHost: boolean?,
+	round: boolean?, -- 10.5: your move is a quick round's (its own words: your own van, no FINISH)
+	queued: boolean?, -- 10.6: in the quick round's queue (the PLAY panel's QUICK ROUND)
 	inside: boolean,
 	carrying: boolean,
 	vanLoad: number,
@@ -223,7 +229,7 @@ end
 
 SandboxSteps.Steps = {
 	-- 9.7 runs: the lobby's (no contract board, no driving: drive, back and home are gone)
-	play = step("play", "Step into PLAY to start a run", "play", false, false), -- (10.4: the one PLAY circle)
+	play = step("play", "Step into PLAY to start", "play", false, false), -- (10.4: the one PLAY circle; 10.6: a quick round or a lobby)
 	lobbyHost = step("lobbyHost", "Your lobby: press READY, then START", nil, false, false),
 	lobbyWait = step("lobbyWait", "In a lobby: press READY, the host starts the run", nil, false, false),
 	plan = step("plan", "Press LAUNCH to start the move", nil, false, false),
@@ -234,6 +240,11 @@ SandboxSteps.Steps = {
 	finish = step("finish", "Finish or beat the clock: load more, or FINISH at the truck", "van", false, false),
 	show = step("show", "Put your pieces on show: E at an empty stand", "stand", false, false),
 	earn = step("earn", "Your pieces earn money while you play. Step into PLAY for another run!", "play", false, true),
+	-- 10.5 rounds (the state's `round`; 10.6 `queued`: in the quick round's queue)
+	roundIn = step("roundIn", "Carry the loot out to YOUR van (E to pick up): the best first", nil, false, false),
+	roundLoad = step("roundLoad", "Load it into YOUR van: E at its back", "van", false, false),
+	roundWait = step("roundWait", "In the QUICK ROUND queue: the next round starts by itself", nil, false, false),
+	roundEarn = step("roundEarn", "Your pieces earn money while you play. The next round brings more!", nil, false, true),
 	-- 8.3, the soft steps (their words with the price or the piece: SandboxSteps.words)
 	grow = step("grow", "Your warehouse is full: grow it at the UPGRADES desk", "desk", false, false, true),
 	hot = step("hot", "🔥 Your piece is hot today: sell it or show it", "hot", false, false, true),
@@ -267,6 +278,9 @@ function SandboxSteps.decide(s: State, done: { [string]: boolean }?): Step
 		if danny then
 			return danny
 		end
+		if s.round then -- 10.5 rounds: your own van, no FINISH
+			return if s.inside then S.roundIn elseif s.carrying then S.roundLoad else S.door
+		end
 		if s.inside then
 			return S.inside
 		end
@@ -289,9 +303,9 @@ function SandboxSteps.decide(s: State, done: { [string]: boolean }?): Step
 		return S.show
 	end
 	if s.shown > 0 then
-		return S.earn
+		return if s.queued then S.roundEarn else S.earn
 	end
-	return S.play
+	return if s.queued then S.roundWait else S.play
 end
 
 -- Did the count go up since the look before (nil before: not known yet, nothing to say)?
@@ -303,8 +317,9 @@ end
 -- when they go up (a piece loaded, a trip unloaded, a piece put on show), so what a save or a crew brought along before
 -- you looked does not.
 function SandboxSteps.doneBy(s: State, done: { [string]: boolean }, last: Last)
-	if s.move or s.planning or s.lobby == true then
-		done.play = true -- (10.4: in a lobby, or in the run)
+	if s.move or s.planning or s.lobby == true or s.queued == true then
+		done.play = true -- (10.4: in a lobby, or in the run; 10.6: in the quick round's queue)
+		done.roundWait = if s.move then true else done.roundWait -- (10.5 rounds: been in one: the banner says the rest)
 	end
 	if s.move then
 		done.plan = true

@@ -2,7 +2,11 @@
 -- 10.4 PARTY LOBBIES (the owner: "on the map just one circle where you'd stand, like PLAY, and you'd create a lobby";
 -- Config.Runs.Party): the rules of the lobbies a party gathers in at the lobby's PLAY circle before a run, pure (no
 -- Roblox: tests/partyrules_test.luau). server/Parties.luau keeps them and starts their runs (server/Runs.luau), the PLAY
--- panel shows them (client/PlayUi.luau), the map reads what the server publishes (client/SandboxMapData.luau).
+-- panel shows them (client/PlayUi.luau), the map reads what the server publishes (client/SandboxMapData.luau). 10.6
+-- both in PLAY: the lobbies are the PLAY panel's PRIVATE LOBBY beside its QUICK ROUND (server/Runs.luau's rounds): a
+-- house is busy (`busy(house)`: server/Runs.luau's Runs.houseBusy, RunRules.houseBusy) while a run is in it ("run" or
+-- true) or while it is the quick round's place ("round"); somebody in the round's queue makes or joins no lobby
+-- (server/Parties.luau asks first: "queued").
 --
 -- A lobby: its host (who made it: a user id), a house (a SandboxMap.Houses id: one lobby holds a house at a time, a
 -- house in a run is busy), a difficulty (the host's pick, open to the host: RunRules), public or friends only (the
@@ -15,8 +19,10 @@
 --   PartyRules.lobbyOf(book, user) -> Lobby?         the lobby a user is in (its host or a member)
 --   PartyRules.get(book, id) -> Lobby?               a lobby by its id
 --   PartyRules.holder(book, house) -> Lobby?         the lobby that holds that house
---   PartyRules.houseState(book, house, busy) -> (state, Lobby?)   "run" (busy(house): a run in it), "lobby" (a lobby
+--   PartyRules.houseState(book, house, busy) -> (state, Lobby?)   "round" (10.6: busy(house) "round": the quick
+--                                                    round's place), "run" (busy(house): a run in it), "lobby" (a lobby
 --                                                    holds it: that lobby) or "free"
+--   PartyRules.busyWhy(busy, house) -> why?          10.6: a busy answer as a why: "round", "run" (true too) or nil
 --   PartyRules.create(book, host, house, difficulty, friends, open, busy, now) -> (Lobby?, why?)   a new lobby
 --                                                    (`open`: the host's open difficulties' count; a pick not open to
 --                                                    them is the hardest open one under it: RunRules.choose)
@@ -26,7 +32,8 @@
 --   PartyRules.ready(book, user, on) -> why?         READY on / off (the host's off calls a countdown off)
 --   PartyRules.setHouse(book, host, house, busy) -> why?        the host's other house (not while counting down)
 --   PartyRules.setDifficulty(book, host, id, open) -> why?      the host's other difficulty (open to them)
---   PartyRules.canStart(lobby, busy) -> (ok, why?)   START may go (the host READY, its house in no run, no countdown)
+--   PartyRules.canStart(lobby, busy) -> (ok, why?)   START may go (the host READY, its house in no run and not the
+--                                                    quick round's, no countdown)
 --   PartyRules.start(book, host, busy, now) -> why?  START: the countdown (endsAt)
 --   PartyRules.cancel(book, host) -> why?            the countdown called off
 --   PartyRules.due(lobby, now) -> bool               the countdown is over: its run now
@@ -62,6 +69,9 @@ export type Lobby = {
 	kicked: { [number]: number },
 }
 export type Book = { lobbies: { Lobby }, next: number }
+-- a house's busy answer (10.6: server/Runs.luau's Runs.houseBusy): nil / false free, "run" / true a run in it, "round"
+-- the quick round's place
+export type Busy = (string) -> any
 -- the map's: host (a display name), house (its id), difficulty (its id), n / max players, friends only, state ("open",
 -- "full", "starting": a lobby's; "run": a run in that house now), who (a run's party: names, comma-joined)
 export type Entry = { host: string, house: string, difficulty: string, n: number, max: number, friends: boolean, state: string, who: string? }
@@ -70,6 +80,11 @@ local WORDS: { [string]: string } = {
 	inLobby = "You are in a lobby already: LEAVE it first.",
 	house = "No such house.",
 	run = "%s is in a run right now: pick another house.",
+	round = "%s is the quick round's place right now: pick another house.", -- 10.6
+	queued = "You are in the QUICK ROUND queue: LEAVE THE QUEUE first.", -- 10.6
+	notQueued = "You are in no queue.",
+	inRun = "You are in a run: finish it first.",
+	roundOff = "There are no quick rounds right now.",
 	taken = "%s is taken by another lobby: pick another house.",
 	many = "Too many lobbies right now: join one instead.",
 	gone = "That lobby is gone.",
@@ -131,9 +146,20 @@ function PartyRules.holder(book: Book, house: string): Lobby?
 	return nil
 end
 
-function PartyRules.houseState(book: Book, house: string, busy: (string) -> boolean): (string, Lobby?)
-	if busy(house) then
-		return "run", nil
+function PartyRules.busyWhy(busy: Busy, house: string): string?
+	local answer = busy(house)
+	if answer == "round" then
+		return "round"
+	elseif answer then
+		return "run"
+	end
+	return nil
+end
+
+function PartyRules.houseState(book: Book, house: string, busy: Busy): (string, Lobby?)
+	local why = PartyRules.busyWhy(busy, house)
+	if why then
+		return why, nil
 	end
 	local lobby = PartyRules.holder(book, house)
 	if lobby then
@@ -143,12 +169,13 @@ function PartyRules.houseState(book: Book, house: string, busy: (string) -> bool
 end
 
 -- Can `house` be this lobby's (`mine`: the lobby asking; nil: a new one)? why or nil.
-local function houseFree(book: Book, house: any, busy: (string) -> boolean, mine: Lobby?): string?
+local function houseFree(book: Book, house: any, busy: Busy, mine: Lobby?): string?
 	if type(house) ~= "string" or not SandboxMap.house(house) then
 		return "house"
 	end
-	if busy(house) then
-		return "run"
+	local why = PartyRules.busyWhy(busy, house)
+	if why then
+		return why
 	end
 	local held = PartyRules.holder(book, house)
 	if held and held ~= mine then
@@ -157,7 +184,7 @@ local function houseFree(book: Book, house: any, busy: (string) -> boolean, mine
 	return nil
 end
 
-function PartyRules.create(book: Book, host: number, house: any, difficulty: any, friends: any, open: number, busy: (string) -> boolean, now: number): (Lobby?, string?)
+function PartyRules.create(book: Book, host: number, house: any, difficulty: any, friends: any, open: number, busy: Busy, now: number): (Lobby?, string?)
 	if PartyRules.lobbyOf(book, host) then
 		return nil, "inLobby"
 	end
@@ -288,7 +315,7 @@ function PartyRules.ready(book: Book, user: number, on: any): string?
 	return nil
 end
 
-function PartyRules.setHouse(book: Book, host: number, house: any, busy: (string) -> boolean): string?
+function PartyRules.setHouse(book: Book, host: number, house: any, busy: Busy): string?
 	local lobby, why = hosted(book, host)
 	if not lobby then
 		return why
@@ -319,20 +346,21 @@ function PartyRules.setDifficulty(book: Book, host: number, id: any, open: numbe
 	return nil
 end
 
-function PartyRules.canStart(lobby: Lobby, busy: (string) -> boolean): (boolean, string?)
+function PartyRules.canStart(lobby: Lobby, busy: Busy): (boolean, string?)
 	if lobby.endsAt then
 		return false, "counting"
 	end
 	if lobby.ready[lobby.host] ~= true then
 		return false, "notReady"
 	end
-	if busy(lobby.house) then
-		return false, "run"
+	local why = PartyRules.busyWhy(busy, lobby.house)
+	if why then
+		return false, why
 	end
 	return true, nil
 end
 
-function PartyRules.start(book: Book, host: number, busy: (string) -> boolean, now: number): string?
+function PartyRules.start(book: Book, host: number, busy: Busy, now: number): string?
 	local lobby, why = hosted(book, host)
 	if not lobby then
 		return why

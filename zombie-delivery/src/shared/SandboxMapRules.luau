@@ -47,6 +47,13 @@
 --                                                      Cid" ("run")
 --     SandboxMapRules.playLine(entries) -> (line, tone)   10.4: the PLAY circle's line on the map: "STARTING"
 --                                                      ("starting"), "2 OPEN LOBBIES" ("open"), "STEP IN" ("free")
+--     SandboxMapRules.roundLine(round, now) -> (top, bottom, tone)   10.6 both in PLAY: the side column's QUICK ROUND row
+--                                                      (`round`: client/SandboxMapData.luau's, the PLAY circle's Round…
+--                                                      attributes; `now` the server's time): "⚡ THE OLD MILL" over "NEXT ·
+--                                                      HARD · 0:42 · 3 QUEUED" ("starting"), the round on ("ON · 3:12
+--                                                      LEFT · 5 MOVERS", "run"), over ("full"), nobody queued ("⚡ QUICK
+--                                                      ROUND" over "NOBODY QUEUED · STEP INTO PLAY", "free"); nil: none
+--                                                      ("off")
 --     SandboxMapRules.names(list, most) -> string      "Ann, Bob +2"
 --     SandboxMapRules.clock(seconds) -> "m:ss"
 --   Layout (px under Roblox's top bar):
@@ -484,6 +491,26 @@ function SandboxMapRules.lobbyLine(entry: any): (string, string, string)
 	end
 	local full = entry.state == "full"
 	return top, `{difficulty} · {n}/{most}{if entry.friends == true then " · FRIENDS ONLY" else ""}{if full then " · FULL" else ""}`, if full then "full" else "open"
+end
+
+function SandboxMapRules.roundLine(round: any, now: number): (string, string, string)
+	if type(round) ~= "table" or type(round.phase) ~= "string" or round.phase == "off" then
+		return "", "", "off"
+	end
+	local house = SandboxMap.house(round.house)
+	local top = if house then `⚡ {string.upper(house.name)}` else "⚡ QUICK ROUND"
+	local queued = `{math.max(0, math.floor(tonumber(round.queued) or 0))} QUEUED`
+	local left = if type(round.endsAt) == "number" then SandboxMapRules.clock(round.endsAt - now) else "–:––"
+	if round.phase == "wait" and house then
+		return top, `NEXT · {difficultyName(round.difficulty)} · {left} · {queued}`, "starting"
+	elseif round.phase == "wait" then
+		return top, `WAITING FOR A FREE HOUSE · {queued}`, "starting"
+	elseif round.phase == "play" then
+		return top, `ON · {left} LEFT · {math.max(0, math.floor(tonumber(round.movers) or 0))} MOVERS`, "run"
+	elseif round.phase == "over" then
+		return top, `OVER · THE NEXT ONE IS COMING`, "full"
+	end
+	return "⚡ QUICK ROUND", "NOBODY QUEUED · STEP INTO PLAY", "free"
 end
 
 function SandboxMapRules.playLine(entries: { any }): (string, string)

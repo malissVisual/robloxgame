@@ -18,6 +18,14 @@
 --     and the touch controls, its words fitting, OPEN a finger's size): OPEN brings the panel back, ✕ shuts it again;
 --     RunUi.isOpen() while the panel is open, RunUi.close() (ESC) shuts it, RunUi.lobby() the lobby; the empty view:
 --     nothing; stepping in again opens it after a ✕; a resize scales it; junk ignored; no warnings.
+--   * 10.6 BOTH IN PLAY (the view's `round`: the quick round): the home screen's two choices side by side, QUICK ROUND
+--     (the next place with its picture, its difficulty, the countdown, how many are queued, the rules: none of its
+--     words cut; ⚡ JOIN THE QUEUE sends { kind = "round", on = true }) and PRIVATE LOBBY (＋ CREATE A LOBBY, the open
+--     lobbies' JOIN as before); the quick round's place on the create screen QUICK ROUND, not pressable; the queue's
+--     state ("queue": ✓ YOU ARE IN THE QUEUE, LEAVE THE QUEUE sends { kind = "round", on = false }, CREATE and JOIN
+--     wait); the bar's IN THE QUICK ROUND QUEUE; the round's banner (client/RoundUi.luau) while queued: hidden while
+--     the panel is open, else on the screen clear of the bar, the chips and the touch controls, its words whole, LEAVE
+--     QUEUE a finger's size sending the Runs remote's { kind = "queue", on = false }; the rounds off: the home as 10.4's.
 -- `luau play.luau -a dump` prints the preview's scenes as JSON instead (play_preview.py).
 local M = require("./sandbox_mock")
 local Config = require("./Config")
@@ -473,6 +481,137 @@ for _, s in SIZES do
 	fire(MEMBER)
 	check(`{label}: … stepping into the circle again opens it after a ✕`, panel() ~= nil)
 	RunUi.onOpen = nil
+end
+
+-- ── 10.6 BOTH IN PLAY: QUICK ROUND beside PRIVATE LOBBY; the queue's state; the round's banner ─────────────────
+do
+	local RoundUi = require("./RoundUi")
+	local runsRemote = M.Net.get("Runs")
+	RoundUi.start()
+	-- labels whose words are cut (truncated: they fit no more): the quick round's card must have none
+	local function cut(root)
+		local bad = {}
+		for _, object in all(root, function(o)
+			return (o.ClassName == "TextLabel" or o.ClassName == "TextButton") and type(o.Text) == "string" and o.Text ~= "" and shown(o) and not o.TextWrapped
+		end) do
+			local b = box(object)
+			local need = M.textWidth(object.Text, (object.TextSize or 14) * M.scaleOf(object), object.Font)
+			if need > b.x1 - b.x0 + 0.5 then
+				table.insert(bad, `{object.Name} "{object.Text}" {math.floor(need)} > {math.floor(b.x1 - b.x0)}`)
+			end
+		end
+		return bad
+	end
+	local function sentOnRuns()
+		return sentOn("Runs")
+	end
+	local ROUND = { phase = "wait", endsAt = M.now + 42, house = "orchard_cottage", name = "The Orchard Cottage", difficulty = "insane", queued = 3, mine = false,
+		inRound = false, movers = 0, seconds = Config.Rounds.Seconds }
+	local BOTH = table.clone(HOME)
+	BOTH.round = ROUND
+	BOTH.houses = houses(false)
+	for _, h in BOTH.houses do
+		if h.id == "orchard_cottage" then
+			h.state, h.by = "round", nil
+		end
+	end
+	local QUEUED = table.clone(BOTH)
+	QUEUED.round = table.clone(ROUND)
+	QUEUED.round.mine, QUEUED.round.queued = true, 4
+	local BANNER = { kind = "round", phase = "wait", endsAt = M.now + 42, house = "orchard_cottage", name = "The Orchard Cottage", difficulty = "insane", inRound = false,
+		players = 4, queued = 4, ready = true, top = {}, mine = nil }
+	for _, sz in SIZES do
+		screen(sz[1], sz[2], sz[3])
+		local label, tag = sz[4], sz[5]
+		fire({ kind = "play" })
+		fire(BOTH)
+		local p = panelChecks(`{label}, 10.6 QUICK ROUND OR PRIVATE LOBBY`)
+		local quick = named(p, "Quick")
+		check(`{label}: … the two choices side by side: QUICK ROUND (its card, JOIN THE QUEUE) and PRIVATE LOBBY (＋ CREATE A LOBBY, the open lobbies)`, quick ~= nil
+			and named(quick, "Queue") ~= nil and named(quick, "Queue").Text == "⚡ JOIN THE QUEUE" and named(p, "Create") ~= nil and named(p, "LobbyTitle") ~= nil
+			and named(p, "Lobby_7") ~= nil and box(quick).x1 <= box(named(p, "Create")).x0 and PlayUi.screen() == "home"
+			and string.find(named(p, "Subtitle").Text, "QUICK ROUND OR PRIVATE LOBBY", 1, true) == 1)
+		check(`{label}: … the quick round: NEXT ROUND, its place (its picture), INSANE, the countdown, 3 in the queue, the rules`, named(quick, "Picture") ~= nil
+			and named(quick, "QuickKicker").Text == "NEXT ROUND" and named(quick, "QuickPlace").Text == "THE ORCHARD COTTAGE"
+			and named(quick, "QuickInfo").Text == "INSANE · STARTS IN 0:42" and named(quick, "QuickCount").Text == "3 IN THE QUEUE"
+			and string.find(named(quick, "QuickRules").Text, "5:00, the most value wins", 1, true) ~= nil, named(quick, "QuickInfo").Text)
+		check(`{label}: … none of the quick round's words cut, nor the lobby column's titles`, #cut(quick) == 0 and #cut(named(p, "LobbyTitle")) == 0 and #cut(named(p, "How")) == 0
+			and #cut(named(p, "Create")) == 0, cut(quick)[1] or cut(named(p, "How"))[1] or cut(named(p, "Create"))[1])
+		check(`{label}: … the two columns apart (nothing of one on the other)`, not overlap(box(quick), box(named(p, "Create"))) and not overlap(box(quick), box(named(p, "Lobbies"))))
+		scene(`play-both-{tag}`)
+		local before = #sentOn("Party")
+		press(named(quick, "Queue"))
+		check(`{label}: … ⚡ JOIN THE QUEUE: {"{"} kind = "round", on = true {"}"} once`, #sentOn("Party") == before + 1 and last().kind == "round" and last().on == true)
+		press(named(named(panel(), "Lobby_7"), "Join"))
+		check(`{label}: … JOIN a lobby as before`, last().kind == "join" and last().id == 7)
+		press(named(panel(), "Create"))
+		p = panelChecks(`{label}, CREATE A LOBBY (both)`)
+		before = #sentOn("Party")
+		press(named(p, "House_orchard_cottage"))
+		check(`{label}: … the quick round's place: QUICK ROUND, not pressable`, string.find(named(named(p, "House_orchard_cottage"), "State").Text, "QUICK ROUND", 1, true) == 1
+			and named(panel(), "Make").Text == "PICK A HOUSE FIRST" and #sentOn("Party") == before)
+		press(named(panel(), "Back"))
+		check(`{label}: … ‹ BACK: the two choices again`, PlayUi.screen() == "home" and named(panel(), "Quick") ~= nil)
+		-- the queue's state
+		fire(QUEUED)
+		p = panelChecks(`{label}, 10.6 IN THE QUEUE`)
+		quick = named(p, "Quick")
+		check(`{label}: … the queue's screen: ✓ YOU ARE IN THE QUEUE, the next round, 4 in the queue, LEAVE THE QUEUE`, PlayUi.screen() == "queue"
+			and named(quick, "QuickTitle").Text == "✓ YOU ARE IN THE QUEUE" and named(quick, "Queue").Text == "LEAVE THE QUEUE"
+			and named(quick, "QuickInfo").Text == "INSANE · STARTS IN 0:42" and named(quick, "QuickCount").Text == "4 IN THE QUEUE"
+			and string.find(named(p, "Subtitle").Text, "IN THE QUEUE", 1, true) ~= nil
+			and string.find(named(p, "How").Text, "LEAVE THE QUEUE", 1, true) ~= nil and #cut(quick) == 0 and #cut(named(p, "How")) == 0, cut(quick)[1] or cut(named(p, "How"))[1])
+		scene(`play-queue-{tag}`)
+		before = #sentOn("Party")
+		press(named(p, "Create"))
+		press(named(named(panel(), "Lobby_7"), "Join"))
+		check(`{label}: … CREATE and JOIN wait while queued (nothing sent)`, #sentOn("Party") == before and PlayUi.screen() == "queue")
+		press(named(named(panel(), "Quick"), "Queue"))
+		check(`{label}: … LEAVE THE QUEUE: {"{"} kind = "round", on = false {"}"}`, #sentOn("Party") == before + 1 and last().kind == "round" and last().on == false)
+		-- the banner: hidden while the panel is open; shut: on the screen with the bar, clear of the rest
+		runsRemote.OnClientEvent:Fire(BANNER)
+		M.flush()
+		local banner = named(M.gui:FindFirstChild("RoundUi"), "Banner")
+		check(`{label}: … the round's banner hidden while the PLAY panel is open`, banner ~= nil and not banner.Visible)
+		press(named(panel(), "Close"))
+		local b = bar()
+		check(`{label}: … ✕: the bar says IN THE QUICK ROUND QUEUE`, panel() == nil and b ~= nil and named(b, "Line").Text == "IN THE QUICK ROUND QUEUE")
+		runsRemote.OnClientEvent:Fire(BANNER)
+		M.flush()
+		check(`{label}: … the banner then: on the screen, NEXT QUICK ROUND · 0:42 over THE ORCHARD COTTAGE · INSANE, its words whole`, banner.Visible and inside(box(banner))
+			and named(banner, "Kicker").Text == "NEXT QUICK ROUND · 0:42" and named(banner, "Title").Text == "THE ORCHARD COTTAGE · INSANE" and #badTexts(banner) == 0
+			and #cut(banner) == 0, cut(banner)[1] or badTexts(banner)[1] or show(box(banner)))
+		local others = blocks()
+		others["the PLAY bar"] = box(b)
+		for name, other in others do
+			check(`{label}: … the banner clear of {name}`, not overlap(box(banner), other), `{show(box(banner))} on {show(other)}`)
+		end
+		if M.touch then
+			check(`{label}: … its LEAVE QUEUE a finger's size`, #smallButtons(banner) == 0, smallButtons(banner)[1])
+		end
+		fire({ kind = "play" })
+		check(`{label}: … away from the circle in the queue (the server's empty view): no PLAY panel, no bar (the banner says it)`, panel() == nil and bar() == nil)
+		runsRemote.OnClientEvent:Fire(BANNER)
+		M.flush()
+		scene(`play-banner-{tag}`)
+		local runsBefore = #sentOnRuns()
+		press(named(banner, "Leave"))
+		local asked = sentOnRuns()[#sentOnRuns()]
+		check(`{label}: … the banner's LEAVE QUEUE: the Runs remote's {"{"} kind = "queue", on = false {"}"}`, #sentOnRuns() == runsBefore + 1 and asked[1].kind == "queue"
+			and asked[1].on == false)
+		local OUT = table.clone(BANNER)
+		OUT.ready = false
+		runsRemote.OnClientEvent:Fire(OUT)
+		M.flush()
+		check(`{label}: … out of the queue: no banner`, not banner.Visible)
+		fire({ kind = "play" })
+	end
+	check("10.6: the rounds off (no `round` in the view): the home as 10.4's (＋ CREATE A LOBBY, how it works, no QUICK ROUND)", (function()
+		fire(HOME)
+		local p = panel()
+		return p ~= nil and named(p, "Quick") == nil and named(p, "Create") ~= nil and named(p, "How") ~= nil
+	end)())
+	fire({ kind = "play" })
 end
 
 -- a resize while it is up: its scale follows (a big screen: 1; a phone: the touch scale, the panel whole)

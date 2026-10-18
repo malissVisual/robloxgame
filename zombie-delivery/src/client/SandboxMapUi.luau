@@ -8,7 +8,9 @@
 --     ring amber while a lobby counts down; its line: STEP IN, 2 OPEN LOBBIES, STARTING), the players as dots with
 --     their names and you as a ▲; the side column's OPEN LOBBIES (a row a lobby: its host and house over its
 --     difficulty, n/4, FRIENDS ONLY, STARTING) and IN A RUN (a row a run: its house over its difficulty and party),
---     server/Parties.luau's attribute on the PLAY circle. A click or a tap on the circle (on the map, on the side
+--     server/Parties.luau's attribute on the PLAY circle; 10.6 both in PLAY: under the PLAY row the QUICK ROUND row
+--     (the next place, its difficulty, the countdown, how many are queued; the round on, over, nobody queued:
+--     SandboxMapData.round, SandboxMapRules.roundLine), hidden while the rounds are off. A click or a tap on the circle (on the map, on the side
 --     column's PLAY row or on a lobby's row) has the guide show the way there (client/SandboxGuide.luau goTo) and
 --     closes the map.
 --   * In a run: the house's floor plan (rooms, walls, doorways, fixtures, windows) over a strip of its front yard (the
@@ -203,8 +205,18 @@ local function buildSide(side: ScrollingFrame, place: Data.Place, u: number, wid
 		local play = row("Play", y)
 		play.top.Text = "▶ THE PLAY CIRCLE"
 		play.top.TextColor3 = rgb(Config.Runs.Play.Free)
-		play.bottom.Text = "STEP IN: CREATE A LOBBY OR JOIN ONE"
+		play.bottom.Text = if Config.Rounds.On then "STEP IN: QUICK ROUND OR LOBBY" else "STEP IN: CREATE A LOBBY OR JOIN ONE"
 		ui.play = play
+		y += rowH + 12
+		-- 10.6: the QUICK ROUND title and row (the look fills it: SandboxMapUi.step; none while the rounds are off)
+		ui.quickTop = y
+		ui.quickTitle = label(side, "QuickTitle", "QUICK ROUND", 0, y, inner, smallSize, K.secondary, true)
+		ui.quickTitle.Visible = false
+		y += smallSize + 10
+		local quick = row("Quick", y)
+		quick.top.Text = "⚡ QUICK ROUND"
+		quick.row.Visible = false
+		ui.quick = quick
 		y += rowH + 12
 		ui.listTop = y
 		ui.rowH = rowH
@@ -409,7 +421,8 @@ local function layoutRows(entries: { any })
 		return
 	end
 	local small, rowH = ui.small or 12, ui.rowH or 40
-	local y = ui.listTop or 0
+	local quick = ui.quick
+	local y = if quick and quick.row.Visible then ui.listTop or 0 else ui.quickTop or ui.listTop or 0 -- (10.6: under the QUICK ROUND row)
 	local open, runs = {}, {}
 	for _, e in entries do
 		table.insert(if e.state == "run" then runs else open, e)
@@ -491,6 +504,24 @@ function SandboxMapUi.step()
 	if place.kind == "lobby" then
 		local entries = Data.lobbies()
 		Draw.play(canvas, entries)
+		local quick = ui.quick -- 10.6: the QUICK ROUND row
+		if quick then
+			local top, bottom, tone = Rules.roundLine(Data.round(), workspace:GetServerTimeNow())
+			quick.row.Visible = tone ~= "off"
+			if ui.quickTitle then
+				ui.quickTitle.Visible = quick.row.Visible
+			end
+			if quick.top.Text ~= top and top ~= "" then
+				quick.top.Text = top
+			end
+			if quick.bottom.Text ~= bottom then
+				quick.bottom.Text = bottom
+			end
+			local c = if tone == "run" then K.red elseif tone == "starting" then rgb(Config.Runs.Play.Waiting) elseif tone == "full" then K.secondary else rgb(Config.Runs.Play.Free)
+			quick.bar.BackgroundColor3 = c
+			quick.top.TextColor3 = rgb(Config.Runs.Play.Waiting)
+			quick.bottom.TextColor3 = if tone == "starting" then c else K.secondary
+		end
 		layoutRows(entries)
 	else
 		local status = Data.status(place)
@@ -576,7 +607,8 @@ function SandboxMapUi.toggle()
 end
 
 function SandboxMapUi.parts(): { [string]: any }
-	return { gui = ui.gui, window = ui.window, map = ui.map, side = ui.side, canvas = ui.canvas, close = ui.close, rows = ui.rows, play = ui.play, lines = ui.lines, chip = chip.button, chipGui = chip.gui }
+	return { gui = ui.gui, window = ui.window, map = ui.map, side = ui.side, canvas = ui.canvas, close = ui.close, rows = ui.rows, play = ui.play, quick = ui.quick, lines = ui.lines,
+		chip = chip.button, chipGui = chip.gui }
 end
 
 -- ── The 🗺 MAP chip ──────────────────────────────────────────────────────────

@@ -19,8 +19,8 @@
 -- the PAINT shop (9.7: the lobby's booth); the line placed as above; nothing while the screen is covered, SoftGap after;
 -- the ✕ on one dismisses it alone (the guide stays on); a window opened, a purchase or SoftSeconds on the screen: done;
 -- a run wins; the ring makes nothing loop after loop.
--- 9.7 runs (no contract board, nobody drives): 10.4 "Step into PLAY to start a run" (the chevron over the lobby's PLAY
--- circle, PLAY on it), quiet in a party lobby (client/PlayUi.luau's panel and bar say it: the host's "lobbyHost", the
+-- 9.7 runs (no contract board, nobody drives): 10.4 "Step into PLAY to start" (10.6: a quick round or a lobby; the
+-- chevron over the lobby's PLAY circle, PLAY on it), quiet in a party lobby (client/PlayUi.luau's panel and bar say it: the host's "lobbyHost", the
 -- others' "lobbyWait"), the run's front door, "Carry the loot out to the truck", "Load the truck", "Finish or beat the
 -- clock" (the truck's back), the stock on show, "Step into PLAY for another run!" (the PLAY circle).
 -- 8.4, Danny's steps (SandboxSteps.danny) at the same three sizes (10.1: no "Hire Danny" step: he is free, with you
@@ -249,6 +249,7 @@ end
 local Config = require("./Config")
 local G = Config.SandboxGuide
 G.HideHold, G.OffNote = 0.05, 0.05 -- (the waits short: the check's own clock is the real one)
+Config.Rounds.On = false -- (10.6: the lobbies' flow here; the quick round's words, in its queue and in a round, are tests/sandboxsteps_test.luau's)
 local TouchLayout = require("./TouchLayout")
 local MoveLayout = require("./MoveLayout")
 local SandboxSteps = require("./SandboxSteps")
@@ -403,8 +404,8 @@ local PLAY = SandboxMap.Lobby.play
 tick()
 local moneyBox = box(money)
 local b = hintBox()
-local PLAY_WORDS = "Step into PLAY to start a run"
-check("no run: \"Step into PLAY to start a run\" (9.7: no contract board; 10.4 no portals)", SandboxGuide.step() == "play" and words.Text == PLAY_WORDS and shown(), words.Text)
+local PLAY_WORDS = "Step into PLAY to start"
+check("no run: \"Step into PLAY to start\" (9.7: no contract board; 10.4 no portals; 10.6 a quick round or a lobby)", SandboxGuide.step() == "play" and words.Text == PLAY_WORDS and shown(), words.Text)
 check("… the hint line at the top in the middle, on the screen", inside(b) and math.abs((b.x0 + b.x1) / 2 - M.width / 2) < 1 and b.y0 < 30, show(b))
 check("… clear of the money at the top left", not overlap(b, moneyBox), `{show(b)} / {show(moneyBox)}`)
 check("… clear of the touch buttons", clearOfTouch(b))

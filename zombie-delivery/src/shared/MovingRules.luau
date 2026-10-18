@@ -71,6 +71,9 @@
 --   MovingRules.deliver(move, now) -> spots    at the Wall: everything in the van (and on its hitch) is delivered
 --                                              (state "delivered", late when the clock had run out), the bed empty again
 --   MovingRules.lose(move) -> spots            the van was lost: what was in it is lost (state "lost", condition 0)
+--   MovingRules.claim(move, who, now) -> (spot?, why?)   10.5 rounds: the carrier loads what they hold into their own van:
+--                                              it is theirs at once (state "delivered", no place on a bed; late after the
+--                                              clock); a helper's end of a pair piece claims nothing ("helper")
 --   MovingRules.setBed(move, bed)              another car's bed (an empty one: after the van was lost)
 --   The hitch: a piece too big for the bed that may be towed (ItemDef.tow: FurnitureLooks bigDoor, the hay wagon) is
 --   hitched behind the car instead (Placement.hitch; one at a time), Unload takes it off once the bed is empty.
@@ -1104,6 +1107,23 @@ function MovingRules.deliver(move: Move, now: number): { number }
 		move.trips = (move.trips or 0) + 1
 	end
 	return delivered
+end
+
+-- 10.5 rounds: the carrier's piece straight into their own van, theirs (delivered: no bed, no trip).
+function MovingRules.claim(move: Move, who: number, now: number): (number?, string?)
+	if not active(move) then
+		return nil, "over"
+	end
+	local spot, role = MovingRules.holding(move, who)
+	if not spot then
+		return nil, "empty"
+	elseif role ~= "carrier" then
+		return nil, "helper"
+	end
+	local thing = move.things[spot]
+	thing.state, thing.place, thing.carrier, thing.helper = "delivered", nil, nil, nil
+	thing.late = now >= move.endsAt
+	return spot, nil
 end
 
 -- The van was lost (wrecked, gone): what was in it is lost with it (condition 0); the spots.
