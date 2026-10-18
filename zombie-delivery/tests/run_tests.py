@@ -9,7 +9,7 @@ import glob, json, os, re, shutil, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SHARED = os.path.join(os.path.dirname(HERE), "src", "shared")
-PURE = ("Config", "ZombieKinds", "Map", "Icons", "SoundSheet", "NpcLooks", "Melee", "KitFit", "Bag", "Gestures", "RunCycle", "BodyMotion", "AvatarLook", "Tasks", "SoundPlan", "StyleLooks", "AnalyticsPlan", "RenderBudget", "OutlinePick", "ZombieStyle", "CardLayout", "KitArt", "SpawnSpot", "Gait", "MovingRules", "MoveHelperBrain", "MoveRoles", "CarryGrip", "ChaletLooks", "SandboxMap", "SandboxAdmin", "CollectionRules", "SandboxSteps", "WarehouseLayout", "SprinterLooks")
+PURE = ("Config", "ZombieKinds", "Icons", "SoundSheet", "NpcLooks", "Melee", "KitFit", "Bag", "Gestures", "RunCycle", "BodyMotion", "AvatarLook", "Tasks", "SoundPlan", "StyleLooks", "AnalyticsPlan", "RenderBudget", "OutlinePick", "ZombieStyle", "CardLayout", "KitArt", "SpawnSpot", "Gait", "MovingRules", "MoveHelperBrain", "MoveRoles", "CarryGrip", "ChaletLooks", "SandboxMap", "SandboxAdmin", "CollectionRules", "SandboxSteps", "WarehouseLayout", "SprinterLooks")
 PURE += ("SandboxScenery",)  # 8.0 sandbox, the map (tests/sandboxworld_test.luau)
 PURE += ("PairCarry",)  # 8.1 carrying in two: the leader's steering (tests/paircarry_test.luau)
 PURE += ("UpgradeRules",)  # 8.1 sandbox, the upgrades (tests/upgrades_test.luau)
@@ -71,7 +71,7 @@ with tempfile.TemporaryDirectory() as tmp:
     prefix = 'local M = require("./ItemMock")\nlocal Instance, Vector3, CFrame, Color3, Enum, UDim2 = M.Instance, M.Vector3, M.CFrame, M.Color3, M.Enum, M.UDim2\n'
     # 7.0 (the moving prototype): the furniture and the house plans are made of Vector3s and CFrames, so they load on
     # the same recorder (tests/furniture_test.luau, tests/houselayout_test.luau).
-    for name in ("GunModels", "CargoLooks", "ItemLooks", "FurnitureLooks", "HouseLayout"):
+    for name in ("CargoLooks", "ItemLooks", "FurnitureLooks", "HouseLayout"):
         source = open(os.path.join(SHARED, name + ".luau"), encoding="utf-8").read()
         source = re.sub(r"require\(script\.Parent\.Layouts\.(\w+)\)", r'require("./\1")', source)  # (shared/Layouts: the countryside's)
         source = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', source)
@@ -715,7 +715,7 @@ if not pad_check():
 # Jinočany (design/jinocany/NAVRH.md: the sandbox in Jinočany in place of the Alps): the sandbox's big house is The Old
 # Farmstead and its street Pražská, so no "Old Chalet" and no "Main Street" is left in src (comments too, a name broken
 # over two comment lines too). The city's own files (Config.Sandbox.On = false, on hold) may keep their own names.
-CITY_ONLY = {"shared/Map.luau", "shared/BusLines.luau"}
+CITY_ONLY: set = set()  # (10.6: the city's own files, shared/Map.luau the last, are gone)
 def jinocany_names_check():
     src = os.path.join(os.path.dirname(HERE), "src")
     old = re.compile(r"\bold(?:\s|--)*chalet|\bmain(?:\s|--)*street\b", re.I)

@@ -19,7 +19,7 @@ from sandboxenv import HERE, PREFIX, ROOT, local
 EXTRA = '''local RaycastParams = mock.RaycastParams or { new = function() return {} end }
 '''
 
-RECORDER = ("GunModels", "CargoLooks", "ItemLooks", "FurnitureLooks", "HouseLayout")
+RECORDER = ("CargoLooks", "ItemLooks", "FurnitureLooks", "HouseLayout")
 ITEM_PREFIX = ('local M = require("./ItemMock")\n'
                'local Instance, Vector3, CFrame, Color3, Enum, UDim2 = M.Instance, M.Vector3, M.CFrame, M.Color3, M.Enum, M.UDim2\n')
 PLANS = '''local HouseLayout = require("./HouseLayout")
