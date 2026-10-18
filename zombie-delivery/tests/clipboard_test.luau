@@ -34,7 +34,7 @@ local C = H.Clipboard
 
 -- ── May it be out ───────────────────────────────────────────────────────────
 local function can(fields: { [string]: any }?): (boolean, string?)
-	local c: ClipboardRules.Can = { hired = true, alive = true, hand = true, seated = false, carrying = false, pushing = false, phone = false, aiming = false }
+	local c: ClipboardRules.Can = { hired = true, alive = true, hand = true, seated = false, carrying = false }
 	for key, value in fields or {} do
 		(c :: any)[key] = value
 	end
@@ -46,8 +46,6 @@ check("no helper on your move (no move, the move over): no (none; 10.1 was \"hir
 check("dead: no (dead); no right hand: no (hand)", select(2, can({ alive = false })) == "dead" and select(2, can({ hand = false })) == "hand")
 check("in a seat: no (seat)", select(2, can({ seated = true })) == "seat")
 check("a piece in your hands: no (carry): you can't carry with it out", select(2, can({ carrying = true })) == "carry")
-check("a trolley, the phone, a gun up: no (push, phone, aim)", select(2, can({ pushing = true })) == "push" and select(2, can({ phone = true })) == "phone"
-	and select(2, can({ aiming = true })) == "aim")
 check("…the helper first, then life, the hand, the seat, the hands", select(2, can({ hired = false, alive = false, seated = true, carrying = true })) == "none"
 	and select(2, can({ alive = false, seated = true })) == "dead" and select(2, can({ seated = true, carrying = true })) == "seat")
 check("the notices: hands full (G), a seat, no helper (10.1: never \"hire him first\"); nothing for death or a missing hand", ClipboardRules.why("carry") == "Put down what you carry first (G): then take out your clipboard."

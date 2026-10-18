@@ -272,11 +272,11 @@ check("Unload (Z, \"Take out\") shows the last one in", unload ~= nil and unload
 -- the owner's report: Unload sat on the door's own attachment with Load and the back's E (all stacked)
 check("Unload on its own spot beside the door, not stacked with Load and the back's E", unload.Parent ~= cargoDoor and unload.Parent.Name == "MoveTakeOut"
 	and unload.Parent.Parent == truck.chassis and (unload.Parent.WorldPosition - cargoDoor.WorldPosition).Magnitude > 2 and not load.Enabled and backPrompt.Enabled)
-character:SetAttribute("Pushing", "trolley")
+character:SetAttribute("Carrying", "box") -- (something else in your hands; 10.6: no trolley to push)
 trigger(unload, ann)
 check("7.0 review: Unload with your hands full: refused", character:GetAttribute("MoveCarry") == nil and string.find(E.lastNotice(ann), "hands are full", 1, true) ~= nil
 	and lampRoot:FindFirstChildOfClass("WeldConstraint").Part0 == truck.chassis, E.lastNotice(ann))
-character:SetAttribute("Pushing", nil)
+character:SetAttribute("Carrying", nil)
 trigger(unload, ann)
 check("unloaded into your hands", character:GetAttribute("MoveCarry") == 1 and lampRoot:FindFirstChildOfClass("WeldConstraint").Part0 == E.rootOf(ann))
 -- 7.0 review: Load checks the carry's pace (a teleport to the truck's back with it does not count)

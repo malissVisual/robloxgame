@@ -652,15 +652,15 @@ end
 
 -- 8.3 walk-in doors: a door's leaf (`leaf`: its part `body`, or the model that part is the PrimaryPart of; no
 -- collision), shut in its doorway, hinged at its end `hinge` (±1 along its width), opening out onto the porch (-Z) a
--- right angle, flat along it: in the sandbox a door leaf of shared/DoorSwing.luau (DoorLeaf, DoorSwing -1, DoorAngle
--- 90: server/Moving.luau says when, every client swings it as you walk up to it); elsewhere (the city's client swings
--- none) it stands open so. Danny's paths go through it whatever its swing does (a PathfindingModifier PassThrough on its
+-- right angle, flat along it: a door leaf of shared/DoorSwing.luau (DoorLeaf, DoorSwing -1, DoorAngle 90:
+-- server/Moving.luau says when, every client swings it as you walk up to it); with Config.Moving.Doors.Swing off it
+-- stands open so (10.6: the city's way, Config.Sandbox.On false, is gone). Danny's paths go through it whatever its swing does (a PathfindingModifier PassThrough on its
 -- part: a door, not a wall).
 local function swingOut(leaf: PVInstance, body: BasePart, hinge: number)
 	local through = Instance.new("PathfindingModifier")
 	through.PassThrough = true
 	through.Parent = body
-	if Config.Sandbox.On and Config.Moving.Doors.Swing then
+	if Config.Moving.Doors.Swing then
 		leaf:SetAttribute("DoorLeaf", hinge)
 		leaf:SetAttribute("DoorSwing", -1) -- (out, onto the porch: -Z)
 		leaf:SetAttribute("DoorAngle", 90) -- (flat along the porch)

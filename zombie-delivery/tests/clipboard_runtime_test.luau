@@ -256,10 +256,6 @@ humanoid.SeatPart, humanoid.Sit = nil, false
 humanoid:GetPropertyChangedSignal("SeatPart"):Fire()
 ask(ann, true)
 check("…out of the seat: out again", humanoid.SeatPart == nil and held(ann))
--- a weapon up (the run's bat: Aiming)
-ann.Character:SetAttribute("Aiming", true)
-check("a gun up (Aiming): the clipboard goes", away(ann))
-ann.Character:SetAttribute("Aiming", nil)
 -- death
 ask(ann, true)
 check("(out again)", held(ann))

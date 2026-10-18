@@ -763,7 +763,7 @@ local function findRoom(ground: CFrame, ignore: { Instance }, what: string): (CF
 			why = if n == 1 then whyNot else why
 			continue
 		end
-		local lookOn, rightOn, upOn = SpawnSpot.frame(up, look.X, look.Z, true)
+		local lookOn, rightOn, upOn = SpawnSpot.frame(up, look.X, look.Z)
 		local origin = Vector3.new(at.X, SpawnSpot.heightAt(up, middle, at.X, at.Z), at.Z)
 		local onPlane = CFrame.fromMatrix(origin, Vector3.new(rightOn[1], rightOn[2], rightOn[3]), Vector3.new(upOn[1], upOn[2], upOn[3]),
 			-Vector3.new(lookOn[1], lookOn[2], lookOn[3]))

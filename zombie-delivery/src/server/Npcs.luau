@@ -1,9 +1,10 @@
 --!strict
 -- People in the world: realistic R15 characters (built from a HumanoidDescription, Roblox's own body) who stand at
 -- their place, play an idle animation, turn to you when you come close, say a line in a speech bubble and can walk
--- somewhere. The employers stand at their WORK HERE boards (server/World.luau), the givers hand cargo over at
--- pick-ups, the receivers take it at the drops, kids board the bus, a patient boards the ambulance
--- (server/Cargo.luau). Doctor Ellie at the City Clinic wears a white coat, the bank guard a uniform.
+-- somewhere. 10.6 (only the sandbox is the game): the run's helpers (Danny and the crew: server/MoveHelper.luau,
+-- server/HelperCrew.luau) and the showroom's visitors (server/Visitors.luau); the city's employers, givers, receivers,
+-- kids, patients and its farmer Walt went with it (no child's body, no moustache, check shirt or bandage, no cowboy hat,
+-- hard hat or chef's hat any more).
 --
 -- Outfits are made of colours and a few parts (no clothing assets): the body parts are coloured like a shirt, pants
 -- and shoes, with a hat, hair, a vest or an apron welded on (Npcs.look gives every role its own look). A standing
@@ -29,9 +30,8 @@
 -- the hair are sized to the smaller head; the walk is slowed to the longer legs (CourierMotion.stride; 6.8 review: the
 -- leg measured on the rig).
 -- 6.9 (the owner: "everybody blocky R15, like Roblox"): the people are Roblox's own classic blocky R15 again, the
--- couriers' body (shared/AvatarLook.luau's Body; a kid smaller), dressed as before 6.7. The realistic body's paint
+-- couriers' body (shared/AvatarLook.luau's Body), dressed as before 6.7. The realistic body's paint
 -- groups, head sizes and stride stay for a body that carries CharacterArt (none is built here any more).
--- 7.x farm move: a moustache and a check shirt (NpcLooks moustache, plaid: Walt at his farm) from a few welded parts.
 
 local Players = game:GetService("Players")
 local PhysicsService = game:GetService("PhysicsService")
@@ -81,7 +81,7 @@ type State = {
 local states: { [Model]: State } = {}
 local loadTrack: (animator: Animator, id: string) -> AnimationTrack? -- (below: 9.3 a walk's legs load the run too)
 local templates: { [string]: Model } = {}
-local baseRigs: { [boolean]: Model } = {} -- the plain R15 rigs (adult, child) every look is dressed on
+local baseRig: Model? = nil -- the plain R15 rig every look is dressed on
 local warmed = false
 local folder: Folder? = nil
 local started = false
@@ -90,48 +90,40 @@ local function rgb(c: { number }?, fallback: Color3): Color3
 	return if c then Color3.fromRGB(c[1], c[2], c[3]) else fallback
 end
 
--- The two base rigs, made once (CreateHumanoidModelFromDescription yields: World.build waits for it at server start,
--- so Npcs.spawn never yields later in the Jobs Heartbeat). A failed load means blocky people, without retries.
+-- The base rig, made once (CreateHumanoidModelFromDescription yields: made as the first person comes, never again).
+-- A failed load means blocky people, without retries.
 local function warmBases()
 	if warmed then
 		return
 	end
 	warmed = true
-	for _, child in { false, true } do
-		-- 6.9: Roblox's classic blocky R15, the couriers' body (shared/AvatarLook.luau), a kid's smaller
-		local ok, rig = pcall(function(): Model
-			local d = Instance.new("HumanoidDescription")
-			for field, value in AvatarLook.Body do
-				(d :: any)[field] = value
-			end
-			if child then
-				d.HeightScale = 0.72
-				d.WidthScale = 0.78
-				d.DepthScale = 0.78
-				d.HeadScale = 0.95
-			end
-			return Players:CreateHumanoidModelFromDescription(d, Enum.HumanoidRigType.R15)
-		end)
-		if ok and rig then
-			baseRigs[child] = rig
-		else
-			warn(`[Npcs] no R15 base rig, using blocks: {rig}`)
+	-- 6.9: Roblox's classic blocky R15, the couriers' body (shared/AvatarLook.luau)
+	local ok, rig = pcall(function(): Model
+		local d = Instance.new("HumanoidDescription")
+		for field, value in AvatarLook.Body do
+			(d :: any)[field] = value
 		end
+		return Players:CreateHumanoidModelFromDescription(d, Enum.HumanoidRigType.R15)
+	end)
+	if ok and rig then
+		baseRig = rig
+	else
+		warn(`[Npcs] no R15 base rig, using blocks: {rig}`)
 	end
 end
 
--- Lazy: World.build places the employers before Npcs.start runs.
+-- Lazy: the first person made (Npcs.spawn) sets it up.
 local function init(): Folder
 	if folder and folder.Parent then
 		return folder
 	end
 	warmBases()
-	for _, name in { GROUP, "Car", "EnemyCar", "Zombie", "Bullet", "Corpse" } do
+	for _, name in { GROUP, "Car", "Zombie", "Corpse" } do
 		pcall(function()
 			PhysicsService:RegisterCollisionGroup(name)
 		end)
 	end
-	for _, other in { "Car", "EnemyCar", "Zombie", "Bullet", "Corpse", GROUP } do
+	for _, other in { "Car", "Zombie", "Corpse", GROUP } do
 		pcall(function()
 			PhysicsService:CollisionGroupSetCollidable(GROUP, other, false)
 		end)
@@ -148,10 +140,8 @@ end
 
 -- ── Looks ──────────────────────────────────────────────────────────────────
 
--- A look for a role (shared/NpcLooks.luau look: "rancher", "soldier", "officer", "farmer", "worker", "foreman",
--- "firefighter", "teacher", "kid", "shopkeeper", "grocer", "icecream", "mover", "cook", "clerk", "attendant", "rider",
--- "doctor", "nurse", "patient", "banker", "guard", anything else = a townsperson). Skin and hair come from the name, so
--- the same person always looks the same.
+-- A look for a role (shared/NpcLooks.luau look: "mover", anything else = a townsperson). Skin and hair come from the
+-- name, so the same person always looks the same.
 function Npcs.look(role: string, name: string, title: string?): Look
 	return NpcLooks.look(role, name, title)
 end
@@ -164,7 +154,7 @@ local function bodyPart(model: Model, name: string): BasePart?
 end
 
 -- A part welded onto `on` at `offset` (cosmetic: no mass, no collisions, not hit by rays).
-local function wear(model: Model, on: BasePart, name: string, size: Vector3, offset: CFrame, color: Color3, material: Enum.Material?, mesh: Enum.MeshType?, shape: Enum.PartType?): Part
+local function wear(model: Model, on: BasePart, name: string, size: Vector3, offset: CFrame, color: Color3, material: Enum.Material?, mesh: Enum.MeshType?): Part
 	local p = Instance.new("Part")
 	p.Name = name
 	p.Size = size
@@ -176,9 +166,6 @@ local function wear(model: Model, on: BasePart, name: string, size: Vector3, off
 	p.CanQuery = false
 	p.CanTouch = false
 	p.Massless = true
-	if shape then
-		p.Shape = shape
-	end
 	p.CFrame = on.CFrame * offset
 	if mesh then
 		local m = Instance.new("SpecialMesh")
@@ -192,8 +179,6 @@ local function wear(model: Model, on: BasePart, name: string, size: Vector3, off
 	p.Parent = model
 	return p
 end
-
-local UPRIGHT = CFrame.Angles(0, 0, math.rad(90)) -- a cylinder standing up
 
 local function dress(model: Model, look: Look)
 	local skin = rgb(look.skin, Color3.fromRGB(241, 194, 160))
@@ -261,16 +246,6 @@ local function dress(model: Model, look: Look)
 			end
 			wear(model, torso, "Pocket", Vector3.new(s.X * 0.18, s.Y * 0.16, 0.04), CFrame.new(-s.X * 0.32, s.Y * 0.16, -s.Z * 0.6), Color3.fromRGB(60, 120, 200), Enum.Material.SmoothPlastic)
 		end
-		if look.plaid then
-			-- 7.x farm move: a check shirt (Walt): two bands across and two down, round the torso
-			local band = rgb(look.plaid, shirt)
-			for _, y in { 0.18, -0.22 } do
-				wear(model, torso, "Plaid", Vector3.new(s.X * 1.02, s.Y * 0.09, s.Z * 1.04), CFrame.new(0, s.Y * y, 0), band)
-			end
-			for _, x in { -0.22, 0.22 } do
-				wear(model, torso, "Plaid", Vector3.new(s.X * 0.09, s.Y * 0.98, s.Z * 1.04), CFrame.new(s.X * x, 0, 0), band)
-			end
-		end
 		-- A collar.
 		wear(model, torso, "Collar", Vector3.new(s.X * 0.42, s.Y * 0.08, s.Z * 0.9), CFrame.new(0, s.Y * 0.48, 0), shirt:Lerp(Color3.new(0, 0, 0), 0.15))
 	end
@@ -308,36 +283,13 @@ local function dress(model: Model, look: Look)
 		-- Hair: an ellipsoid over the top and the back of the head.
 		wear(model, head, "Hair", Vector3.new(h.X * 1.04, h.Y * 0.62, h.Z * 1.06), CFrame.new(0, h.Y * 0.24, h.Z * 0.06), rgb(look.hair, Color3.new(0, 0, 0)), Enum.Material.SmoothPlastic, Enum.MeshType.Sphere)
 	end
-	if look.moustache then
-		-- 7.x farm move: a moustache under the nose (Walt's), its ends drooping a little
-		local tache = rgb(look.moustache, Color3.fromRGB(120, 110, 100))
-		wear(model, head, "Moustache", Vector3.new(h.X * 0.46, h.Y * 0.1, h.Z * 0.12), CFrame.new(0, -h.Y * 0.14, -h.Z * 0.5), tache, Enum.Material.SmoothPlastic)
-		for _, side in { -1, 1 } do
-			wear(model, head, "Moustache", Vector3.new(h.X * 0.09, h.Y * 0.16, h.Z * 0.1), CFrame.new(side * h.X * 0.23, -h.Y * 0.2, -h.Z * 0.49), tache, Enum.Material.SmoothPlastic)
-		end
-	end
-	if look.bandage then
-		-- A white band round the forehead, a plaster on the cheek.
-		wear(model, head, "Bandage", Vector3.new(h.Y * 0.24, h.X * 1.08, h.Z * 1.1), CFrame.new(0, h.Y * 0.2, 0) * UPRIGHT, Color3.fromRGB(246, 244, 238), Enum.Material.Fabric, nil, Enum.PartType.Cylinder)
-		wear(model, head, "Plaster", Vector3.new(h.X * 0.22, h.Y * 0.14, 0.04), CFrame.new(h.X * 0.22, -h.Y * 0.12, -h.Z * 0.5), Color3.fromRGB(226, 196, 160), Enum.Material.Fabric)
-	end
-	if hat == "cowboy" then
-		wear(model, head, "HatBrim", Vector3.new(0.08, h.X * 1.9, h.Z * 1.9), CFrame.new(0, h.Y * 0.36, 0) * UPRIGHT, hatColor, Enum.Material.Leather, nil, Enum.PartType.Cylinder)
-		wear(model, head, "HatCrown", Vector3.new(h.Y * 0.5, h.X * 0.95, h.Z * 0.95), CFrame.new(0, h.Y * 0.6, 0) * UPRIGHT, hatColor, Enum.Material.Leather, nil, Enum.PartType.Cylinder)
-		wear(model, head, "HatBand", Vector3.new(h.Y * 0.1, h.X * 0.97, h.Z * 0.97), CFrame.new(0, h.Y * 0.44, 0) * UPRIGHT, hatColor:Lerp(Color3.new(0, 0, 0), 0.6), Enum.Material.Leather, nil, Enum.PartType.Cylinder)
-	elseif hat == "cap" then
+	if hat == "cap" then
 		wear(model, head, "Cap", Vector3.new(h.X * 1.06, h.Y * 0.5, h.Z * 1.06), CFrame.new(0, h.Y * 0.32, 0), hatColor, Enum.Material.Fabric, Enum.MeshType.Sphere)
 		wear(model, head, "Visor", Vector3.new(h.X * 0.8, 0.06, h.Z * 0.5), CFrame.new(0, h.Y * 0.3, -h.Z * 0.62) * CFrame.Angles(math.rad(8), 0, 0), hatColor:Lerp(Color3.new(0, 0, 0), 0.2))
-	elseif hat == "hardhat" then
-		wear(model, head, "Hardhat", Vector3.new(h.X * 1.14, h.Y * 0.62, h.Z * 1.16), CFrame.new(0, h.Y * 0.36, 0), hatColor, Enum.Material.SmoothPlastic, Enum.MeshType.Sphere)
-		wear(model, head, "HardhatBrim", Vector3.new(0.06, h.X * 1.3, h.Z * 1.34), CFrame.new(0, h.Y * 0.2, -0.04) * UPRIGHT, hatColor, Enum.Material.SmoothPlastic, nil, Enum.PartType.Cylinder)
 	elseif hat == "beanie" then
 		wear(model, head, "Beanie", Vector3.new(h.X * 1.08, h.Y * 0.7, h.Z * 1.08), CFrame.new(0, h.Y * 0.28, 0.02), hatColor, Enum.Material.Fabric, Enum.MeshType.Sphere)
 	elseif hat == "helmet" then
 		wear(model, head, "Helmet", Vector3.new(h.X * 1.18, h.Y * 0.72, h.Z * 1.22), CFrame.new(0, h.Y * 0.3, 0.03), hatColor, Enum.Material.SmoothPlastic, Enum.MeshType.Sphere)
-	elseif hat == "chef" then
-		wear(model, head, "ChefHat", Vector3.new(h.Y * 0.8, h.X * 0.92, h.Z * 0.92), CFrame.new(0, h.Y * 0.8, 0) * UPRIGHT, hatColor, Enum.Material.Fabric, nil, Enum.PartType.Cylinder)
-		wear(model, head, "ChefPuff", Vector3.new(h.X * 1.1, h.Y * 0.5, h.Z * 1.1), CFrame.new(0, h.Y * 1.2, 0), hatColor, Enum.Material.Fabric, Enum.MeshType.Sphere)
 	end
 end
 
@@ -347,8 +299,7 @@ local function lookKey(look: Look): string
 	end
 	return table.concat({
 		c(look.skin), c(look.shirt), c(look.pants), c(look.hatColor), c(look.hair), c(look.vest), c(look.apron), c(look.shoes),
-		look.hat or "none", tostring(look.child == true), tostring(look.boots == true), tostring(look.shortSleeves == true),
-		c(look.coat), c(look.tie), tostring(look.bandage == true), c(look.moustache), c(look.plaid), -- (7.x farm move: Walt's)
+		look.hat or "none", tostring(look.boots == true), tostring(look.shortSleeves == true), c(look.coat), c(look.tie),
 	}, "|")
 end
 
@@ -359,7 +310,7 @@ local function r15Body(look: Look): Model?
 	if cached then
 		return cached:Clone()
 	end
-	local base = baseRigs[look.child == true]
+	local base = baseRig
 	if not base then
 		return nil -- no base rig: blockyBody, no yield
 	end
@@ -401,7 +352,7 @@ end
 -- When no R15 body can be made: a simple blocky person (a statue that still talks, turns and slides along).
 local function blockyBody(look: Look): Model
 	local model = Instance.new("Model")
-	local s = if look.child then 0.75 else 1
+	local s = 1
 	local function block(name: string, size: Vector3, offset: CFrame, color: Color3, root: BasePart?): Part
 		local p = Instance.new("Part")
 		p.Name = name
@@ -967,10 +918,10 @@ function Npcs.spawn(look: Look, at: CFrame): Model
 	local root = (model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart) :: BasePart
 	model.PrimaryPart = root
 	local humanoid = model:FindFirstChildOfClass("Humanoid")
-	local scale = if look.child then 0.72 else 1
+	local scale = 1
 	if humanoid and model:GetAttribute("CharacterArt") ~= nil then
 		-- 6.7: the walk's pace by the legs (the realistic body's step is longer than the stock walk's); 6.8 review: the
-		-- leg measured on the rig, hip to sole (Motion.leg: 2.8 / 2 = 1.4, a kid's 2.1 / 2), the feet planted
+		-- leg measured on the rig, hip to sole (Motion.leg: 2.8 / 2 = 1.4), the feet planted
 		scale = Motion.stride(Motion.leg(model) or humanoid.HipHeight)
 	end
 	local flat = Vector3.new(at.LookVector.X, 0, at.LookVector.Z)
@@ -1001,7 +952,7 @@ function Npcs.spawn(look: Look, at: CFrame): Model
 		scale = scale,
 	}
 	if humanoid then
-		humanoid.WalkSpeed = look.walkSpeed or (if look.child then 9 else 8)
+		humanoid.WalkSpeed = look.walkSpeed or 8
 		local animator = humanoid:FindFirstChildOfClass("Animator")
 		if animator then
 			state.idle = loadTrack(animator, IDLE)

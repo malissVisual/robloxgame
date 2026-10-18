@@ -710,7 +710,7 @@ local function byTruck(truck: Vehicles.Car, side: number, out: number): Vector3?
 	return Vector3.new(at.X, chassis.Y, at.Z) + dir * out + right * side
 end
 
-local NOT_FLOOR = { "Npcs", "Zombies", "Cars", "Traffic", "BanditCars", "Animals", "Moves" } -- (outside: never a floor)
+local NOT_FLOOR = { "Npcs", "Zombies", "Cars", "Moves" } -- (outside: never a floor)
 
 -- The ground under (x, z) near refY (outside), else refY.
 local function groundAt(x: number, z: number, refY: number): number

@@ -4,9 +4,8 @@
 -- (MoveRoles.Chat), client/QuickChat.luau shows the chat.
 --
 --   * The quick chat (the remote's "chat", 1 … 6: MoveRoles.Chat; Config.Robust.Limits.QuickChat): the line goes to
---     the sender's party on a run (MoveLobby.moveCrew: server/Moving.luau's), never to anybody else.
---   * The remote's "state" (client/MoveLobbyUi.luau asks once): no planning is ever open, the answer is ("lobby", nil)
---     (Config.Robust.Limits.MoveLobby).
+--     the sender's party on a run (MoveLobby.moveCrew: server/Moving.luau's), never to anybody else. (10.6: the
+--     remote's "state", the planning's, is answered no more: no client asks.)
 --   MoveLobby.start()   the remote
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -48,8 +47,6 @@ local function onRequest(player: Player, action: any, arg: any)
 		if Net.limit(player, "QuickChat", Config.Robust.Limits.QuickChat) then
 			chat(player, arg)
 		end
-	elseif action == "state" and Net.limit(player, "MoveLobby", Config.Robust.Limits.MoveLobby) then
-		remote:FireClient(player, "lobby", nil)
 	end
 end
 

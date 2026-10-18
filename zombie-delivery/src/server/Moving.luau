@@ -1359,16 +1359,13 @@ end
 
 -- 7.0 review: did `holder` move the thing faster than its carry allows since the last look (item.lastAt at
 -- item.lastTime: a teleport)? watchCarried looks every tick, Load right before it takes it.
-local function paceBroken(s: Session, item: Item, thing: Rules.Thing, holder: Player, character: Model, root: BasePart, clock: number): boolean
+local function paceBroken(s: Session, item: Item, thing: Rules.Thing, holder: Player, _character: Model, root: BasePart, clock: number): boolean
 	local last = item.lastAt
 	if traveling[holder] or not last or item.lastTime <= 0 then
 		return false
 	end
-	local walk = speedOf(thing)
-	local admin = holder:GetAttribute("AdminSpeed")
-	local kit = character:GetAttribute("KitSpeed")
-	local boost = (if type(admin) == "number" then math.clamp(admin, 1, 4) else 1) * (if type(kit) == "number" then math.clamp(kit, 1, 2) else 1)
-	return flat(root.Position, last) > walk * boost * T.Pace.Factor * (clock - item.lastTime) + T.Pace.Slack
+	local walk = speedOf(thing) -- (10.6: no admin's or kit's walk boost any more: AdminSpeed, KitSpeed)
+	return flat(root.Position, last) > walk * T.Pace.Factor * (clock - item.lastTime) + T.Pace.Slack
 end
 
 local function onLoad(s: Session, player: Player)
@@ -1434,7 +1431,7 @@ local function onUnload(s: Session, player: Player)
 		return
 	end
 	local character = player.Character -- (7.0 review: like Pick up: a crate, a trolley in your hands)
-	if character and (character:GetAttribute("Carrying") ~= nil or character:GetAttribute("Pushing") ~= nil) then
+	if character and (character:GetAttribute("Carrying") ~= nil) then
 		say(player, "Your hands are full: put down what you carry first (G).")
 		return
 	end
@@ -2505,7 +2502,7 @@ local function onPick(s: Session, spot: number, player: Player, lifted: boolean?
 		say(player, `You can't reach the {thing.name} through the wall.`) -- 9.0 (a pick, a lift, a drag)
 		return
 	end
-	if character:GetAttribute("Carrying") ~= nil or character:GetAttribute("Pushing") ~= nil then
+	if character:GetAttribute("Carrying") ~= nil then
 		say(player, "Your hands are full: put down what you carry first (G).")
 		return
 	end
@@ -2559,7 +2556,7 @@ local function onHelp(s: Session, spot: number, player: Player, lifted: boolean?
 		say(player, SB.why("yours"))
 		return
 	end
-	if character:GetAttribute("Carrying") ~= nil or character:GetAttribute("Pushing") ~= nil then
+	if character:GetAttribute("Carrying") ~= nil then
 		say(player, "Your hands are full: put down what you carry first (G).")
 		return
 	end
