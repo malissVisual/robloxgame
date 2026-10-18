@@ -20,9 +20,8 @@
 --              SoundPlan.reverb; NoReverb elsewhere, on the start screen and with SOUND all off). 8.3: a warehouse's
 --              hall is the building of its plot's level (workspace.Warehouses' Level<id>, 1 … 5: the Garage is small,
 --              the Logistics Center big; SoundPlan.sandboxPlace's levelOf).
---   8.9, 9.4 the countryside: the fields outdoors (birds and larks over them, a breeze), the D5 motorway's far hum (a
---              3D loop on the motorway at its point nearest you: always from the east; faint in a warehouse, none in
---              the house), and outdoors now and then, each on its own clock (SoundPlan.farGap) and 3D (you hear
+--   8.9, 9.4 the countryside: the fields outdoors (birds and larks over them, a breeze; 10.6: no D5 motorway's far
+--              hum any more, the D5 went in 9.7), and outdoors now and then, each on its own clock (SoundPlan.farGap) and 3D (you hear
 --              where): a woodpecker drumming in the forest (a few drums), a dog barking far off, a tractor driving past
 --              on the fields (a 3D loop that moves across your view, fading in and out). Every one is a sound wanted on
 --              the next sheet; until then its stand-in plays (SoundPlan.sandboxSound, picked once: the sheets do not
@@ -346,40 +345,6 @@ local function farOnce(chosen: SoundPlan.Pick, spot: Vector3, volume: number, ne
 	end)
 end
 
--- The D5's far hum: one 3D loop on the motorway at its point nearest you (SoundPlan.motorwaySpot), toward its volume.
-type Hum = { holder: Attachment, sound: Sound, gain: number }
-local hum: Hum? = nil
-local function updateMotorway(at: Vector3, goal: number)
-	local M = SB.Motorway
-	local current = hum
-	if not current then
-		local chosen = if goal > 0.001 then pick(SoundPlan.SandboxFar.motorway) else nil
-		if not chosen then
-			return
-		end
-		local holder = Instance.new("Attachment")
-		holder.Name = "MotorwayHum"
-		local sound = api.make(chosen.name, holder, true)
-		if not sound then
-			holder:Destroy()
-			return
-		end
-		sound.RollOffMode = Enum.RollOffMode.InverseTapered
-		sound.RollOffMinDistance = M.Near
-		sound.RollOffMaxDistance = M.Range
-		sound.PlaybackSpeed = chosen.pitch
-		sound.Volume = 0
-		holder.Parent = workspace.Terrain
-		sound:Play()
-		current = { holder = holder, sound = sound, gain = chosen.gain }
-		hum = current
-	end
-	assert(current)
-	local x, z = SoundPlan.motorwaySpot(at.Z)
-	current.holder.WorldPosition = Vector3.new(x, M.Y, z)
-	fadeLoop(current.sound, goal * current.gain)
-end
-
 -- A woodpecker drumming in the forest: Drums drums, Every s apart.
 local function drumWoodpecker()
 	local B = SB.Woodpecker
@@ -499,7 +464,6 @@ local function updateAmbience()
 	toward(names.warehouse, mix.warehouse * on, 3) -- (out of step with the fields)
 	toward(names.room, mix.room * on)
 	setReverb(if playing and api.on() then SoundPlan.reverb(place) else "NoReverb")
-	updateMotorway(at, mix.motorway * on)
 	local now = os.clock()
 	local outdoors = playing and place == "outdoors" and api.on()
 	updateTractor(now, outdoors)

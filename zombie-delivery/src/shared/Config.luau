@@ -3188,24 +3188,20 @@ Config.Soundscape = {
 	-- the city's day and night never play here), plays the countryside's far sounds and sets the room's echo;
 	-- client/SandboxSounds.luau the rest. Volumes 0 … 1.
 	-- 8.9 in place of the Alps (no cowbells, no alpine meadow); 9.4 the countryside (design/countryside/plan.py; no
-	-- village: no chapel's bell): outdoors the fields (birds and larks over them, a breeze), the D5 motorway's far hum from
-	-- the east, now and then a woodpecker in the forest, a dog far off and a tractor on the fields. Each is a sound
+	-- village: no chapel's bell): outdoors the fields (birds and larks over them, a breeze; 10.6: no D5 motorway's hum,
+	-- the D5 went in 9.7), now and then a woodpecker in the forest, a dog far off and a tractor on the fields. Each is a sound
 	-- wanted on the next sheet; until a sheet has it, a
 	-- sound of the sheets up now stands in (shared/SoundPlan.luau SandboxStandIns). Indoors and in a warehouse as before.
 	Sandbox = {
 		Fields = 0.24, -- the fields outdoors (amb_fields; its stand-in sfx4's amb_alpine: a breeze, finches, a lark) …
 		FieldsStandIn = 0.09, -- … until sfx4 is up the stand-in's own, sfx2's wind: a breeze only
-		FieldsIndoors = 0.3, -- … × this in a warehouse (through its open roller door; the D5's hum too)
+		FieldsIndoors = 0.3, -- … × this in a warehouse (through its open roller door)
 		Warehouse = 0.22, -- amb_warehouse in a warehouse: the lights' hum, the hall's air, the roof ticking …
 		WarehouseStandIn = 0.12, -- … until sfx4 is up its stand-in, sfx2's hum
 		Room = 0.4, -- amb_room in the house: a quiet room tone and a clock (no stand-in: silent until sfx4 is up)
 		-- SoundService.AmbientReverb by place (an Enum.ReverbType's name; a place not here: NoReverb), only while you are
 		-- in the game and SOUND is not all off
 		Reverb = { warehouse = "Room" } :: { [string]: string },
-		-- The D5's far hum (amb_motorway): a 3D loop on the motorway's middle line (SandboxMap's landmark "d5": X, from
-		-- Z0 to Z1) at its point nearest you, Y up, so it always comes from the east; Volume within Near
-		-- studs, fading out (Roblox's inverse taper) to nothing at Range. Outdoors; × FieldsIndoors in a warehouse.
-		Motorway = { X = 360, Z0 = -680, Z1 = 760, Y = 6, Volume = 0.35, Near = 80, Range = 1900 },
 		-- Now and then outdoors, each on its own clock (Gap: seconds between two, a random pick), 3D (you hear where):
 		-- Volume within Near studs, nothing past Range.
 		--   Woodpecker  a woodpecker drumming in the forest (woodpecker_far, one drum) from its middle (SandboxMap's

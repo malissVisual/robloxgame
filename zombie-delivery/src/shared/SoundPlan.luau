@@ -42,14 +42,14 @@
 --                                                 Logistics Center, up to its roof's top); levelOf(plot id) → its level
 --                                                 (the caller reads workspace.Warehouses' Level<id>; nil, or no levelOf:
 --                                                 4, the building of before 8.3)
---   SoundPlan.sandboxAmbience(place, sheet4)      the loops' volumes there { fields, warehouse, room, motorway }
+--   SoundPlan.sandboxAmbience(place, sheet4)      the loops' volumes there { fields, warehouse, room }
 --                                                 (sheet4: is sfx4.ogg up; else the stand-ins' own volumes and no room
---                                                 tone); the D5's hum (motorway) outdoors, faint in a warehouse
+--                                                 tone)
 --   SoundPlan.reverb(place)                       SoundService.AmbientReverb's name there ("NoReverb" outdoors)
 --   8.9 in place of the Alps' (no cowbell, no alpine meadow); 9.4 the countryside's (design/countryside/plan.py: no chapel);
 --   each one wanted on the next sheet, a stand-in from the sheets up now (sfx … sfx4) until then.
---   SoundPlan.SandboxFar                          the far sounds outdoors by their part: motorway (amb_motorway, the
---                                                 D5's far hum: a 3D loop from the east), woodpecker (woodpecker_far:
+--   SoundPlan.SandboxFar                          the far sounds outdoors by their part (10.6: no D5 motorway's hum,
+--                                                 the D5 went in 9.7): woodpecker (woodpecker_far:
 --                                                 one drum of a woodpecker in the forest), dog (dog_far: a dog barking far off), tractor
 --                                                 (tractor_far: a tractor's diesel, a 3D loop that drives past)
 --   SoundPlan.SandboxStandIns                     a wanted sound → what stands in for it until a sheet has it, in
@@ -57,7 +57,6 @@
 --   SoundPlan.sandboxSound(name, has) -> Pick?    what plays for a wanted sound: { name, pitch, gain }: itself once a
 --                                                 sheet has it, else its first stand-in that plays (has: the client's
 --                                                 api.has, a stand-in's own SoundSheet.Fallback counted); nil: silence
---   SoundPlan.motorwaySpot(z) -> (x, z)           where the D5's hum comes from: the motorway's point nearest z
 --   SoundPlan.farGap(kind, r)                     seconds to a far sound's next time ("woodpecker", "dog", "tractor"; r: a
 --                                                 random 0 … 1)
 --   SoundPlan.farSpot(kind, x, z, r1, r2)         where it sounds: the woodpecker in the forest; a dog or a tractor a
@@ -306,9 +305,9 @@ end
 -- (8.9: the fields in place of the Alps' meadow; amb_alpine, its birds and lark over a breeze, stands in for them)
 SoundPlan.SandboxLoops = { fields = "amb_fields", warehouse = "amb_warehouse", room = "amb_room" }
 
--- The countryside's far sounds outdoors (Config.Soundscape.Sandbox Motorway, Woodpecker, Dog, Tractor), each a sound wanted on the
--- next sheet.
-SoundPlan.SandboxFar = { motorway = "amb_motorway", woodpecker = "woodpecker_far", dog = "dog_far", tractor = "tractor_far" }
+-- The countryside's far sounds outdoors (Config.Soundscape.Sandbox Woodpecker, Dog, Tractor), each a sound wanted on
+-- the next sheet.
+SoundPlan.SandboxFar = { woodpecker = "woodpecker_far", dog = "dog_far", tractor = "tractor_far" }
 
 -- What stands in for a wanted sound until a sheet has it: sounds of the sheets up now (sfx … sfx4), in order, each at
 -- its pitch (PlaybackSpeed, 1 if none) and gain (× its volume, 1 if none). A loop's stand-ins are loops.
@@ -317,8 +316,6 @@ SoundPlan.SandboxStandIns = {
 	-- sfx4's meadow day: a breeze, two finches, a tit, a chiffchaff, a robin, a lark up high, grasshoppers (no bell);
 	-- before sfx4 is up its own stand-in, sfx2's wind
 	amb_fields = { { name = "amb_alpine" } },
-	-- sfx2's far hum (a low rumble and a far band swelling), a little lower: a motorway's roar far off
-	amb_motorway = { { name = "ambience", pitch = 0.85 } },
 	-- sfx2's three knocks, high, quick and quiet: a woodpecker's drum far off in the forest
 	woodpecker_far = { { name = "knock", pitch = 1.5, gain = 0.5 } },
 	-- sfx2's three knocks, low and quiet: dull barks far off (a poor stand-in: a bark is wanted first)
@@ -389,27 +386,21 @@ function SoundPlan.sandboxPlace(x: number, y: number, z: number, inside: boolean
 	return "outdoors"
 end
 
-export type SandboxMix = { fields: number, warehouse: number, room: number, motorway: number }
+export type SandboxMix = { fields: number, warehouse: number, room: number }
 
 function SoundPlan.sandboxAmbience(place: string, sheet4: boolean): SandboxMix
 	local B = S.Sandbox
 	local fields = if sheet4 then B.Fields else B.FieldsStandIn
-	local motorway = B.Motorway.Volume
 	if place == "warehouse" then
-		return { fields = fields * B.FieldsIndoors, warehouse = if sheet4 then B.Warehouse else B.WarehouseStandIn, room = 0, motorway = motorway * B.FieldsIndoors }
+		return { fields = fields * B.FieldsIndoors, warehouse = if sheet4 then B.Warehouse else B.WarehouseStandIn, room = 0 }
 	elseif place == "house" then
-		return { fields = 0, warehouse = 0, room = if sheet4 then B.Room else 0, motorway = 0 }
+		return { fields = 0, warehouse = 0, room = if sheet4 then B.Room else 0 }
 	end
-	return { fields = fields, warehouse = 0, room = 0, motorway = motorway }
+	return { fields = fields, warehouse = 0, room = 0 }
 end
 
 function SoundPlan.reverb(place: string): string
 	return S.Sandbox.Reverb[place] or "NoReverb"
-end
-
-function SoundPlan.motorwaySpot(z: number): (number, number)
-	local m = S.Sandbox.Motorway
-	return m.X, math.clamp(z, m.Z0, m.Z1)
 end
 
 local function between(range: { number }, r: number): number
