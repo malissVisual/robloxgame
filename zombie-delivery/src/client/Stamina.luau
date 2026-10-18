@@ -38,15 +38,13 @@ function Stamina.canSprint(state: State): boolean
 end
 
 -- One step of `dt` seconds: `wantSprint` is Shift held where a sprint is allowed (not aiming, not carrying), `moving`
--- whether the character really goes somewhere. Returns the next state (the given one is left as it was). 6.4: `cost`
--- multiplies the drain (the BreathCost attribute; nil = 1), never under MIN_COST.
-local MIN_COST = 0.25
-function Stamina.step(state: State, dt: number, wantSprint: boolean, moving: boolean, tuning: Tuning, cost: number?): State
+-- whether the character really goes somewhere. Returns the next state (the given one is left as it was).
+function Stamina.step(state: State, dt: number, wantSprint: boolean, moving: boolean, tuning: Tuning): State
 	dt = math.max(0, dt)
 	local breath, exhausted, rest = state.breath, state.exhausted, state.rest
 	local sprinting = wantSprint and Stamina.canSprint(state)
 	if sprinting and moving then
-		breath -= dt * math.clamp(cost or 1, MIN_COST, 3) / math.max(0.01, tuning.Stamina)
+		breath -= dt / math.max(0.01, tuning.Stamina)
 		rest = 0
 		if breath <= 0 then
 			-- Out of breath: the sprint stops right here.
@@ -102,12 +100,10 @@ local function tuningNow(): Tuning
 	return found :: Tuning
 end
 
--- CameraRig, every frame on foot: steps the breath and answers whether the character sprints now.
--- 6.4: the character's BreathCost (server/Transport.luau) makes the sprint cost more breath.
+-- CameraRig, every frame on foot: steps the breath and answers whether the character sprints now. (10.6: no kit makes
+-- the sprint cost more: the city's BreathCost is gone.)
 function Stamina.update(dt: number, wantSprint: boolean, moving: boolean): boolean
-	local character = game:GetService("Players").LocalPlayer.Character
-	local cost = if character then character:GetAttribute("BreathCost") else nil
-	current = Stamina.step(current, dt, wantSprint, moving, tuningNow(), if type(cost) == "number" then cost else nil)
+	current = Stamina.step(current, dt, wantSprint, moving, tuningNow())
 	return current.sprinting
 end
 

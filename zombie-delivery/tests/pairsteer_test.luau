@@ -4,7 +4,7 @@
 -- lifted the piece and Danny with it), AutoRotate off and the heading PairTurn degrees a second at most (8.1); let go,
 -- AutoRotate back on (8.1) and your jumps your own again (nothing switched off: a bus ride's own jump lock untouched).
 -- 8.3 (the owner: "when I run, he just goes behind me with his arms stretched out"): nobody runs with a move's piece:
--- its walk held at the server's CarrySpeed (× the admin's boost) every step before the physics whatever wrote
+-- its walk held at the server's CarrySpeed every step before the physics whatever wrote
 -- Humanoid.WalkSpeed (a sprint's 28, client/CameraRig.luau's bleed-off); in two (CarryPair: the leader and the far end's
 -- crew mate) the run key says Config.MoveHelper.RunHint once a carry; let go, your walk is yours again.
 -- 9.2 (the owner, 8.9.5: "the carrying is better, but it feels like it's harder to control … fix it so it's playable"):
@@ -196,10 +196,10 @@ PairSteer.refuseRun()
 PairSteer.refuseRun()
 check(`…the run key says "{Config.MoveHelper.RunHint}" once a carry`, #hints == 1 and hints[1] == Config.MoveHelper.RunHint
 	and Config.MoveHelper.RunHint == "Too heavy to run with", #hints)
-playerAttributes.AdminSpeed = 2 -- (the admin's walk × 2: the carry's too, the server's walkOf the same)
+playerAttributes.AdminSpeed = 2 -- (10.6: the city's admin walk multiplier; nothing sets it any more)
 humanoid.WalkSpeed = 50
 PairSteer.step(1 / 60)
-check("…an admin's walk × 2: held at CarrySpeed × 2", humanoid.WalkSpeed == 21 and PairSteer.cap() == 21, humanoid.WalkSpeed)
+check("…10.6: no admin's or kit's boost (a stray AdminSpeed changes nothing): held at CarrySpeed", humanoid.WalkSpeed == 10.5 and PairSteer.cap() == 10.5, humanoid.WalkSpeed)
 playerAttributes.AdminSpeed = nil
 -- let go: your walk is yours again, and the next carry in two says it again
 for _, name in { "MoveCarry", "CarrySpeed", "PairTurn", "CarryPair" } do

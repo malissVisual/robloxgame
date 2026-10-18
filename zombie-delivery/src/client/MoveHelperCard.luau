@@ -341,7 +341,7 @@ end
 local function mayAct(): boolean
 	local character = player.Character
 	return type(player:GetAttribute("MoveHelper")) == "string" and character ~= nil and character:GetAttribute("Carrying") == nil
-		and character:GetAttribute("Pushing") == nil and player:GetAttribute("MoveHelperCall") == nil and not seated() and not CarryGripUi.active()
+		and player:GetAttribute("MoveHelperCall") == nil and not seated() and not CarryGripUi.active()
 end
 
 -- A piece's own prompt (its Pick up / Lift, tagged MovePrompt) when it is your move's: shown to you (MovingHud's rule).

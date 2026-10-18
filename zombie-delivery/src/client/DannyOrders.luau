@@ -265,8 +265,7 @@ end
 local function mayTake(): boolean
 	local character = player.Character
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-	return hired() and character ~= nil and character:GetAttribute("Carrying") == nil and character:GetAttribute("Pushing") == nil
-		and not (humanoid ~= nil and humanoid.SeatPart ~= nil)
+	return hired() and character ~= nil and character:GetAttribute("Carrying") == nil and not (humanoid ~= nil and humanoid.SeatPart ~= nil)
 end
 
 local function myRoot(): BasePart?
