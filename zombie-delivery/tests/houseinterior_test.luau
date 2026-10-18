@@ -3,7 +3,7 @@
 -- (Config.Furniture.InteriorMaxParts, its furniture included) and a modest number of lights, everything anchored (a
 -- piece's looks held by welds to its anchored Root), every spot a piece of the right kind at the right place with its
 -- Spot and Star, the house closed (walls, a ceiling, ground under it all, the porch's daylight wall), the EXIT sign
--- over the front door; the slots lie far off the map (Map.Bounds) and never overlap; destroy takes it down. 7.x alpine:
+-- over the front door; the slots lie far off the map (SandboxMap.Bounds: the game's world) and never overlap; destroy takes it down. 7.x alpine:
 -- the chalet's looks built (beams, wainscot, one plank floor, the Kachelofen, the corner bench and its shelf, lace, the
 -- painted front door, antlers, pictures, rag rugs), warm lights, the same plan the same interior, seeds 10-60 in budget.
 -- 8.3 walk-in doors: the front door's leaves shut across the doorway as door leaves (shared/DoorSwing.luau) in the
@@ -12,7 +12,7 @@
 
 local M = require("./ItemMock")
 local Config = require("./Config")
-local Map = require("./Map")
+local SandboxMap = require("./SandboxMap")
 local HouseLayout = require("./HouseLayout")
 local HouseInterior = require("./HouseInterior")
 
@@ -33,7 +33,7 @@ local T = Config.Furniture
 
 -- ── The slots ─────────────────────────────────────────────────────────────────
 do
-	local b = Map.Bounds
+	local b = SandboxMap.Bounds -- (10.6: the game's world)
 	local far, apart = true, true
 	local biggest = 0
 	for seed = 1, 20 do
@@ -273,15 +273,15 @@ do
 	check(`seeds 10-60 within {T.InteriorMaxParts} parts and 12 lights (the most: seed {worstSeed}, {worst})`, #over == 0, table.concat(over, "; "))
 end
 
--- 8.3: off the sandbox (the city's client swings no leaf: client/WalkDoors.luau is the sandbox's) the front door's leaves
--- stand open as they always did: flat along the porch beside the doorway, no door leaf attributes
+-- 8.3: the doors' swing off (Config.Moving.Doors.Swing; 10.6: the city's way, Config.Sandbox.On false, is gone) the
+-- front door's leaves stand open as they always did: flat along the porch beside the doorway, no door leaf attributes
 do
-	local on = Config.Sandbox.On
-	Config.Sandbox.On = false
+	local on = Config.Moving.Doors.Swing
+	Config.Moving.Doors.Swing = false
 	local plan = HouseLayout.plan(1955, "house")
 	local origin = HouseInterior.slot(1)
 	local model = HouseInterior.build(plan, origin)
-	Config.Sandbox.On = on
+	Config.Moving.Doors.Swing = on
 	local o = origin.Position
 	local front = plan.doors[1]
 	local outer = o.Z + front.at.Z - plan.wall / 2
@@ -296,7 +296,7 @@ do
 				and at.Z < outer - front.width / 4 and math.abs(r9) < 1e-6 and math.abs(r3) > 1 - 1e-6
 		end
 	end
-	check("8.3 off the sandbox: the front door's leaves stand open along the porch beside the doorway, as before (no DoorLeaf)", count == 2 and open)
+	check("8.3 the swing off: the front door's leaves stand open along the porch beside the doorway, as before (no DoorLeaf)", count == 2 and open)
 	HouseInterior.destroy(model)
 end
 

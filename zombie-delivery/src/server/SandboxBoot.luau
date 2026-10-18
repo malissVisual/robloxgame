@@ -8,15 +8,15 @@
 --   * the folders the game puts things in (Cars, Zombies, Effects: World's build made them) and the map
 --     (server/SandboxWorld.luau: the ground, the roads, the house's outside, the scenery, the lighting);
 --   * 10.1's SaveSlots (the save slots: a join's save loads once the start screen picked one), PlayerData (its own saves,
---     Config.Sandbox.Store), Analytics, Vehicles, CarRighting, Zombies (only what a run spawns), Npcs (Danny), Admin,
---     8.5's Clipboard (Danny's clipboard: orders mode);
+--     Config.Sandbox.Store), Analytics, Vehicles (10.6: the parked vans), Zombies (only what a run spawns), Npcs
+--     (Danny), Admin, 8.5's Clipboard (Danny's clipboard: orders mode);
 --   * the plots (server/SandboxPlots.luau), FurnitureMesh (the Blender furniture, before any piece is shown), 8.9.1's
 --     FixtureMesh (the Blender fixtures of the moves' houses), the collection (Collection: its payout loop) and 8.2's
 --     collection book (CollectionBook: its remote, its hook on Collection.add), the warehouses (Warehouse), 8.1's upgrades (Upgrades: its remote, the vans' engines), 8.2's
 --     daily tasks (SandboxTasks) and SandboxLeaders (the player list's columns, the TOP MOVERS board), 8.3's showroom
 --     visitors (Visitors: their offers, server/VisitorOffers.luau), 8.7's trading between players (PlayerTrade: the
 --     stands' trade prompts go to it, Warehouse.onTrade), the Sprinter's model (SprinterMesh) and last
---     Moving (it wraps the hooks set here: Vehicles.callCar …).
+--     Moving (its hook parkVan is SandboxBoot.parkVan).
 --   The modules written alongside this one (SandboxWorld.build, Collection.start, Warehouse.start, SprinterMesh.start)
 --   run only when they are in the place (a FindFirstChild guard); every service through `safely` (one that fails only
 --   warns).
@@ -28,23 +28,20 @@
 --   * PLAY (the Play remote): 9.7 runs: no van in the lobby (your truck, Config.Sandbox.Van, is parked at a run's house
 --     when the run starts: server/Runs.luau); it is your only vehicle (profile.car; no bike, no dealer). Marge's first
 --     day is off (no Tutorial). 10.5 rounds: the player attribute InGame (server/Runs.luau takes them on the next round);
---   * no CAR (the client calls no car, nobody drives): no chauffeur and no repair bay, every van parked here
---     comes repaired. A forced spawn (an admin's: Vehicles.homeGarage) and Vehicles.placeNear park it at the spot
---     nearest you (a run's curb, else your plot's old van spot);
+--   * no CAR (the client calls no car, nobody drives; 10.6: a van has no health, no seats): a van is parked only by
+--     parkVan (a run's, a round's);
 --   * RequestState sends the State (Main's queueState).
 --
 --   SandboxBoot.start(queueState)   boots the sandbox; queueState: Main's (the State to a player's client)
 --   SandboxBoot.vanId()             the van's Config.Cars id
 --   SandboxBoot.spawnSpot(player)   where the player stands at every spawn (SandboxMap.Spot)
---   SandboxBoot.vanSpot(player)     where PLAY parks their van (SandboxMap.Spot)
---   SandboxBoot.parkVan(player, spot, seat, carId?)   the van parked there, repaired (a run's truck): err, car
+--   SandboxBoot.parkVan(player, spot)   the player's van parked there (a run's truck, a round's van): err, car
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
-local Economy = require(Shared.Economy)
 local Net = require(Shared.Net)
 local SandboxMap = require(Shared.SandboxMap)
 
@@ -59,14 +56,12 @@ local SandboxBoot = {}
 local PLOT_WAIT = 3 -- seconds a new body waits for its player's plot (SandboxPlots claims it when they join)
 local SAVE_WAIT = 15 -- seconds PLAY waits for the save to load
 
-local notice = Net.get("Notice")
 local playing: { [Player]: boolean } = {} -- PLAY pressed (the van is theirs to keep)
 
 -- ── The spots ──────────────────────────────────────────────────────────────
 
 function SandboxBoot.vanId(): string
-	local id = Config.Sandbox.Van
-	return if Economy.isPlayerCar(id) then id else Config.CompanyVan.Car
+	return Config.Sandbox.Van
 end
 
 -- 9.7 runs: every spawn in the lobby's plaza (SandboxMap.Lobby.spawn), the players a few studs apart across its look
@@ -78,59 +73,6 @@ function SandboxBoot.spawnSpot(player: Player): SandboxMap.Spot
 	local s = L.spawn
 	local a = math.rad(s.yaw)
 	return { x = s.x + math.cos(a) * across, y = s.y, z = s.z - math.sin(a) * across, yaw = s.yaw }
-end
-
--- Where a van stands for a player out of a run (9.7: none parks there: the plot's old van spot, the bay's middle).
-function SandboxBoot.vanSpot(player: Player): SandboxMap.Spot
-	local plot = SandboxPlots.of(player) or SandboxMap.Plots[1]
-	return plot.vanSpot
-end
-
-local function rootOf(player: Player): BasePart?
-	local character = player.Character
-	local root = character and character:FindFirstChild("HumanoidRootPart")
-	return if root and root:IsA("BasePart") then root else nil
-end
-
--- Where the player's vanSpot is, for the notices.
-local function homeWords(player: Player): string
-	return if SandboxPlots.of(player) then "at your warehouse" else "in the lobby"
-end
-
--- The sandbox's parking spot nearest the player: their vanSpot, or the house's curb when they are nearer the house.
--- Also what the notice says about it. The place of their move, else of their card (Moving.houseOf), else
--- the house to empty nearest them (SandboxMap.Houses').
-local function parkingNear(player: Player): (SandboxMap.Spot, string)
-	local home = SandboxBoot.vanSpot(player)
-	local root = rootOf(player)
-	if root then
-		local at = root.Position
-		local ok, found = pcall(function(): any
-			return require(Server.Moving).houseOf(player)
-		end)
-		local house: SandboxMap.House? = if ok and type(found) == "table" then SandboxMap.house(found.id) else nil
-		if not house then
-			local best = math.huge
-			for _, h in SandboxMap.Houses do
-				local d = (at.X - h.curb.x) ^ 2 + (at.Z - h.curb.z) ^ 2
-				if d < best then
-					house, best = h, d
-				end
-			end
-		end
-		local curb = if house then house.curb else SandboxMap.House.curb
-		if house and (at.X - curb.x) ^ 2 + (at.Z - curb.z) ^ 2 < (at.X - home.x) ^ 2 + (at.Z - home.z) ^ 2 then
-			return curb, `at {house.name}`
-		end
-	end
-	return home, homeWords(player)
-end
-
--- A spot's CFrame for Vehicles.placeAt, which stands a long van out of a garage's door by Vehicles.driveOut along its
--- look: taken back here, so the van's middle is the spot itself.
-local function parkAt(player: Player, spot: SandboxMap.Spot): CFrame
-	local out = Vehicles.driveOut(player, nil)
-	return SandboxMap.cframe(spot) * CFrame.new(0, 0, out)
 end
 
 -- ── The van ────────────────────────────────────────────────────────────────
@@ -153,22 +95,16 @@ local function ownVan(player: Player, profile: PlayerData.Profile): string
 	return id
 end
 
--- Parks the player's van (or carId's car) at `spot` (the old one goes: Vehicles.placeAt), repaired: the sandbox has
--- no repair bay. Returns an error text and the car (nil with no error: server/Moving.luau's wrap refused and said why).
+-- Parks the player's van at `spot` (its middle there, facing the spot's yaw; the old one goes: Vehicles.placeAt).
+-- Returns an error text and the van (nil with no error: server/Moving.luau's wrap refused and said why).
 -- (server/Moving.luau's START brings the van this way too, when none is out: its hook Moving.parkVan.)
-function SandboxBoot.parkVan(player: Player, spot: SandboxMap.Spot, seat: boolean, carId: string?): (string?, Vehicles.Car?)
+function SandboxBoot.parkVan(player: Player, spot: SandboxMap.Spot): (string?, Vehicles.Car?)
 	local profile = PlayerData.get(player)
 	if not profile then
 		return "Still loading...", nil
 	end
-	if carId == nil then
-		ownVan(player, profile)
-	end
-	local car = Vehicles.placeAt(player, carId, parkAt(player, spot), seat)
-	if car and carId == nil then
-		Vehicles.repair(car, 1)
-	end
-	return nil, car
+	ownVan(player, profile)
+	return nil, Vehicles.placeAt(player, SandboxMap.cframe(spot))
 end
 
 -- PLAY: 9.7 runs: no van in the lobby; the save waited for, the van made the player's own (profile.car), nothing parked.
@@ -187,23 +123,6 @@ end
 -- On a move (its owner or its crew)? Then a respawn brings no van: the move decides (its CAR, after VanAgain).
 local function onMove(player: Player): boolean
 	return require(Server.Moving).busy(player) ~= nil
-end
-
--- The hooks the city's services set (server/CarCall.luau, Main), the sandbox's way. Before Moving.start: it wraps them.
-local function vehicleHooks()
-	-- a forced spawn (an admin's car, Vehicles.spawn(player, true)): parked at the spot nearest you
-	Vehicles.homeGarage = function(player: Player): CFrame?
-		return parkAt(player, (parkingNear(player)))
-	end
-	-- the city's "next to you on the nearest road" (a move's LAUNCH without a van out): the spot nearest you, seated
-	Vehicles.placeNear = function(player: Player, carId: string?): string?
-		local err, car = SandboxBoot.parkVan(player, (parkingNear(player)), true, carId)
-		return err or (if car then nil else "Your van could not come: try again.")
-	end
-	Vehicles.onWrecked = function(player: Player, car: Vehicles.Car, reason: string)
-		Zombies.releaseCar(car)
-		notice:FireClient(player, `{reason} Press CAR: it comes back repaired.`)
-	end
 end
 
 -- ── The players ────────────────────────────────────────────────────────────
@@ -341,9 +260,6 @@ local function services()
 	end)
 	optional("SandboxAnalytics", "start") -- 8.2: the sandbox's funnel steps and events (listeners only; after Analytics' hooks)
 	safely("Vehicles", Vehicles.start)
-	safely("CarRighting", function()
-		require(Server.CarRighting).start()
-	end)
 	safely("Zombies", Zombies.start)
 	safely("Npcs", function()
 		require(Server.Npcs).start()
@@ -399,10 +315,9 @@ local function sandbox()
 		end
 	end)
 	optional("SprinterMesh", "start") -- (before any van: a run parks one)
-	vehicleHooks()
 	safely("Moving", function()
 		local Moving = require(Server.Moving)
-		Moving.parkVan = SandboxBoot.parkVan -- (a run's truck comes this way: at its house's curb, repaired)
+		Moving.parkVan = SandboxBoot.parkVan -- (a run's truck comes this way: at its house's curb)
 		Moving.start()
 	end)
 	optional("HelperCrew", "start") -- 10.1: the helpers' crew (the CREW window's remote, your helper at your warehouse)

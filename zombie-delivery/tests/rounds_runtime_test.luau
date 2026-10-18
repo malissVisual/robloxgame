@@ -287,8 +287,8 @@ check("…both land in the place's zone, by its door", H.inRect(E.rootOf(ann).Po
 check("…each has their own van at the place: two vans, side by side (Across apart), in the zone, facing the curb's way", annVan ~= nil and bobVan ~= nil and annVan ~= bobVan
 	and H.inRect(annVan.chassis.Position, zone.rect) and H.inRect(bobVan.chassis.Position, zone.rect)
 	and math.abs((annVan.chassis.Position - bobVan.chassis.Position).Magnitude - Q.Park.Across) < 1, annVan and bobVan and (annVan.chassis.Position - bobVan.chassis.Position).Magnitude)
-check("…locked (Config.Runs.Truck.Attribute, the seat off), the back open, RoundVan its owner's, the owner's name over it", annVan.model:GetAttribute(R.Truck.Attribute) == true
-	and annVan.seat.Disabled == true and Vehicles.backOpen(annVan) and annVan.model:GetAttribute("RoundVan") == ann.UserId
+check("…marked a run's (Config.Runs.Truck.Attribute), the back open, RoundVan its owner's, the owner's name over it", annVan.model:GetAttribute(R.Truck.Attribute) == true
+	and Vehicles.backOpen(annVan) and annVan.model:GetAttribute("RoundVan") == ann.UserId
 	and bobVan.model:GetAttribute("RoundVan") == bob.UserId and annVan.chassis:FindFirstChild("RoundVanTag") ~= nil
 	and annVan.chassis:FindFirstChild("RoundVanTag"):FindFirstChild("Words").Text == "🚐 Ann")
 local annLoad, bobLoad = H.loadPrompt(annVan), H.loadPrompt(bobVan)

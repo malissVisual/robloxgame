@@ -13,7 +13,7 @@
 --   * Nobody carries a two-person piece alone: Bob's Lift on the sofa (10.1: the run's helper, Ann's Danny, is with
 --     the party, but asked not to answer a Lift here: Config.MoveHelper.WaitForHelper off for it) drags it at
 --     Moving.Speed.Drag (the Mover's Alone walk no more); Ann's Help lift makes it the pair's walk.
---   * No Guard's damage on a zombie by the house, no Driver's cut of a hit on the van with Ann at its wheel.
+--   * No Guard's damage on a zombie by the house.
 --   * The end: nobody holds a role.
 -- The city's roles with the switch on: tests/moving_runtime_test.luau (and the farm's, the grip's, the art's); the rules
 -- with the switch either way: tests/moveroles_test.luau.
@@ -163,8 +163,7 @@ check("the switch: the city's roles on (Config.MoveRoles.On), none in the sandbo
 local moves = workspace:FindFirstChild("Moves")
 check("9.7: no Moving contracts kiosk on the plots (the lobby's portals start the runs)", moves ~= nil and moves:FindFirstChild("MovingBoard1") == nil
 	and promptIn(moves, "Moving contracts") == nil)
-E.truckAt = V3(plot1.vanSpot.x, 2, plot1.vanSpot.z)
-E.Vehicles.placeNear(ann, "sprinter") -- (PLAY: Ann's Sprinter at her plot)
+Moving.parkVan(ann, plot1.vanSpot) -- (Ann's Sprinter at her plot's old van spot)
 local truck = E.cars[ann]
 park(truck, plot1.vanSpot)
 E.request(ann, "start", House.id)
@@ -272,10 +271,6 @@ E.Zombies.damage(z, 10, ann, {})
 local byAnn = E.zombieHits[#E.zombieHits].amount
 E.Zombies.damage(z, 10, bob, { cause = "melee" })
 check("a zombie by the house takes a hit as it was (no Guard's damage)", byAnn == 10 and E.zombieHits[#E.zombieHits].amount == 10)
-E.seated[ann] = truck
-E.Vehicles.damage(truck, 100)
-E.seated[ann] = nil
-check("the van takes a hit whole with Ann at its wheel (no Driver's cut)", E.carHits[#E.carHits].amount == 100, E.carHits[#E.carHits].amount)
 
 -- The end ------------------------------------------------------------------------------------------------------------------
 

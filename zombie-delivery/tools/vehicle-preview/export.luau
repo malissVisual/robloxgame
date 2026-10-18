@@ -1,9 +1,10 @@
 --!strict
 -- Execute the actual Vehicles factory, audit moving-part welds and serialize its resulting display geometry.
+-- 10.6 (only the sandbox is the game): the one van it builds, the ZDC Sprinter (Config.Sandbox.Van): its working build
+-- audited (its hinges, its wheels, its sliding door, its back's attachment; no seats) and its display build printed.
 local Mock = require('./roblox-mock')
 local Vehicles = require('./Vehicles')
 local Config = require('./Config')
-local Economy = require('./Economy')
 local function encode(v)
 	local kind=type(v)
 	if kind=='string' then return (string.gsub(string.format('%q',v),'\\\n','\\n')) end -- (8.0: %q writes a label's newline as a backslash and a newline)
@@ -24,32 +25,20 @@ local function audit(built, display)
 			assert(not p.CanCollide and not p.CanQuery and not p.CanTouch and p.Massless, p.Name..' affects physics')
 			assert(welds[p]~=nil,p.Name..' has no weld')
 			if p.Shape=='Cylinder' then assert(math.abs(p.Size.Y-p.Size.Z)<.00001,p.Name..' has a flattened cylinder') end
-			if p.Parent.Name=='CarDoor' or p.Parent.Name=='BackDoor' then assert(welds[p]==p.Parent,p.Name..' will not follow its door') end
-			if p.Parent.Name=='FleetWheel' then assert(welds[p].Name=='Tyre',p.Name..' will not rotate with its tyre') end
+			if p.Parent.Name=='BackDoor' then assert(welds[p]==p.Parent,p.Name..' will not follow its door') end
 		end
 		if p:IsA('BasePart') then
 			for _,s in triple(p.Size) do assert(s>0 and s<2048 and s==s) end
 		end
+		assert(p.ClassName~='Seat' and p.ClassName~='VehicleSeat','a seat in the van (10.6: nobody sits in it)')
 	end
 	if not display then
-		assert(built.seat~=nil and model.PrimaryPart:FindFirstChild('CargoDoor') and model.PrimaryPart:FindFirstChild('Drive'))
-		local wheels,doors,backs=0,0,0
+		assert(model.PrimaryPart:FindFirstChild('CargoDoor') and model.PrimaryPart.Anchored,'no back, or not anchored')
+		local wheels,backs,slides=0,0,0
 		for _,p in model:GetDescendants() do
-			if p.Name=='WheelMotor' then wheels+=1 elseif p.Name=='DoorHinge' then doors+=1 elseif p.Name=='BackHinge' then backs+=1 end
+			if p.Name=='WheelMotor' then wheels+=1 elseif p.Name=='BackHinge' then backs+=1 elseif p.Name=='SlideMotor' then slides+=1 end
 		end
-		assert(wheels>=4 and doors>=2 and backs>=1,'lost moving joints')
-		-- 6.16: the body that sways (client/CarSway.luau) on its Motor6D BodyRoll: a hidden root that affects no physics,
-		-- resting on the chassis (C0 = C1), the doors and the back hung on it. (The baseline factory has none.)
-		local roll=model.PrimaryPart:FindFirstChild('BodyRoll')
-		if roll then
-			assert(roll.ClassName=='Motor6D' and roll.Part0==model.PrimaryPart and roll.Part1.Name=='BodyRoot','a broken BodyRoll')
-			local root=roll.Part1
-			assert(not root.CanCollide and not root.CanQuery and not root.CanTouch and root.Massless and root.Transparency==1,'the BodyRoot affects physics')
-			assert((roll.C0.Position-roll.C1.Position).Magnitude<1e-6,'the BodyRoot does not rest on the chassis')
-			for _,p in model:GetDescendants() do
-				if p.Name=='DoorHinge' or p.Name=='BackHinge' then assert(p.Part0==root,p.Name..' does not sway with the body') end
-			end
-		end
+		assert(wheels==4 and backs==2 and slides==1,'lost moving joints')
 	end
 end
 local function physics(built)
@@ -58,9 +47,7 @@ local function physics(built)
         local pose={position=triple(p.Position),rotation=p.CFrame.R}
         if p:IsA('BasePart') and p.CanCollide then
             table.insert(out.hulls,{name=p.Name,size=triple(p.Size),pose=pose,group=p.CollisionGroup,massless=p.Massless})
-        elseif p.ClassName=='VehicleSeat' or p.ClassName=='Seat' then
-            table.insert(out.seats,{name=p.Name,size=triple(p.Size),pose=pose,door=p:GetAttribute('Door')})
-        elseif p.ClassName=='Motor6D' and p.Name~='BodyRoll' then -- (6.16: the body's sway moves only looks: audit)
+        elseif p.ClassName=='Motor6D' then
             table.insert(out.joints,{name=p.Name,part=p.Part1.Name,c0={triple(p.C0.Position),p.C0.R},c1={triple(p.C1.Position),p.C1.R},attributes=p:GetAttributes()})
         elseif p.ClassName=='Attachment' then
             table.insert(out.attachments,{name=p.Name,position=triple(p.Position)})
@@ -68,62 +55,28 @@ local function physics(built)
     end
     return out
 end
--- 7.x (one car): every body the factory builds: the player's (Config.Cars: the ZDC Van, the bikes) and the world's
--- (Config.AmbientCars: the old cars the traffic and Earl's lot still show, the company vehicles), in the old Config.Cars
--- order (the ZDC Van after the Pickup, where it stood: the garage snapshots' colours follow the order)
-local ALL = {}
-for _, d in Config.AmbientCars do
-	table.insert(ALL, d)
-	if d.id == "pickup" then
-		for _, c in Config.Cars do
-			table.insert(ALL, c)
-		end
+local def=nil
+for _,car in Config.Cars do if car.id==Config.Sandbox.Van then def=car end end
+assert(def,'no Config.Sandbox.Van in Config.Cars')
+local color=Mock.Color3.fromRGB(unpack(def.color))
+local working=Vehicles.__testBuild(def,color,Mock.CFrame.identity,false)
+audit(working,false)
+local invariant=physics(working)
+local model=Vehicles.__testBuild(def,color,Mock.CFrame.identity,true).model
+audit({model=model},true)
+local parts={};local nodeIds={};local all={model};for _,v in model:GetDescendants() do table.insert(all,v) end
+for _,v in all do nodeIds[v]=v.uid end
+for _,p in all do
+	local item={id=p.uid,parent=if p.Parent then nodeIds[p.Parent] else nil,name=p.Name,class=p.ClassName,attributes=p:GetAttributes()}
+	if p:IsA('BasePart') then
+		assert(p.Anchored,'unanchored display part')
+		item.size=triple(p.Size);item.position=triple(p.Position);item.rotation=p.CFrame.R
+		item.color={p.Color.R,p.Color.G,p.Color.B};item.material=p.Material;item.opacity=1-p.Transparency;item.shape=p.Shape
+		item.reflectance=p.Reflectance;item.castShadow=p.CastShadow
+		item.canCollide=p.CanCollide;item.canQuery=p.CanQuery;item.canTouch=p.CanTouch;item.massless=p.Massless
+	elseif p.ClassName=='WeldConstraint' then item.part0=nodeIds[p.Part0];item.part1=nodeIds[p.Part1]
+	elseif p.ClassName=='TextLabel' then item.text=p.Text
 	end
+	table.insert(parts,item)
 end
-for _,def in ALL do
-	-- 5.1: the bikes (CarDef.bike) are not in the fleet's garage data: bike-check.luau audits them.
-	if not def.company and not def.bike then
-		for stage=0,Economy.maxStage(def.id) do
-			local player=Vehicles.__testBuild(def,Mock.Color3.fromRGB(unpack(def.color)),Mock.CFrame.identity,false,nil,nil,stage)
-			audit(player,false)
-			local invariant = physics(player)
-			local function wheels()
-				local out={}
-				for _,p in player.model:GetChildren() do if p.Name=='Tyre' then out[p]=p:FindFirstChild('FleetWheel') or false end end
-				return out
-			end
-			local stock=wheels()
-			Vehicles.__testBuildKit(player.model,player.chassis,Vehicles.__testStyle(def,stage),{},def.id)
-			for tyre,folder in wheels() do assert(folder==stock[tyre],'stock kit dressed the wheels again') end
-			-- 4.6: every piece of gear that fits the car (the trolley, the straps, the cooler, the roof rack) on the kit too.
-			local gear={}
-			for _,piece in Config.Gear do if Economy.gearFits(def.id,piece.id) then gear[piece.id]=true end end
-			Vehicles.__testBuildKit(player.model,player.chassis,Vehicles.__testStyle(def,stage),{engine=5,handling=5,armor=5,plow=5},def.id,gear)
-			audit(player,false)
-			local fitted=wheels()
-			Vehicles.__testBuildKit(player.model,player.chassis,Vehicles.__testStyle(def,stage),{engine=5,handling=4,armor=3,plow=5},def.id,gear)
-			for tyre,folder in wheels() do assert(folder==fitted[tyre] and (folder==false or folder.Parent==tyre),'a kit change without a new tyre look dressed the wheels again') end
-			for _,upgraded in {false,true} do
-				local levels=if upgraded then {engine=5,handling=5,armor=5,plow=5} else nil
-				local model=Vehicles.displayModel(def,Mock.CFrame.identity,stage,levels,if upgraded then gear else nil)
-				audit({model=model},true)
-				local parts={};local nodeIds={};local all={model};for _,v in model:GetDescendants() do table.insert(all,v) end
-				for _,v in all do nodeIds[v]=v.uid end
-				for _,p in all do
-					local item={id=p.uid,parent=if p.Parent then nodeIds[p.Parent] else nil,name=p.Name,class=p.ClassName,attributes=p:GetAttributes()}
-					if p:IsA('BasePart') then
-						assert(p.Anchored,'unanchored display part')
-						item.size=triple(p.Size);item.position=triple(p.Position);item.rotation=p.CFrame.R
-						item.color={p.Color.R,p.Color.G,p.Color.B};item.material=p.Material;item.opacity=1-p.Transparency;item.shape=p.Shape
-						item.reflectance=p.Reflectance;item.castShadow=p.CastShadow
-						item.canCollide=p.CanCollide;item.canQuery=p.CanQuery;item.canTouch=p.CanTouch;item.massless=p.Massless
-					elseif p.ClassName=='WeldConstraint' then item.part0=nodeIds[p.Part0];item.part1=nodeIds[p.Part1]
-					elseif p.ClassName=='TextLabel' then item.text=p.Text
-					end
-					table.insert(parts,item)
-				end
-				print(encode({id=def.id,style=def.style,stage=stage,name=(Economy.stageDef(def.id,stage) or def).name,upgraded=upgraded,capacity=Economy.stageCapacity(def.id,stage),parts=parts,physics=invariant,sandboxOnly=def.sandboxOnly==true}))
-			end
-		end
-	end
-end
+print(encode({id=def.id,style=def.style,stage=0,name=def.name,upgraded=false,capacity=def.capacity,parts=parts,physics=invariant,sandboxOnly=def.sandboxOnly==true}))

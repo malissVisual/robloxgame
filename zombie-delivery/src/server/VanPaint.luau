@@ -1,13 +1,13 @@
 --!strict
 -- 8.3 SANDBOX: the PAINT shop on the server (the owner: players earn money from their collection, give them a way to
 -- make their van their own). Config.VanPaint has the catalogue and the prices, shared/VanPaintRules.luau the rules,
--- shared/VanLook.luau paints a van, client/VanPaintUi.luau is the window. Cosmetic only: a van's collision, cargo bay,
--- doors, seats and speed never change.
+-- shared/VanLook.luau paints a van, client/VanPaintUi.luau is the window. Cosmetic only: a van's collision, cargo bay
+-- and doors never change.
 --   * What you own and wear is in the save (profile.vanPaint = { owned, worn }, server/PlayerData.luau: read only from a
 --     real save written with its flag). Each item is bought once (PlayerData.spend, the reason "VanPaint", the item's id
 --     its SKU) and kept for good; it goes on the van at once. Wearing an item you own is free.
---   * Every van of a player's is painted as it is built (the hook Vehicles.onStyle: PLAY, a move's START, CAR, an
---     admin's BRING VAN, a rebuild), and again when its owner wears something else: for everybody to see (the server's
+--   * Every van of a player's is painted as it is built (the hook Vehicles.onStyle: a run's van, a round's, 10.6 the
+--     only ways one is parked), and again when its owner wears something else: for everybody to see (the server's
 --     parts and attributes replicate). The owner's Blender look (server/SprinterMesh.luau) takes it too.
 --   * The 🎨 Paint van prompt (the ProximityPrompt "PaintPrompt" on the chassis' Attachment "PaintPoint": the driver's
 --     side of the cargo box, Config.VanPaint.Prompt.At) is on every player's van, its owner's only (client/CargoPrompts
@@ -127,11 +127,8 @@ local function pushState(player: Player)
 	end)
 end
 
--- A player's own sandbox van (the Sprinter): not a rental, not a lent company vehicle.
+-- A player's own sandbox van (the Sprinter: 10.6 every van is one).
 local function isVan(car: Vehicles.Car): boolean
-	if car.rental or car.lent or not car.model then
-		return false
-	end
 	return car.model:GetAttribute("SprinterArt") ~= nil or car.id == Config.Sandbox.Van
 end
 

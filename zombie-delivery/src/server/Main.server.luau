@@ -6,8 +6,8 @@
 -- 8.0.2: the owner's Blender imports (Import 3D leaves each in the Workspace, its parts loose: the sandbox builds no
 -- Marge's house, so nothing took ZDCHouseArt away and its pieces fell apart over the plots) leave the world first
 -- thing, before physics can move a piece; their dressers find them in ServerStorage (FurnitureMesh, HouseMesh,
--- VanMesh, SprinterMesh, 8.2: WarehouseMesh, 8.9.1: FixtureMesh read the pieces where the importer put them, against
--- their markers).
+-- SprinterMesh, 8.2: WarehouseMesh, 8.9.1: FixtureMesh read the pieces where the importer put them, against their
+-- markers). 10.6: the old ZDC Van's ZDCVanArt has no dresser any more (the city's van went): it only leaves the world.
 pcall(function()
 	for _, name in { "ZDCFurnitureArt", "ZDCHouseArt", "ZDCVanArt", "ZDCSprinterArt", "ZDCWarehouseArt", "ZDCFixtureArt" } do
 		local art = workspace:FindFirstChild(name)
@@ -28,7 +28,7 @@ StarterPlayer.EnableMouseLockOption = false
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Net = require(Shared.Net)
 local Config = require(Shared.Config)
-StarterPlayer.CharacterWalkSpeed = Config.Movement.Walk -- 3.7: the walk of client/CameraRig.luau (server/Cargo.luau falls back to it)
+StarterPlayer.CharacterWalkSpeed = Config.Movement.Walk -- 3.7: the walk of client/CameraRig.luau
 
 local Server = script.Parent
 -- The same native courier and animation set for everyone, installed before the long world build/first spawn.
@@ -36,9 +36,9 @@ require(Server.CourierAvatar).start()
 local PlayerData = require(Server.PlayerData)
 
 -- ── Collision groups ───────────────────────────────────────────────────────
--- Cars and zombies pass through each other (ramming and grabbing are computed, not physical), corpses only lie on
--- the ground, bullets fly through cars and corpses.
-for _, name in { "Car", "Zombie", "Corpse", "Bullet", "EnemyCar" } do
+-- The vans and the zombies pass through each other, corpses only lie on the ground. (10.6: the city's bullets and its
+-- bandits' cars went with their groups.)
+for _, name in { "Car", "Zombie", "Corpse" } do
 	pcall(function()
 		PhysicsService:RegisterCollisionGroup(name)
 	end)
@@ -48,11 +48,6 @@ PhysicsService:CollisionGroupSetCollidable("Zombie", "Zombie", false)
 PhysicsService:CollisionGroupSetCollidable("Corpse", "Car", false)
 PhysicsService:CollisionGroupSetCollidable("Corpse", "Zombie", false)
 PhysicsService:CollisionGroupSetCollidable("Corpse", "Corpse", false)
-PhysicsService:CollisionGroupSetCollidable("Bullet", "Car", false)
-PhysicsService:CollisionGroupSetCollidable("Bullet", "Corpse", false)
--- The bandits' cars bump into your car and the world, the zombies and the corpses pass through, bullets hit them.
-PhysicsService:CollisionGroupSetCollidable("EnemyCar", "Zombie", false)
-PhysicsService:CollisionGroupSetCollidable("EnemyCar", "Corpse", false)
 
 local stateRemote = Net.get("State")
 

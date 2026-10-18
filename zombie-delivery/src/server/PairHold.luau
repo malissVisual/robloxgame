@@ -4,7 +4,7 @@
 -- server, Danny (server/MoveHelper.luau's mover) and a crew mate who helps lift (server/Moving.luau's watchCarried)
 -- alike. The piece's far end (turned to its leader) the goal of an AlignPosition and an AlignOrientation on the holder's
 -- root (9.0: one attachment each, the holder's; the server sets the goals every Heartbeat): the holder walks there at a top speed that fits the pair's walk (MaxVelocity:
--- shared/MoveHelperBrain.luau holdSpeed, the leader's CarrySpeed × PairCarry.boost) and turns to the leader at
+-- shared/MoveHelperBrain.luau holdSpeed, the leader's CarrySpeed) and turns to the leader at
 -- holdTurn; the server owns the holder's body meanwhile (SetNetworkOwner(nil): the positions are the server's whatever
 -- the lag; a player's body is given back when they let go). The leader's client turns the piece slowly (client/
 -- PairSteer.luau), so the far end never swings faster than that.
@@ -84,7 +84,7 @@
 --   PairHold.alive(hold, anchor) -> boolean  its pieces are all there, on this piece
 --   PairHold.drop(hold)                      let go: the constraints gone, the groups and the body's owner given back
 --                                            (9.2 a driven one: PairLead* gone, the server's again)
---   PairHold.walkOf(player, fallback)        a leader's walk now (their CarrySpeed × their boosts), else `fallback`
+--   PairHold.walkOf(player, fallback)        a leader's walk now (their CarrySpeed), else `fallback`
 --   PairHold.pingOf(player)                  8.3 a leader's ping (Player:GetNetworkPing, s; 0 without one): Danny's lead
 --   PairHold.follow(player, root, anchor, size, carrierRoot, carrier, away) -> boolean   a crew mate holding the far
 --                                            end of `anchor`'s piece (`size` its size; 8.6 its end decided at the
@@ -99,7 +99,6 @@ local RunService = game:GetService("RunService") -- 9.0 the holds' goals every H
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Brain = require(Shared.MoveHelperBrain)
-local PairCarry = require(Shared.PairCarry)
 
 local PairHold = {}
 
@@ -462,8 +461,7 @@ function PairHold.walkOf(player: Player?, fallback: number): number
 		return fallback
 	end
 	local speed = character:GetAttribute("CarrySpeed")
-	local walk = if type(speed) == "number" and speed == speed then speed else fallback
-	return walk * PairCarry.boost(player:GetAttribute("AdminSpeed"), character:GetAttribute("KitSpeed"))
+	return if type(speed) == "number" and speed == speed then speed else fallback -- (10.6: no AdminSpeed, KitSpeed boost)
 end
 
 -- ── A crew mate at the far end (server/Moving.luau's tick) ────────────────

@@ -16,8 +16,8 @@
 --   * Away: asked (the remote's false), or by itself when the check fails, looked at again on whatever can end it: the
 --     hire over (your MoveHelper no longer "hired": the move's end clears it, its hirer leaving the move makes it
 --     "offer" again: Danny let go), a piece picked up or carried (Carrying: you can't carry with it out, so a pick puts
---     it away), a trolley (Pushing), the phone (PhoneHeld), a gun up (Aiming), a seat (the humanoid's SeatPart), death
---     (at once), a new body, leaving. A right hand replaced meanwhile (the avatar loading) gets it again at the next look.
+--     it away), a seat (the humanoid's SeatPart), death (at once), a new body, leaving. (10.6: the city's trolley, phone
+--     and guns went: no Pushing, PhoneHeld, Aiming.) A right hand replaced meanwhile (the avatar loading) gets it again at the next look.
 -- Nothing runs per frame: events only.
 --   Clipboard.start()                      the remote and the players
 --   Clipboard.out(player) -> boolean       is it out
@@ -40,7 +40,7 @@ local HAND = "RightHand"
 local ATTRIBUTE = "ClipboardHeld"
 local MODEL = "Clipboard"
 -- The character attributes a change of which can end it (the hands' other work, the phone, a gun up).
-local BUSY: { [string]: boolean } = { Carrying = true, Pushing = true, PhoneHeld = true, Aiming = true }
+local BUSY: { [string]: boolean } = { Carrying = true }
 
 type Held = { character: Model, hand: BasePart, built: Builder.Built }
 
@@ -68,9 +68,6 @@ local function can(player: Player): (boolean, string?)
 		hand = character ~= nil and handOf(character) ~= nil,
 		seated = humanoid ~= nil and (humanoid.Sit == true or humanoid.SeatPart ~= nil),
 		carrying = busy("Carrying"),
-		pushing = busy("Pushing"),
-		phone = busy("PhoneHeld"),
-		aiming = busy("Aiming"),
 	})
 end
 

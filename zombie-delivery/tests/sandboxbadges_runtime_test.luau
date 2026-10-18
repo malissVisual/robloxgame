@@ -295,7 +295,7 @@ check("once a session: never two checks or two awards of one badge", once)
 E.saves.Player_120 = {
 	money = 50000, xp = 0, deliveries = 3, tutorial = true, phone = true, starterKit = true, vestKit = true,
 	noPacks = true, noJacket = true, noShoes = true, perGameBags = true, vanOnly = true, carStages = true,
-	vanStages = true, xpCurve = Config.Levels.Curve, cars = { [Config.CompanyVan.Car] = true }, car = Config.CompanyVan.Car,
+	vanStages = true, xpCurve = 2, cars = { zdcvan = true }, car = "zdcvan",
 }
 local Vet = E.join(120, "Vet")
 E.plotOf[Vet] = 3
@@ -437,8 +437,8 @@ check("… a new session: her state's badges asked once each (owned), none award
 -- A save from before the badges were set up, written with the flag: its milestones awarded on joining.
 local save = {
 	money = 900, xp = 0, tutorial = true, phone = true, starterKit = true, vestKit = true, noPacks = true, noJacket = true, noShoes = true,
-	perGameBags = true, vanOnly = true, carStages = true, vanStages = true, xpCurve = Config.Levels.Curve, cars = { [Config.CompanyVan.Car] = true },
-	car = Config.CompanyVan.Car, sandboxMovesKept = true, sandboxMoves = 12, vanPaintKept = true,
+	perGameBags = true, vanOnly = true, carStages = true, vanStages = true, xpCurve = 2, cars = { zdcvan = true },
+	car = "zdcvan", sandboxMovesKept = true, sandboxMoves = 12, vanPaintKept = true,
 	vanPaint = { owned = { racing = true }, worn = { paint = "cream", livery = "racing" } },
 }
 E.saves.Player_108 = save

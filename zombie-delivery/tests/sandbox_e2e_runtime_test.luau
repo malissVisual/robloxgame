@@ -860,9 +860,9 @@ do
 	local run = Runs.runOf(ann)
 	check("…the countdown over: Ann's run on the farmstead at Normal (Runs.runOf: she the host, alone)", started and run ~= nil and run.house == House.id
 		and run.difficulty == "normal" and #run.party == 1 and run.host == ann)
-	check("…her own Sprinter parked at the farmstead's curb, its back to the front door, locked (RunParked: no Drive, its seat Disabled)", annVan ~= nil
+	check("…her own Sprinter parked at the farmstead's curb, its back to the front door, marked a run's (RunParked; 10.6 no seat in it)", annVan ~= nil
 		and annVan.id == Config.Sandbox.Van and H.flat(annVan.chassis.Position, V3(House.curb.x, 0, House.curb.z)) < 0.5
-		and H.doorOf(annVan).WorldPosition.Z > annVan.chassis.Position.Z and annVan.model:GetAttribute(R.Truck.Attribute) == true and annVan.seat.Disabled == true,
+		and H.doorOf(annVan).WorldPosition.Z > annVan.chassis.Position.Z and annVan.model:GetAttribute(R.Truck.Attribute) == true and annVan.model:FindFirstChildWhichIsA("Seat", true) == nil,
 		annVan and annVan.chassis.Position)
 	local zone = SandboxMap.zone(House.id) :: SandboxMap.Zone
 	local fades = {}

@@ -84,9 +84,9 @@ P.MESH_CREAM = Mock.Color3.fromRGB(217, 204, 176)
 
 -- A player's sandbox van standing on `ground` (the ground under its middle), not in the world's Cars yet; then the
 -- build's hook, as server/Vehicles.luau's spawnAt calls it: Vehicles.onStyle(car). `meshed`: the owner's Blender look
--- already on it (server/SprinterMesh.luau dresses a van after it is put out; a rebuild, a test); `rental`: a lent one
--- (a ZDC RIDE scooter or a company vehicle: Car.rental, Car.lent).
-function P.van(player: any, ground: any, meshed: boolean?, rental: boolean?): any
+-- already on it (server/SprinterMesh.luau dresses a van after it is put out; a rebuild, a test). (10.6: no rentals,
+-- no lent vehicles: every van is a player's own Sprinter.)
+function P.van(player: any, ground: any, meshed: boolean?): any
 	local model = Mock.Instance.new("Model")
 	model.Name = `{player.Name}'s Deliveros Sprinter`
 	model:SetAttribute("OwnerId", player.UserId)
@@ -130,7 +130,7 @@ function P.van(player: any, ground: any, meshed: boolean?, rental: boolean?): an
 	if meshed then
 		P.dress(model)
 	end
-	local car = { owner = player, id = "sprinter", model = model, chassis = chassis, paintParts = paint, rental = rental == true, lent = rental == true, wrecked = false }
+	local car = { owner = player, id = "sprinter", model = model, chassis = chassis, paintParts = paint, wrecked = false }
 	P.cars[player] = car
 	P.Vehicles.onStyle(car) -- (spawnAt: its STYLE looks, before it is in the world)
 	return car

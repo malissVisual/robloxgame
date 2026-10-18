@@ -1,6 +1,7 @@
--- 7.1, the Alps step 1: the Suburbs houses as Austrian chalets (shared/ChaletLooks.luau; server/Chalets.luau builds
--- them, World's buildHouse hands it each house's lot and the world's dice) and the houses for sale on the Suburbs lots
--- dressed as chalets (ChaletLooks.estate). For every house of the map (Map.Homes, kind "house"):
+-- 7.1, the Alps step 1: the Suburbs houses as Austrian chalets (shared/ChaletLooks.luau; 10.6: server/SandboxWorld.luau
+-- builds the sandbox's house with it) and the houses for sale on the Suburbs lots dressed as chalets
+-- (ChaletLooks.estate). For every lot the old city's Suburbs had (shared/Map.luau's 44 house lots before 10.6, kept here
+-- as LOTS: a spread of sizes and seeds to build on):
 --   * the gameplay where it was: the house's solid box (its lot's w, h, d behind the front wall), the "Door" (Cargo
 --     swings it open for a delivery: found by its name next to the home's door, solid and queryable), the two
 --     ground-floor windows lit by the world's two window dice; the only solid pieces the body, the gable and the door
@@ -11,7 +12,6 @@
 --     the roof's verge
 -- Run with tests/run_tests.py.
 local Config = require("./Config")
-local Map = require("./Map")
 local ChaletLooks = require("./ChaletLooks")
 
 local failures = 0
@@ -24,21 +24,58 @@ local function check(name: string, ok: boolean, detail: any?)
 	end
 end
 
--- Every Suburbs house's lot.
-local houses: { Map.Lot } = {}
-for _, list in Map.lots("suburbs") do
-	for _, lot in list do
-		if lot.kind == "house" and lot.home then
-			table.insert(houses, lot)
-		end
-	end
-end
-local homes = 0
-for _, home in Map.Homes do
-	homes += if home.kind == "house" then 1 else 0
-end
-print(`  {#houses} houses in the Suburbs`)
-check("every house of Map.Homes stands on a Suburbs lot (44 in 7.0)", #houses == homes and #houses >= 30, #houses)
+-- The old city's Suburbs house lots (shared/Map.luau's, frozen at 10.6): the house's width, depth and height, the lot's
+-- size, its seed; its front wall HOUSE_FRONT forward of the lot's middle (Map.HouseFront: its door in the wall's middle).
+type Lot = { w: number, d: number, h: number, size: number, seed: number }
+local HOUSE_FRONT = 18
+local houses: { Lot } = {
+	{ w = 24.843384421284668, d = 19.339617220069858, h = 12.99713362659992, size = 50, seed = 491885 },
+	{ w = 22.64807839379467, d = 16.928148136407273, h = 12.979071172866105, size = 50, seed = 197229 },
+	{ w = 23.31952467869923, d = 16.517217159752935, h = 12.942197539324125, size = 50, seed = 337108 },
+	{ w = 24.317705059719927, d = 18.627317036154974, h = 13.415512318644218, size = 50, seed = 38733 },
+	{ w = 22.971244310933393, d = 16.622800762413814, h = 13.411758792038782, size = 50, seed = 318980 },
+	{ w = 23.87993096362793, d = 18.765061958474163, h = 11.229368947659962, size = 50, seed = 702443 },
+	{ w = 24.298724226000463, d = 19.811434339556317, h = 12.310256720343844, size = 50, seed = 680609 },
+	{ w = 25.717778886405547, d = 17.936421349585448, h = 11.746259167088438, size = 50, seed = 150213 },
+	{ w = 21.339049743804196, d = 19.513525293686918, h = 12.034596871151214, size = 50, seed = 471136 },
+	{ w = 25.75983303762957, d = 19.267043209883425, h = 13.58210056841569, size = 50, seed = 307077 },
+	{ w = 23.04668860886869, d = 16.470603388241123, h = 11.372174839370116, size = 50, seed = 205889 },
+	{ w = 21.962850798818145, d = 17.847333663932357, h = 11.482505048608878, size = 50, seed = 285706 },
+	{ w = 24.21259574239384, d = 16.139414178337358, h = 12.24641697457658, size = 50, seed = 424244 },
+	{ w = 23.853216798839362, d = 19.085430019614687, h = 11.594373032538568, size = 50, seed = 30797 },
+	{ w = 22.117154268657, d = 19.43585974670561, h = 11.289384429146894, size = 50, seed = 549281 },
+	{ w = 22.8777236369231, d = 19.06516539777179, h = 12.949202640866119, size = 50, seed = 310279 },
+	{ w = 20.441933031605494, d = 17.699662374052835, h = 11.301882207209134, size = 50, seed = 699386 },
+	{ w = 25.532067494962426, d = 17.620039898548313, h = 11.709497240567112, size = 50, seed = 830704 },
+	{ w = 23.020469451342215, d = 16.72063514098584, h = 12.334223179923578, size = 50, seed = 864732 },
+	{ w = 21.008226393729657, d = 17.397575951551623, h = 12.791611883595225, size = 50, seed = 149554 },
+	{ w = 24.173509645437363, d = 18.322757307740634, h = 12.363529736049035, size = 50, seed = 363876 },
+	{ w = 25.06373642763471, d = 18.41407959946811, h = 12.52728617938914, size = 50, seed = 322177 },
+	{ w = 20.537797883653823, d = 18.694509754604205, h = 13.01029538271045, size = 50, seed = 864786 },
+	{ w = 20.820487556811877, d = 19.836647527140236, h = 13.109589693238576, size = 50, seed = 740323 },
+	{ w = 22.81918782817124, d = 19.343816767766903, h = 12.034408718379595, size = 50, seed = 13433 },
+	{ w = 22.732443157334295, d = 19.842480754333064, h = 11.291371962792587, size = 50, seed = 434493 },
+	{ w = 23.24001490067692, d = 17.8395550752427, h = 11.872314201083327, size = 50, seed = 364039 },
+	{ w = 22.285358479512258, d = 16.359498687423297, h = 12.020916829836477, size = 50, seed = 771941 },
+	{ w = 24.542881913057418, d = 16.968571963690753, h = 12.452995591753158, size = 50, seed = 176829 },
+	{ w = 23.56839377765394, d = 17.290730526010254, h = 11.639961453750693, size = 50, seed = 459708 },
+	{ w = 25.25866602944086, d = 19.37861586863046, h = 11.874956470332068, size = 50, seed = 828403 },
+	{ w = 20.3571575101066, d = 17.56686479557945, h = 12.597951579930216, size = 50, seed = 529801 },
+	{ w = 25.15019408534299, d = 16.67914179403255, h = 13.140210793018538, size = 50, seed = 89740 },
+	{ w = 22.98786091430845, d = 19.356174859550013, h = 12.43749485717853, size = 50, seed = 229775 },
+	{ w = 23.452327538702942, d = 18.201785329917247, h = 12.784775641080714, size = 50, seed = 338082 },
+	{ w = 23.479676794707473, d = 18.319075983314846, h = 11.087621279608106, size = 50, seed = 22758 },
+	{ w = 22.091791699725942, d = 19.251483545872834, h = 11.271694738205237, size = 50, seed = 359829 },
+	{ w = 21.101413543430542, d = 16.22217669544944, h = 11.518513217119978, size = 50, seed = 212823 },
+	{ w = 22.270588672040578, d = 17.05724793212232, h = 12.811248217067913, size = 50, seed = 716193 },
+	{ w = 25.928298341974894, d = 16.592844719619347, h = 11.905652997461756, size = 50, seed = 239377 },
+	{ w = 22.784124192580695, d = 18.972648232218482, h = 11.527130382160777, size = 50, seed = 745115 },
+	{ w = 24.7234705814379, d = 16.432310186729126, h = 11.033827845504348, size = 50, seed = 772591 },
+	{ w = 20.089481155471393, d = 19.56332574371558, h = 11.972738531858417, size = 50, seed = 179031 },
+	{ w = 20.248364860423248, d = 16.546871182086758, h = 12.514181096119975, size = 50, seed = 720640 },
+}
+print(`  {#houses} houses`)
+check("the old Suburbs' 44 house lots", #houses == 44, #houses)
 
 local function overlaps(a: { number }, b: { number }): boolean
 	return a[1] < b[2] and b[1] < a[2] and a[3] < b[4] and b[3] < a[4] and a[5] < b[6] and b[5] < a[6]
@@ -59,17 +96,14 @@ local function note(text: string)
 end
 local swing = math.rad(Config.Jobs.Places.DoorSwing)
 for n, lot in houses do
-	local home = lot.home :: Map.Home
-	local spec: ChaletLooks.Spec = { w = lot.w, d = lot.d, h = lot.h, lot = lot.size, front = Map.HouseFront, seed = lot.seed, render = n % 5 + 1, shade = (n % 7) * 10 - 30 }
+	local id = `lot {n}`
+	local spec: ChaletLooks.Spec = { w = lot.w, d = lot.d, h = lot.h, lot = lot.size, front = HOUSE_FRONT, seed = lot.seed, render = n % 5 + 1, shade = (n % 7) * 10 - 30 }
 	local pieces = ChaletLooks.house(spec)
 	local variant = ChaletLooks.variantOf(lot.seed)
 	used[variant] = (used[variant] or 0) + 1
 	most = math.max(most, #pieces)
 	total += #pieces
 	budgetOk = budgetOk and #pieces <= ChaletLooks.Budget
-	-- the house's door where Map.Homes has it: the middle of the front wall, Map.HouseFront forward of its lot's middle
-	local out = (home.door.x - home.x) * home.facing.x + (home.door.z - home.z) * home.facing.z
-	doorOk = doorOk and math.abs(out - Map.HouseFront) < 1e-6
 	local bodies, doors, windows = 0, 0, {}
 	local names: { [string]: number } = {}
 	for _, p in pieces do
@@ -89,17 +123,17 @@ for n, lot in houses do
 		local b = boxOf(p)
 		-- on its lot (the front edge lot / 2 - HouseFront out from the wall, the back edge lot / 2 + HouseFront in), not
 		-- under the walk
-		local front, back = -(lot.size / 2 - Map.HouseFront), lot.size / 2 + Map.HouseFront
+		local front, back = -(lot.size / 2 - HOUSE_FRONT), lot.size / 2 + HOUSE_FRONT
 		if b[1] < -lot.size / 2 - 1e-6 or b[2] > lot.size / 2 + 1e-6 or b[5] < front - 1e-6 or b[6] > back + 1e-6 or b[3] < -0.05 then
 			lotOk = false
-			note(`{home.id} {p.name} off its lot`)
+			note(`{id} {p.name} off its lot`)
 		end
 		-- nothing in the door's way out or on the path to the kerb (the walk, out to the curb), from the ground up to
 		-- over a mover's head with a wardrobe; the wall's own skin (the door's surround, the plinth beside the door)
 		-- stays within 0.13 of the wall
 		if p.name ~= "Door" and overlaps(b, { -ChaletLooks.Path, ChaletLooks.Path, 0.05, 9, front - 5, -0.13 }) then
 			pathOk = false
-			note(`{home.id} {p.name} on the path`)
+			note(`{id} {p.name} on the path`)
 		end
 		-- the door's swing (DoorSwing outward round its hinge at x = -2): nothing there but the door
 		if p.name ~= "Door" then
@@ -109,7 +143,7 @@ for n, lot in houses do
 					local x, z = -2 + r * math.cos(a), -0.2 - r * math.sin(a)
 					if b[1] < x and x < b[2] and b[5] < z and z < b[6] and b[3] < 7 and b[4] > 0.1 then
 						pathOk = false
-						note(`{home.id} {p.name} in the door's swing`)
+						note(`{id} {p.name} in the door's swing`)
 					end
 				end
 			end
@@ -129,7 +163,7 @@ for _, text in notes do
 	print("  " .. text)
 end
 print(`  pieces: {most} at most a house, {total} in all ({#houses} houses); looks: tyrol {used[1] or 0}, salzburg {used[2] or 0}, bregenz {used[3] or 0}`)
-check("the house's solid box where it always was (its lot's w, h, d behind the front wall, Map.Homes' door in its middle)", bodyOk)
+check("the house's solid box where it always was (its lot's w, h, d behind the front wall, the door in its middle)", bodyOk)
 check("the Door where it always was, solid (Cargo finds it by its name and swings it open)", doorOk)
 check("two ground-floor windows, lit at night by the world's two window dice", windowsOk)
 check("solid: the body, the gable and the door only (everything else decoration: nothing to bump into)", solidOk)
@@ -157,7 +191,7 @@ for w = 20, 26, 0.5 do
 			seed += 1
 		end
 		local h = 11
-		for _, p in ChaletLooks.house({ w = w, d = 18, h = h, lot = 50, front = Map.HouseFront, seed = seed, render = 1, shade = 0 }) do
+		for _, p in ChaletLooks.house({ w = w, d = 18, h = h, lot = 50, front = HOUSE_FRONT, seed = seed, render = 1, shade = 0 }) do
 			if p.name == "BalconySide" or p.name == "HandRail" then
 				-- its ends under the roof's verge (the shingles' underside over it), not through it
 				local b = boxOf(p)

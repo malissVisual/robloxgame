@@ -1,8 +1,8 @@
 -- 8.2 SANDBOX, showing off on the server: the real server/SandboxLeaders.luau with the real server/PlayerData.luau and
 -- server/Collection.luau (SandboxLeadersServer.luau, PlayerDataServer.luau, CollectionServer.luau through
 -- tests/run_tests.py) on tests/runtime/CollectionRuntime.luau's players, DataStore, clock and Net and
--- tests/runtime/LeadersRuntime.luau's OrderedDataStore. The player list: PlayerData's city columns replaced by the
--- sandbox's (in their order, for a player here before the start and one who joins later), their values (the money, $ a
+-- tests/runtime/LeadersRuntime.luau's OrderedDataStore. The player list: PlayerData's empty folder given the
+-- columns (in their order, for a player here before the start and one who joins later), their values (the money, $ a
 -- minute to a tenth, the collection's worth), the updates throttled (at most one write a second, the last change always
 -- lands); the TOP MOVERS board: built once at SandboxLeadersRules.spot with every part inside its footprint, a SurfaceGui
 -- on each face, its rows (ranked, the medals, both faces the same, an empty line), written at most every BoardEvery s,
@@ -45,7 +45,7 @@ local function save(userId: number, cash: number, pieces: { { any } }): any
 	return {
 		money = cash, xp = 0, deliveries = 3, tutorial = true, phone = true, starterKit = true, vestKit = true,
 		noPacks = true, noJacket = true, noShoes = true, perGameBags = true, vanOnly = true, carStages = true,
-		vanStages = true, xpCurve = Config.Levels.Curve, cars = { [Config.CompanyVan.Car] = true }, car = Config.CompanyVan.Car,
+		vanStages = true, xpCurve = 2, cars = { zdcvan = true }, car = "zdcvan",
 		collectionKept = true, collection = { entries = entries, nextUid = #pieces + 1 },
 	}
 end
@@ -102,11 +102,11 @@ end
 PlayerData.start()
 Collection.start()
 
--- ── Before the start: PlayerData's (the city's) columns ────────────────────
+-- ── Before the start: PlayerData's folder, empty ──────────────────────────────
 L.ordered[STORE] = { ["101"] = 9000 } -- Ann's best, from an earlier day
 E.saves.Player_101 = save(101, 1500, { { "sofa", 1 }, { "oil_painting" } })
 local A = E.join(101, "Ann")
-check("before the start: PlayerData's columns (Level, Money, Deliveries)", statNames(A) == "Level, Money, Deliveries", statNames(A))
+check("before the start: PlayerData's leaderstats folder, empty (10.6: no city columns)", statNames(A) == "", statNames(A))
 
 -- ── The start ──────────────────────────────────────────────────────────────
 Leaders.start()
@@ -114,9 +114,9 @@ Leaders.start() -- (a second start does nothing)
 local board = Leaders.board()
 check("start: the board \"TopMovers\" in the workspace (no workspace.Sandbox here), once", board ~= nil and board.Parent == E.workspace and board.Name == "TopMovers" and #E.workspace:GetChildren() == 2, #E.workspace:GetChildren())
 check("start: the all-time store asked for by its name", #L.asked == 1 and L.asked[1] == STORE)
-check("start: the list waits for the frame's end", statNames(A) == "Level, Money, Deliveries")
+check("start: the list waits for the frame's end", statNames(A) == "")
 E.flush()
-check("a player here before the start: the sandbox's columns in their order, the city's gone", statNames(A) == table.concat(STATS, ", "), statNames(A))
+check("a player here before the start: the columns in their order", statNames(A) == table.concat(STATS, ", "), statNames(A))
 local ok, detail = listRight(A)
 check("… their values: $1,500, the sofa's $2.1 a minute, the collection $6,350", ok and stat(A, STATS[1]) == 1500 and stat(A, STATS[2]) == 2.1 and stat(A, STATS[3]) == 6350, detail)
 check("the all-time best read once for Ann (the store's $9,000)", L.gets == 1 and Leaders.best(101) == 9000, Leaders.best(101))

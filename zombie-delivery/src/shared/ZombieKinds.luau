@@ -3,10 +3,10 @@
 -- the runner's leap, the brute's armour and the bloater's blast (Config.Zombies' lunge, armour, blast) and where they
 -- come (Config.ZombieTypes). Shared by the server (server/Zombies.luau: the spawns, the damage, the blast) and the
 -- tests (tests/zombiekinds_test.luau runs it in the plain Luau CLI; no Roblox at its top level).
---   * ZombieKinds.danger(tier, distance)   0 … 1: a job's tier ((stars − 1) / 3) or how far from the depot
---                                          (DangerNear … DangerFar), the bigger
---   * ZombieKinds.weights(base, context)   a kinds table ({ kind = weight }) weighed for the night, the danger, the
---                                          player's level and the Blood Moon (a new table; the base is never changed)
+--   * ZombieKinds.danger(distance)         0 … 1: how far from the old city's depot (DangerNear … DangerFar)
+--   * ZombieKinds.weights(base, context)   a kinds table ({ kind = weight }) weighed for the night and the danger (a new
+--                                          table; the base is never changed). (10.6: no job's tier, no player's level,
+--                                          no Blood Moon: the city's.)
 --   * ZombieKinds.capped(kind, alive)      is a kind at its MaxAlive (alive: how many of it live now)?
 --   * ZombieKinds.isFront(lookX, lookZ, dirX, dirZ, angle)   does a hit travelling `dir` strike the front of a body
 --                                          facing `look` (within `angle` degrees of where it faces)?
@@ -21,21 +21,18 @@ local ZombieKinds = {}
 
 local Types = Config.ZombieTypes
 
--- What a random pick of a kind knows: the night's share (0 … 1), the danger (0 … 1), the player's level (nil: no
--- player: no level rule) and whether the Blood Moon is up.
-export type Context = { night: number, danger: number, level: number?, bloodMoon: boolean }
+-- What a random pick of a kind knows: the night's share (0 … 1) and the danger (0 … 1).
+export type Context = { night: number, danger: number }
 
 -- What a hit on armour is: a headshot (crit), its cause ("gun" / nil a round, "melee", "car", "splash", "other" …), its
 -- pellets (a shotgun's many), its damage (a pellet's) and whether it struck the front.
 export type Hit = { crit: boolean, cause: string?, pellets: number, damage: number, front: boolean }
 
-function ZombieKinds.danger(tier: number?, distance: number?): number
-	local byTier = if tier then math.clamp((tier - 1) / 3, 0, 1) else 0
-	local byPlace = 0
-	if distance then
-		byPlace = math.clamp((distance - Types.DangerNear) / math.max(1, Types.DangerFar - Types.DangerNear), 0, 1)
+function ZombieKinds.danger(distance: number?): number
+	if not distance then
+		return 0
 	end
-	return math.max(byTier, byPlace)
+	return math.clamp((distance - Types.DangerNear) / math.max(1, Types.DangerFar - Types.DangerNear), 0, 1)
 end
 
 -- One kind's factor for this context (1: as the table says).
@@ -43,13 +40,6 @@ function ZombieKinds.factor(kind: string, context: Context): number
 	local factor = 1
 	factor *= 1 + (Types.Night[kind] or 0) * math.clamp(context.night, 0, 1)
 	factor *= 1 + (Types.Danger[kind] or 0) * math.clamp(context.danger, 0, 1)
-	local from = Types.FromLevel[kind]
-	if from and context.level and context.level < from then
-		factor *= Types.Young[kind] or 1
-	end
-	if context.bloodMoon then
-		factor *= Types.BloodMoon[kind] or 1
-	end
 	return math.max(0, factor)
 end
 

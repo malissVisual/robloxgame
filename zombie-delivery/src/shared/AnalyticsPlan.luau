@@ -1,66 +1,45 @@
 --!strict
 -- 6.13, analytics: the plan, pure (tests/analytics_test.luau). server/Analytics.luau sends what this says to Roblox's
--- AnalyticsService (Config.Analytics holds its numbers; the owner's guide is design/analytics/NAVOD.md):
---   * the onboarding funnel (Steps): nine steps of a new courier's first days, each logged once for life, in order.
---     The steps are one number, a bit a step (reach: reached this session, with the ones waiting; mark: the save's,
---     profile.onboarding, only the steps Roblox took). A step reached before the ones above it waits for them (they
---     are logged together), and the first three (joined, PLAY, the welcome) are implied by any later one, so the
---     funnel never shows a later step above an earlier one. A save from before 6.13 (onboardingFrom) counts as past
---     all of them: only new couriers walk the funnel.
---   * the funnels (Funnels): Delivery (an order taken, picked up, delivered) and Mission (started, completed); a
---     funnel cannot branch, so a failed order is a custom event (failEvent) and a failed mission a progression Fail.
+-- AnalyticsService (Config.Analytics holds its numbers; the owner's guide is design/analytics/NAVOD.md). 10.6: the
+-- game's plan only (the city's funnel, its order and mission funnels, its events, its money's reasons and the driver
+-- levels went with it):
+--   * the onboarding funnel (SandboxSteps: ten steps from joining to the first upgrade), each logged once for life, in
+--     order. The steps are one number, a bit a step (reach: reached this session, with the ones waiting; mark: the
+--     save's, profile.sandboxOnboarding, only the steps Roblox took; sandboxFrom reads it, only with its flag
+--     SandboxFlag). A step reached before the ones above it waits for them (they are logged together), and the first
+--     two (joined, PLAY) are implied by any later one, so the funnel never shows a later step above an earlier one. A
+--     save from before 8.2 counts as past all of them: only new players walk the funnel.
 --   * the custom events (Events): a short fixed list of names (validName), never a player's data in a name; their
---     custom fields (fields) are a few short values from small fixed sets (a mode, the stars, a chapter, a script).
+--     custom fields (fields) are a few short values from small fixed sets (how a move ended, a rarity, a script).
 --   * the economy (money): every money change's reason (PlayerData.addMoney / spend, `reason`) → a Source or a Sink,
 --     a transaction type (the AnalyticsEconomyTransactionType names where one fits, a plain word otherwise) and
---     whether it is batched (the frequent small ones: kill rewards, fuel at the pump, tips). An unknown reason is
---     "Other", never dropped.
---   * the progression (Paths, levelUps): the driver levels and the missions (by their order in the story).
+--     whether it is batched (the frequent small ones: kill rewards, the stands' income). An unknown reason is "Other",
+--     never dropped.
 --   * the errors (errorWhere): a script error's script name and line from its message.
---   * 8.2 SANDBOX (the blocks marked so; server/SandboxAnalytics.luau): Roblox keeps one onboarding funnel an
---     experience, so a sandbox server walks the sandbox's own (SandboxSteps: ten steps from joining to the first
---     upgrade, by the same rules, in its own save field profile.sandboxOnboarding: sandboxFrom reads it, only with its
---     flag SandboxFlag); the funnel's functions take the steps (nil: the city's Steps). The moves' events (moveHow,
---     band), the grip checks' sampling (sampler, sample) and the collectibles' event.
+--   * 8.2: the moves' events (moveHow, band), the grip checks' sampling (sampler, sample).
 
 local AnalyticsPlan = {}
 
 export type Step = { name: string, implied: boolean? }
 
--- The onboarding funnel, in order (LogOnboardingFunnelStepEvent: the step's number and name).
-AnalyticsPlan.Steps = {
-	{ name = "Joined", implied = true }, -- 1: the save loaded (server/Analytics.luau)
-	{ name = "PressedPlay", implied = true }, -- 2: PLAY on the start screen (Main.server's Play)
-	{ name = "WelcomeSeen", implied = true }, -- 3: Marge's welcome showed (server/Tutorial.luau)
-	{ name = "FirstJob" }, -- 4: a job of their own taken (server/Jobs.luau, an order)
-	{ name = "FirstDelivery" }, -- 5: an order of their own delivered and paid
-	{ name = "Level2" }, -- 6: driver level 2
-	{ name = "FirstVehicle" }, -- 7: a bike or a car of their own (bought or given)
-	{ name = "FirstMission" }, -- 8: a mission started (server/Missions.luau)
-	{ name = "FirstChapter" }, -- 9: a mission chapter finished (its finale)
-} :: { Step }
-
--- 8.2 SANDBOX: the sandbox's onboarding funnel, in order (server/Analytics.luau logs it in place of Steps on a sandbox
--- server; server/SandboxAnalytics.luau says when each is reached). Only joining and PLAY are implied by a later step:
+-- 8.2: the onboarding funnel, in order (server/Analytics.luau logs it, LogOnboardingFunnelStepEvent: the step's number
+-- and name; server/SandboxAnalytics.luau says when each is reached). Only joining and PLAY are implied by a later step:
 -- the others wait for the ones before them (an upgrade bought before the first move waits for the move, the show, the
 -- income and the sale).
 AnalyticsPlan.SandboxSteps = {
 	{ name = "Joined", implied = true }, -- 1: the save loaded (server/Analytics.luau)
 	{ name = "PressedPlay", implied = true }, -- 2: PLAY on the start screen (server/SandboxBoot.luau's Play)
-	{ name = "FirstContract" }, -- 3: a moving contract taken (their move started: LAUNCH at a plot's board)
-	{ name = "EnteredHouse" }, -- 4: into the house of a move (the chalet's front door)
-	{ name = "FirstPieceInVan" }, -- 5: a piece loaded into the van (by them, or into the van of their move)
-	{ name = "FirstTripHome" }, -- 6: their van home at their warehouse with a load (a trip: the pieces into the stock)
+	{ name = "FirstContract" }, -- 3: a run started (their move: a portal's run, a round)
+	{ name = "EnteredHouse" }, -- 4: into the house of a run (its front door)
+	{ name = "FirstPieceInVan" }, -- 5: a piece loaded into the van (by them, or into the van of their run)
+	{ name = "FirstTripHome" }, -- 6: pieces home at their warehouse (into the stock)
 	{ name = "FirstPieceOnShow" }, -- 7: a piece of their stock on a display stand
 	{ name = "FirstIncome" }, -- 8: the stands paid them ("CollectionIncome")
 	{ name = "FirstSale" }, -- 9: a piece sold ("CollectionSale")
 	{ name = "FirstUpgrade" }, -- 10: an upgrade bought at the UPGRADES desk ("Upgrade")
 } :: { Step }
 
--- Every step reached (an old save's number).
-AnalyticsPlan.ALL = 2 ^ #AnalyticsPlan.Steps - 1
-
--- 8.2: every step of `steps` reached (an old sandbox save's number: allOf(SandboxSteps)).
+-- Every step of `steps` reached (an old save's number: allOf(SandboxSteps)).
 function AnalyticsPlan.allOf(steps: { Step }): number
 	return 2 ^ #steps - 1
 end
@@ -69,15 +48,15 @@ local function bit(step: number): number
 	return bit32.lshift(1, step - 1)
 end
 
--- Was this step reached? (8.2: of `steps`; nil: the city's Steps. The same for the functions below.)
+-- Was this step reached? (`steps`: the funnel's, nil: SandboxSteps. The same for the functions below.)
 function AnalyticsPlan.has(mask: number, step: number, steps: { Step }?): boolean
-	local list = steps or AnalyticsPlan.Steps
+	local list = steps or AnalyticsPlan.SandboxSteps
 	return step >= 1 and step <= #list and bit32.btest(mask, bit(step))
 end
 
--- A step's number by its name (nil for a name not in Steps).
+-- A step's number by its name (nil for a name not in the steps).
 function AnalyticsPlan.stepOf(name: string, steps: { Step }?): number?
-	for index, step in steps or AnalyticsPlan.Steps do
+	for index, step in steps or AnalyticsPlan.SandboxSteps do
 		if step.name == name then
 			return index
 		end
@@ -87,7 +66,7 @@ end
 
 -- The number with `step` marked (server/Analytics.luau marks the save's only once Roblox took the step).
 function AnalyticsPlan.mark(mask: number, step: number, steps: { Step }?): number
-	if step < 1 or step > #(steps or AnalyticsPlan.Steps) or step ~= math.floor(step) then
+	if step < 1 or step > #(steps or AnalyticsPlan.SandboxSteps) or step ~= math.floor(step) then
 		return mask
 	end
 	return bit32.bor(mask, bit(step))
@@ -95,7 +74,7 @@ end
 
 -- How many steps from the first were reached one after the other: the ones logged.
 function AnalyticsPlan.logged(mask: number, steps: { Step }?): number
-	local list = steps or AnalyticsPlan.Steps
+	local list = steps or AnalyticsPlan.SandboxSteps
 	local n = 0
 	while n < #list and AnalyticsPlan.has(mask, n + 1, list) do
 		n += 1
@@ -105,7 +84,7 @@ end
 
 -- `step` reached: the new number and the steps to log now (none, it, or it with the ones that waited for it).
 function AnalyticsPlan.reach(mask: number, step: number, steps: { Step }?): (number, { number })
-	local all = steps or AnalyticsPlan.Steps
+	local all = steps or AnalyticsPlan.SandboxSteps
 	if step < 1 or step > #all or step ~= math.floor(step) then
 		return mask, {}
 	end
@@ -123,26 +102,12 @@ function AnalyticsPlan.reach(mask: number, step: number, steps: { Step }?): (num
 	return after, list
 end
 
--- The steps reached as the save says (PlayerData's applySaved): no real save (a new courier, or a lock-only record:
--- no money in it) starts at 0; a real save keeps its number (checked); a real save without one is from before 6.13,
--- a courier past their first days: every step (nothing is logged for them).
-function AnalyticsPlan.onboardingFrom(saved: any): number
-	if type(saved) ~= "table" or saved.money == nil then
-		return 0
-	end
-	local value = saved.onboarding
-	if type(value) ~= "number" or value ~= value then
-		return AnalyticsPlan.ALL
-	end
-	return math.clamp(math.floor(value), 0, AnalyticsPlan.ALL)
-end
-
--- 8.2 SANDBOX: the save's flag of the sandbox's funnel (server/PlayerData.luau writes it with profile.sandboxOnboarding).
+-- 8.2: the save's flag of the funnel (server/PlayerData.luau writes it with profile.sandboxOnboarding).
 AnalyticsPlan.SandboxFlag = "sandboxOnboardingKept"
 
--- 8.2 SANDBOX: the sandbox's steps reached as the save says (PlayerData's applySaved): no real save (a new player, or a
--- lock-only record: no money in it) starts at 0; a real save written with the flag keeps its number (checked); a real
--- save without it is from before 8.2, a player who knows the sandbox already: every step (nothing is logged for them).
+-- 8.2: the steps reached as the save says (PlayerData's applySaved): no real save (a new player, or a lock-only
+-- record: no money in it) starts at 0; a real save written with the flag keeps its number (checked); a real save
+-- without it is from before 8.2, a player who knows the game already: every step (nothing is logged for them).
 function AnalyticsPlan.sandboxFrom(saved: any): number
 	if type(saved) ~= "table" or saved.money == nil then
 		return 0
@@ -155,64 +120,22 @@ function AnalyticsPlan.sandboxFrom(saved: any): number
 	return math.clamp(math.floor(value), 0, all)
 end
 
--- ── The funnels ────────────────────────────────────────────────────────────
-
-AnalyticsPlan.Funnels = {
-	Delivery = { "Taken", "PickedUp", "Delivered" },
-	Mission = { "Started", "Completed" },
-}
-
--- The funnel steps to log to get from `last` (logged so far) to `step`: the skipped ones too (an order delivered was
--- picked up), none when it is not ahead.
-function AnalyticsPlan.funnelSteps(last: number, step: number, size: number): { number }
-	local list: { number } = {}
-	for n = math.max(1, last + 1), math.min(step, size) do
-		table.insert(list, n)
-	end
-	return list
-end
-
 -- ── The custom events ──────────────────────────────────────────────────────
 
 -- The whole list (LogCustomEvent's names). Never more, never built from a player's data.
 AnalyticsPlan.Events = {
-	"DeathOnJob", -- died on a job or a mission (or in its crew)
-	"JobFailedTime", -- an order's clock ran out
-	"JobFailedCargo", -- an order's cargo was lost (stolen, wrecked, ruined)
-	"JobGaveUp", -- GIVE UP (the player cancelled)
-	"JobFailedOther", -- any other end (a partner left, NO SHOOTING broken, an admin)
-	"QueueAddAll", -- ADD ALL on the job board (value: the jobs taken or queued)
-	"ZipRide", -- a zip line ridden
-	"BusRide", -- a city bus boarded
-	"ScooterRental", -- a ZDC RIDE scooter taken
-	"StylePurchase", -- a cosmetic bought (value: its price)
-	"ShiftDone", -- 6.14: a shift finished (value: the shifts this session; field: the driver level)
+	"DeathOnJob", -- died on a run (its host or its party; the name as ever)
 	"SessionLength", -- a player left (value: the minutes played)
 	"ServerError", -- a script error on the server
 	"ClientError", -- a script error on a player's device
-	-- 6.14, the golden orders (server/SpecialOrders.luau; value: its danger level, fields: its transport, where) and
-	-- the regulars (server/Regulars.luau; value: the tier's number, fields: the tier, the business)
-	"GoldenOffered", -- a golden order came onto a board
-	"GoldenTaken", -- a golden order taken (started, or added to a run)
-	"GoldenDone", -- a golden order delivered and paid
-	"GoldenExpired", -- a golden order's clock ran out (on the board or in NEXT UP)
-	"RegularTierUp", -- a courier became a business's Bronze / Silver / Gold / Platinum regular
-	-- 6.15, the fixed missions (server/Jobs.luau): a mission done with every enemy of its plan killed (value: how many;
-	-- fields: the chapter, "solo" or "crew")
-	"MissionCleared",
-	-- 6.15, the live events (server/LiveEvents.luau)
-	"EventStarted", -- a live event started (value: the players in the server; field: its id); logged with one of them
-	"SupplyDelivered", -- a supply drop brought to the depot (value: seconds since it landed; field: the driver level)
-	"HordeBeaten", -- a share of the horde's reward paid (value: the player's kills; field: "beaten" or "time")
-	-- 7.0, MOVES (server/Moving.luau)
-	"MoveDone", -- a house move ended and paid (value: its stars; fields: the contract, "solo" or "crew")
-	-- 8.0 SANDBOX, the collection (server/Collection.luau; field: the rarity)
+	"MoveDone", -- a run ended (value: its stars; fields: the house, "solo" or "crew"; server/Moving.luau)
+	-- 8.0, the collection (server/Collection.luau; field: the rarity)
 	"CollectionAdded", -- pieces came home into the warehouse's stock (value: how many at once; field: the rarest)
 	"CollectionDisplayed", -- a piece put on show on a display stand (value: its $ a minute)
 	"CollectionSold", -- a piece sold (value: its price; 8.3: a second field, the market: "hot", "cold" or none)
-	-- 8.1 SANDBOX, the upgrades (server/Upgrades.luau; value: the level bought, field: the upgrade's id)
+	-- 8.1, the upgrades (server/Upgrades.luau; value: the level bought, field: the upgrade's id)
 	"UpgradeBought",
-	-- 8.2 SANDBOX, the moves, the grip and the finds (server/SandboxAnalytics.luau; the fields' words: moveHow, band)
+	-- 8.2, the moves, the grip and the finds (server/SandboxAnalytics.luau; the fields' words: moveHow, band)
 	"MoveStarted", -- a move started (value: the owner's moves this session; field: "solo" or "crew")
 	"MoveFinished", -- a move ended with pieces home (value: its minutes; fields: how, the trips, the pieces home)
 	"MoveFinishedValue", -- that move's haul (value: what came home is worth, $; fields: how, the pieces, "solo" / "crew")
@@ -230,14 +153,6 @@ end
 
 function AnalyticsPlan.isEvent(name: string): boolean
 	return table.find(AnalyticsPlan.Events, name) ~= nil
-end
-
--- A failed order's event by why it failed (server/Jobs.luau passes "time", "cargo" or "gaveup"; nil: other).
-function AnalyticsPlan.failEvent(why: string?): string
-	return if why == "time" then "JobFailedTime"
-		elseif why == "cargo" then "JobFailedCargo"
-		elseif why == "gaveup" then "JobGaveUp"
-		else "JobFailedOther"
 end
 
 -- Enum.AnalyticsCustomFieldKeys' names: the keys of an event's custom fields.
@@ -272,21 +187,8 @@ AnalyticsPlan.EnumTypes = { "ContextualPurchase", "Gameplay", "IAP", "Onboarding
 
 -- Where money comes from: reason → transaction type.
 AnalyticsPlan.Sources = {
-	DeliveryPay = "Gameplay", -- an order's pay (the owner)
-	CrewPay = "Gameplay", -- a crew member's share of it
-	Tip = "Gameplay", -- trickshot and PERFECT tips, a survivor's tip, a lift to the depot
-	KillReward = "Gameplay", -- a zombie or a bandit car
-	CrateLoot = "Gameplay", -- a supply crate's cash
-	MissionReward = "Gameplay", -- a mission's first clear, new stars, a chapter's reward
-	ChallengeReward = "Gameplay", -- challenges and lost packages
-	LevelReward = "Gameplay", -- a driver level's reward
-	CompanySafe = "Gameplay", -- your company's safe emptied
-	TaskReward = "TimedReward", -- the daily and weekly tasks
-	SandboxTask = "TimedReward", -- 8.2 SANDBOX: a daily or weekly task's reward, the all-dailies bonus (server/SandboxTasks.luau; the SKU the task's id)
-	ShiftBonus = "Gameplay", -- 6.14: a shift's pay (Config.Jobs.Shift: its deliveries in one go, server/Shift.luau)
-	SupplyDrop = "Gameplay", -- 6.15: a live event's supply drop brought to the depot (server/LiveEvents.luau)
-	HordeReward = "Gameplay", -- 6.15: a share of the horde at the gates' reward (server/LiveEvents.luau)
-	MovePay = "Gameplay", -- 7.0: a house move's pay (the owner's and each crew mate's share: server/Moving.luau)
+	KillReward = "Gameplay", -- a zombie of a run's (server/Zombies.luau; Config.Runs.Danger has them off since 10.5)
+	SandboxTask = "TimedReward", -- 8.2: a daily or weekly task's reward, the all-dailies bonus (server/SandboxTasks.luau; the SKU the task's id)
 	CollectionIncome = "Gameplay", -- 8.0: the warehouse's display stands earn every minute you play (server/Collection.luau)
 	CollectionSale = "Sale", -- 8.0: a piece of your collection sold (server/Collection.luau; the item SKU its furniture id)
 	VisitorOffer = "Sale", -- 8.3: a showroom visitor's offer accepted: the piece sold at it (server/VisitorOffers.luau → Collection.sellAt; the SKU its furniture id)
@@ -294,47 +196,22 @@ AnalyticsPlan.Sources = {
 	CrewRescue = "Gameplay", -- 10.1: a run's trapped helper freed who is in your crew already: the bonus instead (server/HelperCrew.luau; the SKU his kind)
 	BookMilestone = "Gameplay", -- 8.2: a collection book milestone, paid once (server/CollectionBook.luau; the SKU its id)
 	AuctionSale = "Sale", -- 8.8: your piece sold at the Auction House, the whole price (shared/AuctionRules.luau payments; the fee goes out as AuctionFee; the SKU its furniture id)
-	TutorialReward = "Onboarding", -- Marge's first-delivery reward
-	Refund = "Refund", -- money back (a tow that did not come, a scooter that did not, retired kit)
-	BagRefund = "Refund", -- 6.23: an old save's bags, owned for good before, paid back once (bags are bought each game now)
-	CarRefund = "Refund", -- 7.x: an old save's cars (all but the ZDC Van left the game), paid back once (Config.CompanyVan); 7.2 review: with what the van could not take over and the employers' bonuses for vehicles it had earned
-	EmployerBonus = "Gameplay", -- 7.x: an employer's bonus after their jobs (Config.Employers bonus: their vehicle before)
-	PropertySale = "Sale", -- real estate sold
 	Admin = "Admin", -- the admin panel
 }
 
 -- Where money goes: reason → transaction type (the item SKU is the item's id).
 AnalyticsPlan.Sinks = {
-	Car = "Shop",
-	Bike = "Shop",
-	Gun = "Shop",
-	CarGun = "Shop",
-	Item = "Shop",
-	Kit = "Shop",
-	Bag = "Shop", -- 6.23: a bag for this game at ZDC Bags (Config.BagShop.PerGame)
-	Gear = "Shop",
-	Paint = "Shop",
-	Stage = "Shop",
-	Upgrade = "Shop", -- a city upgrade track; 8.1 SANDBOX: a warehouse upgrade at the UPGRADES desk (server/Upgrades.luau; the SKU its id)
-	VanPaint = "Shop", -- 8.3 SANDBOX: a paint or a livery for your van at the PAINT shop (server/VanPaint.luau; the SKU its id)
-	Style = "Shop",
-	RealEstate = "Shop",
-	Company = "Shop", -- a courier hired, an upgrade of your company
+	Upgrade = "Shop", -- 8.1: a warehouse upgrade at the UPGRADES desk (server/Upgrades.luau; the SKU its id)
+	VanPaint = "Shop", -- 8.3: a paint or a livery for your van at the PAINT shop (server/VanPaint.luau; the SKU its id)
 	AuctionBuy = "Shop", -- 8.8: a lot bought at the Auction House (shared/AuctionRules.luau payments; the SKU its furniture id)
 	AuctionFee = "ContextualPurchase", -- 8.8: the house's fee on your piece sold there (Config.PlayerTrade.Fee, the trades' own: it disappears, a money sink)
-	Fuel = "ContextualPurchase",
-	Tow = "ContextualPurchase",
-	Repair = "ContextualPurchase",
-	Reroll = "ContextualPurchase",
-	Rental = "ContextualPurchase",
-	HelperHire = "ContextualPurchase", -- 8.3: Danny hired for a move (10.1: no hire any more, Danny is free; kept for the dashboard's history)
 	CrewDischarge = "ContextualPurchase", -- 10.1: a helper of your crew discharged from hospital early (server/HelperCrew.luau; the SKU his kind)
 	PlayerBuy = "Shop", -- 8.7: a piece bought from another player (server/PlayerTrade.luau → Collection.transfer; the SKU its furniture id)
 	TradeFee = "ContextualPurchase", -- 8.7: the ZDC fee on a sale between players, from the seller's side (Config.PlayerTrade.Fee: it disappears, a money sink)
 }
 
 -- The frequent small ones: summed a player and sent every Config.Analytics.BatchSeconds (and when they leave).
-AnalyticsPlan.Batched = { KillReward = true, Fuel = true, Tip = true, CollectionIncome = true } -- (8.0: the stands pay every Config.Collection.Tick s)
+AnalyticsPlan.Batched = { KillReward = true, CollectionIncome = true } -- (8.0: the stands pay every Config.Collection.Tick s)
 
 export type MoneyRule = { reason: string, flow: string, kind: string, batch: boolean }
 
@@ -350,19 +227,6 @@ function AnalyticsPlan.money(reason: string?, delta: number): MoneyRule
 	return { reason = reason, flow = if source then "Source" else "Sink", kind = kind, batch = AnalyticsPlan.Batched[reason] == true }
 end
 
--- ── The progression ────────────────────────────────────────────────────────
-
-AnalyticsPlan.Paths = { Level = "DriverLevel", Missions = "Missions" }
-
--- The levels completed by going from `before` to `after` (a level-up from 3 to 5 completes 3 and 4; 20 at most).
-function AnalyticsPlan.levelUps(before: number, after: number): { number }
-	local list: { number } = {}
-	for level = math.max(1, before), math.min(after - 1, before + 19) do
-		table.insert(list, level)
-	end
-	return list
-end
-
 -- ── The errors ─────────────────────────────────────────────────────────────
 
 -- A script's name as a field (its own name: letters, digits, _; "Unknown" for anything else).
@@ -373,7 +237,7 @@ function AnalyticsPlan.scriptName(name: any): string
 	return name
 end
 
--- Where an error happened: "ServerScriptService.Server.Jobs:123: attempt to …" → "Jobs", 123. A message without
+-- Where an error happened: "ServerScriptService.Server.Moving:123: attempt to …" → "Moving", 123. A message without
 -- its place: the script's own name (or "Unknown") and line 0.
 function AnalyticsPlan.errorWhere(message: any, scriptName: string?): (string, number)
 	if type(message) == "string" then
@@ -385,7 +249,7 @@ function AnalyticsPlan.errorWhere(message: any, scriptName: string?): (string, n
 	return AnalyticsPlan.scriptName(scriptName), 0
 end
 
--- ── 8.2 SANDBOX: the moves and the grip checks ────────────────────────────
+-- ── 8.2: the moves and the grip checks ─────────────────────────────────────
 
 -- How a move ended, a word (MoveFinished's and MoveGaveUp's field 01), from server/Moving.luau's end (its onFinish
 -- listeners' facts): the phase (done | late | cancelled | failed), the words it said (why: the result card's; nil for
@@ -464,7 +328,7 @@ end
 
 -- The admin panel's line: "on" (sending), "studio" (counted, not sent) or "off" (Config.Analytics.Enabled), the counts
 -- of this server's session by kind and the last event.
-AnalyticsPlan.Kinds = { "onboarding", "funnel", "economy", "progression", "custom", "error" }
+AnalyticsPlan.Kinds = { "onboarding", "economy", "custom", "error" }
 
 function AnalyticsPlan.summary(mode: string, counts: { [string]: number }, last: string?): string
 	local head = if mode == "on" then "ON, sending" elseif mode == "studio" then "OFF in Studio (counted, not sent)" else "OFF (Config.Analytics.Enabled)"

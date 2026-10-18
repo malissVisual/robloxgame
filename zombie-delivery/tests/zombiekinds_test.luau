@@ -1,12 +1,12 @@
 -- 6.24, the special zombies (the owner: "new zombies, so the fighting isn't always the same"): shared/ZombieKinds.luau,
 -- Config.Zombies' runner / brute / bloater and Config.ZombieTypes in the standalone Luau CLI: the spawn weights (the
--- night, the danger, the level, the Blood Moon, the caps), the brute's armour maths, the bloater's blast falloff and
+-- night, the danger, the caps; 10.6: no level, no Blood Moon, no job's tiers: the city's), the brute's armour maths, the bloater's blast falloff and
 -- fuse, the moves, and the parts budget of every look of every kind. (10.6: the city's fixed missions and their
 -- plans went with shared/MissionPlan.luau.)
 -- Run: python3 tests/run_tests.py [path to the luau binary]
 
 local Config = require("./Config")
-local Economy = require("./Economy")
+local DangerRules = require("./DangerRules") -- (its pickKind: server/Zombies.luau's pick of a kind by the weights)
 local ZombieKinds = require("./ZombieKinds")
 local ZombieStyle = require("./ZombieStyle")
 local Geometry = require("./CharacterGeometry")
@@ -53,9 +53,9 @@ end
 
 -- ── The spawn weights ─────────────────────────────────────────────────────
 do
-	local base = Config.Horde.Roam.kinds
-	local day = { night = 0, danger = 0, level = 10, bloodMoon = false }
-	local night = { night = 1, danger = 0, level = 10, bloodMoon = false }
+	local base = Config.Moving.Horde.Kinds -- (a move's horde: every kind in it)
+	local day = { night = 0, danger = 0 }
+	local night = { night = 1, danger = 0 }
 	local share = function(context: ZombieKinds.Context, kind: string, table_: { [string]: number }?): number
 		return ZombieKinds.shares(ZombieKinds.weights(table_ or base, context))[kind] or 0
 	end
@@ -75,33 +75,24 @@ do
 	check("weights: more runners at night", share(night, "runner") > share(day, "runner") * 1.4, `{share(day, "runner")} → {share(night, "runner")}`)
 	check("weights: more bloaters at night", share(night, "bloater") > share(day, "bloater"))
 	check("weights: fewer walkers at night", share(night, "walker") < share(day, "walker"))
-	local far = { night = 0, danger = 1, level = 10, bloodMoon = false }
+	local far = { night = 0, danger = 1 }
 	check("weights: more brutes and bloaters in danger", share(far, "brute") > share(day, "brute") * 1.5 and share(far, "bloater") > share(day, "bloater") * 1.5)
-	local young = { night = 1, danger = 1, level = 1, bloodMoon = true }
-	check("weights: a level 1 courier never meets a bloater", share(young, "bloater") == 0)
-	check("weights: … and fewer brutes", share({ night = 0, danger = 0, level = 1, bloodMoon = false }, "brute") < share(day, "brute"))
-	check("weights: from FromLevel on, the bloater comes", share({ night = 0, danger = 0, level = T.FromLevel.bloater, bloodMoon = false }, "bloater") > 0)
-	check("weights: no player (nil level): no level rule", share({ night = 0, danger = 0, level = nil, bloodMoon = false }, "bloater") > 0)
-	local moon = { night = 1, danger = 0, level = 10, bloodMoon = true }
-	check("weights: a Blood Moon has more runners and bloaters than a night", share(moon, "runner") > share(night, "runner") and share(moon, "bloater") > share(night, "bloater"))
-	check("weights: the people are never weighed (a stop's bandits stay)", ZombieKinds.factor("bandit", moon) == 1 and ZombieKinds.factor("gunner", far) == 1)
-	-- the danger: a tier, or the distance from the depot
-	check("danger: none at the depot, by day, without a job", ZombieKinds.danger(nil, 0) == 0 and ZombieKinds.danger(nil, nil) == 0)
-	check("danger: a ★ job none, ★★★★ full", ZombieKinds.danger(1, nil) == 0 and ZombieKinds.danger(4, nil) == 1)
-	check("danger: grows with the distance, full far out", ZombieKinds.danger(nil, T.DangerNear) == 0 and ZombieKinds.danger(nil, (T.DangerNear + T.DangerFar) / 2) > 0.4 and ZombieKinds.danger(nil, T.DangerFar * 2) == 1)
-	check("danger: the bigger of the two", ZombieKinds.danger(2, T.DangerFar) == 1 and ZombieKinds.danger(4, 0) == 1)
-	-- every table the game picks from: the specials stay a minority; a tier's waves get more of them as it gets harder
+	check("weights: the people are never weighed (the city's bandits)", ZombieKinds.factor("bandit", night) == 1 and ZombieKinds.factor("gunner", far) == 1)
+	-- the danger: the distance from the old depot
+	check("danger: none at the depot, none without a spot", ZombieKinds.danger(0) == 0 and ZombieKinds.danger(nil) == 0)
+	check("danger: grows with the distance, full far out", ZombieKinds.danger(T.DangerNear) == 0 and ZombieKinds.danger((T.DangerNear + T.DangerFar) / 2) > 0.4 and ZombieKinds.danger(T.DangerFar * 2) == 1)
+	-- every table the game picks from (a move's horde and its roamers, a run's danger by its difficulty): the specials
+	-- stay a minority
 	local tables: { [string]: { [string]: number } } = {
-		roam = Config.Horde.Roam.kinds,
-		residents = Config.Horde.Residents.kinds,
-		supply = Config.LiveEvents.Supply.Kinds,
-		horde = Config.LiveEvents.Horde.Kinds,
+		horde = Config.Moving.Horde.Kinds,
+		roam = Config.Moving.Roam.Kinds,
 	}
-	for n, tier in Config.Jobs.Tiers do
-		tables[`waves{n}`] = tier.waveKinds
-		tables[`stops{n}`] = tier.kinds
+	for id, level in Config.Runs.Danger :: any do
+		if type(level) == "table" and type(level.Kinds) == "table" then
+			tables[`run {id}`] = level.Kinds
+		end
 	end
-	local worst = { night = 1, danger = 1, level = 15, bloodMoon = true }
+	local worst = { night = 1, danger = 1 }
 	local minority, kindsOk = {}, {}
 	for name, kinds in tables do
 		local shares = ZombieKinds.shares(ZombieKinds.weights(kinds, worst))
@@ -114,18 +105,14 @@ do
 			end
 		end
 	end
-	check("weights: even a Blood Moon night far out keeps the bloaters and brutes a minority", #minority == 0, table.concat(minority, "; "))
+	check("weights: even a night far out keeps the bloaters and brutes a minority", #minority == 0, table.concat(minority, "; "))
 	check("weights: every table names known kinds", #kindsOk == 0, table.concat(kindsOk, ", "))
-	local function bloaterShare(n: number): number
-		return ZombieKinds.shares(Config.Jobs.Tiers[n].waveKinds).bloater or 0
-	end
-	check("tiers: no bloater in a ★ job's waves, more from ★★ to ★★★★", bloaterShare(1) == 0 and bloaterShare(2) > 0 and bloaterShare(3) > bloaterShare(2) and bloaterShare(4) > bloaterShare(3))
-	-- the pick: the same roll, the same kind (Economy.pickKind sorts the names); the shares come out over many rolls
-	local weights = ZombieKinds.weights(base, moon)
+	-- the pick: the same roll, the same kind (DangerRules.pickKind sorts the names); the shares come out over many rolls
+	local weights = ZombieKinds.weights(base, far)
 	local counts: { [string]: number } = {}
 	local rolls = 20000
 	for i = 0, rolls - 1 do
-		local kind = Economy.pickKind(weights, (i + 0.5) / rolls)
+		local kind = DangerRules.pickKind(weights, (i + 0.5) / rolls)
 		counts[kind] = (counts[kind] or 0) + 1
 	end
 	local shares = ZombieKinds.shares(weights)
@@ -136,7 +123,7 @@ do
 		end
 	end
 	check("pick: an even spread of rolls comes out in the weights' shares", #off == 0, table.concat(off, ", "))
-	check("pick: the same roll, the same kind", Economy.pickKind(weights, 0.37) == Economy.pickKind(table.clone(weights), 0.37))
+	check("pick: the same roll, the same kind", DangerRules.pickKind(weights, 0.37) == DangerRules.pickKind(table.clone(weights), 0.37))
 	-- the caps
 	check("caps: the brute and the bloater have one, the walker none", T.MaxAlive.brute ~= nil and T.MaxAlive.bloater ~= nil and T.MaxAlive.walker == nil)
 	check("caps: at its cap a kind is capped, below it not", ZombieKinds.capped("bloater", T.MaxAlive.bloater) and not ZombieKinds.capped("bloater", T.MaxAlive.bloater - 1) and not ZombieKinds.capped("walker", 1000))

@@ -2,8 +2,8 @@
 -- 8.2 SANDBOX, showing off: what every player's collection is worth, where everybody sees it (the numbers are
 -- Config.SandboxLeaders', the rules shared/SandboxLeadersRules.luau's). server/SandboxBoot.luau starts it after the
 -- collection; the city never does.
---   * Roblox's player list (leaderstats): the folder server/PlayerData.luau makes when a save loads loses the city's
---     columns (Level, Money, Deliveries: the sandbox has no levels) and gets the sandbox's, in Stats' order: "💰 $" (the
+--   * Roblox's player list (leaderstats): the folder server/PlayerData.luau makes when a save loads (empty) gets the
+--     columns, in Stats' order: "💰 $" (the
 --     money, an IntValue: the list sorts by it), "📈 $/min" (what the pieces on show earn a minute,
 --     Collection.incomePerMinute, a NumberValue to a tenth) and "⭐ Collection" (what everything the player owns is
 --     worth, on show or not: SandboxLeadersRules.summary). Written when the money (PlayerData.Changed) or the collection
@@ -44,8 +44,7 @@ local SandboxLeaders = {}
 
 local S = Config.SandboxLeaders
 local B = S.Board
-local MARK = "SandboxColumns" -- the leaderstats folder's attribute once it shows the sandbox's columns
-local CITY_STATS = { "Level", "Money", "Deliveries" } -- server/PlayerData.luau's (the city's) columns
+local MARK = "SandboxColumns" -- the leaderstats folder's attribute once it shows the columns
 local MAX_INT = 2 ^ 31 - 1
 
 -- The board's looks: alpine wood, a dark green painted panel, gold letters.
@@ -203,20 +202,14 @@ end
 
 -- ── The player list ────────────────────────────────────────────────────────
 
--- The player's list columns: PlayerData's leaderstats folder (made when the save loads) with the sandbox's columns in
--- place of the city's (once). Nil before the save has loaded.
+-- The player's list columns: PlayerData's leaderstats folder (made when the save loads) with the columns put in it
+-- (once). Nil before the save has loaded.
 local function columnsOf(player: Player): Columns?
 	local folder = player:FindFirstChild("leaderstats")
 	if not folder then
 		return nil
 	end
 	if folder:GetAttribute(MARK) ~= true then
-		for _, name in CITY_STATS do
-			local old = folder:FindFirstChild(name)
-			if old then
-				old:Destroy()
-			end
-		end
 		for _, spec in { { S.Stats.Money, "IntValue" }, { S.Stats.Income, "NumberValue" }, { S.Stats.Collection, "IntValue" } } do
 			if not folder:FindFirstChild(spec[1]) then
 				local value = Instance.new(spec[2])

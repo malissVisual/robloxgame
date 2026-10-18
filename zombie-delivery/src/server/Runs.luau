@@ -15,9 +15,9 @@
 --   * 10.x the map (read-only, for client/SandboxMapUi.luau's lobby): each portal model's attributes RunState ("free",
 --     "wait": counting down, "use": in a run), RunEndsAt (the countdown's end), RunWho (who is on the pad, else the
 --     run's party) and RunDifficulty, written in the same look as its sign, only when they change.
---   * The start: the host's van is parked at the house's curb (Moving.parkVan: server/SandboxBoot.luau's, repaired),
---     not drivable (its model's Config.Runs.Truck.Attribute: client/CarVisuals.luau shows no Drive / Ride along, its
---     seats Disabled), the party is the run's (Crew.members and Crew.ownerOf are wrapped: a run's party is its host's
+--   * The start: the host's van is parked at the house's curb (Moving.parkVan: server/SandboxBoot.luau's), marked a
+--     run's (its model's Config.Runs.Truck.Attribute: client/SandboxMapData.luau finds it by it; 10.6: no van has seats
+--     or drives), the party is the run's (Crew.members and Crew.ownerOf are wrapped: a run's party is its host's
 --     crew, nobody else's crew counts in the sandbox), Moving.startRun starts the move (its contract's difficulty, the
 --     house's clock × the difficulty's time; the inside's RunDifficulty attribute is Moving's), the map's house model
 --     gets the attribute RunDifficulty too (traps, zombies and the loot's rarity read it: a later worker's), the truck
@@ -401,15 +401,9 @@ end
 
 -- ── The truck ──────────────────────────────────────────────────────────────
 
--- The van at the house's curb, not drivable (the attribute, its seats off).
-local function lockVan(car: any)
+-- The van at the house's curb: a run's (the attribute: the lobby's map finds it by it).
+local function lockVan(car: Vehicles.Car)
 	car.model:SetAttribute(R.Truck.Attribute, true)
-	pcall(function()
-		car.seat.Disabled = true
-		for _, seat in car.passengers do
-			seat.Disabled = true
-		end
-	end)
 end
 
 local function truckPrompts(run: Run, car: any)
@@ -486,7 +480,7 @@ function Runs.begin(house: string, party: { Player }, difficulty: string, admin:
 	if not park then
 		return "Runs are not ready yet."
 	end
-	local err, car = park(host, H.curb, false)
+	local err, car = park(host, H.curb)
 	if err or not car then
 		return err or "The truck could not come: try again."
 	end
@@ -894,7 +888,7 @@ function Round.begin(house: string, players: { Player }, difficulty: string): st
 		local spot = spots[#going + 1]
 		local err, car = nil, nil
 		if spot then
-			err, car = park(p, spot, false)
+			err, car = park(p, spot)
 		end
 		if car then
 			lockVan(car)

@@ -59,13 +59,13 @@
 --     mid-run stands the new body by the run's van, else outside the house (Moving.respawnAt, SandboxBoot's spawn).
 --   * The clock and the zombies: the run's clock (0:00 ends it: late, the truck's load home); the horde (Config.Moving
 --     Horde; Config.Moving.Sandbox.Horde false: none by the clock, the admin's HORDE NOW brings it) marches on the door
---     in bursts; Sandbox.Roam roamers round the house while somebody of the party is outside near it (0 by default);
---     the party is "hunted" (no ordinary roamers come round them). A run's own danger (its traps, its zombies from Hard,
+--     in bursts; Sandbox.Roam roamers round the house while somebody of the party is outside near it (0 by default).
+--     A run's own danger (its traps, its zombies from Hard,
 --     the vault) is server/RunDanger.luau's (Moving.onRunStart, Moving.runDrop).
 --   * The edges: whoever leaves, dies, sits down or leaves the party drops what they hold where they are (inside: on
 --     the floor); somebody inside an interior that goes is brought out to the door; every prompt and request is checked
 --     here (who, how far, the state), the remote is rate limited (Config.Robust.Limits.Moving). While a run's truck is
---     out nothing of its host's takes its place (Vehicles.spawn / placeNear / placeAt / spawnAt wrapped), a run's people
+--     out nothing of its host's takes its place (Vehicles.placeAt / spawnAt wrapped), a run's people
 --     count as busy (Moving.busy). A door trip whose run ends
 --     meanwhile comes out at the house's door; Load checks the carry's pace (no teleport to the truck) and that the
 --     thing still exists (a missing model never comes home); the end's facts run in a pcall (the cleanup always frees
@@ -111,7 +111,7 @@
 --                             or nil (off a run)
 --   Moving.houseOf(player)    the SandboxMap house of the run `player` is on, else of their card (its seed unspent;
 --                             nil: none)
---   Moving.parkVan            the hook server/SandboxBoot.luau sets (its parkVan: a run's van, repaired)
+--   Moving.parkVan            the hook server/SandboxBoot.luau sets (its parkVan: a run's van, a round's)
 --   Moving.admin(player, arg) the admin panel's SANDBOX tab's Runs group: "time" (one minute left) | "horde" (the horde
 --                             now) | "end" (called off) on `player`'s run; returns what to say
 --   Moving.useArt(art)        the art modules given (a test or a fallback), instead of finding them by name
@@ -136,7 +136,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
-local Economy = require(Shared.Economy)
 local Net = require(Shared.Net)
 local Rules = require(Shared.MovingRules)
 local MoveRoles = require(Shared.MoveRoles) -- (8.8 no roles: only the climb's rules and the van call's words)
@@ -1270,28 +1269,27 @@ function SB.inBay(truck: Vehicles.Car, at: Vector3): boolean
 	return math.abs(p.X - cx) <= bed.Width / 2 + 0.5 and math.abs(p.Z - cz) <= bed.Length / 2 + 0.5 and p.Y >= floor - 1 and p.Y <= floor + bed.Height + 2
 end
 
--- server/SandboxBoot.luau's parkVan (the player's van parked at a spot as their one vehicle, repaired: a run's van,
--- CAR's), set by it before Moving.start (a hook: the two modules never require each other).
-Moving.parkVan = nil :: ((player: Player, spot: SandboxMap.Spot, seat: boolean, carId: string?) -> (string?, Vehicles.Car?))?
+-- server/SandboxBoot.luau's parkVan (the player's van parked at a spot as their one vehicle: a run's van, a round's),
+-- set by it before Moving.start (a hook: the two modules never require each other).
+Moving.parkVan = nil :: ((player: Player, spot: SandboxMap.Spot) -> (string?, Vehicles.Car?))?
 
 -- 10.5 rounds: server/Runs.luau's hook: the van a player has at a round's house (respawnAt stands a new body by it).
 Moving.roundVan = nil :: ((player: Player) -> Vehicles.Car?)?
 
 -- The host's own van when none is out as their run starts (server/Runs.luau parks it first: a run started some other
--- way) at the house's curb, its back to the door, not seated, the sandbox's way (Moving.parkVan: repaired). nil, or why
--- it could not come.
+-- way) at the house's curb, its back to the door, the sandbox's way (Moving.parkVan). nil, or why it could not come.
 function SB.bringVan(owner: Player, house: SandboxMap.House?): string?
 	local park = Moving.parkVan
 	if not park then
 		return "Your van could not come: try again."
 	end
-	local err, car = park(owner, (house or SandboxMap.House).curb, false)
+	local err, car = park(owner, (house or SandboxMap.House).curb)
 	return err or (if car then nil else "Your van could not come: try again.")
 end
 
 -- The van's name on its prompts: the car's own ("Sprinter").
 function SB.vanLabel(truck: Vehicles.Car): string
-	local def = Economy.findCar(truck.id)
+	local def = Vehicles.carDef(truck.id)
 	return if def then def.name else "Deliveros Van"
 end
 
@@ -1355,24 +1353,19 @@ local function atBack(s: Session, player: Player): (boolean, string?)
 		return false, nil
 	elseif not inBay and not Vehicles.backOpen(truck) then
 		return false, `Open the back first (E): {Vehicles.backVerb(truck, true)}.`
-	elseif Vehicles.speed(truck) > Config.Cargo.MaxCarSpeed then
-		return false, "Stop the van first."
 	end
 	return true, nil
 end
 
 -- 7.0 review: did `holder` move the thing faster than its carry allows since the last look (item.lastAt at
 -- item.lastTime: a teleport)? watchCarried looks every tick, Load right before it takes it.
-local function paceBroken(s: Session, item: Item, thing: Rules.Thing, holder: Player, character: Model, root: BasePart, clock: number): boolean
+local function paceBroken(s: Session, item: Item, thing: Rules.Thing, holder: Player, _character: Model, root: BasePart, clock: number): boolean
 	local last = item.lastAt
 	if traveling[holder] or not last or item.lastTime <= 0 then
 		return false
 	end
-	local walk = speedOf(thing)
-	local admin = holder:GetAttribute("AdminSpeed")
-	local kit = character:GetAttribute("KitSpeed")
-	local boost = (if type(admin) == "number" then math.clamp(admin, 1, 4) else 1) * (if type(kit) == "number" then math.clamp(kit, 1, 2) else 1)
-	return flat(root.Position, last) > walk * boost * T.Pace.Factor * (clock - item.lastTime) + T.Pace.Slack
+	local walk = speedOf(thing) -- (10.6: no admin's or kit's walk boost any more: AdminSpeed, KitSpeed)
+	return flat(root.Position, last) > walk * T.Pace.Factor * (clock - item.lastTime) + T.Pace.Slack
 end
 
 local function onLoad(s: Session, player: Player)
@@ -1438,7 +1431,7 @@ local function onUnload(s: Session, player: Player)
 		return
 	end
 	local character = player.Character -- (7.0 review: like Pick up: a crate, a trolley in your hands)
-	if character and (character:GetAttribute("Carrying") ~= nil or character:GetAttribute("Pushing") ~= nil) then
+	if character and (character:GetAttribute("Carrying") ~= nil) then
 		say(player, "Your hands are full: put down what you carry first (G).")
 		return
 	end
@@ -2509,7 +2502,7 @@ local function onPick(s: Session, spot: number, player: Player, lifted: boolean?
 		say(player, `You can't reach the {thing.name} through the wall.`) -- 9.0 (a pick, a lift, a drag)
 		return
 	end
-	if character:GetAttribute("Carrying") ~= nil or character:GetAttribute("Pushing") ~= nil then
+	if character:GetAttribute("Carrying") ~= nil then
 		say(player, "Your hands are full: put down what you carry first (G).")
 		return
 	end
@@ -2563,7 +2556,7 @@ local function onHelp(s: Session, spot: number, player: Player, lifted: boolean?
 		say(player, SB.why("yours"))
 		return
 	end
-	if character:GetAttribute("Carrying") ~= nil or character:GetAttribute("Pushing") ~= nil then
+	if character:GetAttribute("Carrying") ~= nil then
 		say(player, "Your hands are full: put down what you carry first (G).")
 		return
 	end
@@ -2746,12 +2739,6 @@ local function callTruck(s: Session, player: Player)
 		say(player, "No van to call: bring it back with CAR first.")
 		return
 	end
-	for _, other in Players:GetPlayers() do
-		if Vehicles.seatedIn(other) == truck then
-			say(player, "Somebody sits in the van: it can't drive itself.")
-			return
-		end
-	end
 	local door = doorNear(s, player)
 	local spot, heading = door.park, door.heading
 	if flat(truck.chassis.Position, spot) <= R.Driver.Near then
@@ -2763,10 +2750,8 @@ local function callTruck(s: Session, player: Player)
 	task.delay(T.Fade, function()
 		if not s.ended and truckOk(s) == truck then
 			local ground = Vector3.new(spot.X, Vehicles.groundY(spot.X, spot.Z) + 4, spot.Z)
-			truck.chassis.AssemblyLinearVelocity = Vector3.zero
-			truck.chassis.AssemblyAngularVelocity = Vector3.zero
 			truck.model:PivotTo(CFrame.lookAt(ground, ground + heading))
-			pcall(Vehicles.standUp, truck, heading) -- (on its wheels, on free ground: Vehicles.clearFor)
+			pcall(Vehicles.standUp, truck, heading) -- (on its wheels, on free ground near: Vehicles' findRoom)
 			local where = if door.exit == 1 then `{s.contract.name}'s {door.name}` else `the {door.name}`
 			tellAll(s, `🚐 {player.DisplayName} called the van: it waits at {where}.`)
 			s.dirty = true
@@ -3255,9 +3240,9 @@ local function hordeBurst(s: Session, clock: number)
 	local door = doors[s.bursts % #doors + 1].door
 	for _ = 1, math.ceil(T.Horde.Count / math.max(1, T.Horde.Bursts)) do
 		local spot = Zombies.findSpot(door, nil, T.Horde.Near, T.Horde.Far)
-		local z = if spot then Zombies.spawn(Zombies.pickKind(T.Horde.Kinds, spot, s.owner), spot, s.owner) else nil
+		local z = if spot then Zombies.spawn(Zombies.pickKind(T.Horde.Kinds, spot), spot, s.owner) else nil
 		if z then
-			Zombies.march(z, door, "move")
+			Zombies.march(z, door)
 			table.insert(s.horde, z)
 		end
 	end
@@ -3287,7 +3272,7 @@ local function keepRoam(s: Session, clock: number)
 	end
 	for _ = 1, T.Sandbox.Roam - #s.roam do -- (Config.Moving.Sandbox.Roam: the test world's few; 0: none)
 		local spot = Zombies.findSpot(s.site.door, nil, T.Roam.Near, T.Roam.Far)
-		local z = if spot then Zombies.spawn(Zombies.pickKind(T.Roam.Kinds, spot, s.owner), spot, s.owner, false, false, true) else nil
+		local z = if spot then Zombies.spawn(Zombies.pickKind(T.Roam.Kinds, spot), spot, s.owner, false, true) else nil
 		if z then
 			table.insert(s.roam, z)
 		end
@@ -4375,29 +4360,6 @@ function Moving.respawnAt(player: Player): CFrame?
 end
 
 local function wireHooks()
-	-- a crew on a move is "hunted" like a job's: no ordinary roamers round them (the move brings its own), none inside
-	local hunts = Zombies.hunts
-	Zombies.hunts = function(player: Player): boolean
-		return hunts(player) or sessionOf(player) ~= nil
-	end
-	-- the truck's knocks knock its load
-	local function truckHit(player: Player, amount: number)
-		local s = sessions[player]
-		if not s or s.ended or type(amount) ~= "number" then
-			return
-		end
-		for _, spot in s.move.order do
-			local thing = s.move.things[spot]
-			if thing.state == "truck" then
-				hurtThing(s, spot, Rules.truckDamage(amount, thing.fragile))
-			end
-		end
-	end
-	local zombieHit = Zombies.onCarDamaged
-	Zombies.onCarDamaged = function(player: Player, amount: number)
-		zombieHit(player, amount)
-		truckHit(player, amount)
-	end
 	-- the crew opens and closes the truck's back too
 	local backAllowed = Vehicles.backAllowed
 	Vehicles.backAllowed = function(player: Player, car: Vehicles.Car): boolean
@@ -4407,40 +4369,25 @@ local function wireHooks()
 		local s = sessions[car.owner]
 		return s ~= nil and not s.ended and s.truck == car and sessionOf(player) == s
 	end
-	-- 7.0 review: while your run's truck is out nothing of yours takes its place (each of these would remove it first:
-	-- CAR, the phone's CALL CAR; startMove's own SB.bringVan runs before the session exists)
-	local spawn = Vehicles.spawn
-	Vehicles.spawn = function(player: Player, force: boolean?, carId: string?): string?
-		if truckOut(player) then
-			return TRUCK_OUT
-		end
-		return vanWait(player) or spawn(player, force, carId) -- (7.x van moves: a lost van back after VanAgain s)
-	end
-	local placeNear = Vehicles.placeNear
-	Vehicles.placeNear = function(player: Player, carId: string?): string?
-		if truckOut(player) then
-			return TRUCK_OUT
-		end
-		return vanWait(player) or placeNear(player, carId)
-	end
-	-- (7.2 review: these wait for a lost van's VanAgain s too: the garage's TAKE OUT is placeAt)
+	-- 7.0 review: while your run's truck is out nothing of yours takes its place (a park would remove it first;
+	-- startMove's own SB.bringVan runs before the session exists); 7.2 review: nor before a lost van's VanAgain s
 	local placeAt = Vehicles.placeAt
-	Vehicles.placeAt = function(player: Player, carId: string?, spot: CFrame, seat: boolean?): Vehicles.Car?
+	Vehicles.placeAt = function(player: Player, spot: CFrame): Vehicles.Car?
 		local refused = if truckOut(player) then TRUCK_OUT else vanWait(player)
 		if refused then
 			say(player, refused)
 			return nil
 		end
-		return placeAt(player, carId, spot, seat)
+		return placeAt(player, spot)
 	end
 	local spawnAt = Vehicles.spawnAt
-	Vehicles.spawnAt = function(player: Player, carId: string?, ground: CFrame, seat: boolean, chauffeured: boolean?, rental: boolean?, keep: { Instance }?): Vehicles.Car?
+	Vehicles.spawnAt = function(player: Player, ground: CFrame): Vehicles.Car?
 		local refused = if truckOut(player) then TRUCK_OUT else vanWait(player)
 		if refused then
 			say(player, refused)
 			return nil
 		end
-		return spawnAt(player, carId, ground, seat, chauffeured, rental, keep)
+		return spawnAt(player, ground)
 	end
 end
 

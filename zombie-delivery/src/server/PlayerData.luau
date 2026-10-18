@@ -3,10 +3,8 @@
 -- (Config.Sandbox.Store, ZombieDelivery_v2_Sandbox; the key Player_<UserId> and the 10.1 slots' own keys, the lock).
 -- In Studio without API access it simply runs without saving.
 --
--- The profile: the money; the van (cars / car: Config.Sandbox.Van, SandboxBoot's ownVan keeps it the save's one car)
--- and what server/Vehicles.luau builds it with (carUpgrades, carHealth, carGear, carPaint, carGuns: as the save has
--- them); the XP (the level and the rank, shared/Levels.luau; a kill's XP) and the level rewards given (levelRewards:
--- Config.Levels Rewards' money, each level once; shared/Career.luau); rewards (short keys an older server keeps:
+-- The profile: the money; the van (cars / car: Config.Sandbox.Van, the one vehicle); the XP a save has (10.6: nothing
+-- gives or shows it, the old career went: kept for a career to come); rewards (short keys an older server keeps:
 -- "book:<id>", "mv:<n>", "paint:<id>", "warehouse:<k>", the one-car flag, the chapters done of old); the counters
 -- (deliveries, kills, earned) and every sandbox field, each read only from a real save written with its flag:
 --   8.0 the collection (collection: the pieces the runs brought home, shared/CollectionRules.luau; server/Collection
@@ -32,11 +30,13 @@
 -- (playTime, s: this session's added at each save) and when (savedAt, os.time) for the start screen's cards.
 -- 10.6, the save stays the sandbox's as it was: the same store, keys, slots and lock; every sandbox field and its flag;
 -- the city's boolean flags still written (xpCurve, carStages, vanStages, vestKit, starterKit, noPacks, noJacket,
--- noShoes, perGameBags, vanOnly: an older server reading a save of this one never pays a refund or gives a kit twice).
--- The city's fields a loaded save has (its guns, kit, tutorial, phone, wardrobe, skills, tasks, story …) are no field of
--- this version any more: as every key it does not know, they are written back as they were (SaveGuard, below).
--- 6.13, analytics (server/Analytics.luau): every money change tells its reason (addMoney / spend's `reason` and `sku`,
--- the level rewards) to PlayerData.onMoney; the game's other analytics calls go through PlayerData.track (the hooks
+-- noShoes, perGameBags, vanOnly: an older server reading a save of this one never pays a refund or gives a kit twice);
+-- the city's tables of the cars and the career (carUpgrades, carHealth, carGear, carPaint, carGuns, levelRewards: no
+-- field the game reads) written back as the save had them (a new save's empty), the xp too. The city's other fields a
+-- loaded save has (its guns, kit, tutorial, phone, wardrobe, skills, tasks, story …) are no field of this version any
+-- more: as every key it does not know, they are written back as they were (SaveGuard, below).
+-- 6.13, analytics (server/Analytics.luau): every money change tells its reason (addMoney / spend's `reason` and `sku`)
+-- to PlayerData.onMoney; the game's other analytics calls go through PlayerData.track (the hooks
 -- Analytics.start puts in PlayerData.analytics: without them nothing happens, so the game never depends on
 -- server/Analytics.luau loading).
 -- 8.3 SAVES (Config.Saving, shared/SaveGuard.luau): a save is written (UpdateAsync) only while the stored save is still
@@ -50,8 +50,7 @@
 -- once, waited for). A load that fails, or a save that cannot be read without an error, never gets a fresh profile that
 -- would be saved over the real one: a live player is kicked. A rejoin to this server waits for its own leave save of
 -- that player.
--- The player list (leaderstats) shows Level, Money and Deliveries; the player attributes Xp, Level and Rank carry the
--- level to every client.
+-- The player list: the leaderstats folder is made when a save loads; server/SandboxLeaders.luau puts its columns in it.
 
 local DataStoreService = game:GetService("DataStoreService")
 local Players = game:GetService("Players")
@@ -60,9 +59,6 @@ local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
-local Economy = require(Shared.Economy)
-local Levels = require(Shared.Levels)
-local Career = require(Shared.Career) -- 4.6: the level rewards
 local AnalyticsPlan = require(Shared.AnalyticsPlan) -- 8.2: the onboarding funnel's steps in the save
 local CollectionRules = require(Shared.CollectionRules) -- 8.0: the collection (profile.collection, server/Collection.luau)
 local CharacterLooks = require(Shared.CharacterLooks) -- 10.1: the courier made for a slot
@@ -74,17 +70,21 @@ local Market = require(Shared.Market) -- 8.3: the market's demand (profile.marke
 local VanPaintRules = require(Shared.VanPaintRules) -- 8.3: the van's paint (profile.vanPaint, server/VanPaint.luau)
 local SaveGuard = require(Shared.SaveGuard) -- 8.3 saves: what a save writes, checked; the unknown keys kept
 
+-- 10.6: a table of the city's that a save keeps as it was (KEPT below)
+export type Kept = { [any]: any }
+
 export type Profile = {
 	money: number,
-	cars: { [string]: boolean }, -- the van (Config.Sandbox.Van: SandboxBoot's ownVan keeps it the one car)
+	cars: { [string]: boolean }, -- the van (Config.Sandbox.Van), the one vehicle
 	car: string?, -- the van it is
-	carUpgrades: { [string]: { [string]: number } }, -- 3.3: car id → its tracks' levels (+ 3.5 stage): server/Vehicles.luau
-	carHealth: { [string]: number }, -- 3.4: car id → its share of health (0 … 1) while parked; no entry = as new
-	carGear: { [string]: { [string]: string } }, -- 4.6: car id → gear id → "owned" | "installed" (Config.Gear)
-	carPaint: { [string]: string }, -- car id → paint id (Config.Paints)
-	carGuns: { [string]: string }, -- car id → the gun on its roof (Config.CarGuns); no entry = none
-	xp: number, -- the XP (Config.Levels: the level and the rank)
-	levelRewards: { [string]: boolean }, -- 4.6: the levels (as strings, "2" … ) whose Config.Levels.Rewards was given
+	-- 10.6: the city's tables a save has, read by nothing here: written back as they were (KEPT; a new save's empty)
+	carUpgrades: Kept, -- the cars' tracks and stages of old
+	carHealth: Kept, -- the cars' health of old
+	carGear: Kept, -- the cars' gear of old
+	carPaint: Kept, -- the cars' paint of old
+	carGuns: Kept, -- the cars' roof guns of old
+	levelRewards: Kept, -- the old career's level rewards given
+	xp: number, -- the XP a save has (10.6: nothing gives or shows it; kept for a career to come)
 	rewards: { [string]: boolean }, -- short keys an older server keeps ("book:<id>", "mv:<n>", "paint:<id>", "warehouse:<k>" …)
 	-- 8.2 SANDBOX: the onboarding funnel's steps reached (a bit a step of AnalyticsPlan.SandboxSteps): read only from a
 	-- real save written with its flag (AnalyticsPlan.sandboxFrom); an older real save is past every step
@@ -181,6 +181,12 @@ function PlayerData.track(name: string, ...: any)
 	end
 end
 
+-- 10.6: the city's tables a save keeps as they were (the Profile's Kept ones) and the flags of its migrations that
+-- every save still writes (an older server reading one never runs them again: no refund, no kit given twice).
+local KEPT = { "carUpgrades", "carHealth", "carGear", "carPaint", "carGuns", "levelRewards" }
+local XP_CURVE = 2 -- xpCurve: the XP curve the xp is on (the city's Config.Levels.Curve)
+local VAN_ONLY = "vanOnly" -- the one-car flag (the city's Config.CompanyVan.Flag): a field and a `rewards` key
+
 local store: DataStore? = nil
 pcall(function()
 	store = DataStoreService:GetDataStore(Config.Sandbox.Store) -- (8.0: the sandbox's own saves; the city's never touched)
@@ -189,15 +195,15 @@ end)
 local function newProfile(): Profile
 	return {
 		money = Config.Sandbox.StartMoney,
-		cars = { [Config.CompanyVan.Car] = true },
-		car = Config.CompanyVan.Car,
+		cars = { [Config.Sandbox.Van] = true },
+		car = Config.Sandbox.Van,
 		carUpgrades = {},
 		carHealth = {},
 		carGear = {},
 		carPaint = {},
 		carGuns = {},
-		xp = 0,
 		levelRewards = {},
+		xp = 0,
 		rewards = {},
 		sandboxOnboarding = 0, -- 8.2: no step of the funnel yet
 		collection = CollectionRules.empty(), -- 8.0: nothing brought home yet
@@ -240,55 +246,9 @@ local function applyRewards(profile: Profile, saved: { [any]: any })
 	end
 end
 
--- 4.6, the gear of every car you own (Config.Gear, only what fits it: Economy.gearFits), never more installed than
--- the car's gear slots at its stage (the extra ones stay "owned"). (After the cars and their stages are read.)
-local function applyGear(profile: Profile, saved: { [any]: any })
-	local list: any = saved.carGear
-	if type(list) ~= "table" then
-		return
-	end
-	for carId, gear in list do
-		if type(carId) ~= "string" or not profile.cars[carId] or type(gear) ~= "table" then
-			continue
-		end
-		local slots = Economy.gearSlots(carId, Economy.stageOf(carId, Economy.carLevels(profile.carUpgrades, carId)))
-		local into: { [string]: string } = {}
-		local used = 0
-		for _, def in Config.Gear do
-			local value = gear[def.id]
-			if (value == "owned" or value == "installed") and Economy.gearFits(carId, def.id) then
-				if value == "installed" and used < slots then
-					used += 1
-					into[def.id] = "installed"
-				else
-					into[def.id] = "owned"
-				end
-			end
-		end
-		if next(into) ~= nil then
-			profile.carGear[carId] = into
-		end
-	end
-end
-
--- 4.6, the career rewards given (the levels 2 … MaxLevel as strings). A save from before 4.6 (no levelRewards) has had
--- the levels it reached: they count as given (Career.reached), nothing is paid back. (After the XP is read.)
-local function applyLevelRewards(profile: Profile, saved: { [any]: any })
-	local list = saved.levelRewards
-	if type(list) ~= "table" then
-		profile.levelRewards = Career.reached(Levels.levelFor(profile.xp))
-		return
-	end
-	for key, given in list do
-		local level = tonumber(key)
-		if given == true and level and level == math.floor(level) and level >= 2 and level <= Config.Levels.MaxLevel then
-			profile.levelRewards[tostring(level)] = true
-		end
-	end
-end
-
 -- Saved data is checked, never trusted. (10.6: the city's fields and migrations went; what a save has of them is
--- written back as it was: an unknown key.)
+-- written back as it was: KEPT's tables, every other one as an unknown key. The van is the one vehicle: a save's other
+-- cars are not read.)
 local function applySaved(profile: Profile, saved: any)
 	if type(saved) ~= "table" then
 		return
@@ -358,64 +318,14 @@ local function applySaved(profile: Profile, saved: any)
 	profile.runUnlocked = require(Shared.RunRules).fromSave(saved)
 	-- 10.1 the helpers' crew, only from a real save written with its flag (crewKept); else Danny alone, free
 	profile.crew = require(Shared.CrewRules).fromSave(saved)
-	-- the van and what it is built with: only the vehicles a player may have (Economy.isPlayerCar), the van always
-	if type(saved.cars) == "table" then
-		for id, owned in saved.cars do
-			if owned == true and type(id) == "string" and Economy.isPlayerCar(id) then
-				profile.cars[id] = true
-			end
+	-- 10.6: the city's tables as the save has them (KEPT: no field the game reads)
+	for _, name in KEPT do
+		local kept = saved[name]
+		if type(kept) == "table" then
+			(profile :: any)[name] = kept
 		end
 	end
-	profile.cars[Config.CompanyVan.Car] = true
-	-- 3.3: a car's tracks (only cars you own that can take them, only car tracks, clamped) and 3.5 its stage
-	if type(saved.carUpgrades) == "table" then
-		for carId, levels in saved.carUpgrades do
-			if type(carId) == "string" and type(levels) == "table" and profile.cars[carId] and Economy.canUpgrade(carId) then
-				local into: { [string]: number } = {}
-				for _, def in Config.Upgrades do
-					local level = if def.car then number(levels[def.id], 0, def.maxLevel) else 0
-					if level > 0 then
-						into[def.id] = level
-					end
-				end
-				local stage = number(levels.stage, 0, Economy.maxStage(carId))
-				if stage > 0 then
-					into.stage = stage
-				end
-				if next(into) ~= nil then
-					profile.carUpgrades[carId] = into
-				end
-			end
-		end
-	end
-	-- 3.4: the damage of every car (a share of its health, for cars you own)
-	if type(saved.carHealth) == "table" then
-		for carId, share in saved.carHealth do
-			if type(carId) == "string" and profile.cars[carId] and type(share) == "number" and share == share then
-				profile.carHealth[carId] = math.clamp(share, 0, 1)
-			end
-		end
-	end
-	if type(saved.carPaint) == "table" then
-		for carId, paintId in saved.carPaint do
-			if type(carId) == "string" and type(paintId) == "string" and profile.cars[carId] and Economy.findPaint(paintId) then
-				profile.carPaint[carId] = paintId
-			end
-		end
-	end
-	if type(saved.carGuns) == "table" then
-		for carId, gunId in saved.carGuns do
-			if type(carId) == "string" and type(gunId) == "string" and profile.cars[carId] and Economy.canMount(carId) and Economy.findCarGun(gunId) then
-				profile.carGuns[carId] = gunId
-			end
-		end
-	end
-	applyGear(profile, saved)
-	applyLevelRewards(profile, saved)
 	applyRewards(profile, saved)
-	if type(saved.car) == "string" and profile.cars[saved.car] then
-		profile.car = saved.car
-	end
 end
 
 local function key(player: Player): string
@@ -549,20 +459,7 @@ function PlayerData.load(player: Player)
 		playing.ticked = os.clock() -- 10.1: the time played counts from here
 		slots[player] = playing
 		local stats = Instance.new("Folder")
-		stats.Name = "leaderstats"
-		-- The first stat is the one the player list sorts by: the best players on top.
-		local level = Instance.new("IntValue")
-		level.Name = "Level"
-		level.Value = Levels.levelFor(profile.xp)
-		level.Parent = stats
-		local money = Instance.new("IntValue")
-		money.Name = "Money"
-		money.Value = profile.money
-		money.Parent = stats
-		local deliveries = Instance.new("IntValue")
-		deliveries.Name = "Deliveries"
-		deliveries.Value = profile.deliveries
-		deliveries.Parent = stats
+		stats.Name = "leaderstats" -- (the player list: server/SandboxLeaders.luau puts its columns in it)
 		stats.Parent = player
 		changed:Fire(player)
 		if choice and (choice.fresh or choice.character) and canSave[player] then
@@ -570,39 +467,6 @@ function PlayerData.load(player: Player)
 		end
 	end
 end
-
--- The player list shows the level, money and deliveries; the attributes carry the XP to the client.
-local function updateLeaderstats(player: Player)
-	local profile = profiles[player]
-	if not profile then
-		return
-	end
-	local levelNow = Levels.levelFor(profile.xp)
-	if player:GetAttribute("Xp") ~= profile.xp then
-		player:SetAttribute("Xp", profile.xp)
-	end
-	if player:GetAttribute("Level") ~= levelNow then
-		player:SetAttribute("Level", levelNow)
-		player:SetAttribute("Rank", Levels.rank(levelNow))
-	end
-	local stats = player:FindFirstChild("leaderstats")
-	if not stats then
-		return
-	end
-	local level = stats:FindFirstChild("Level") :: IntValue?
-	local money = stats:FindFirstChild("Money") :: IntValue?
-	local deliveries = stats:FindFirstChild("Deliveries") :: IntValue?
-	if level then
-		level.Value = levelNow
-	end
-	if money then
-		money.Value = math.min(profile.money, 2 ^ 31 - 1)
-	end
-	if deliveries then
-		deliveries.Value = profile.deliveries
-	end
-end
-changed.Event:Connect(updateLeaderstats)
 
 local saving = 0 -- saves in flight (BindToClose waits for them)
 local finished: { [Player]: boolean } = {} -- the final save (leave or shutdown) has started: no more saves
@@ -617,13 +481,13 @@ build = function(profile: Profile, lock: any): { [string]: any }
 		car = profile.car,
 		carUpgrades = profile.carUpgrades,
 		carHealth = profile.carHealth,
-		carGear = profile.carGear, -- 4.6
+		carGear = profile.carGear,
 		carPaint = profile.carPaint,
 		carGuns = profile.carGuns,
+		levelRewards = profile.levelRewards,
 		xp = profile.xp,
-		levelRewards = profile.levelRewards, -- 4.6
 		-- 10.6: the city's flags, still written: an older server reading this save never runs their migration again
-		xpCurve = Config.Levels.Curve, -- 3.2: the XP curve the xp is on
+		xpCurve = XP_CURVE, -- 3.2: the XP curve the xp is on
 		carStages = true, -- 3.5: the cars' room is their stages
 		vanStages = true, -- 4.0: the Old Van's four stages
 		vestKit = true, -- 6.0.1: the courier vest is bought kit
@@ -632,7 +496,7 @@ build = function(profile: Profile, lock: any): { [string]: any }
 		noJacket = true, -- 6.7: the Thermal Jacket is gone
 		noShoes = true, -- 6.12.2: the Running Shoes are gone
 		perGameBags = true, -- 6.23: the bags are bought for each game
-		vanOnly = true, -- 7.x: Config.CompanyVan.Flag: one car
+		[VAN_ONLY] = true, -- 7.x: one car
 		rewards = profile.rewards,
 		sandboxOnboarding = profile.sandboxOnboarding, -- 8.2
 		sandboxOnboardingKept = true, -- 8.2: AnalyticsPlan.SandboxFlag (applySaved reads the steps only with it)
@@ -707,8 +571,8 @@ function PlayerData.save(player: Player, final: boolean?): boolean
 		playing.ticked = now
 	end
 	-- 7.2 review: an older server (main before 7.x) keeps the fields it knows only, but every short key of `rewards`:
-	-- the one-car flag goes there too (Economy.vanMigrated: never paid back twice)
-	profile.rewards[Config.CompanyVan.Flag] = true
+	-- the one-car flag goes there too (never paid back twice)
+	profile.rewards[VAN_ONLY] = true
 	-- (8.4 review: the van's paint and the moves finished too, "paint:" / "paintOn:" and one "mv:<n>" key, the stale ones
 	-- cleared: an 8.2 server drops vanPaint and sandboxMoves with their flags; their fromSave reads these back)
 	VanPaintRules.mirror(profile.rewards, profile.vanPaint)
@@ -922,59 +786,6 @@ function PlayerData.spend(player: Player, amount: number, reason: string?, sku: 
 		PlayerData.saveSoon(player) -- 8.3 saves: a purchase is saved a moment later (one save for a burst)
 	end
 	return true
-end
-
--- ── Levels (Config.Levels, shared/Levels.luau) ────────────────────────────
-
--- 4.6, the career: every level reached whose reward (Config.Levels.Rewards) was not given yet gives its money now, once
--- (profile.levelRewards; counted as earned). 10.6: its items, kit, paint and title went with the city. 6.13: returns
--- the money it gave (for analytics).
-local function giveLevelRewards(profile: Profile): number
-	local cash = 0
-	for _, level in Career.pending(Levels.levelFor(profile.xp), profile.levelRewards) do
-		profile.levelRewards[tostring(level)] = true
-		local reward = Career.reward(level)
-		if not reward then
-			continue
-		end
-		local money = reward.money
-		if money and money > 0 then
-			profile.money += math.floor(money)
-			profile.earned += math.floor(money)
-			cash += math.floor(money)
-		end
-	end
-	return cash
-end
-
--- Adds XP; returns the new level and whether it went up.
-function PlayerData.addXp(player: Player, amount: number): (number, boolean)
-	local profile = profiles[player]
-	if not profile then
-		return 1, false
-	end
-	local before = Levels.levelFor(profile.xp)
-	if type(amount) ~= "number" or amount ~= amount or amount <= 0 then
-		return before, false
-	end
-	profile.xp = math.min(profile.xp + math.floor(amount + 0.5), 2 ^ 50)
-	local after = Levels.levelFor(profile.xp)
-	local cash = giveLevelRewards(profile) -- 4.6
-	changed:Fire(player)
-	tellMoney(player, cash, "LevelReward") -- 6.13
-	return after, after > before
-end
-
--- The player's level (1 when not loaded).
-function PlayerData.level(player: Player): number
-	local profile = profiles[player]
-	return if profile then Levels.levelFor(profile.xp) else 1
-end
-
--- The player's XP (0 when not loaded).
-function PlayerData.xp(player: Player): number
-	local profile = profiles[player]
-	return if profile then profile.xp else 0
 end
 
 function PlayerData.notify(player: Player)

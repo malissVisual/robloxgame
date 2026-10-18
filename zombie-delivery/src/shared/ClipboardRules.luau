@@ -9,9 +9,9 @@
 -- Danny or the helper of the crew the host picked); the words take his name (`who`: the player attribute MoveHelperName)
 -- where they name him, Danny's without one.
 --   ClipboardRules.check(c) -> (boolean, string?)   may it be out now (a Can: Danny hired, alive, on foot, the right
---                                              hand there, the hands free, the phone away, no gun up): (true, nil) or
---                                              (false, why: "none" (no helper on your move: 10.1, was "hire") | "dead" |
---                                              "hand" | "seat" | "carry" | "push" | "phone" | "aim"); the same rule keeps
+--                                              hand there, the hands free): (true, nil) or (false, why: "none" (no helper
+--                                              on your move: 10.1, was "hire") | "dead" | "hand" | "seat" | "carry"; 10.6:
+--                                              the city's trolley, phone and guns went: no "push", "phone", "aim"); the same rule keeps
 --                                              it out (anything that fails it puts it away: a pick, a seat, death, the
 --                                              move's end)
 --   ClipboardRules.why(why) -> string?         the notice for a refusal ("Put down what you carry first (G)."; a key in
@@ -53,9 +53,6 @@ export type Can = {
 	hand: boolean, -- your body has its right hand (the clipboard's art hangs on it)
 	seated: boolean,
 	carrying: boolean, -- a piece in your hands (the character's Carrying)
-	pushing: boolean, -- a trolley's handle (Pushing)
-	phone: boolean, -- the phone in your right hand (PhoneHeld, server/KitWear.luau)
-	aiming: boolean, -- a gun up (Aiming: the city's; the sandbox has none)
 }
 
 -- A Builder piece (server/ModelArt/Builder.luau's Piece).
@@ -78,12 +75,6 @@ function ClipboardRules.check(c: Can): (boolean, string?)
 		return false, "seat"
 	elseif c.carrying then
 		return false, "carry"
-	elseif c.pushing then
-		return false, "push"
-	elseif c.phone then
-		return false, "phone"
-	elseif c.aiming then
-		return false, "aim"
 	end
 	return true, nil
 end
@@ -92,9 +83,6 @@ local WHY: { [string]: string } = {
 	none = "📋 The clipboard is for your helper's orders: your helper comes with you into a run.", -- (10.1: no hire)
 	seat = "📋 Get out first: you give %s orders on foot.",
 	carry = "Put down what you carry first (G): then take out your clipboard.",
-	push = "Let go of what you push first (G): then take out your clipboard.",
-	phone = "Put your phone away first: then take out your clipboard.",
-	aim = "Lower your gun first: then take out your clipboard.",
 }
 
 function ClipboardRules.why(why: string?, who: string?): string?

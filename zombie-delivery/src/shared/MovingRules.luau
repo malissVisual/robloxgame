@@ -23,7 +23,6 @@
 --                                              SafeDrop, then PerStud a stud
 --   MovingRules.hitDamage(hp, fragile)         its carrier lost `hp` health (a zombie's bite)
 --   MovingRules.deathDamage(fragile)           its carrier died: it fell
---   MovingRules.truckDamage(hp, fragile)       the truck it rides in took `hp` damage
 --   MovingRules.hurt(thing, share) -> broke    takes it off (true when this broke it); MovingRules.broken(thing)
 --   The truck bed (a grid of cells `cell` studs square under the box, any size: cols across, rows from the cab to the
 --   door). A thing rests on the highest top under its footprint (the floor, or the things it covers, overhanging the
@@ -244,13 +243,6 @@ end
 
 function MovingRules.deathDamage(fragile: boolean): number
 	return math.min(1, tune().Damage.Death * fragility(fragile))
-end
-
-function MovingRules.truckDamage(hp: number, fragile: boolean): number
-	if hp ~= hp or hp <= 0 then
-		return 0
-	end
-	return math.min(1, hp * tune().Damage.PerTruckHp * fragility(fragile))
 end
 
 function MovingRules.broken(thing: Thing): boolean

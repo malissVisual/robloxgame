@@ -1,14 +1,13 @@
 -- 6.26: a vehicle never comes out into something (shared/SpawnSpot.luau, Config.SpawnSpot; server/Vehicles.luau
--- findRoom asks the world) in the standalone Luau CLI: the four wheel spots match the factory's colliders, the ground
--- under them one plane or not (a crate under a wheel, too steep; a hill road and the curb are fine), the frame on it (a
--- bike without its roll), the room the hull needs (over a curb and the road's paint), the spots tried (the one asked
--- for first, a small spiral, never more than Tries, never up onto the sidewalk).
+-- findRoom asks the world) in the standalone Luau CLI: the ground under the four wheels one plane or not (a crate under
+-- a wheel, too steep; a hill road and a step are fine), the frame on it, the room the hull needs (over a step and the
+-- road's paint), the spots tried (the one asked for first, a small spiral, never more than Tries, never far aside).
+-- (10.6: no bike, no city car: the wheel spots are the van's own, server/Vehicles.luau wheelsOf.)
 -- Run: python3 tests/run_tests.py [path to the luau binary]
 
 local Config = require("./Config")
 local SpawnSpot = require("./SpawnSpot")
-local Map = require("./Map")
-local CarUpright = require("./CarUpright")
+local SandboxMap = require("./SandboxMap")
 
 local failures = 0
 local function check(name: string, ok: boolean, detail: any?)
@@ -26,22 +25,19 @@ end
 local Cfg = Config.SpawnSpot
 check("the numbers are there", Cfg.Tries >= 6 and Cfg.Tries <= 20 and Cfg.Gap > 0 and Cfg.Pad >= 0 and Cfg.Probe > 2
 	and Cfg.Drop > 0 and Cfg.Drop < 1 and Cfg.Across >= 0 and Cfg.Across <= 2)
--- The curb (Map.WalkTop over Map.RoadTop) and the road's paint stay under the room checked; the lowest hull of any
--- vehicle (a scooter's chassis 0.3 … the cars' 0.6 and more: tools/vehicle-preview/ground-check.luau) is not much below.
-check("the room starts over the curb", Cfg.Lift > Map.WalkTop - Map.RoadTop and Cfg.Lift <= 0.9)
+-- The step from the meadow up onto a yard's asphalt (SandboxMap.RoadTop over GroundTop; the old city's curb was 0.5)
+-- and the road's paint stay under the room checked; the van's hull is not much below (its chassis 1.2 up).
+check("the room starts over the asphalt's step", Cfg.Lift > SandboxMap.RoadTop - SandboxMap.GroundTop and Cfg.Lift <= 0.9)
 check("a crate under one wheel is uneven", Cfg.Spread < 1.5)
 check("the steepest road (14°) is fine, not much more", Cfg.Slope >= 14 and Cfg.Slope <= 20)
 
--- wheels: the Old Van's (13 × 6.6, wheel 1.3, 1 wide): the colliders at x ±3.1, z ±4.7 (Vehicles build)
-local w = SpawnSpot.wheels(6.6, 13, 1.3, 1)
-check("four wheels", #w == 4)
-check("front left, front right, back left, back right", near(w[1].x, -3.1) and near(w[1].z, -4.7) and near(w[2].x, 3.1) and near(w[2].z, -4.7)
-	and near(w[3].x, -3.1) and near(w[3].z, 4.7) and near(w[4].x, 3.1) and near(w[4].z, 4.7))
-
--- bikeWheels: a bike's four hidden colliders (Vehicles bikeBody: x = width/2 - wheelWidth/2, z at the art's axles)
-local b = SpawnSpot.bikeWheels(2.4, 0.5, -2.2, 2.0)
-check("a bike's wheels: closer in, under its axles, in the same order", #b == 4 and near(b[1].x, -0.95) and near(b[2].x, 0.95)
-	and near(b[1].z, -2.2) and near(b[2].z, -2.2) and near(b[3].z, 2.0) and near(b[4].z, 2.0) and b[3].x < 0 and b[4].x > 0)
+-- the four wheels' spots (front left, front right, back left, back right: the old Old Van's colliders, x ±3.1, z ±4.7)
+local w = { { x = -3.1, z = -4.7 }, { x = 3.1, z = -4.7 }, { x = -3.1, z = 4.7 }, { x = 3.1, z = 4.7 } }
+-- the degrees between two vectors
+local function angleOf(a: { number }, b: { number }): number
+	local dot = (a[1] * b[1] + a[2] * b[2] + a[3] * b[3]) / math.sqrt((a[1] ^ 2 + a[2] ^ 2 + a[3] ^ 2) * (b[1] ^ 2 + b[2] ^ 2 + b[3] ^ 2))
+	return math.deg(math.acos(math.clamp(dot, -1, 1)))
+end
 
 -- plane: the ground under the four wheels (front left, front right, back left, back right)
 local function at(heights: { number }, wheels: { any }?): { { number } }
@@ -69,31 +65,27 @@ ok, why = plane({ 0.4, 4.4, 0.4, 4.4 })
 check("both right wheels up on a crate: too steep", not ok and why == "ground too steep", why)
 local rise = math.tan(math.rad(14)) * 9.4
 ok, why, up, middle = plane({ rise + 3, rise + 3, 3, 3 })
-check("a 14° hill road (a van's 9.4 wheelbase): one plane, its slope 14°, fine", ok and up ~= nil and near(CarUpright.angle(up, { 0, 1, 0 }), 14, 1e-4), why)
+check("a 14° hill road (a van's 9.4 wheelbase): one plane, its slope 14°, fine", ok and up ~= nil and near(angleOf(up, { 0, 1, 0 }), 14, 1e-4), why)
 if up and middle then
 	check("heightAt: the plane's height in the middle and under a wheel", near(SpawnSpot.heightAt(up, middle, 0, 0), 3 + rise / 2, 1e-6)
 		and near(SpawnSpot.heightAt(up, middle, 3.1, -4.7), 3 + rise, 1e-6) and near(SpawnSpot.heightAt(up, middle, -3.1, 4.7), 3, 1e-6))
-	local look, right, upOn = SpawnSpot.frame(up, 0, -1, true)
+	local look, right, upOn = SpawnSpot.frame(up, 0, -1)
 	check("frame on the hill road: facing up the climb, right level, up the plane's", near(math.deg(math.asin(look[2])), 14, 1e-4)
-		and near(right[2], 0, 1e-9) and near(CarUpright.angle(upOn, up), 0, 1e-6))
+		and near(right[2], 0, 1e-9) and near(angleOf(upOn, up), 0, 1e-6))
 end
 local steep = math.tan(math.rad(Cfg.Slope + 2)) * 9.4
 local steepUp
 ok, why, steepUp = plane({ steep, steep, 0, 0 })
 check("steeper than Slope: no spot, but its plane all the same (to stand it on when nothing is free)",
-	not ok and why == "ground too steep" and steepUp ~= nil and near(CarUpright.angle(steepUp :: any, { 0, 1, 0 }), Cfg.Slope + 2, 1e-4), why)
+	not ok and why == "ground too steep" and steepUp ~= nil and near(angleOf(steepUp :: any, { 0, 1, 0 }), Cfg.Slope + 2, 1e-4), why)
 check("Steepest: past Slope, short of a wall", Cfg.Steepest > Cfg.Slope and Cfg.Steepest < 60)
 local leaning = { 0.4 + 0.5, 0.4, 0.4 + 0.5, 0.4 } -- (a road that leans across: the left wheels higher)
 ok, why, up = plane(leaning)
 check("ground that leans across: one plane", ok and up ~= nil, why)
 if up then
-	local _, rightBike, upBike = SpawnSpot.frame(up, 0, -1, false)
-	local _, _, upCar = SpawnSpot.frame(up, 0, -1, true)
-	check("a bike stands without that roll, a car with it", near(upBike[1], 0, 1e-9) and near(rightBike[2], 0, 1e-9)
-		and math.abs(upCar[1]) > 0.01)
+	local _, _, upOn = SpawnSpot.frame(up, 0, -1)
+	check("…the van stands with that roll (on its four wheels)", math.abs(upOn[1]) > 0.01)
 end
-ok = plane({ 0.4, 0.4, 0.4, 0.4 }, b)
-check("a bike's own wheel spots: flat is fine", ok)
 ok, why = SpawnSpot.plane(at({ 0.4, 0.4, 0.4 }), Cfg.Spread, Cfg.Slope)
 check("a wheel with no ground: no spot", not ok and why == "no ground under a wheel", why)
 

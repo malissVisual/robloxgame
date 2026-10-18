@@ -1025,7 +1025,7 @@ local function spawnInside(st: State, count: number)
 	for _ = 1, count do
 		local at = insideSpot(st, nil, nil, nil)
 		if at then
-			enlist(st, Zombies.spawn(kindOf(st), at, st.s.owner, false, true, true), Z.Aggro)
+			enlist(st, Zombies.spawn(kindOf(st), at, st.s.owner, true, true), Z.Aggro)
 		end
 	end
 end
@@ -1034,7 +1034,7 @@ local function spawnYard(st: State, count: number)
 	for _ = 1, count do
 		local at = yardSpot(st, nil, nil)
 		if at then
-			enlist(st, Zombies.spawn(kindOf(st), at, st.s.owner, false, true, true), Z.YardAggro)
+			enlist(st, Zombies.spawn(kindOf(st), at, st.s.owner, true, true), Z.YardAggro)
 		end
 	end
 end
@@ -1048,7 +1048,7 @@ local function wave(st: State)
 		local at = yardSpot(st, door, Z.WaveFar) or yardSpot(st, door, Z.WaveFar / 2)
 		local z = if at then Zombies.spawn(kindOf(st), at, st.s.owner) else nil
 		if z then
-			Zombies.march(z, door, "run")
+			Zombies.march(z, door)
 			enlist(st, z, nil)
 			made += 1
 		end
@@ -1066,7 +1066,7 @@ local function spawnBoss(st: State)
 	if not at then
 		return
 	end
-	local z = Zombies.spawn(B.Kind, at, st.s.owner, false, true, true)
+	local z = Zombies.spawn(B.Kind, at, st.s.owner, true, true)
 	if not z then
 		return
 	end
