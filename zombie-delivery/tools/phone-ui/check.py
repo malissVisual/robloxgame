@@ -87,7 +87,6 @@ local NumberSequence, NumberSequenceKeypoint = mock.NumberSequence, mock.NumberS
         text = (ROOT / f"src/client/{name}.luau").read_text()
         text = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', text)
         (dest / f"{name}.luau").write_text(prefix + text)
-    (dest / "ItemModel.luau").write_text("return { view = function() return nil end, has = function() return false end }")
     for name, field in (("Ui", "MUi"), ("Theme", "MTheme"), ("Net", "Net"), ("Sounds", "Sounds"), ("Fade", "MFade")):
         (dest / f"{name}.luau").write_text(f'return require("./missions_mock").{field}')
     for name in ("mock.luau", "missions_mock.luau", "movehud.luau"):
@@ -163,7 +162,6 @@ local function require(module) if type(module) == "table" and module.fakeModule 
         text = (ROOT / f"src/client/{name}.luau").read_text()
         text = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', text)
         (dest / f"{name}.luau").write_text(prefix + (found if name == "SandboxGuide" else "") + text)
-    (dest / "ItemModel.luau").write_text("return { view = function() return nil end, has = function() return false end }")
     for name, field in (("Ui", "MUi"), ("Theme", "MTheme"), ("Net", "Net"), ("Sounds", "Sounds"), ("Fade", "MFade")):
         (dest / f"{name}.luau").write_text(f'return require("./missions_mock").{field}')
     for name in ("mock.luau", "missions_mock.luau", "sandboxguide.luau"):

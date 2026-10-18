@@ -365,7 +365,7 @@ def stage(tmp: Path, manifest: dict):
     """The real modules on the recorder, as tests/run_tests.py stages server/Warehouse.luau for its runtime test."""
     for source in SHARED.glob("*.luau"):
         (tmp / source.name).write_text(re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', source.read_text()))
-    for name in ("GunModels", "CargoLooks", "ItemLooks", "FurnitureLooks", "HouseLayout"):
+    for name in ("GunModels", "ItemLooks", "FurnitureLooks", "HouseLayout"):
         text = (SHARED / f"{name}.luau").read_text()
         text = re.sub(r"require\(script\.Parent\.Layouts\.(\w+)\)", r'require("./\1")', text)
         (tmp / f"{name}.luau").write_text(PREFIX + re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', text))
