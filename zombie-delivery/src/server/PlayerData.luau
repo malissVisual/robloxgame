@@ -261,7 +261,9 @@ local function applySaved(profile: Profile, saved: any)
 	-- 8.2: the funnel's steps, only from a real save written with their flag (sandboxOnboardingKept); a real save from
 	-- before 8.2 is past every step (a player who knows the sandbox), a new one at none
 	profile.sandboxOnboarding = AnalyticsPlan.sandboxFrom(saved)
-	-- 8.0: the collection, checked, only from a real save written with its flag (collectionKept); else the empty one
+	-- 8.0: the collection, checked, only from a real save written with its flag (collectionKept); else the empty one.
+	-- 10.4, the showroom's migration (the same call): a real save without showroomKept (8.0 – 10.3) keeps every piece on
+	-- its stand, in the collection hall (its income as before); its FOR SALE signs come down (a sign is the showroom's)
 	profile.collection = CollectionRules.fromSave(saved)
 	-- 8.2: the collection book, checked, only from a real save: written with its flag (collectionBookKept) its own; an
 	-- older real save the book of its stock (just read above), no milestone paid yet (CollectionBookRules.fromSave)
@@ -282,6 +284,9 @@ local function applySaved(profile: Profile, saved: any)
 	-- 8.1: the upgrades, checked, only from a real save written with their flag (sandboxUpgradesKept); 8.3, the
 	-- migration (the same call): a real save (money in it) without warehouseLevelKept gets the warehouse at level 4
 	-- (warehouse = 3) on top of those; a new player (no save) or a lock-only record none: the garage, level 1
+	-- 10.4, the upgrade tree's migration (the same call): a real save without upgradeTreeKept (8.1 – 10.3: the five
+	-- tracks) has each track's level as its node's rank (nothing lost); the tree's own nodes an older server dropped
+	-- come back from `rewards` ("up:<id>:<rank>", UpgradeRules.mirror)
 	profile.sandboxUpgrades = UpgradeRules.fromSave(saved)
 	-- 8.2: the daily tasks, checked, only from a real save written with their flag (sandboxTasksKept); else none:
 	-- server/SandboxTasks.luau starts them fresh
@@ -502,12 +507,14 @@ build = function(profile: Profile, lock: any): { [string]: any }
 		sandboxOnboardingKept = true, -- 8.2: AnalyticsPlan.SandboxFlag (applySaved reads the steps only with it)
 		collection = profile.collection, -- 8.0
 		collectionKept = true, -- 8.0: CollectionRules.SaveFlag (applySaved reads the collection only with it)
+		showroomKept = true, -- 10.4: Config.Showroom.Flag (the stands are the hall's and the showroom's: no migration)
 		collectionBook = profile.collectionBook, -- 8.2
 		collectionBookPaid = profile.collectionBookPaid, -- 8.2
 		collectionBookKept = true, -- 8.2: CollectionBookRules.Flag (applySaved reads the book only with it)
 		sandboxUpgrades = profile.sandboxUpgrades, -- 8.1
 		sandboxUpgradesKept = true, -- 8.1: UpgradeRules.Flag (applySaved reads the upgrades only with it)
 		warehouseLevelKept = true, -- 8.3: Config.SandboxUpgrades.WarehouseFlag (the warehouse's level in them is the player's: no migration)
+		upgradeTreeKept = true, -- 10.4: Config.SandboxUpgrades.TreeFlag (they are the tree's nodes: no migration from the five tracks)
 		sandboxTasks = profile.sandboxTasks, -- 8.2
 		sandboxTasksKept = true, -- 8.2: Config.SandboxTasks.Flag (applySaved reads the tasks only with it)
 		sandboxMoves = profile.sandboxMoves, -- 8.3
@@ -588,6 +595,8 @@ function PlayerData.save(player: Player, final: boolean?): boolean
 		end
 	end
 	profile.rewards[UpgradeRules.warehouseKey(profile.sandboxUpgrades)] = true
+	-- 10.4: the tree's own nodes too ("up:<id>:<rank>"): an older server keeps only the five tracks of sandboxUpgrades
+	UpgradeRules.mirror(profile.rewards, profile.sandboxUpgrades)
 	local seq = (serial[player] or 0) + 1
 	serial[player] = seq
 	local session = sessions[player] -- (kept here: the leave's cleanup may clear it while the shutdown's save still runs)

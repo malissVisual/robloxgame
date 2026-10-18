@@ -10,7 +10,7 @@
 --     TouchScale big and its ✕ a finger's size.
 --   * The 3D guide: a soft glowing path on the ground (Beams between Attachments in the Terrain: no parts; 9.7 a
 --     straight one: the lobby and a run's front yard have no roads to follow), a floating orange chevron over the
---     target and its distance tag ("THE OLD FARMSTEAD · 42 m": 9.7 the nearest portal's pad, named for its house).
+--     target and its distance tag ("PLAY · 42 m": 10.4 the lobby's PLAY circle).
 --     Inside the house only the hint (no target there). 9.7 runs: nobody drives (the run's truck stands at the curb).
 --     10.3 (the owner: "I don't want that line on the ground all the time, I know what to do … and if it shows, let it
 --     show smoothly, not jump after every step"): the path on the ground only while it helps (Config.SandboxGuide.Path:
@@ -65,7 +65,7 @@
 --   SandboxGuide.enabled()          is it on?
 --   SandboxGuide.close()            the hint's ✕ (8.3: a soft step dismissed, else the guide off)
 --   SandboxGuide.goTo(at?, label?, seconds?)   10.x the map: a place picked on the big map (client/SandboxMapUi.luau:
---                                   a portal) takes the chevron and the path until you are there, a run starts or
+--                                   10.4 the PLAY circle) takes the chevron and the path until you are there, a run starts or
 --                                   `seconds` pass (180); nil lets go. SandboxGuide.picked: the pick now
 --   SandboxGuide.step()             the step now (its id, SandboxSteps.Steps), nil before the first look
 --   SandboxGuide.hint()             the hint line (a top block), for the layout checks
@@ -112,7 +112,7 @@ local LINE_H = G.TextSize + 4 -- one line of words
 local CLOSE_W = 28 -- the ✕'s column (at scale 1; a finger's size on a touch screen)
 local MIN_ROOM = 220 -- px at scale 1: narrower than this beside the sides' HUD, the line goes under it
 local LABELS: { [string]: string } = {
-	portal = "PORTAL", -- 9.7 runs (a portal's own name: its house's)
+	play = "PLAY", -- 10.4: the lobby's PLAY circle
 	door = "FRONT DOOR",
 	van = "THE TRUCK",
 	stand = "EMPTY STAND",
@@ -122,10 +122,6 @@ local LABELS: { [string]: string } = {
 	danny = string.upper(Config.MoveHelper.Name), -- 8.4
 	sale = "SET PRICE", -- 8.9
 }
-local HOUSE_LABELS: { [string]: string } = {} -- a place's id → its chevron's tag (its name, made once)
-for _, h in SandboxMap.Houses do
-	HOUSE_LABELS[h.id] = string.upper(h.name)
-end
 local RING = 4 -- 8.3: px the ring round the 📦 STOCK chip stands out of it
 
 local started = false
@@ -537,19 +533,9 @@ local function targetOf(kind: string?, px: number, pz: number): (Vector3?, strin
 	local plotId = state.plot
 	local plot = if plotId then SandboxMap.Plots[plotId] else nil
 	local house = SandboxMap.house(state.house) or SandboxMap.House -- (the move's place)
-	if kind == "portal" then -- 9.7 runs: the nearest portal's pad (its house's name on the chevron)
-		local best: SandboxMap.Portal? = nil
-		local bestD = math.huge
-		for _, portal in SandboxMap.Lobby.portals do
-			local mx, mz = (portal.pad.x0 + portal.pad.x1) / 2, (portal.pad.z0 + portal.pad.z1) / 2
-			local d = (mx - px) ^ 2 + (mz - pz) ^ 2
-			if d < bestD then
-				best, bestD = portal, d
-			end
-		end
-		if best then
-			return Vector3.new((best.pad.x0 + best.pad.x1) / 2, SandboxMap.GroundTop + 1, (best.pad.z0 + best.pad.z1) / 2), HOUSE_LABELS[best.house] or LABELS.portal
-		end
+	if kind == "play" then -- 10.4: the lobby's PLAY circle (its middle)
+		local p = SandboxMap.Lobby.play
+		return Vector3.new(p.x, SandboxMap.GroundTop + 1, p.z), LABELS.play
 	elseif kind == "door" then
 		return Vector3.new(house.door.x, house.door.y + 3, house.door.z), LABELS.door
 	elseif kind == "van" then
@@ -1041,9 +1027,9 @@ local function showWorld(at: Vector3, label: string, px: number, pz: number, wit
 	if metres > G.Near and withPath then -- (10.3: only while the path helps)
 		count = SandboxSteps.route(px, pz, at.X, at.Z, path, G.Direct)
 	end
-	local y = SandboxMap.RoadTop + G.PathLift
 	for i = 1, count do
-		local point = Vector3.new(path[i * 2 - 1], y, path[i * 2])
+		local x, z = path[i * 2 - 1], path[i * 2]
+		local point = Vector3.new(x, SandboxMap.roadAt(x, z) + G.PathLift, z) -- (10.8 over its island's yard)
 		-- (10.3: the first point, your feet, is eased every frame by follow(); written here only when the path lights)
 		if point ~= world.pointAt[i] and (i > 1 or (world.pathOn or 0) == 0) then
 			world.pointAt[i] = point
@@ -1096,14 +1082,21 @@ local function look()
 	local window = if state.covered then ask(SandboxGuide.windowOpen, "window") else nil -- (a window open covers it)
 	state.window = if type(window) == "string" then window else nil
 	state.vanHome = calm and state.painted == false -- (9.7: in the lobby, the PAINT shop's booth there)
-	-- 9.7 runs: on a portal's pad (client/RunUi.luau's pad view: you its host or not)
-	local pad: any = nil
+	-- 10.4: in a party lobby (client/RunUi.luau's lobby view: you its host or not)
+	local lobby: any = nil
 	pcall(function()
-		pad = (require(script.Parent.RunUi) :: any).pad()
+		lobby = (require(script.Parent.RunUi) :: any).lobby()
 	end)
-	state.pad = type(pad) == "table" and not state.move
-	state.round = Config.Rounds.On -- 10.5 rounds: their words, no portal to walk to
-	state.padHost = state.pad == true and pad.mine == true
+	state.lobby = type(lobby) == "table" and not state.move
+	state.lobbyHost = state.lobby == true and lobby.mine == true
+	-- 10.5 rounds: your move a quick round's (their words: your own van, no FINISH); 10.6 both in PLAY: in its queue
+	-- (the PLAY panel's QUICK ROUND: client/RoundUi.luau's view, its `ready`)
+	state.round = move ~= nil and type(move.run) == "table" and move.run.round == true
+	local round: any = nil
+	pcall(function()
+		round = (require(script.Parent.RoundUi) :: any).view()
+	end)
+	state.queued = not state.move and not state.lobby and type(round) == "table" and round.ready == true
 	state.hush = asks and (os.clock() < softAfter or ask(nil, "busy") == true) -- (a first-time hint talks)
 	SandboxSteps.doneBy(state, done, last)
 	local step = SandboxSteps.choose(state, done)
@@ -1156,7 +1149,7 @@ local function look()
 			-- Danny's "Pick a piece …")
 			ui.stepText = SandboxSteps.onDevice(step, words, device)
 		end
-		setHint(hint and not state.pad, ui.stepText, true) -- (9.7: on a pad its panel says it: client/RunUi.luau's, where the line is)
+		setHint(hint and not state.lobby, ui.stepText, true) -- (10.4: in a lobby its bar says it: client/PlayUi.luau's, where the line is)
 	end
 	if (ui.shown or ui.chip.Visible) and (os.clock() - (ui.laidAt or 0) > 1 or under(ui.root.AbsolutePosition, Ui.screenScale()) ~= ui.under) then
 		layout() -- (what is above moved: at once; the sides' HUD may have moved: a second's look is enough)
@@ -1211,7 +1204,7 @@ function SandboxGuide.enabled(): boolean
 	return on
 end
 
--- 10.x the map (client/SandboxMapUi.luau): a place picked there (a portal's pad) is the chevron's and the path's for
+-- 10.x the map (client/SandboxMapUi.luau): a place picked there (10.4: the PLAY circle) is the chevron's and the path's for
 -- `seconds` (or until you are there, or a run starts); nil `at` lets go. It turns the guide on.
 SandboxGuide.picked = nil :: { at: Vector3, label: string, untilAt: number }?
 function SandboxGuide.goTo(at: Vector3?, label: string?, seconds: number?)
@@ -1260,7 +1253,7 @@ local function follow(dt: number)
 	end
 	local feet = root.Position
 	local point = world.points[1]
-	local want = Vector3.new(feet.X, SandboxMap.RoadTop + G.PathLift, feet.Z)
+	local want = Vector3.new(feet.X, SandboxMap.roadAt(feet.X, feet.Z) + G.PathLift, feet.Z)
 	local now = point.WorldPosition
 	local step = now:Lerp(want, math.min(1, dt * G.PathFollow))
 	if (step - now).Magnitude > 1e-3 then

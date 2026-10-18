@@ -1,24 +1,25 @@
 --!strict
 -- 9.7 RUNS, the lobby (design/lobby/plan.py; shared/SandboxMap.luau Lobby; the owner: "shrink the map and put things
--- quite close together, so that it's one little lobby"): builds the lobby's own dress into workspace.Sandbox (server/
+-- quite close together, so that it's one little lobby"; 10.4 smaller still, one PLAY circle): builds the lobby's own dress into workspace.Sandbox (server/
 -- SandboxWorld.luau calls it once, after its ground: the meadow under the lobby, the plots' concrete pads; the
 -- warehouses are server/Warehouse.luau's, the TOP MOVERS board server/SandboxLeaders.luau's, the Auction House
 -- SandboxWorld's own while Config.Auction.On). Everything anchored, in the Persistent model "Lobby" (small: every client
 -- always has it, so coming back from a run never shows it streaming in):
 --   Plaza      the paved square in the middle (SandboxMap.Lobby.plaza: its top flush with the meadow, the meadow's hole)
 --              and the fountain on it (a basin, its water, the spout)
---   Hedge      the hedge round the lobby, Lobby.hedge in from its bounds (solid), and the invisible walls on the bounds
+--   Hedge      the hedge round the lobby, Lobby.hedge in from its bounds (solid; 10.8 low: HEDGE_TALL, the other
+--              islands seen over it), and the invisible walls on the bounds (10.8 its island's grass goes on past them
+--              to its edge: server/SandboxWorld.luau, design/islands/plan.py)
 --   Lamps      the plaza's lamps (decoration: a fixed afternoon, their heads dim)
 --   Trees      the lobby's trees (VillageLooks' trees, server/VillageWorld.luau's parts)
---   Dispatch   the ZDC dispatch kiosk (server/MoveSites.luau's kiosk art at Lobby.dispatch, its corkboard "Board" with
---              the attribute RunDispatch: server/Runs.luau hangs its "How runs work" prompt there)
---   Portals    a Model "Portal_<house>" per place to empty (Lobby.portals; attribute RunPortal = its house's id): two
---              gate posts and a lintel in its house's colours (Config.Runs.Portal.Styles), a small facade behind the
---              gate in the house's look (its walls, a dark door, two windows, a gable and a detail of its own: hay
---              bales, a boat, a mailbox, antlers and a log pile, a mill wheel, an apple tree and a beehive), the sign
---              over the gate (SurfaceGui "Words": Title, its name; Status, server/Runs.luau's line: free, a countdown,
---              IN USE) and the glowing pad in front of it ("RunPad": attribute RunPad = its house's id, Neon, no
---              collision, its colour server/Runs.luau's by the pad's state) on a dark rim
+--   Dispatch   the Deliveros dispatch kiosk (server/MoveSites.luau's kiosk art at Lobby.dispatch, its corkboard "Board"
+--              with the attribute RunDispatch: server/Runs.luau hangs its "How runs work" prompt there)
+--   PlayCircle 10.4 (the owner: "on the map just one circle where you'd stand, like PLAY"; it replaces the six portals)
+--              the Model "PlayCircle" at Lobby.play (attribute PlayCircle = true; Config.Runs.Party.Attribute: the open
+--              lobbies and the runs for the map, server/Parties.luau writes it): a dark rim, the glowing ring
+--              ("PlayRing", Neon, its colour Parties' by the lobbies' state), its floor and a soft glow ("PlayGlow"), PLAY
+--              on the ground in white light, four lit posts at its corners, and the floating sign over it ("PlaySign":
+--              a BillboardGui "Words", Title ▶ PLAY, Status: Parties' line). Nothing on the ground collides.
 --   PaintShop  9.7 the PAINT shop's booth (Lobby.shops.paint: its counter's prompt "Paint your truck", attribute
 --              PaintShop: server/VanPaint.luau opens its window there, no van needed) and its sign
 --
@@ -40,7 +41,7 @@ local LobbyWorld = {}
 
 local L = SandboxMap.Lobby
 local R = Config.Runs
-local P = R.Portal
+local PL = R.Play
 local CREAM = Color3.fromRGB(250, 244, 228)
 local DARK = Color3.fromRGB(40, 30, 24)
 local PLAZA = Color3.fromRGB(196, 188, 172)
@@ -48,6 +49,7 @@ local STONE = Color3.fromRGB(150, 146, 140)
 local WATER = Color3.fromRGB(76, 140, 190)
 local POLE = Color3.fromRGB(50, 50, 54)
 local HEDGE = Color3.fromRGB(52, 96, 44)
+local HEDGE_TALL = Config.Islands.LobbyHedge -- 10.8: a low hedge (9.7 – 10.5: 4.5): the other islands seen over it
 
 local function rgb(c: { number }): Color3
 	return Color3.fromRGB(c[1], c[2], c[3])
@@ -91,7 +93,7 @@ local function words(part: BasePart, face: Enum.NormalId, lines: { { name: strin
 	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
 	gui.PixelsPerStud = 40
 	gui.LightInfluence = 0.3
-	gui.MaxDistance = P.SignRange
+	gui.MaxDistance = PL.Sign.Range
 	for _, line in lines do
 		local label = Instance.new("TextLabel")
 		label.Name = line.name
@@ -128,7 +130,7 @@ end
 
 local function hedge(model: Model)
 	local b, h = L.bounds, L.hedge
-	local tall, wide = 4.5, 2.6
+	local tall, wide = HEDGE_TALL, 2.6
 	local x0, x1, z0, z1 = b.x0 + h, b.x1 - h, b.z0 + h, b.z1 - h
 	for _, e in { { x0, x1, z0, z0 }, { x0, x1, z1, z1 }, { x0, x0, z0, z1 }, { x1, x1, z0, z1 } } do
 		local along = e[2] - e[1] + e[4] - e[3] + wide
@@ -161,94 +163,96 @@ local function trees(model: Model)
 	end
 end
 
--- ── The portals ────────────────────────────────────────────────────────────
+-- ── 10.4 The PLAY circle ───────────────────────────────────────────────────
 
--- One house's gate, facade, sign and pad, in the portal's frame (its gate's middle on the ground, -Z out toward the
--- plaza: SandboxMap.cframe of the portal).
-local function portal(parent: Instance, p: SandboxMap.Portal): Model
+-- PLAY on the ground in the circle, read from the south (the spawn's side): each letter's bars on a 3 × 5 grid (x
+-- across, y down from its top), a bar { x0, y0, x1, y1 } in grid units.
+local LETTERS: { { { number } } } = {
+	{ { 0, 0, 1, 5 }, { 1, 0, 3, 1 }, { 1, 2, 3, 3 }, { 2, 1, 3, 2 } }, -- P
+	{ { 0, 0, 1, 5 }, { 1, 4, 3, 5 } }, -- L
+	{ { 0, 0, 3, 1 }, { 0, 1, 1, 5 }, { 2, 1, 3, 5 }, { 1, 2, 2, 3 } }, -- A
+	{ { 0, 0, 1, 2 }, { 2, 0, 3, 2 }, { 0, 2, 3, 3 }, { 1, 3, 2, 5 } }, -- Y
+}
+
+-- The circle (Lobby.play): a dark rim, the glowing ring (Neon, the colour server/Parties.luau keeps), its floor and a
+-- soft glow over it (client/PlayUi.luau breathes it), PLAY on the ground, four lit posts round it at its corners (the
+-- only solid parts: the way in is open on every side), and the floating sign over it (a BillboardGui "Words": Title
+-- PLAY, Status: Parties' line). Nothing on the ground collides: you walk in on the plaza.
+local function playCircle(parent: Instance): Model
+	local p = L.play
+	local top = SandboxMap.GroundTop
 	local model = Instance.new("Model")
-	model.Name = `Portal_{p.house}`
-	model:SetAttribute("RunPortal", p.house)
-	local style = P.Styles[p.house] or P.Styles.sandbox_house
-	local wall, trim, roof, accent = rgb(style.wall), rgb(style.trim), rgb(style.roof), rgb(style.accent)
-	local frame = CFrame.new(p.x, SandboxMap.GroundTop, p.z) * CFrame.Angles(0, math.rad(p.yaw), 0)
-	local W, H = P.Gate[1], P.Gate[2]
-	local stony = p.house == "old_mill"
-	local woody = p.house == "forest_lodge" or p.house == "pond_cabin"
-	local postLook = if stony then Enum.Material.Cobblestone elseif woody then Enum.Material.Wood else Enum.Material.WoodPlanks
-	local function at(x: number, y: number, z: number): CFrame
-		return frame * CFrame.new(x, y, z)
+	model.Name = "PlayCircle"
+	model:SetAttribute("PlayCircle", true)
+	model:SetAttribute(R.Party.Attribute, "[]")
+	local flat = CFrame.Angles(0, 0, math.rad(90)) -- (a cylinder lies along its X: stood up, a disc)
+	local function disc(name: string, diameter: number, y: number, high: number, color: Color3, material: Enum.Material): Part
+		local d = cylinder(model, name, high, diameter, CFrame.new(p.x, top + y, p.z) * flat, color, material)
+		d.CastShadow = false
+		return d
 	end
-	-- the gate
-	for _, side in { -1, 1 } do
-		block(model, "GatePost", Vector3.new(1.6, H, 1.6), at(side * W / 2, H / 2, 0), trim, postLook, true)
-	end
-	block(model, "GateLintel", Vector3.new(W + 2.4, 1.6, 2), at(0, H + 0.8, 0), trim, postLook, true)
-	local sign = block(model, "GateSign", Vector3.new(W - 2, 3.4, 0.4), at(0, H - 1.9, -0.7), DARK, Enum.Material.WoodPlanks)
-	words(sign, Enum.NormalId.Front, {
-		{ name = "Title", text = string.upper(p.name), box = { 0.04, 0.06, 0.92, 0.5 }, color = CREAM, bold = true },
-		{ name = "Status", text = "WALK ONTO THE PAD", box = { 0.06, 0.6, 0.88, 0.32 }, color = rgb(P.Free) },
-	})
-	-- the facade behind it: its walls, a dark door, two windows, a gable, a band
-	local wallLook = if stony then Enum.Material.Cobblestone elseif woody then Enum.Material.WoodPlanks else Enum.Material.SmoothPlastic
-	local fw, fh, fz = W + 4, 10, 9
-	block(model, "Facade", Vector3.new(fw, fh, 1.2), at(0, fh / 2, fz), wall, wallLook, true)
-	block(model, "FacadeBand", Vector3.new(fw + 0.4, 0.6, 1.5), at(0, fh - 0.3, fz), trim, Enum.Material.WoodPlanks)
-	block(model, "FacadeDoor", Vector3.new(4.6, 7.4, 0.4), at(0, 3.7, fz - 0.7), DARK, Enum.Material.WoodPlanks)
-	for _, side in { -1, 1 } do
-		block(model, "FacadeWindow", Vector3.new(3, 3, 0.3), at(side * 6.4, 5.6, fz - 0.7), Color3.fromRGB(150, 180, 196), Enum.Material.Glass)
-		local half = fw / 2
-		local gable = Instance.new("WedgePart")
-		gable.Name = "FacadeGable"
-		gable.Anchored = true
-		gable.Size = Vector3.new(1.2, 5, half)
-		-- (a wedge's high side is its +Z: turned a quarter so it faces the facade's middle)
-		gable.CFrame = at(side * half / 2, fh + 2.5, fz) * CFrame.Angles(0, math.rad(if side < 0 then 90 else -90), 0)
-		gable.Color = roof
-		gable.Material = Enum.Material.Slate
-		gable.TopSurface = Enum.SurfaceType.Smooth
-		gable.BottomSurface = Enum.SurfaceType.Smooth
-		gable.CanTouch = false
-		gable.Parent = model
-	end
-	block(model, "FacadeRidge", Vector3.new(1.8, 0.8, 1.8), at(0, fh + 5.1, fz), trim, Enum.Material.WoodPlanks)
-	-- its house's own detail
-	if p.house == "sandbox_house" then -- (the farm: round bales)
-		for _, side in { -1, 1 } do
-			cylinder(model, "Bale", 3, 3.6, at(side * (fw / 2 + 2.2), 1.8, fz - 1), accent, Enum.Material.Grass, true)
+	disc("PlayRim", 2 * p.r + 1.6, 0.08, 0.16, Color3.fromRGB(34, 40, 48), Enum.Material.Metal)
+	local ring = disc("PlayRing", 2 * p.r, 0.12, 0.2, rgb(PL.Free), Enum.Material.Neon)
+	ring.Transparency = 0.05
+	disc("PlayFloor", 2 * p.r - 2 * PL.Ring, 0.14, 0.24, Color3.fromRGB(44, 66, 86), Enum.Material.SmoothPlastic)
+	local glow = disc("PlayGlow", 2 * p.r - 2 * PL.Ring - 0.6, 0.27, 0.02, rgb(PL.Free), Enum.Material.Neon)
+	glow.Transparency = 0.8
+	-- PLAY: four letters, Letters studs high, a grid unit between them
+	local u = PL.Letters / 5
+	local x0 = p.x - 7.5 * u
+	local z0 = p.z - 2.5 * u
+	for n, bars in LETTERS do
+		local lx = x0 + (n - 1) * 4 * u
+		for _, b in bars do
+			local w, d = (b[3] - b[1]) * u, (b[4] - b[2]) * u
+			local letter = block(model, "PlayLetter", Vector3.new(w, 0.06, d), CFrame.new(lx + (b[1] + b[3]) / 2 * u, top + 0.3, z0 + (b[2] + b[4]) / 2 * u),
+				Color3.fromRGB(240, 248, 255), Enum.Material.Neon)
+			letter.CastShadow = false
 		end
-	elseif p.house == "pond_cabin" then -- (the pond: a rowing boat leaning on the wall, an oar)
-		block(model, "Boat", Vector3.new(2.4, 7, 0.9), at(fw / 2 + 1.8, 3.4, fz - 1) * CFrame.Angles(math.rad(-12), 0, 0), accent, Enum.Material.WoodPlanks, true)
-		block(model, "Oar", Vector3.new(0.3, 6, 0.3), at(-fw / 2 - 1.2, 3, fz - 1) * CFrame.Angles(0, 0, math.rad(10)), trim, Enum.Material.Wood)
-	elseif p.house == "lone_house" then -- (the lone house: its mailbox)
-		block(model, "MailboxPost", Vector3.new(0.35, 3.4, 0.35), at(W / 2 + 2.6, 1.7, -0.5), DARK, Enum.Material.Wood)
-		block(model, "Mailbox", Vector3.new(1.5, 1.1, 1.9), at(W / 2 + 2.6, 3.9, -0.5), accent, Enum.Material.Metal)
-	elseif p.house == "forest_lodge" then -- (the lodge: antlers over its door, a log pile)
-		for _, side in { -1, 1 } do
-			block(model, "Antler", Vector3.new(0.3, 2.4, 0.3), at(side * 0.9, 9, fz - 0.8) * CFrame.Angles(0, 0, math.rad(side * -30)), accent, Enum.Material.SmoothPlastic)
-		end
-		for n = 0, 2 do
-			cylinder(model, "Log", 4, 1.3, at(-fw / 2 - 2.2, 0.65 + n * 1.1, fz - 1 - (n % 2) * 0.4) * CFrame.Angles(0, math.rad(90), 0), trim, Enum.Material.Wood)
-		end
-	elseif p.house == "old_mill" then -- (the mill: its wheel on the side)
-		cylinder(model, "MillWheel", 1.4, 9, at(fw / 2 + 0.9, 4.6, fz), accent, Enum.Material.WoodPlanks, true)
-		cylinder(model, "MillHub", 2, 1.4, at(fw / 2 + 0.9, 4.6, fz), DARK, Enum.Material.Metal)
-	elseif p.house == "orchard_cottage" then -- (the orchard: an apple tree, a beehive)
-		block(model, "AppleTrunk", Vector3.new(0.7, 4.5, 0.7), at(-fw / 2 - 2.6, 2.25, fz - 2), Color3.fromRGB(110, 80, 56), Enum.Material.Wood, true)
-		local crown = block(model, "AppleCrown", Vector3.new(5, 4.4, 5), at(-fw / 2 - 2.6, 6, fz - 2), Color3.fromRGB(86, 140, 60), Enum.Material.LeafyGrass)
-		crown.Shape = Enum.PartType.Ball
-		block(model, "Beehive", Vector3.new(1.8, 2, 1.8), at(fw / 2 + 2, 1, fz - 1.5), Color3.fromRGB(236, 196, 60), Enum.Material.WoodPlanks, true)
 	end
-	-- the pad: a dark rim, the glow on it (no collision: you stand on the plaza through it)
-	local pad = p.pad
-	local px, pz = (pad.x0 + pad.x1) / 2, (pad.z0 + pad.z1) / 2
-	local rim = block(model, "RunPadRim", Vector3.new(pad.x1 - pad.x0 + 1.6, 0.16, pad.z1 - pad.z0 + 1.6), CFrame.new(px, SandboxMap.GroundTop + 0.08, pz), Color3.fromRGB(34, 40, 48), Enum.Material.Metal)
-	rim.CastShadow = false
-	local glow = block(model, "RunPad", Vector3.new(pad.x1 - pad.x0, 0.2, pad.z1 - pad.z0), CFrame.new(px, SandboxMap.GroundTop + 0.12, pz), rgb(P.Free), Enum.Material.Neon)
-	glow.Transparency = 0.25
-	glow.CastShadow = false
-	glow:SetAttribute("RunPad", p.house)
-	model.PrimaryPart = glow
+	-- four lit posts at its corners (45° off the four ways in)
+	for k = 0, 3 do
+		local a = math.rad(45 + 90 * k)
+		local px, pz = p.x + math.cos(a) * (p.r + 2.2), p.z + math.sin(a) * (p.r + 2.2)
+		cylinder(model, "PlayPost", 3, 0.9, CFrame.new(px, top + 1.5, pz) * flat, POLE, Enum.Material.Metal, true)
+		local lamp = cylinder(model, "PlayLamp", 0.5, 1.2, CFrame.new(px, top + 3.25, pz) * flat, rgb(PL.Free), Enum.Material.Neon)
+		lamp.CastShadow = false
+	end
+	-- the floating sign
+	local anchor = block(model, "PlaySign", Vector3.new(1, 1, 1), CFrame.new(p.x, top + PL.Sign.Height, p.z), Color3.new(0, 0, 0), Enum.Material.SmoothPlastic)
+	anchor.Transparency = 1
+	anchor.CastShadow = false
+	local gui = Instance.new("BillboardGui")
+	gui.Name = "Words"
+	gui.Size = UDim2.fromScale(PL.Sign.Size[1], PL.Sign.Size[2])
+	gui.LightInfluence = 0
+	gui.MaxDistance = PL.Sign.Range
+	gui.AlwaysOnTop = false
+	local title = Instance.new("TextLabel")
+	title.Name = "Title"
+	title.BackgroundTransparency = 1
+	title.Size = UDim2.fromScale(1, 0.62)
+	title.Text = "▶ PLAY"
+	title.TextScaled = true
+	title.Font = Enum.Font.GothamBlack
+	title.TextColor3 = CREAM
+	title.TextStrokeColor3 = DARK
+	title.TextStrokeTransparency = 0.2
+	title.Parent = gui
+	local status = Instance.new("TextLabel")
+	status.Name = "Status"
+	status.BackgroundTransparency = 1
+	status.Position = UDim2.fromScale(0.05, 0.64)
+	status.Size = UDim2.fromScale(0.9, 0.3)
+	status.Text = "STEP IN TO PLAY"
+	status.TextScaled = true
+	status.Font = Enum.Font.GothamBold
+	status.TextColor3 = rgb(PL.Free)
+	status.TextStrokeColor3 = DARK
+	status.TextStrokeTransparency = 0.3
+	status.Parent = gui
+	gui.Parent = anchor
+	model.PrimaryPart = ring
 	model.Parent = parent
 	return model
 end
@@ -300,14 +304,9 @@ function LobbyWorld.build(world: Instance): Model
 	hedge(model)
 	lamps(model)
 	trees(model)
-	local portals = Instance.new("Folder")
-	portals.Name = "Portals"
-	for _, p in L.portals do
-		portal(portals, p)
-	end
-	portals.Parent = model
+	playCircle(model) -- (10.4: the one PLAY circle in place of the six portals)
 	paintShop(model)
-	-- the ZDC dispatch kiosk (MoveSites' kiosk art; server/Runs.luau puts its prompt on the corkboard)
+	-- the Deliveros dispatch kiosk (MoveSites' kiosk art; server/Runs.luau puts its prompt on the corkboard)
 	local _, board = MoveSites.kiosk(model, L.dispatch, "ZdcDispatch")
 	board:SetAttribute("RunDispatch", true)
 	model.Parent = world

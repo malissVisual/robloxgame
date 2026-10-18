@@ -1,14 +1,9 @@
--- 9.7 runs: the pad panel and the run's results card (client/RunUi.luau), run for real on sandbox_mock.luau's recorder
+-- 9.7 runs: the run's results card (client/RunUi.luau), run for real on sandbox_mock.luau's recorder
 -- beside the real client/SandboxHud.luau (the money block) and client/SandboxTasksUi.luau (the TASKS chip), Hud's groups
 -- where client/Hud.luau puts them, on phones held sideways (844 × 390 and 667 × 375: under Roblox's top bar, the touch
 -- layout), a computer (1280 × 800) and a big screen (1920 × 1080):
 --   * the Runs remote's "state" asked once at the start;
---   * the pad panel (the host's): the house, the countdown and how many go, the line (the host first, the fifth
---     "waits"), five difficulty buttons (the locked ones 🔒); on the screen, clear of the HUD's chips and groups, the
---     touch buttons, the thumbstick and the jump button; its words fitting; on a phone its buttons a finger's size; a
---     locked one tapped: nothing sent, how to open it said; an open one: { kind = "difficulty", id } once; another
---     player's panel: no buttons, the difficulty and who picks it; off the pad ({ kind = "pad" }) or into the run
---     ({ kind = "run" }): gone;
+--   * 10.4: the PLAY panel (it replaced the portals' pad panel) is tools/phone-ui/play.luau's;
 --   * the results card: its head, the pieces (each its rarity's stripe and stars, its value, whose warehouse) in a list
 --     that scrolls when they are many, the total, yours, a difficulty opened; on the screen whole (a phone too: the list
 --     shorter), its words fitting, OK a finger's size, OK and RunUi.close() close it; a resize scales both; no warnings.
@@ -154,7 +149,7 @@ RunUi.start()
 local asked = sentOn("Runs")
 check("RunUi.start(): the Runs remote's \"state\" asked once", #asked == 1 and asked[1][1].kind == "state")
 
--- What the panel and the card keep clear of: the touch controls, Hud's groups, the chips.
+-- What the danger strip keeps clear of: the touch controls, Hud's groups, the chips.
 local function blocks()
 	local list = {}
 	local S = M.MUi.scaleFor(M.Vector2.new(M.width, M.height))
@@ -175,10 +170,6 @@ local function blocks()
 	return list
 end
 
-local HOST = { kind = "pad", house = "sandbox_house", name = "The Old Farmstead", endsAt = 110, left = 7, host = 14, hostName = "Ann",
-	party = { "Ann", "Bob", "Cid", "Dee", "Eve" }, going = 4, max = 4, difficulty = "normal", open = { "easy", "normal" }, mine = true, place = 1 }
-local GUEST = table.clone(HOST)
-GUEST.mine, GUEST.place = false, 2
 local PIECES = {}
 local RARITY = { "legendary", "epic", "rare", "uncommon", "common" }
 for n = 1, 12 do
@@ -188,29 +179,6 @@ end
 local RESULT = { kind = "result", house = "sandbox_house", name = "The Old Farmstead", difficulty = "normal", phase = "done",
 	why = "Finished at the truck by Ann: what was in the truck went home", pieces = PIECES, count = #PIECES, value = 5700, mine = 8, mineValue = 3900,
 	total = 40, me = 14, opened = "hard", openedName = "Hard", danger = { vault = true, stopped = 7, zombies = true } }
-
-local function panelChecks(label, host)
-	local panel = M.gui:FindFirstChild("RunUi") and M.gui:FindFirstChild("RunUi"):FindFirstChild("PadPanel")
-	check(`{label}: the pad panel there, on the screen`, panel ~= nil and inside(box(panel)), panel and show(box(panel)))
-	local p = box(panel)
-	for name, other in blocks() do
-		check(`{label}: … clear of {name}`, not overlap(p, other), `{show(p)} on {show(other)}`)
-	end
-	check(`{label}: … its words fit`, #badTexts(panel) == 0, badTexts(panel)[1])
-	local row = panel:FindFirstChild("Difficulties")
-	if host then
-		check(`{label}: … the host's five difficulty buttons (Hard, Insane, Nightmare 🔒)`, row ~= nil and #row:GetChildren() >= 5
-			and string.find(named(row, "Difficulty_hard").Text, "🔒", 1, true) ~= nil and string.find(named(row, "Difficulty_easy").Text, "🔒", 1, true) == nil)
-		if M.touch then
-			check(`{label}: … a finger's size each`, #smallButtons(panel) == 0, smallButtons(panel)[1])
-		end
-	else
-		check(`{label}: … another player's: no buttons, the difficulty and who picks it`, row == nil and named(panel, "Difficulty") ~= nil
-			and string.find(named(panel, "Difficulty").Text, "Ann picks", 1, true) ~= nil)
-	end
-	check(`{label}: … the line, the fifth waits`, string.find(named(panel, "Party").Text, "Ann (host)", 1, true) ~= nil and string.find(named(panel, "Party").Text, "Eve (waits)", 1, true) ~= nil)
-	return panel
-end
 
 local function cardChecks(label)
 	local card = M.gui:FindFirstChild("RunUi") and M.gui:FindFirstChild("RunUi"):FindFirstChild("RunResult")
@@ -235,27 +203,9 @@ for _, s in { { true, 844, 354, "a phone (844 × 390)" }, { true, 667, 339, "a s
 	{ false, 1920, 1044, "a big screen (1920 × 1080)" } } do
 	screen(s[1], s[2], s[3])
 	local label = s[4]
-	remote.OnClientEvent:Fire(HOST)
-	M.flush()
-	local panel = panelChecks(`{label}, the host's`, true)
-	local before = #sentOn("Runs")
-	named(panel, "Difficulty_hard").Activated:Fire() -- (its words stay 3 s: no flush here, the recorder's delays run at a flush)
-	check(`{label}: a locked one tapped: nothing sent, how to open it said`, #sentOn("Runs") == before and named(panel, "Locked") ~= nil
-		and string.find(named(panel, "Locked").Text, "NORMAL", 1, true) ~= nil)
-	named(panel, "Difficulty_easy").Activated:Fire()
-	local sent = sentOn("Runs")
-	check(`{label}: an open one: {"{"} kind = "difficulty", id = "easy" {"}"} once`, #sent == before + 1 and sent[#sent][1].kind == "difficulty" and sent[#sent][1].id == "easy")
-	check(`{label}: RunUi.pad() the view (the guide's "pick" step)`, RunUi.pad() ~= nil and RunUi.pad().mine == true)
-	remote.OnClientEvent:Fire(GUEST)
-	M.flush()
-	panelChecks(`{label}, another player's`, false)
-	remote.OnClientEvent:Fire({ kind = "pad" })
-	M.flush()
-	check(`{label}: off the pad: the panel gone, RunUi.pad() nil`, M.gui:FindFirstChild("RunUi"):FindFirstChild("PadPanel") == nil and RunUi.pad() == nil)
-	remote.OnClientEvent:Fire(HOST)
 	remote.OnClientEvent:Fire({ kind = "run", house = "sandbox_house", name = "The Old Farmstead", difficulty = "normal", host = 14, hostName = "Ann", mine = true, members = 4, votes = 0, voted = false })
 	M.flush()
-	check(`{label}: the run starts: the panel gone, RunUi.run() the run`, M.gui:FindFirstChild("RunUi"):FindFirstChild("PadPanel") == nil and RunUi.run() ~= nil)
+	check(`{label}: the run: RunUi.run() the run, no window`, RunUi.run() ~= nil and not RunUi.isOpen())
 	local opened = 0
 	RunUi.onOpen = function()
 		opened += 1
@@ -371,7 +321,9 @@ do
 		local gui = M.gui:FindFirstChild("RoundUi")
 		local banner = named(gui, "Banner")
 		check(`{label}: the lobby's banner: on the screen, its words fit, the place, its difficulty and the countdown`, banner ~= nil and banner.Visible and inside(box(banner))
-			and #badTexts(banner) == 0 and string.find(named(banner, "Title").Text, "THE ORCHARD COTTAGE · INSANE", 1, true) ~= nil, banner and (badTexts(banner)[1] or show(box(banner))))
+			and #badTexts(banner) == 0 and string.find(named(banner, "Kicker").Text, "NEXT QUICK ROUND · 0:4", 1, true) ~= nil
+			and string.find(named(banner, "Title").Text, "THE ORCHARD COTTAGE · INSANE", 1, true) ~= nil and string.find(named(banner, "Line").Text, "16 queued", 1, true) ~= nil,
+			banner and (badTexts(banner)[1] or show(box(banner))))
 		for name, other in blocks() do
 			check(`{label}: … clear of {name}`, not overlap(box(banner), other), `{show(box(banner))} on {show(other)}`)
 		end
@@ -398,9 +350,54 @@ do
 	end
 end
 
+-- ── 10.6 snatching: the tug's panel (client/TugUi.luau) ─────────────────────────────────────────────────────────
+do
+	M.services.ProximityPromptService = M.services.ProximityPromptService or {}
+	M.services.ProximityPromptService.MaxPromptsVisible = 16
+	local TugUi = require("./TugUi")
+	TugUi.start()
+	local tugRemote = M.Net.get("Tug")
+	local id = 0
+	for _, s in { { true, 844, 354, "a phone (844 × 390)" }, { true, 667, 339, "a small phone (667 × 375)" }, { false, 1280, 764, "a computer (1280 × 800)" },
+		{ false, 1920, 1044, "a big screen (1920 × 1080)" } } do
+		screen(s[1], s[2], s[3])
+		local label = s[4]
+		id += 1
+		tugRemote.OnClientEvent:Fire({ kind = "start", id = id, side = "carrier", other = "Bartholomew", name = "Grandfather Clock", icon = "🕰", p = -0.2,
+			endsAt = (M.now or 0) + 3, seconds = 3 })
+		M.flush()
+		local tg = M.gui:FindFirstChild("TugUi")
+		local panel = named(tg, "TugPanel")
+		check(`{label}: 10.6 the tug's panel, whole on the screen, its words fit; the prompts hidden while it goes on`, panel ~= nil and inside(box(panel))
+			and #badTexts(panel) == 0 and M.services.ProximityPromptService.MaxPromptsVisible == 0, panel and (badTexts(panel)[1] or show(box(panel))))
+		check(`{label}: … YOU on the left, the other on the right, the mark on your side (the carrier's head start)`, string.find(named(panel, "Me").Text, "YOU", 1, true) ~= nil
+			and string.find(named(panel, "Them").Text, "BARTHOLOMEW", 1, true) ~= nil and named(named(panel, "Track"), "Mark").Position.X.Scale < 0.5)
+		local before = #sentOn("Tug")
+		if M.touch then
+			local pull = named(panel, "Pull")
+			check(`{label}: … the PULL button a finger's size`, pull ~= nil and #smallButtons(panel) == 0, smallButtons(panel)[1])
+			pull.Activated:Fire()
+		else
+			M.services.UserInputService.InputBegan:Fire({ KeyCode = M.Enum.KeyCode.E, UserInputType = M.Enum.UserInputType.Keyboard }, false)
+		end
+		M.flush()
+		local sent = sentOn("Tug")
+		check(`{label}: … a press: {"{"} kind = "pull", id {"}"} once`, #sent == before + 1 and sent[#sent][1].kind == "pull" and sent[#sent][1].id == id)
+		tugRemote.OnClientEvent:Fire({ kind = "state", id = id, p = 0.6 })
+		M.flush()
+		check(`{label}: … the server's mark: toward them now`, named(named(panel, "Track"), "Mark").Position.X.Scale > 0.5)
+		tugRemote.OnClientEvent:Fire({ kind = "end", id = id, won = true, text = "You held on!" })
+		M.flush()
+		local banner = named(tg, "Banner")
+		check(`{label}: … its end: the panel gone, the prompts back, the big line on the screen and its words fit`, named(tg, "TugPanel") == nil
+			and M.services.ProximityPromptService.MaxPromptsVisible == 16 and banner.Visible and inside(box(banner)) and #badTexts(banner) == 0
+			and string.find(banner.Text, "HELD ON", 1, true) ~= nil, banner and (badTexts(banner)[1] or show(box(banner))))
+	end
+	check("TugUi.active(): none after its end", TugUi.active() == nil)
+end
+
 -- a resize while both are up: their scale follows
 screen(true, 844, 354)
-remote.OnClientEvent:Fire(HOST)
 remote.OnClientEvent:Fire(RESULT)
 M.flush()
 screen(false, 1920, 1044)

@@ -1,30 +1,37 @@
 --!strict
 -- 8.1 SANDBOX: the UPGRADES desk's window (the owner: "the money players earn needs something to buy"). The desk in
 -- your warehouse (server/Warehouse.luau) opens it through the "Upgrades" remote; server/Upgrades.luau decides every
--- purchase, this window only shows the cards and asks:
+-- purchase, this window only shows the tree and asks:
 --   { kind = "state", levels, money }   kept; an open window is drawn again only when what it shows changed
 --   { kind = "open" }                   the desk's prompt: THE WINDOW
---   { kind = "bought", id, level }      a toast "Showroom lights: level 2 · Income ×1.21" (UpgradeUi.notify, else
---                                       client/Hud.luau's toast; 8.3: "ZDC Warehouse: level 2 · Workshop · 4 stands")
--- THE WINDOW: a modal card "ZDC UPGRADES" (your money under it, ✕) over one card an upgrade (shared/UpgradeRules.luau
--- rows, Config.SandboxUpgrades' order): its picture (the emoji), its name and level (a segmented bar, "LV 1/4"), what
--- it gives now and what the next level gives, the next price (money green when you have it) and BUY. BUY sends
--- { kind = "buy", id, level } (the level it offers: a second click buys once); without the money the button is grey,
--- says how much is missing and a tap only says so; at the top level a gold MAX. Your money follows the State remote
--- (a sale, the stands' income) so the buttons light up while it is open.
--- ✕, ESC, the gamepad's B, the Roblox menu or a tap beside the card close it. It is modal: the mouse is free while it is
--- open (a Modal button), a touch screen's buttons are under it. Follows client/WarehouseUi.luau's kit (CardKit, Theme).
--- 8.3 (design/warehouse-levels/KONTRAKT.md): five cards, the ZDC Warehouse 🏭 first. Its bar counts the warehouse's own
--- levels, 1 … 5 ("LV 1/5" is the Garage; its upgrade level 0 … 4 + 1, UpgradeRules.warehouseLevel: the names the
--- players see, "level 1 Garage … level 5 Logistics Center"), its lines "Garage · 2 stands" → "Next: Workshop · 4 stands"
--- (UpgradeRules.effect with the levels). A locked card (Row.locked: More stands below the Big Warehouse) is grey, its
--- reason ("🔒 Needs the Big Warehouse") in place of the price and BUY, its next line "Locked for now" (its next level
--- gives nothing yet); a tap on the reason only says it again, never a purchase. The cards are lower when the screen is
--- short (a phone held sideways shows all five); the list scrolls only below that.
---   UpgradeUi.start()                  listens (once)
+--   { kind = "bought", id, level }      a toast "Hall spotlights: rank 2 · Income ×1.21" (UpgradeUi.notify, else
+--                                       client/Hud.luau's toast; the trunk: "Deliveros Warehouse: tier 2 · Workshop ·
+--                                       4 stands")
+-- 10.4 THE UPGRADE TREE (the owner: "not a skill tree, but an upgrade tree … well thought-out"; shared/UpgradeRules.luau,
+-- Config.SandboxUpgrades): a full-screen window in the contract look (client/Theme.luau), "⬆ DELIVEROS UPGRADES" with
+-- your money and the branches' legend over two parts:
+--   * THE TREE (a ScrollingFrame both ways: drag it, a phone's finger too; − / + zoom it, Config's Window.Zooms): the
+--     trunk across its middle row, the warehouse's tiers 1 … 5 (Garage … Logistics Center, each its tile "Tier_n": its
+--     building, its stands, OWNED or its price), and the branches in their lanes (each lane's name at its left, in its
+--     colour): LOOKS over the HALL over the trunk, the SHOWROOM, RUNS and the CREW under it. A node ("Node_<id>") shows
+--     its icon, its name, what its next rank gives (or, at its top, what it gives), its cost (or MAX, 🔒, SOON) and its
+--     ranks' pips; its edge says its state: gold MAX, green (the money buys it), its branch's colour (it could be bought:
+--     the money is missing), grey (locked: its parents or its tier; SOON). Lines join a node to its parents (its branch's
+--     colour, faint until the parent has the rank it needs) or, a branch's first node, to the trunk's tier it needs.
+--   * THE DETAILS (the selected node; at the right): its icon and name, its branch, "RANK 2/5" and its pips, what it
+--     does (its blurb), NOW and NEXT, the next rank's checklist (✓ / ✗: its parents, its tier), its price and BUY (green
+--     with the money; grey "NEED $X" without, a tap only says so; "🔒 <why>" locked, a tap says it; a gold MAX; SOON).
+-- A tap (a click, the gamepad's A) on a node selects it; BUY sends { kind = "buy", id, level } (the rank it offers: a
+-- second tap buys once). Your money follows the State remote (a sale, the hall's income): the details' NEED follow it in
+-- place, the tree is drawn again only when a node's state changes. ✕, ESC, the gamepad's B, the Roblox menu or a tap on
+-- the shade close it; modal: the mouse is free while it is open (a Modal button), a touch screen's buttons are under it.
+--   UpgradeUi.start()                  listens (once; nothing when Config.Sandbox.On is false)
 --   UpgradeUi.open() / close() / isOpen()
 --   UpgradeUi.state()                  { levels, money } the last state (nil: none yet)
---   UpgradeUi.layout(W, H, touch)      the card on a W × H screen (px under Roblox's top bar)
+--   UpgradeUi.select(id) / selected()  the details' node (an unknown id: nothing)
+--   UpgradeUi.zoom(step?)              the tree's zoom step (1 … #Window.Zooms; nil: the step now) → the zoom
+--   UpgradeUi.layout(W, H, touch)      the window on a W × H screen (px under Roblox's top bar)
+--   UpgradeUi.place(at, zoom, layout?) a grid cell's box in the tree's canvas { x, y, w, h } (pure: the tests')
 --   UpgradeUi.notify / onOpen          hooks: the toasts, the window opened
 -- Presentation only.
 
@@ -45,36 +52,35 @@ local UpgradeUi = {}
 
 local K = Theme.Contract
 local C = CardKit.Color
+local W = Config.SandboxUpgrades.Window
 
 export type State = { levels: { [string]: number }, money: number }
 export type Layout = {
 	touch: boolean,
-	scale: number, -- the card's UIScale
-	x: number, -- the card's top left on the screen (px)
+	scale: number, -- the window's UIScale
+	x: number, -- the window's top left on the screen (px)
 	y: number,
-	w: number, -- the card's size (unscaled)
+	w: number, -- the window's size (unscaled)
 	h: number,
 	pad: number,
 	header: number,
 	close: number, -- the ✕'s side
-	listY: number,
-	listH: number,
-	rowW: number,
-	rowH: number,
-	gap: number,
-	button: number, -- BUY's height
-	buttonW: number,
-	priceW: number,
+	button: number, -- a button's height (BUY, − / +)
+	treeX: number, -- the tree's view in the window
+	treeY: number,
+	treeW: number,
+	treeH: number,
+	panelX: number, -- the details
+	panelW: number,
+	zoom: number, -- the zoom step a fresh window starts at
 }
+export type Box = { x: number, y: number, w: number, h: number }
 
 UpgradeUi.notify = nil :: ((text: string) -> ())?
 UpgradeUi.onOpen = nil :: (() -> ())?
 
-local WIDTH = 680 -- the card's widest (unscaled px)
-local HEADER = 52
-local LIST_GAP = 4 -- under the header
+local LANE = 112 -- the lanes' names' column (unscaled, at zoom 1)
 local SCROLLBAR = 6
-local WORDS = 52 -- a card's words: its name and level, what it gives now, the next level's (8.3: the lowest card's)
 
 local started = false
 local remote: RemoteEvent? = nil
@@ -84,54 +90,90 @@ local opened = false
 local shownKey = ""
 local card: any = nil -- the shade over the screen (the window: card's Upgrades)
 local sentAt: { [string]: number } = {}
+local chosen: string? = nil -- the details' node
+local step: number? = nil -- the zoom step (nil: the layout's)
+local dragging: { at: Vector2, from: Vector2 }? = nil
+
+local function rgb(c: { number }): Color3
+	return Color3.fromRGB(c[1], c[2], c[3])
+end
+
+local function branchColor(id: string): Color3
+	local b = UpgradeRules.branch(id)
+	return if b then rgb(b.color) else K.line
+end
 
 -- ── The layout (pure) ───────────────────────────────────────────────────────
 
-function UpgradeUi.layout(W: number, H: number, touch: boolean): Layout
-	local margin = if touch then 8 else 16
+function UpgradeUi.layout(width: number, height: number, touch: boolean): Layout
+	local margin = if touch then 6 else 16
 	local scale = if touch
-		then math.clamp(math.min(W / 860, H / 380), 0.8, Ui.MaxScale)
-		else math.max(Ui.scaleFor(Vector2.new(W, H)), 0.7)
-	local pad = if touch then 10 else 16
-	local gap = 6
+		then math.clamp(math.min(width / 860, height / 380), W.TouchScale, Ui.MaxScale)
+		else math.max(Ui.scaleFor(Vector2.new(width, height)), 0.7)
 	local finger = math.ceil(Ui.MinTouch / scale)
-	local button = if touch then math.max(44, finger) else 36
-	local rowH = math.max(if touch then 68 else 72, button + 16)
-	local rows = #UpgradeRules.Order
-	-- 8.3: five cards. Too tall for the screen (a phone held sideways), they get lower, as low as their words and BUY
-	-- allow; only below that does the list scroll.
-	local room = math.floor((H - 2 * margin) / scale) - HEADER - LIST_GAP - pad
-	if rows * rowH + (rows - 1) * gap > room then
-		gap = 4
-		rowH = math.clamp(math.floor((room - (rows - 1) * gap) / rows), math.max(WORDS + 4, button + 8), rowH)
+	local pad = if touch then 8 else 14
+	local button = if touch then math.max(40, finger) else 36
+	local header = if touch then math.max(W.Header - 8, button + 8) else W.Header
+	local w = math.floor((width - 2 * margin) / scale)
+	local h = math.floor((height - 2 * margin) / scale)
+	local panelW = if touch then math.min(W.Panel - 60, math.floor(w * 0.34)) else math.min(W.Panel, math.floor(w * 0.3))
+	local treeW = w - panelW - 3 * pad
+	local zooms = W.Zooms :: { number }
+	-- (a fresh window: the closest zoom step whose tree is as wide as the view, never under DefaultZoom's: the words
+	-- stay readable, the tree scrolls)
+	local fit = 1
+	local full = UpgradeUi.canvasSize(1)
+	for n, z in zooms do
+		if full.X * z <= treeW then
+			fit = n
+		end
 	end
-	local want = HEADER + LIST_GAP + rows * rowH + (rows - 1) * gap + pad
-	local w = math.floor(math.min(WIDTH, (W - 2 * margin) / scale))
-	local h = math.floor(math.min(want, (H - 2 * margin) / scale))
+	fit = math.clamp(math.max(fit, W.DefaultZoom), 1, #zooms)
 	return {
 		touch = touch,
 		scale = scale,
-		x = math.floor((W - w * scale) / 2),
-		y = math.floor((H - h * scale) / 2),
+		x = math.floor((width - w * scale) / 2),
+		y = math.floor((height - h * scale) / 2),
 		w = w,
 		h = h,
 		pad = pad,
-		header = HEADER,
+		header = header,
 		close = if touch then math.max(40, finger) else 40,
-		listY = HEADER + LIST_GAP,
-		listH = h - HEADER - LIST_GAP - pad,
-		rowW = w - 2 * pad,
-		rowH = rowH,
-		gap = gap,
 		button = button,
-		buttonW = if touch then 112 else 104,
-		priceW = 100, -- (8.3 economy: "$100,000", the Logistics Center's, whole)
+		treeX = pad,
+		treeY = header,
+		treeW = treeW,
+		treeH = h - header - pad,
+		panelX = pad + treeW + pad,
+		panelW = panelW,
+		zoom = fit,
 	}
 end
 
--- ── Sending ─────────────────────────────────────────────────────────────────
+-- The grid's cell `at` = { column, row } in the canvas at zoom z: its node's box. A column is half a node and its gap
+-- wide (the nodes on the even columns, the trunk's tiers on the odd ones between them: a tier's line down to a branch
+-- runs in the gap between two nodes).
+function UpgradeUi.place(at: { number }, zoom: number): Box
+	local nodeW, nodeH = W.Node[1] * zoom, W.Node[2] * zoom
+	local gx, gy = W.Gap[1] * zoom, W.Gap[2] * zoom
+	return {
+		x = W.Pad * zoom + LANE * zoom + (at[1] - 1) * (nodeW + gx) / 2,
+		y = W.Pad * zoom + (at[2] - 1) * (nodeH + gy),
+		w = nodeW,
+		h = nodeH,
+	}
+end
 
--- One request an upgrade at most every 0.6 s (a double tap is one request).
+-- The canvas's size at zoom z (the grid's columns and rows, the lanes' column, the margins).
+function UpgradeUi.canvasSize(zoom: number): Vector2
+	local grid = Config.SandboxUpgrades.Grid
+	local last = UpgradeUi.place({ grid.Columns, grid.Rows }, zoom)
+	return Vector2.new(math.ceil(last.x + last.w + W.Pad * zoom), math.ceil(last.y + last.h + W.Pad * zoom))
+end
+
+-- ── Sending, toasts ─────────────────────────────────────────────────────────
+
+-- One request a node at most every 0.6 s (a double tap is one request).
 local function send(message: { [string]: any }): boolean
 	local key = `{message.kind}:{tostring(message.id)}`
 	local now = os.clock()
@@ -181,6 +223,7 @@ function UpgradeUi.close()
 		return
 	end
 	opened = false
+	dragging = nil
 	if card then
 		Ui.gamepadRelease(gui)
 		card:Destroy()
@@ -197,57 +240,17 @@ function UpgradeUi.state(): State?
 	return current
 end
 
-local function stateKey(state: State?, layout: Layout): string
-	local parts = { `{layout.w}x{layout.h}@{layout.scale}` }
-	if state then
-		for _, id in UpgradeRules.Order do
-			table.insert(parts, `{id}={UpgradeRules.level(state.levels, id)}`)
-		end
-		-- (only what changes a card: which prices the money reaches; the money's line and a NEED's amount follow the
-		-- money in place, so a payout never rebuilds the window under a tap or a gamepad's selection)
-		for _, row in UpgradeRules.rows(state.levels, state.money) do
-			table.insert(parts, if row.can then "1" else "0")
-		end
-	else
-		table.insert(parts, "none")
-	end
-	return table.concat(parts, "|")
+function UpgradeUi.selected(): string?
+	return chosen
 end
 
--- 8.3: the level a card shows: the warehouse's own (its upgrade level + 1: 1 the Garage … 5 the Logistics Center),
--- every other upgrade's as it is.
-local function shownLevel(id: string, level: number): number
-	return if id == "warehouse" then UpgradeRules.warehouseLevel({ warehouse = level }) else level
-end
-
--- The level's segments (one a level, the bought ones lit) and "LV 1/4" (8.3: the warehouse's "LV 1/5").
-local function levelBar(parent: any, row: UpgradeRules.Row, x: number, y: number): number
-	local seg, gap = 12, 3
-	local level, max = shownLevel(row.id, row.level), shownLevel(row.id, row.max)
-	for n = 1, max do
-		local on = n <= level
-		local piece = Ui.make("Frame", {
-			Name = `Level{n}`,
-			Size = UDim2.fromOffset(seg, 5),
-			Position = UDim2.fromOffset(x + (n - 1) * (seg + gap), y + 6),
-			BackgroundColor3 = if on then (if row.level >= row.max then C.gold else C.money) else K.track,
-			BorderSizePixel = 0,
-		}, parent)
-		Ui.corner(piece, 2)
-	end
-	local after = x + max * (seg + gap) + 4
-	local text = `LV {level}/{max}`
-	Ui.label(parent, text, UDim2.fromOffset(CardKit.width(text, 11, Theme.HeadingFont) + 4, 16), { Name = "Level", Position = UDim2.fromOffset(after, y), Font = Theme.HeadingFont, TextSize = 11, TextColor3 = if row.level >= row.max then C.gold else K.secondary, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Left })
-	return after + CardKit.width(text, 11, Theme.HeadingFont) + 4
-end
-
--- The row `id` for the money and the levels now (nil: no state yet).
-local function liveRow(id: string): UpgradeRules.Row?
+local function rowsNow(): { UpgradeRules.Row }
 	local state = current
-	if not state then
-		return nil
-	end
-	for _, row in UpgradeRules.rows(state.levels, state.money) do
+	return if state then UpgradeRules.rows(state.levels, state.money) else {}
+end
+
+local function rowOf(id: string): UpgradeRules.Row?
+	for _, row in rowsNow() do
 		if row.id == id then
 			return row
 		end
@@ -255,11 +258,63 @@ local function liveRow(id: string): UpgradeRules.Row?
 	return nil
 end
 
--- What follows the money on an open window without a rebuild: the money's line and each NEED's amount.
-local function subtitleOf(state: State?): string
-	return if state then `Your money {UpgradeRules.money(state.money)} · a bigger warehouse, more stands, brighter lights, a faster van and Danny` else "Loading your upgrades…"
+-- The node a fresh window shows: the cheapest one the money buys, else the trunk's next tier, else the trunk.
+local function firstPick(rows: { UpgradeRules.Row }): string
+	local best: UpgradeRules.Row? = nil
+	for _, row in rows do
+		if row.status == "buy" and row.price and (best == nil or row.price < (best.price :: number)) then
+			best = row
+		end
+	end
+	return if best then best.id else "warehouse"
 end
 
+function UpgradeUi.select(id: string)
+	if not UpgradeRules.def(id) then
+		return
+	end
+	chosen = id
+	if opened then
+		draw(true)
+	end
+end
+
+local function zoomOf(layout: Layout): number
+	local zooms = W.Zooms :: { number }
+	return zooms[math.clamp(step or layout.zoom, 1, #zooms)]
+end
+
+function UpgradeUi.zoom(want: number?): number
+	local zooms = W.Zooms :: { number }
+	if want then
+		step = math.clamp(math.floor(want), 1, #zooms)
+		if opened then
+			draw(true)
+		end
+	end
+	local size = Ui.screenSize()
+	return zoomOf(UpgradeUi.layout(size.X, size.Y, Ui.touchLayout()))
+end
+
+local function stateKey(state: State?, layout: Layout, zoom: number): string
+	local parts = { `{layout.w}x{layout.h}@{layout.scale}:{zoom}:{chosen or "-"}` }
+	if state then
+		-- (only what changes a node: its rank and its state; the money's line and NEED follow the money in place, so a
+		-- payout never rebuilds the window under a tap or a gamepad's selection)
+		for _, row in UpgradeRules.rows(state.levels, state.money) do
+			table.insert(parts, `{row.id}={row.level}{string.sub(row.status, 1, 1)}`)
+		end
+	else
+		table.insert(parts, "none")
+	end
+	return table.concat(parts, "|")
+end
+
+local function subtitleOf(state: State?): string
+	return if state then `Your money {UpgradeRules.money(state.money)} · pick a node for its details` else "Loading your upgrades…"
+end
+
+-- What follows the money on an open window without a rebuild: the money's line and the details' NEED.
 local function followMoney()
 	local state = current
 	local frame = card and card:FindFirstChild("Upgrades")
@@ -270,115 +325,332 @@ local function followMoney()
 	if subtitle then
 		subtitle.Text = subtitleOf(state)
 	end
-	local list = frame:FindFirstChild("List")
-	if not list then
+	local panel = frame:FindFirstChild("Details")
+	local buy = panel and panel:FindFirstChild("Buy")
+	local row = if chosen then rowOf(chosen) else nil
+	if buy and row and row.status == "short" then
+		buy.Text = `NEED {UpgradeRules.money(row.short)}`
+	end
+end
+
+-- A line of the tree: one thin bar (a box in the canvas).
+local function bar(parent: any, name: string, x0: number, y0: number, x1: number, y1: number, thick: number, color: Color3, lit: boolean)
+	local x, y = math.min(x0, x1), math.min(y0, y1)
+	local w, h = math.max(thick, math.abs(x1 - x0)), math.max(thick, math.abs(y1 - y0))
+	Ui.make("Frame", {
+		Name = name,
+		Size = UDim2.fromOffset(math.floor(w + 0.5), math.floor(h + 0.5)),
+		Position = UDim2.fromOffset(math.floor(x - (if x0 == x1 then thick / 2 else 0) + 0.5), math.floor(y - (if y0 == y1 then thick / 2 else 0) + 0.5)),
+		BackgroundColor3 = color,
+		BackgroundTransparency = if lit then 0.1 else 0.7,
+		BorderSizePixel = 0,
+		ZIndex = 1,
+	}, parent)
+end
+
+-- A node's pips: one a rank, the owned ones lit.
+local function pips(parent: any, rank: number, max: number, x: number, y: number, zoom: number, color: Color3)
+	if max <= 1 then
 		return
 	end
-	for _, row in UpgradeRules.rows(state.levels, state.money) do
-		local made = list:FindFirstChild(`Upgrade_{row.id}`)
-		local buy = made and made:FindFirstChild("Buy")
-		if buy and not row.can and row.price then
-			buy.Text = `NEED {UpgradeRules.money(row.short)}`
+	local seg, gap = math.max(4, math.floor(9 * zoom)), math.max(2, math.floor(3 * zoom))
+	for n = 1, max do
+		local piece = Ui.make("Frame", {
+			Name = `Pip{n}`,
+			Size = UDim2.fromOffset(seg, math.max(3, math.floor(4 * zoom))),
+			Position = UDim2.fromOffset(x + (n - 1) * (seg + gap), y),
+			BackgroundColor3 = if n <= rank then color else K.track,
+			BorderSizePixel = 0,
+			ZIndex = 4,
+		}, parent)
+		Ui.corner(piece, 2)
+	end
+end
+
+-- The edge a node's state gives it: gold at the top, green when the money buys it, its branch's colour when it could
+-- be bought, grey when locked or not sold yet.
+local function edgeOf(row: UpgradeRules.Row): (Color3, number)
+	if row.status == "max" then
+		return C.gold, 0.1
+	elseif row.status == "buy" then
+		return C.money, 0.1
+	elseif row.status == "short" then
+		return branchColor(row.branch), 0.35
+	end
+	return K.line, 0.75
+end
+
+local function costText(row: UpgradeRules.Row): (string, Color3)
+	if row.status == "max" then
+		return "MAX", C.gold
+	elseif row.status == "soon" then
+		return "SOON", C.dim
+	elseif row.status == "locked" then
+		return `🔒 {UpgradeRules.money(row.price or 0)}`, C.dim
+	end
+	return UpgradeRules.money(row.price or 0), if row.status == "buy" then C.money else K.secondary
+end
+
+local function drawNode(canvas: any, row: UpgradeRules.Row, zoom: number)
+	local b = UpgradeUi.place(row.at, zoom)
+	local edge, edgeT = edgeOf(row)
+	local dim = row.status == "locked" or row.status == "soon"
+	local node = Ui.make("TextButton", {
+		Name = `Node_{row.id}`,
+		Size = UDim2.fromOffset(math.floor(b.w), math.floor(b.h)),
+		Position = UDim2.fromOffset(math.floor(b.x), math.floor(b.y)),
+		BackgroundColor3 = if chosen == row.id then K.raised else K.row,
+		BorderSizePixel = 0,
+		AutoButtonColor = false,
+		Text = "",
+		ZIndex = 2,
+	}, canvas)
+	node:SetAttribute("Status", row.status)
+	Ui.corner(node, math.max(6, math.floor(10 * zoom)))
+	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = if chosen == row.id then K.text else edge, Thickness = if chosen == row.id then 2 else 1.5, Transparency = if chosen == row.id then 0 else edgeT }, node)
+	local color = branchColor(row.branch)
+	Ui.make("Frame", { Name = "Bar", Size = UDim2.new(0, math.max(3, math.floor(5 * zoom)), 1, -math.floor(14 * zoom)), Position = UDim2.fromOffset(math.floor(4 * zoom), math.floor(7 * zoom)), BackgroundColor3 = color, BackgroundTransparency = if dim then 0.6 else 0, BorderSizePixel = 0, ZIndex = 3 }, node)
+	local icon = math.floor(30 * zoom)
+	local left = math.floor(14 * zoom)
+	Ui.label(node, row.icon, UDim2.fromOffset(icon, icon), { Name = "Icon", Position = UDim2.fromOffset(left, math.floor(8 * zoom)), TextSize = math.floor(24 * zoom), TextTransparency = if dim then 0.5 else 0, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Center, ZIndex = 4 })
+	local textX = left + icon + math.floor(6 * zoom)
+	local room = math.floor(b.w - textX - 8 * zoom)
+	Ui.label(node, row.name, UDim2.fromOffset(room, math.floor(17 * zoom)), { Name = "NodeName", Position = UDim2.fromOffset(textX, math.floor(9 * zoom)), Font = Theme.HeadingFont, TextSize = math.max(8, math.floor(13 * zoom)), TextColor3 = if dim then K.secondary else K.text, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 4 })
+	local effect = if row.status == "max" then row.now elseif row.next then `→ {row.next}` else row.now
+	Ui.label(node, effect, UDim2.fromOffset(math.floor(b.w - left - 8 * zoom), math.floor(15 * zoom)), { Name = "Effect", Position = UDim2.fromOffset(left, math.floor(42 * zoom)), TextSize = math.max(7, math.floor(11 * zoom)), TextColor3 = if dim then C.dim else K.secondary, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 4 })
+	local cost, ink = costText(row)
+	Ui.label(node, cost, UDim2.fromOffset(math.floor(b.w * 0.5), math.floor(16 * zoom)), { Name = "Cost", Position = UDim2.new(1, -math.floor(8 * zoom), 0, math.floor(b.h - 22 * zoom)), AnchorPoint = Vector2.new(1, 0), Font = Theme.HeadingFont, TextSize = math.max(8, math.floor(12 * zoom)), TextColor3 = ink, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 4 })
+	pips(node, row.level, row.max, left, math.floor(b.h - 16 * zoom), zoom, if row.status == "max" then C.gold else color)
+	node.Activated:Connect(function()
+		UpgradeUi.select(row.id)
+	end)
+	node.SelectionGained:Connect(function()
+		if chosen ~= row.id then
+			task.defer(UpgradeUi.select, row.id)
+		end
+	end)
+	return node
+end
+
+-- The trunk's tiles: the warehouse's tiers, owned or priced (a tile selects the trunk's node). → the next tier's tile
+-- (the top one's once every tier is owned: where a gamepad lands when the trunk is selected).
+local function drawTrunk(canvas: any, row: UpgradeRules.Row, zoom: number): any
+	local levels = Config.Warehouse.Levels
+	local tier = 1 + row.level
+	local color = branchColor("warehouse")
+	local focus: any = nil
+	for n = 1, #levels do
+		local b = UpgradeUi.place(UpgradeRules.trunkAt(n), zoom)
+		local owned = n <= tier
+		local nextOne = n == tier + 1
+		local tile = Ui.make("TextButton", {
+			Name = `Tier_{n}`,
+			Size = UDim2.fromOffset(math.floor(b.w), math.floor(b.h)),
+			Position = UDim2.fromOffset(math.floor(b.x), math.floor(b.y)),
+			BackgroundColor3 = if chosen == "warehouse" and nextOne then K.raised elseif owned then Color3.fromRGB(46, 34, 20) else K.row,
+			BorderSizePixel = 0,
+			AutoButtonColor = false,
+			Text = "",
+			ZIndex = 2,
+		}, canvas)
+		tile:SetAttribute("Owned", owned)
+		Ui.corner(tile, math.max(6, math.floor(10 * zoom)))
+		local edge = if owned then color elseif nextOne and row.status == "buy" then C.money elseif nextOne then color else K.line
+		Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = if chosen == "warehouse" and nextOne then K.text else edge, Thickness = if owned or nextOne then 2 else 1, Transparency = if owned or nextOne then 0 else 0.7 }, tile)
+		local def = levels[n]
+		local left = math.floor(10 * zoom)
+		Ui.label(tile, `🏭 TIER {n}`, UDim2.fromOffset(math.floor(b.w - 2 * left), math.floor(14 * zoom)), { Name = "Tier", Position = UDim2.fromOffset(left, math.floor(7 * zoom)), Font = Theme.HeadingFont, TextSize = math.max(7, math.floor(10 * zoom)), TextColor3 = color, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 4 })
+		Ui.label(tile, def.name, UDim2.fromOffset(math.floor(b.w - 2 * left), math.floor(18 * zoom)), { Name = "NodeName", Position = UDim2.fromOffset(left, math.floor(23 * zoom)), Font = Theme.HeadingFont, TextSize = math.max(8, math.floor(14 * zoom)), TextColor3 = if owned or nextOne then K.text else K.secondary, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 4 })
+		local show = (Config.Showroom.Levels[n] or { Stands = 0 }).Stands
+		Ui.label(tile, `{def.stands} hall · {show} showroom`, UDim2.fromOffset(math.floor(b.w - 2 * left), math.floor(14 * zoom)), { Name = "Effect", Position = UDim2.fromOffset(left, math.floor(44 * zoom)), TextSize = math.max(7, math.floor(11 * zoom)), TextColor3 = K.secondary, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 4 })
+		local price = UpgradeRules.price("warehouse", n - 2)
+		local text = if owned then "OWNED" elseif price then UpgradeRules.money(price) else ""
+		Ui.label(tile, text, UDim2.fromOffset(math.floor(b.w - 2 * left), math.floor(16 * zoom)), { Name = "Cost", Position = UDim2.new(1, -left, 0, math.floor(b.h - 22 * zoom)), AnchorPoint = Vector2.new(1, 0), Font = Theme.HeadingFont, TextSize = math.max(8, math.floor(12 * zoom)), TextColor3 = if owned then color elseif nextOne and row.status == "buy" then C.money else K.secondary, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 4 })
+		tile.Activated:Connect(function()
+			UpgradeUi.select("warehouse")
+		end)
+		if nextOne or (n == #levels and focus == nil) then
+			focus = tile
+		end
+	end
+	return focus
+end
+
+-- The lines: the trunk's tiers in a row, a branch's first node to the trunk's tier it needs, a node to its parents.
+local function drawLines(canvas: any, rows: { UpgradeRules.Row }, levels: { [string]: number }, zoom: number)
+	local thick = math.max(2, math.floor(3 * zoom))
+	local byId: { [string]: UpgradeRules.Row } = {}
+	for _, row in rows do
+		byId[row.id] = row
+	end
+	local tier = UpgradeRules.warehouseLevel(levels)
+	local trunk = branchColor("warehouse")
+	for n = 1, #Config.Warehouse.Levels - 1 do
+		local a, b = UpgradeUi.place(UpgradeRules.trunkAt(n), zoom), UpgradeUi.place(UpgradeRules.trunkAt(n + 1), zoom)
+		bar(canvas, `Trunk{n}`, a.x + a.w, a.y + a.h / 2, b.x, b.y + b.h / 2, thick + 2, trunk, n + 1 <= tier)
+	end
+	for n, link in UpgradeRules.links() do
+		local to = byId[link.to]
+		if to then
+			local b = UpgradeUi.place(to.at, zoom)
+			local color = branchColor(to.branch)
+			local tx, ty = b.x, b.y + b.h / 2
+			if link.from == "warehouse" then
+				local t = UpgradeUi.place(UpgradeRules.trunkAt(link.tier), zoom)
+				local cx = t.x + t.w / 2
+				local edgeY = if ty < t.y then t.y else t.y + t.h
+				local lit = tier >= link.tier
+				bar(canvas, `Line{n}a`, cx, edgeY, cx, ty, thick, color, lit)
+				bar(canvas, `Line{n}b`, cx, ty, tx, ty, thick, color, lit)
+			else
+				local from = byId[link.from]
+				if from then
+					local a = UpgradeUi.place(from.at, zoom)
+					local ax, ay = a.x + a.w, a.y + a.h / 2
+					local lit = from.level >= link.rank
+					if math.abs(ay - ty) < 1 then
+						bar(canvas, `Line{n}a`, ax, ay, tx, ty, thick, color, lit)
+					else
+						local mx = tx - W.Gap[1] * zoom / 2
+						bar(canvas, `Line{n}a`, ax, ay, mx, ay, thick, color, lit)
+						bar(canvas, `Line{n}b`, mx, ay, mx, ty, thick, color, lit)
+						bar(canvas, `Line{n}c`, mx, ty, tx, ty, thick, color, lit)
+					end
+				end
+			end
 		end
 	end
 end
 
-local function drawRow(parent: any, row: UpgradeRules.Row, index: number, layout: Layout, rowW: number)
-	local h = layout.rowH
-	local frame = Ui.make("Frame", {
-		Name = `Upgrade_{row.id}`,
-		Size = UDim2.fromOffset(rowW, h),
-		Position = UDim2.fromOffset(0, (index - 1) * (h + layout.gap)),
+-- The lanes' names at the left of their rows.
+local function drawLanes(canvas: any, zoom: number)
+	for _, branch in UpgradeRules.branches() do
+		local b = UpgradeUi.place({ 1, branch.row }, zoom)
+		Ui.label(canvas, branch.name, UDim2.fromOffset(math.floor((LANE - 10) * zoom), math.floor(b.h)), {
+			Name = `Lane_{branch.id}`,
+			Position = UDim2.fromOffset(math.floor(W.Pad * zoom), math.floor(b.y)),
+			Font = Theme.HeadingFont,
+			TextSize = math.max(7, math.floor(11 * zoom)),
+			TextColor3 = rgb(branch.color),
+			TextWrapped = true,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			ZIndex = 2,
+		})
+	end
+end
+
+-- THE DETAILS of the selected node.
+local function drawDetails(frame: any, layout: Layout, row: UpgradeRules.Row)
+	local w = layout.panelW
+	local panel = Ui.make("Frame", {
+		Name = "Details",
+		Size = UDim2.fromOffset(w, layout.treeH),
+		Position = UDim2.fromOffset(layout.panelX, layout.treeY),
 		BackgroundColor3 = K.row,
 		BorderSizePixel = 0,
-	}, parent)
-	Ui.corner(frame, Config.UiKit.RowCorner)
-	local locked = row.locked -- 8.3: why it can't be bought now (nil: it can, with the money)
-	local top = row.level >= row.max and not locked
-	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = if top then C.gold elseif row.can then C.money else K.line, Thickness = 1, Transparency = if top or row.can then 0.45 else 0.8 }, frame)
-	-- the picture: the upgrade's emoji on charcoal (8.3: faded on a locked card)
-	local side = h - 12
-	local picture = Ui.make("Frame", { Name = "Picture", Size = UDim2.fromOffset(side, side), Position = UDim2.fromOffset(6, 6), BackgroundColor3 = K.charcoal, BorderSizePixel = 0 }, frame)
-	Ui.corner(picture, 8)
-	Ui.label(picture, row.icon, UDim2.fromScale(1, 1), { Name = "Emoji", TextSize = math.floor(side * 0.55), TextTransparency = if locked then 0.5 else 0, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Center })
-	-- the right: the price and BUY (at the top: MAX; 8.3: locked, its reason over both)
-	local right = layout.buttonW + 10
-	local buttonY = math.floor((h - layout.button) / 2)
-	if locked then
-		local why = CardKit.bigButton(frame, {
-			name = "Locked",
-			text = `🔒 {locked}`,
-			kind = "shut",
-			height = layout.button,
-			textSize = if layout.touch then 12 else 11,
-			onClick = function()
-				toast(`{row.name}: 🔒 {locked}`) -- (only says it: a locked card buys nothing)
-			end,
-		})
-		why.Size = UDim2.fromOffset(layout.priceW + 8 + layout.buttonW, layout.button)
-		why.Position = UDim2.new(1, -(right + layout.priceW + 8), 0, buttonY)
-		why.TextWrapped = true -- (a long reason takes two lines)
-	elseif top then
-		local max = Ui.label(frame, "MAX", UDim2.fromOffset(layout.buttonW, layout.button), {
-			Name = "Max",
-			Position = UDim2.new(1, -right, 0, buttonY),
-			BackgroundColor3 = C.gold,
-			BackgroundTransparency = 0,
-			Font = Theme.HeadingFont,
-			TextSize = 14,
-			TextColor3 = C.goldInk,
-			TextWrapped = false,
-			TextXAlignment = Enum.TextXAlignment.Center,
-			Selectable = true, -- (8.3: the gamepad reaches a row at its top level too: the list scrolls to it)
-		})
-		Ui.corner(max, 8)
-	else
-		local price = row.price :: number
-		Ui.label(frame, UpgradeRules.money(price), UDim2.fromOffset(layout.priceW, 24), {
-			Name = "Price",
-			Position = UDim2.new(1, -(right + 8), 0.5, 0),
-			AnchorPoint = Vector2.new(1, 0.5),
-			Font = Theme.DisplayFont,
-			TextSize = 18,
-			TextColor3 = if row.can then C.money else C.dim,
-			TextWrapped = false,
-			TextXAlignment = Enum.TextXAlignment.Right,
-		})
-		local words = if row.can then "BUY" else `NEED {UpgradeRules.money(row.short)}`
-		local buy = CardKit.bigButton(frame, {
-			name = "Buy",
-			text = words,
-			kind = if row.can then "good" else "shut",
-			height = layout.button,
-			textSize = if row.can then 15 elseif layout.touch then 12 else 11,
-			onClick = function()
-				if not row.can then
-					local live = liveRow(row.id) -- (the money moved since the card was drawn)
-					toast(`{row.name}: you need {UpgradeRules.money(if live then live.short else row.short)} more.`)
-					return
-				end
-				if send({ kind = "buy", id = row.id, level = row.level + 1 }) then
-					local button = frame:FindFirstChild("Buy")
-					if button then
-						button.Text = "…"
-						button.Active = false
-					end
-				end
-			end,
-		})
-		buy.Size = UDim2.fromOffset(layout.buttonW, layout.button)
-		buy.Position = UDim2.new(1, -right, 0, buttonY)
+	}, frame)
+	Ui.corner(panel, Config.UiKit.RowCorner)
+	local color = branchColor(row.branch)
+	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = color, Thickness = 1, Transparency = 0.5 }, panel)
+	local pad = if layout.touch then 8 else 12
+	local inner = w - 2 * pad
+	local y = pad
+	local branch = UpgradeRules.branch(row.branch)
+	local trunk = row.id == "warehouse"
+	Ui.label(panel, row.icon, UDim2.fromOffset(36, 36), { Name = "Icon", Position = UDim2.fromOffset(pad, y), TextSize = 28, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Center })
+	Ui.label(panel, row.name, UDim2.fromOffset(inner - 42, 20), { Name = "NodeName", Position = UDim2.fromOffset(pad + 42, y), Font = Theme.HeadingFont, TextSize = 16, TextColor3 = K.text, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
+	Ui.label(panel, if branch then branch.name else "", UDim2.fromOffset(inner - 42, 14), { Name = "Branch", Position = UDim2.fromOffset(pad + 42, y + 21), Font = Theme.HeadingFont, TextSize = 11, TextColor3 = color, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
+	y += 42
+	local rank = if trunk then `TIER {1 + row.level}/{1 + row.max}` else `RANK {row.level}/{row.max}`
+	Ui.label(panel, rank, UDim2.fromOffset(CardKit.width(rank, 11, Theme.HeadingFont) + 4, 14), { Name = "Rank", Position = UDim2.fromOffset(pad, y), Font = Theme.HeadingFont, TextSize = 11, TextColor3 = if row.status == "max" then C.gold else K.secondary, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Left })
+	pips(panel, if trunk then row.level + 1 else row.level, if trunk then row.max + 1 else row.max, pad + CardKit.width(rank, 11, Theme.HeadingFont) + 10, y + 5, 1, if row.status == "max" then C.gold else color)
+	y += 20
+	local blurbH = if layout.touch then 42 else 50
+	Ui.label(panel, row.blurb, UDim2.fromOffset(inner, blurbH), { Name = "Blurb", Position = UDim2.fromOffset(pad, y), TextSize = if layout.touch then 11 else 12, TextColor3 = K.secondary, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top })
+	y += blurbH + 4
+	Ui.label(panel, `Now: {row.now}`, UDim2.fromOffset(inner, 16), { Name = "Now", Position = UDim2.fromOffset(pad, y), TextSize = 12, TextColor3 = K.text, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
+	y += 17
+	local nextText = if row.status == "max" then "Top rank" elseif row.next then `Next: {row.next}` else ""
+	Ui.label(panel, nextText, UDim2.fromOffset(inner, 16), { Name = "Next", Position = UDim2.fromOffset(pad, y), Font = Theme.HeadingFont, TextSize = 12, TextColor3 = if row.status == "max" then C.gold elseif row.status == "locked" or row.status == "soon" then C.dim else C.money, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
+	y += 20
+	-- the next rank's checklist: its parents, its tier
+	for n, need in row.needs do
+		Ui.label(panel, `{if need.ok then "✓" else "✗"} {need.text}`, UDim2.fromOffset(inner, 15), { Name = `Need{n}`, Position = UDim2.fromOffset(pad, y), Font = Theme.HeadingFont, TextSize = 11, TextColor3 = if need.ok then K.good else K.red, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
+		y += 16
 	end
-	-- the words: the name and its level, what it gives now, what the next level gives
-	local x = 6 + side + 12
-	local room = math.max(60, rowW - x - right - layout.priceW - 16)
-	local nameW = math.min(room, CardKit.width(row.name, 15, Theme.HeadingFont) + 12) -- (a little slack: the name is never cut where it fits)
-	local y = math.floor((h - WORDS) / 2)
-	Ui.label(frame, row.name, UDim2.fromOffset(nameW, 18), { Name = "UpgradeName", Position = UDim2.fromOffset(x, y), Font = Theme.HeadingFont, TextSize = 15, TextColor3 = if locked then K.secondary else K.text, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
-	levelBar(frame, row, x + nameW + 8, y + 1)
-	Ui.label(frame, row.now, UDim2.fromOffset(room, 16), { Name = "Now", Position = UDim2.fromOffset(x, y + 20), TextSize = 13, TextColor3 = K.secondary, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
-	-- (8.3: a locked card's next level gives nothing yet: "Locked for now", grey)
-	Ui.label(frame, if locked then "Locked for now" elseif row.next then `Next: {row.next}` else "Top level", UDim2.fromOffset(room, 14), { Name = "Next", Position = UDim2.fromOffset(x, y + 38), Font = Theme.HeadingFont, TextSize = 12, TextColor3 = if locked then C.dim elseif row.next then C.money else C.gold, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
+	-- the price and BUY at the bottom
+	local by = layout.treeH - pad - layout.button
+	if row.price and row.status ~= "soon" then
+		Ui.label(panel, UpgradeRules.money(row.price), UDim2.fromOffset(inner, 24), { Name = "Price", Position = UDim2.fromOffset(pad, by - 28), Font = Theme.DisplayFont, TextSize = 20, TextColor3 = if row.status == "buy" then C.money else K.secondary, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Left })
+	end
+	local button: any
+	if row.status == "max" then
+		button = Ui.label(panel, "MAX", UDim2.fromOffset(inner, layout.button), { Name = "Max", Position = UDim2.fromOffset(pad, by), BackgroundColor3 = C.gold, BackgroundTransparency = 0, Font = Theme.HeadingFont, TextSize = 15, TextColor3 = C.goldInk, TextWrapped = false, TextXAlignment = Enum.TextXAlignment.Center, Selectable = true })
+		Ui.corner(button, 8)
+	elseif row.status == "soon" or row.status == "locked" then
+		local why = row.locked or "Not yet"
+		button = CardKit.bigButton(panel, { name = "Locked", text = if row.status == "soon" then `⏳ {why}` else `🔒 {why}`, kind = "shut", height = layout.button, textSize = 12, onClick = function()
+			toast(`{row.name}: {if row.status == "soon" then "⏳" else "🔒"} {why}`) -- (only says it: nothing is bought)
+		end })
+		button.TextWrapped = true
+	else
+		local can = row.status == "buy"
+		button = CardKit.bigButton(panel, { name = "Buy", text = if can then "BUY" else `NEED {UpgradeRules.money(row.short)}`, kind = if can then "good" else "shut", height = layout.button, textSize = if can then 16 else 12, onClick = function()
+			local live = rowOf(row.id) -- (the money moved since it was drawn)
+			if not live or live.status ~= "buy" then
+				toast(`{row.name}: you need {UpgradeRules.money(if live then live.short else row.short)} more.`)
+				return
+			end
+			if send({ kind = "buy", id = row.id, level = live.level + 1 }) then
+				local made = panel:FindFirstChild("Buy")
+				if made then
+					made.Text = "…"
+					made.Active = false
+				end
+			end
+		end })
+	end
+	button.Size = UDim2.fromOffset(inner, layout.button)
+	button.Position = UDim2.fromOffset(pad, by)
+	return panel
+end
+
+-- The header's zoom buttons and the branches' legend.
+local function drawHeader(frame: any, layout: Layout, state: State?)
+	local wide = layout.w - (layout.pad * 2 + layout.close + 8)
+	Ui.label(frame, "⬆ DELIVEROS UPGRADES", UDim2.fromOffset(math.min(wide, 280), 24), { Name = "Title", Position = UDim2.fromOffset(layout.pad, if layout.touch then 4 else 8), Font = Theme.HeadingFont, TextSize = 18, TextColor3 = K.text, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
+	Ui.label(frame, subtitleOf(state), UDim2.fromOffset(math.min(wide, 360), 16), { Name = "Subtitle", Position = UDim2.fromOffset(layout.pad, if layout.touch then 26 else 32), TextSize = 12, TextColor3 = K.secondary, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
+	local close = Ui.closeButton(frame, UpgradeUi.close)
+	close.Size = UDim2.fromOffset(layout.close, layout.close)
+	close.Position = UDim2.new(1, -6, 0, 6)
+	close.AnchorPoint = Vector2.new(1, 0)
+	-- − / + (the tree's zoom), left of the ✕
+	local side = if layout.touch then layout.close else 32
+	local zx = layout.w - 6 - layout.close - 10 - 2 * side - 6
+	local zooms = W.Zooms :: { number }
+	local now = math.clamp(step or layout.zoom, 1, #zooms)
+	for n, spec in { { name = "ZoomOut", text = "−", by = -1 }, { name = "ZoomIn", text = "+", by = 1 } } do
+		local target = math.clamp(now + spec.by, 1, #zooms)
+		local made = CardKit.bigButton(frame, { name = spec.name, text = spec.text, kind = "shut", height = side, textSize = 18, onClick = function()
+			UpgradeUi.zoom(target)
+		end })
+		made.Size = UDim2.fromOffset(side, side)
+		made.Position = UDim2.fromOffset(zx + (n - 1) * (side + 6), math.floor((layout.header - side) / 2))
+		made.TextColor3 = if target == now then C.dim else K.text
+	end
+	-- the legend: each branch's colour and name (a computer's: room enough)
+	if not layout.touch then
+		local x = layout.pad + 380
+		for _, branch in UpgradeRules.branches() do
+			local text = branch.name
+			local width = CardKit.width(text, 11, Theme.HeadingFont) + 22
+			if x + width > zx - 10 then
+				break
+			end
+			CardKit.chip(frame, { name = `Legend_{branch.id}`, text = text, face = K.row, ink = rgb(branch.color), stroke = rgb(branch.color), faint = 0.5, static = true }).Position = UDim2.fromOffset(x, math.floor((layout.header - 24) / 2))
+			x += width + 6
+		end
+	end
 end
 
 draw = function(keepScroll: boolean)
@@ -387,26 +659,32 @@ draw = function(keepScroll: boolean)
 	end
 	local size = Ui.screenSize()
 	local layout = UpgradeUi.layout(size.X, size.Y, Ui.touchLayout())
-	local key = stateKey(current, layout)
+	local zoom = zoomOf(layout)
+	local state = current
+	local rows: { UpgradeRules.Row } = if state then UpgradeRules.rows(state.levels, state.money) else {}
+	if chosen == nil and #rows > 0 then
+		chosen = firstPick(rows)
+	end
+	local key = stateKey(state, layout, zoom)
 	if card and key == shownKey then
 		followMoney()
 		return -- (nothing else it shows changed: no redraw, a tap is never lost)
 	end
 	shownKey = key
-	local list = card and card:FindFirstChild("Upgrades") and card:FindFirstChild("Upgrades"):FindFirstChild("List")
-	local scroll = if keepScroll and list then list.CanvasPosition else Vector2.zero
+	local oldTree = card and card:FindFirstChild("Upgrades") and card:FindFirstChild("Upgrades"):FindFirstChild("Tree")
+	local scroll = if keepScroll and oldTree then oldTree.CanvasPosition else nil
 	local selected = Ui.gamepadSelection()
 	local heldInside = card ~= nil and selected ~= nil and selected:IsDescendantOf(card)
 	if card then
 		card:Destroy()
 	end
 	local root = ensureGui()
-	-- a shade over the world (the touch buttons too): a tap beside the card closes it; Modal frees the mouse
+	-- a shade over the world (the touch buttons too): a tap on it closes; Modal frees the mouse
 	card = Ui.make("TextButton", {
 		Name = "UpgradeShade",
 		Size = UDim2.fromScale(1, 1),
 		BackgroundColor3 = Color3.new(0, 0, 0),
-		BackgroundTransparency = 0.45,
+		BackgroundTransparency = 0.35,
 		BorderSizePixel = 0,
 		AutoButtonColor = false,
 		Text = "",
@@ -422,7 +700,7 @@ draw = function(keepScroll: boolean)
 		BackgroundTransparency = Theme.WindowTransparency,
 		BorderSizePixel = 0,
 		Active = true,
-		SelectionGroup = true, -- (8.3: the gamepad's selection stays in the window)
+		SelectionGroup = true, -- (the gamepad's selection stays in the window)
 		SelectionBehaviorUp = Enum.SelectionBehavior.Stop,
 		SelectionBehaviorDown = Enum.SelectionBehavior.Stop,
 		SelectionBehaviorLeft = Enum.SelectionBehavior.Stop,
@@ -431,47 +709,59 @@ draw = function(keepScroll: boolean)
 	Ui.make("UIScale", { Name = "Scale", Scale = layout.scale }, frame)
 	Ui.corner(frame, Config.UiKit.Corner)
 	Ui.make("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.rule, Thickness = 1 }, frame)
-	-- the header: the title, your money, the ✕
-	local state = current
-	local wide = layout.w - (layout.pad * 2 + layout.close + 8)
-	Ui.label(frame, "⬆ DELIVEROS UPGRADES", UDim2.fromOffset(wide, 24), { Name = "Title", Position = UDim2.fromOffset(layout.pad, 10), Font = Theme.HeadingFont, TextSize = 18, TextColor3 = K.text, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
-	local subtitle = subtitleOf(state)
-	Ui.label(frame, subtitle, UDim2.fromOffset(wide, 16), { Name = "Subtitle", Position = UDim2.fromOffset(layout.pad, 33), TextSize = 12, TextColor3 = K.secondary, TextWrapped = false, TextTruncate = Enum.TextTruncate.AtEnd, TextXAlignment = Enum.TextXAlignment.Left })
-	local close = Ui.closeButton(frame, UpgradeUi.close)
-	close.Size = UDim2.fromOffset(layout.close, layout.close)
-	close.Position = UDim2.new(1, -6, 0, 6)
-	close.AnchorPoint = Vector2.new(1, 0)
-	-- the cards (a list that scrolls when the screen is short)
-	local rows: { UpgradeRules.Row } = if state then UpgradeRules.rows(state.levels, state.money) else {}
-	local tall = #rows * (layout.rowH + layout.gap) - layout.gap
-	local scrolls = tall > layout.listH
-	local listFrame = Ui.make("ScrollingFrame", {
-		Name = "List",
-		Size = UDim2.fromOffset(layout.rowW, layout.listH),
-		Position = UDim2.fromOffset(layout.pad, layout.listY),
-		BackgroundTransparency = 1,
+	drawHeader(frame, layout, state)
+	-- THE TREE: a canvas that scrolls both ways (a finger drags it; a mouse drags it too, below)
+	local canvasSize = UpgradeUi.canvasSize(zoom)
+	local tree = Ui.make("ScrollingFrame", {
+		Name = "Tree",
+		Size = UDim2.fromOffset(layout.treeW, layout.treeH),
+		Position = UDim2.fromOffset(layout.treeX, layout.treeY),
+		BackgroundColor3 = K.recessed,
+		BackgroundTransparency = 0.2,
 		BorderSizePixel = 0,
-		ScrollBarThickness = if scrolls then SCROLLBAR else 0,
+		ScrollBarThickness = SCROLLBAR,
 		ScrollBarImageColor3 = K.line,
-		ScrollingDirection = Enum.ScrollingDirection.Y,
-		CanvasSize = UDim2.fromOffset(0, math.max(0, tall)),
-		CanvasPosition = Vector2.new(0, math.clamp(scroll.Y, 0, math.max(0, tall - layout.listH))),
+		ScrollingDirection = Enum.ScrollingDirection.XY,
+		CanvasSize = UDim2.fromOffset(canvasSize.X, canvasSize.Y),
+		ClipsDescendants = true,
+		Selectable = false,
 	}, frame)
-	local rowW = layout.rowW - (if scrolls then SCROLLBAR + 2 else 0)
-	for index, row in rows do
-		drawRow(listFrame, row, index, layout, rowW)
+	Ui.corner(tree, Config.UiKit.RowCorner)
+	local most = Vector2.new(math.max(0, canvasSize.X - layout.treeW), math.max(0, canvasSize.Y - layout.treeH))
+	local start = scroll
+	if start == nil then
+		-- (a fresh view: the selected node in it with as little a scroll as it takes, the lanes' names at the left when
+		-- it allows; its row in the middle when the tree is taller than the view)
+		local tierNext = math.min(#Config.Warehouse.Levels, UpgradeRules.warehouseLevel(if state then state.levels else {}) + 1)
+		local focus = if chosen and chosen ~= "warehouse" then (UpgradeRules.def(chosen) :: any).at else UpgradeRules.trunkAt(tierNext)
+		local b = UpgradeUi.place(focus, zoom)
+		start = Vector2.new(b.x + b.w + W.Pad * zoom - layout.treeW, b.y + b.h / 2 - layout.treeH / 2)
 	end
-	local first: any = nil
+	tree.CanvasPosition = Vector2.new(math.clamp(start.X, 0, most.X), math.clamp(start.Y, 0, most.Y))
+	drawLanes(tree, zoom)
+	if state then
+		drawLines(tree, rows, state.levels, zoom)
+	end
+	local focusNode: any = nil
 	for _, row in rows do
-		local made = listFrame:FindFirstChild(`Upgrade_{row.id}`)
-		local buy = made and made:FindFirstChild("Buy")
-		if buy and row.can then
-			first = buy
-			break
+		if row.id == "warehouse" then
+			local tile = drawTrunk(tree, row, zoom)
+			if chosen == "warehouse" then
+				focusNode = tile
+			end
+		else
+			local made = drawNode(tree, row, zoom)
+			if row.id == chosen then
+				focusNode = made
+			end
 		end
 	end
+	-- THE DETAILS
+	local detail = if chosen then rowOf(chosen) else nil
+	local panel = if detail then drawDetails(frame, layout, detail) else nil
+	local buy = panel and (panel:FindFirstChild("Buy") or panel:FindFirstChild("Locked") or panel:FindFirstChild("Max"))
 	if not keepScroll or heldInside then
-		Ui.gamepadFocus(first or close) -- (a redraw while open moves the gamepad only when its selection went with it)
+		Ui.gamepadFocus(focusNode or buy or frame:FindFirstChild("Close")) -- (a redraw moves the gamepad only when its selection went with it)
 	end
 end
 
@@ -501,6 +791,7 @@ function UpgradeUi.open()
 	opened = true
 	shownKey = ""
 	if not was then
+		chosen = nil -- (a fresh window shows the best node to buy)
 		local onOpen = UpgradeUi.onOpen
 		if onOpen then
 			onOpen()
@@ -525,18 +816,18 @@ local function onEvent(message: any)
 		local def = UpgradeRules.def(message.id)
 		local level = amount(message.level)
 		if def and level then
-			-- 8.3: what it gives with the levels after it (the state may come after the toast): the warehouse's stands,
-			-- More stands' count on the warehouse's base; the warehouse's own level 1 … 5
+			-- (what it gives with the levels after it: the state may come after the toast; the trunk's tier 1 … 5)
 			local id: string = message.id
 			local at = math.floor(level)
 			local levels = table.clone(if current then current.levels else {})
 			levels[id] = at
-			toast(`{def.name}: level {shownLevel(id, at)} · {UpgradeRules.effect(id, at, levels)}`)
+			local words = UpgradeRules.words(id, at, levels)
+			toast(if id == "warehouse" then `{def.name}: tier {at + 1} · {words}` else `{def.name}: rank {at} · {words}`)
 		end
 	end
 end
 
--- The money from the player's State (a sale, the stands' income): the cards' BUY follow it while open.
+-- The money from the player's State (a sale, the hall's income): the details' BUY follows it while open.
 local function onMoney(state: any)
 	local money = if type(state) == "table" then amount(state.money) else nil
 	local now = current
@@ -548,17 +839,58 @@ local function onMoney(state: any)
 	end
 end
 
+-- A mouse drags the tree (a touch screen's finger scrolls it by itself).
+local function onDrag(input: InputObject)
+	local drag = dragging
+	if not drag or not opened or input.UserInputType ~= Enum.UserInputType.MouseMovement then
+		return
+	end
+	local tree = card and card:FindFirstChild("Upgrades") and card:FindFirstChild("Upgrades"):FindFirstChild("Tree")
+	if not tree then
+		return
+	end
+	local scale = UpgradeUi.layout(Ui.screenSize().X, Ui.screenSize().Y, Ui.touchLayout()).scale
+	local dx, dy = (input.Position.X - drag.at.X) / scale, (input.Position.Y - drag.at.Y) / scale
+	tree.CanvasPosition = Vector2.new(drag.from.X - dx, drag.from.Y - dy)
+end
+
+local function sandboxOn(): boolean
+	local sandbox = (Config :: any).Sandbox
+	return type(sandbox) == "table" and sandbox.On == true
+end
+
 function UpgradeUi.start()
-	if started then
+	if started or not sandboxOn() then
 		return
 	end
 	started = true
-	-- ESC, the gamepad's B and the Roblox menu close it
+	-- ESC, the gamepad's B and the Roblox menu close it; a mouse's left button held on the tree drags it
 	UserInputService.InputBegan:Connect(function(input: InputObject)
 		if (input.KeyCode == Enum.KeyCode.Escape or input.KeyCode == Enum.KeyCode.ButtonB) and opened and not UserInputService:GetFocusedTextBox() then
 			UpgradeUi.close()
+		elseif input.UserInputType == Enum.UserInputType.MouseButton1 and opened then
+			local tree = card and card:FindFirstChild("Upgrades") and card:FindFirstChild("Upgrades"):FindFirstChild("Tree")
+			if tree then
+				local p, s = tree.AbsolutePosition, tree.AbsoluteSize
+				local at = Vector2.new(input.Position.X, input.Position.Y)
+				if at.X >= p.X and at.Y >= p.Y and at.X <= p.X + s.X and at.Y <= p.Y + s.Y then
+					dragging = { at = at, from = tree.CanvasPosition }
+				end
+			end
 		end
 	end)
+	local ended = (UserInputService :: any).InputEnded
+	if ended then
+		ended:Connect(function(input: InputObject)
+			if input.UserInputType == Enum.UserInputType.MouseButton1 then
+				dragging = nil
+			end
+		end)
+	end
+	local changed = (UserInputService :: any).InputChanged
+	if changed then
+		changed:Connect(onDrag)
+	end
 	GuiService.MenuOpened:Connect(UpgradeUi.close)
 	local camera = workspace.CurrentCamera
 	if camera then

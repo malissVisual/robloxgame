@@ -1,19 +1,27 @@
 -- 10.5 ROUNDS end to end (the owner: "16 people on one server … a round starts at one place, everybody runs there,
 -- everyone has their own car, what you carry off to it quickly is yours … not teams"): the REAL sandbox server
--- (SandboxBoot, Moving, Runs, Collection …) on tests/runtime/SandboxE2E.luau's stand-in, Config.Rounds.On.
---   1. Three join; nothing counts down before PLAY (InGame); Ann and Bob press PLAY: the countdown, the next place
---      named (its portal's sign, the round view), Cid (still on the start screen) not in it
+-- (SandboxBoot, Moving, Runs, Parties, Collection …) on tests/runtime/SandboxE2E.luau's stand-in, Config.Rounds.On.
+-- 10.6 both in PLAY (the owner: "Both in the PLAY circle"): the round's queue is the PLAY panel's QUICK ROUND.
+--   1. Three join; nothing counts down, the start screen's PLAY queues nobody; a QUICK ROUND away from the PLAY circle
+--      is refused; Ann and Bob step in (the PLAY view's `round`: nobody queued) and join the queue: the countdown, the
+--      next place named (the round view, the PLAY view, the map's attributes on the circle, its sign), Cid (not
+--      queued) not in it; Bob leaves the queue from the banner (the Runs remote's "queue") and joins it again
 --   2. The countdown ends: Ann and Bob ride to the place (the ride's round count), each one's own van parked at its
 --      curb (side by side, locked, the back open, the owner's name over it, the Load prompt only theirs), no move
 --      truck's Load, no helper, the move's view a round's (no FINISH for anybody)
 --   3. Ann carries a piece out: Bob's van's Load does nothing for her, her own takes it: into her stock at once, the
 --      model gone, the feed to both, the table (Ann first); Bob loads one of his own; an empty-handed Load is off;
 --      CAR, FINISH and GIVE UP do nothing in a round
---   4. Cid presses PLAY mid-round: he waits in the lobby (not in it, his view says so)
+--   3b. 10.6 snatching (Ann and Bob in the round from the queue): Ann carries a piece in the house, Bob beside her: her
+--      Snatch prompt only after Protect s; his tug (both still, her Load off), she does nothing: his (the feed, she
+--      stunned, then free); she can't take it straight back; he loads it; another tug where both pull: hers, he stunned,
+--      she isn't open again at once
+--   4. Cid joins the queue mid-round (in the circle): he waits in the lobby (not in it, his view says so)
 --   5. Ann (the host) leaves the game: the round goes on, Bob's now (its move his, the pieces' prompts his), he loads
---      another
+--      another; Ann is out of the queue
 --   6. The clock: the results card ranks everybody who came (Ann too), the ride back to the plaza, the vans gone, the
---      next countdown (never the same place twice in a row), Bob and Cid in it; Cid leaves it alone (the list's LEAVE)
+--      next countdown (never the same place twice in a row), Bob (still queued: Config.Rounds.Stay) and Cid in it; Cid
+--      leaves it alone (the list's LEAVE): out of the queue too; Bob leaves the queue from the panel: no round after
 local E = require("./SandboxE2E")
 local Config = require("./Config")
 local SandboxMap = require("./SandboxMap")
@@ -52,6 +60,7 @@ local Collection = E.module("Collection")
 local Moving = E.module("Moving")
 local MoveHelper = E.module("MoveHelper")
 local Runs = E.module("Runs")
+local Parties = E.module("Parties")
 local Danger = E.module("RunDanger")
 local Vehicles = E.fakes.Vehicles
 MoveHelper.useMover(E.mover)
@@ -155,13 +164,16 @@ function H.free(player: any, spot: number): boolean
 	return true
 end
 function H.choose(player: any): (any, any)
-	for _, item in H.stateOf(player).items do
-		local model = H.pieceOf(player, item.spot)
-		local id = model and model:GetAttribute("FurnitureId")
-		local def = id and FurnitureLooks.Items[id]
-		if item.state == "home" and def and def.class ~= "pair" and H.free(player, item.spot) and not S.taken[item.spot] then
-			S.taken[item.spot] = true
-			return item, model
+	local items = H.stateOf(player).items
+	for pass = 1, 2 do -- (a piece one carries first; none left: a two-person one, dragged alone)
+		for _, item in items do
+			local model = H.pieceOf(player, item.spot)
+			local id = model and model:GetAttribute("FurnitureId")
+			local def = id and FurnitureLooks.Items[id]
+			if item.state == "home" and def and (def.class ~= "pair" or pass == 2) and H.free(player, item.spot) and not S.taken[item.spot] then
+				S.taken[item.spot] = true
+				return item, model
+			end
 		end
 	end
 	return nil, nil
@@ -214,12 +226,26 @@ end
 function H.round(player: any, from: number?): any
 	return E.lastKind(player, "Runs", "round", from)
 end
-function H.sign(house: string): string
-	local model = workspace:FindFirstChild("Sandbox"):FindFirstChild("Lobby"):FindFirstChild("Portals"):FindFirstChild(`Portal_{house}`)
-	local sign = model and model:FindFirstChild("GateSign")
-	local words = sign and sign:FindFirstChild("Words")
-	local status = words and words:FindFirstChild("Status")
+-- 10.6: the PLAY circle (its model: the map's attributes, its sign's Status line), a spot in it, a request on the Party
+-- remote (a moment after: its rate limit, the loop's look), the PLAY view.
+function H.circle(): any
+	return workspace:FindFirstChild("Sandbox"):FindFirstChild("Lobby"):FindFirstChild("PlayCircle")
+end
+function H.sign(): string
+	local status = H.circle():FindFirstChild("Status", true)
 	return if status then status.Text else ""
+end
+function H.inCircle(n: number): any
+	local L = SandboxMap.Lobby.play
+	local x, z = L.x + ((n - 1) % 3 - 1) * 3, L.z + ((n - 1) // 3 - 1) * 3
+	return V3(x, E.groundY(x, z) + 3, z)
+end
+function H.ask(player: any, message: any)
+	E.fire(player, "Party", message)
+	E.advance(0.25)
+end
+function H.play(player: any, from: number?): any
+	return E.lastKind(player, "Party", "play", from)
 end
 function H.inRect(at: any, rect: any): boolean
 	return at.X > rect.x0 and at.X < rect.x1 and at.Z > rect.z0 and at.Z < rect.z1
@@ -244,7 +270,7 @@ function H.client(player: any): (string, ...any) -> ()
 	end
 end
 
--- ── 1. Join, PLAY, the countdown ──────────────────────────────────────────
+-- ── 1. Join, the queue, the countdown ─────────────────────────────────────
 
 local ann = E.join(11, "Ann")
 local bob = E.join(22, "Bob")
@@ -253,22 +279,49 @@ for _, p in { ann, bob, cid } do
 	E.clients[p] = H.client(p)
 end
 E.advance(1)
-check("1. three in the server, nobody pressed PLAY: no countdown (the round idle)", Runs.round().phase == "idle" and Runs.round().house == nil)
-local playAt = #E.sent
+check("1. three in the server, nobody queued: no countdown (the round idle)", Runs.round().phase == "idle" and Runs.round().house == nil)
 E.fire(ann, "Play")
 E.fire(bob, "Play")
 E.advance(1)
+check("…the start screen's PLAY queues nobody (10.6: the QUICK ROUND is the PLAY panel's): still idle", Runs.round().phase == "idle" and #Runs.round().queue == 0)
+local playAt = #E.sent
+H.ask(ann, { kind = "round", on = true })
+check("NEG. QUICK ROUND away from the PLAY circle: refused (told to step in), nobody queued", not Runs.queued(ann) and Runs.round().phase == "idle"
+	and E.heard(ann, "Step into the PLAY circle", playAt))
+E.walk(ann, H.inCircle(1))
+E.walk(bob, H.inCircle(2))
+E.advance(R.Every + 0.05)
+local panel = H.play(ann, playAt)
+check("…Ann and Bob step into the circle: the PLAY view's QUICK ROUND (nobody queued, no round yet, not hers)", panel ~= nil and panel.circle == true and panel.round ~= nil
+	and panel.round.phase == "idle" and panel.round.queued == 0 and panel.round.mine == false and panel.round.seconds == Q.Seconds)
+playAt = #E.sent
+H.ask(ann, { kind = "round", on = true })
+H.ask(bob, { kind = "round", on = true })
+E.advance(Q.Every + 0.05)
 local round = Runs.round()
 local house = SandboxMap.house(round.house or "")
 local view = H.round(ann, playAt)
-check("…Ann and Bob press PLAY (InGame): the countdown (Config.Rounds.Wait), its place and difficulty picked", ann:GetAttribute("InGame") == true
+check("…both JOIN THE QUEUE (told): the countdown (Config.Rounds.Wait), its place and difficulty picked", Runs.queued(ann) and Runs.queued(bob) and #round.queue == 2
 	and round.phase == "wait" and house ~= nil and table.find(Config.Rounds.Difficulties, round.difficulty) ~= nil
-	and math.abs(round.endsAt - workspace:GetServerTimeNow() - Q.Wait) < 2, round.phase)
-check("…their round view: the countdown, the place's name, 2 in the game", view ~= nil and view.phase == "wait" and view.name == (house and house.name)
-	and view.players == 2 and view.ready == true and view.inRound == false)
-check("…Cid (still on the start screen) hears the round too, but is not ready", H.round(cid, playAt) ~= nil and H.round(cid, playAt).ready == false)
-check("…the place's portal says NEXT ROUND HERE, the others ROUNDS · WAIT IN THE LOBBY", house ~= nil and string.find(H.sign(house.id), "NEXT ROUND HERE", 1, true) ~= nil
-	and H.sign(if house.id == "old_mill" then "lone_house" else "old_mill") == "ROUNDS · WAIT IN THE LOBBY", house and H.sign(house.id))
+	and math.abs(round.endsAt - workspace:GetServerTimeNow() - Q.Wait) < 2 and E.heard(ann, "You are in the QUICK ROUND queue", playAt), round.phase)
+check("…their round view: the countdown, the place's name, 2 in the queue, theirs", view ~= nil and view.phase == "wait" and view.name == (house and house.name)
+	and view.players == 2 and view.queued == 2 and view.ready == true and view.inRound == false)
+check("…Cid (not queued) hears the round too, but is not in it", H.round(cid, playAt) ~= nil and H.round(cid, playAt).ready == false and not Runs.queued(cid))
+E.advance(R.Every + 0.05)
+panel = H.play(ann)
+local circle = H.circle()
+check("…the PLAY view says so (round.mine, the place, 2 queued); the map's attributes on the circle; its sign names the next round",
+	panel.round.mine == true and panel.round.house == house.id and panel.round.queued == 2 and panel.round.phase == "wait"
+		and circle:GetAttribute("RoundPhase") == "wait" and circle:GetAttribute("RoundHouse") == house.id and circle:GetAttribute("RoundQueued") == 2
+		and circle:GetAttribute("RoundEndsAt") == round.endsAt and string.find(H.sign(), "QUICK ROUND IN", 1, true) == 1
+		and string.find(H.sign(), string.upper(house.name), 1, true) ~= nil, H.sign())
+local leaveAt = #E.sent
+E.fire(bob, "Runs", { kind = "queue", on = false })
+E.advance(Q.Every + 0.05)
+check("…Bob's LEAVE QUEUE on the banner (the Runs remote): out (told), 1 in the queue, the countdown goes on", not Runs.queued(bob) and #Runs.round().queue == 1
+	and Runs.round().phase == "wait" and E.heard(bob, "You left the QUICK ROUND queue", leaveAt) and H.round(bob, leaveAt).ready == false and H.round(ann, leaveAt).queued == 1)
+H.ask(bob, { kind = "round", on = true })
+check("…and joins it again in the panel (2 queued)", Runs.queued(bob) and #Runs.round().queue == 2)
 S.house = house
 
 -- ── 2. The round starts ──────────────────────────────────────────────────
@@ -334,6 +387,113 @@ local bobItem = H.fetch(bob, house)
 local bobOk = bobItem ~= nil and H.loadAt(bob, bobVan)
 E.advance(0.3)
 check("…Bob loads one of his own: into his stock", bobOk and #Collection.stock(bob) == before + 1)
+
+-- ── 3b. 10.6 snatching (inside the house: away from the vans and the door) ─────────────────────────────────────────
+
+local TUG = Config.Rounds.Tug
+function H.grabOf(player: any): any
+	local root = E.rootOf(player)
+	local at = root and root:FindFirstChild("SnatchAt")
+	return at and at:FindFirstChild("SnatchPrompt")
+end
+function H.beside(player: any, other: any)
+	local at = E.rootOf(other).Position
+	E.walk(player, at + V3(2.5, 0, 0))
+end
+function H.mash(player: any, id: number, seconds: number, rate: number)
+	local steps = math.floor(seconds * rate + 0.5)
+	for _ = 1, steps do
+		if next(Runs.tugs()) == nil then
+			return -- (over: no more presses)
+		end
+		E.fire(player, "Tug", { kind = "pull", id = id })
+		E.advance(1 / rate + 0.001)
+	end
+end
+function H.tugMsg(player: any, kind: string, from: number?): any
+	return E.lastKind(player, "Tug", kind, from)
+end
+S.annBefore, S.bobBefore = #Collection.stock(ann), #Collection.stock(bob)
+local inAnn = H.enterHouse(ann, house)
+local annPiece, annModel = H.choose(ann)
+local picked = inAnn and annPiece ~= nil and H.pickUp(ann, annModel)
+local inBob = H.enterHouse(bob, house)
+H.beside(bob, ann)
+E.advance(0.3)
+local grab = H.grabOf(ann)
+check("3b. 10.6 Ann carries a piece in the house, Bob beside her (both in the round from the queue): her Snatch prompt (theirs to see: MoveSkip her, MoveOwner the round's)",
+	picked and inBob and Runs.queued(ann) and Runs.queued(bob) and grab ~= nil and grab:GetAttribute("MoveSkip") == ann.UserId and grab:GetAttribute("MoveOwner") == Runs.runOf(ann).host.UserId
+		and string.find(grab.ActionText, "Snatch", 1, true) == 1, annPiece and annPiece.name)
+E.advance(TUG.Protect + 0.5)
+check("…on once she has held it Protect s (never at once after a pick-up)", grab.Enabled == true)
+local tugAt = #E.sent
+local triggered = E.trigger(grab, bob)
+E.advance(0.2)
+local startAnn, startBob = H.tugMsg(ann, "start", tugAt), H.tugMsg(bob, "start", tugAt)
+local id = startBob and startBob.id
+check("…Bob snatches: a tug (both told: their sides, the piece, the clock), both standing still (anchored)", triggered and startAnn ~= nil and startBob ~= nil
+	and startAnn.side == "carrier" and startBob.side == "snatcher" and startBob.other == "Ann" and startAnn.name == annPiece.name
+	and E.rootOf(ann).Anchored == true and E.rootOf(bob).Anchored == true and next(Runs.tugs()) ~= nil)
+E.advance(Q.Every + 0.05)
+check("…her Load and her Snatch prompt off while it goes on", annLoad.Enabled == false and grab.Enabled == false)
+H.mash(bob, id, 2, TUG.Rate)
+E.advance(0.3)
+local endBob, endAnn = H.tugMsg(bob, "end", tugAt), H.tugMsg(ann, "end", tugAt)
+check("…Ann does nothing, Bob pulls: he takes it (in his hands now, hers empty), both told", endBob ~= nil and endBob.won == true and endAnn ~= nil and endAnn.won == false
+	and bob.Character:GetAttribute("MoveCarry") == annPiece.spot and ann.Character:GetAttribute("MoveCarry") == nil and next(Runs.tugs()) == nil)
+local feed = E.lastKind(ann, "Runs", "snatch", tugAt)
+check("…the round's feed: Bob snatched it from Ann", feed ~= nil and feed.took == true and feed.by == "Bob" and feed.from == "Ann" and feed.name == annPiece.name)
+check("…Ann, the loser, stunned (still standing: anchored; told), Bob free", E.rootOf(ann).Anchored == true and E.rootOf(bob).Anchored == false
+	and H.tugMsg(ann, "stun", tugAt) ~= nil)
+local back = #E.sent
+local bobGrab = H.grabOf(bob)
+check("NEG. …she can't snatch it straight back: his is a fresh pick-up (his prompt off)", bobGrab ~= nil and bobGrab.Enabled == false)
+bobGrab.Enabled = true -- (pressed anyway, as a laggy client could: the server says no)
+E.trigger(bobGrab, ann)
+bobGrab.Enabled = false
+check("NEG. …(pressed anyway: nothing, told why)", next(Runs.tugs()) == nil and bob.Character:GetAttribute("MoveCarry") == annPiece.spot
+	and E.heard(ann, "just picked it up", back), E.lastNotice(ann, back))
+E.advance(TUG.Stun + 0.3)
+check("…Stun s later she can move again", E.rootOf(ann).Anchored == false)
+local outBob = H.leaveHouse(bob)
+local loaded = outBob and H.loadAt(bob, bobVan)
+E.advance(0.3)
+check("…he carries it out and loads it at his van: his now (in his stock)", loaded and #Collection.stock(bob) == S.bobBefore + 1 and #Collection.stock(ann) == S.annBefore)
+E.advance(Q.Every + 0.05)
+check("NEG. …by his own van nobody could have snatched it (his prompt off there)", bobGrab.Parent == nil or bobGrab.Enabled == false)
+-- the carrier holds on
+local second, secondModel = H.choose(ann)
+local held = second ~= nil and H.pickUp(ann, secondModel)
+local again = H.enterHouse(bob, house)
+H.beside(bob, ann)
+E.advance(TUG.Again + TUG.Protect + 0.5)
+local holdAt = #E.sent
+local tried = held and again and E.trigger(H.grabOf(ann), bob)
+E.advance(0.2)
+local start2 = H.tugMsg(bob, "start", holdAt)
+for _ = 1, math.floor(TUG.Seconds * TUG.Rate) + 2 do
+	if start2 then
+		E.fire(bob, "Tug", { kind = "pull", id = start2.id })
+		E.fire(ann, "Tug", { kind = "pull", id = start2.id })
+	end
+	E.advance(1 / TUG.Rate + 0.001)
+end
+E.advance(0.3)
+local end2 = H.tugMsg(ann, "end", holdAt)
+check("…another tug, both pulling as fast as is heard: Ann (the carrier) holds on to it, Bob stunned",
+	tried and start2 ~= nil and end2 ~= nil and end2.won == true and ann.Character:GetAttribute("MoveCarry") == second.spot
+		and E.rootOf(bob).Anchored == true and E.rootOf(ann).Anchored == false and E.lastKind(bob, "Runs", "snatch", holdAt).took == false)
+E.advance(Q.Every + 0.05)
+check("NEG. …right after a tug she isn't open again at once (Target s)", H.grabOf(ann).Enabled == false)
+E.advance(TUG.Stun + 0.3)
+H.leaveHouse(ann)
+H.loadAt(ann, annVan)
+E.advance(0.3)
+check("…she carries it out and loads it: hers", #Collection.stock(ann) == S.annBefore + 1 and ann.Character:GetAttribute("MoveCarry") == nil)
+S.annClaims = #Collection.stock(ann)
+if H.isInside(bob) then
+	H.leaveHouse(bob)
+end
 check("10.6: no CAR remote at all (nobody calls a van); hers stays parked", Vehicles.get(ann) == annVan)
 E.fire(ann, "Moving", "finish")
 E.advance(0.3)
@@ -344,11 +504,13 @@ check("NEG. …FINISH and GIVE UP in a round: nothing (the clock ends it)", Runs
 -- ── 4. A late PLAY ───────────────────────────────────────────────────────
 
 local lateAt = #E.sent
-E.fire(cid, "Play")
+E.walk(cid, H.inCircle(3))
+E.advance(R.Every + 0.05)
+H.ask(cid, { kind = "round", on = true })
 E.advance(1)
 view = H.round(cid, lateAt)
-check("4. Cid presses PLAY mid-round: not in it (he waits for the next one), his view says so", Runs.runOf(cid) == nil and view ~= nil and view.ready == true
-	and view.phase == "play" and view.inRound == false and Vehicles.get(cid) == nil)
+check("4. Cid joins the queue mid-round (in the circle): not in it (he waits for the next one, told), his view says so", Runs.runOf(cid) == nil and view ~= nil
+	and view.ready == true and view.phase == "play" and view.inRound == false and Vehicles.get(cid) == nil and E.heard(cid, "you go in the next one", lateAt))
 
 -- ── 5. The host leaves the game ──────────────────────────────────────────
 
@@ -357,12 +519,14 @@ check("5. (Ann is the round's host: the first in it)", host == ann)
 E.leave(ann)
 E.advance(1)
 local run = Runs.runOf(bob)
-check("…Ann leaves the game: the round goes on, Bob's now (Runs' host, his move's view still there), Ann out of it",
-	run ~= nil and run.host == bob and #run.party == 1 and Runs.round().phase == "play" and H.stateOf(bob) ~= nil and H.stateOf(bob).run.round == true)
+check("…Ann leaves the game: the round goes on, Bob's now (Runs' host, his move's view still there), Ann out of it and of the queue",
+	run ~= nil and run.host == bob and #run.party == 1 and Runs.round().phase == "play" and H.stateOf(bob) ~= nil and H.stateOf(bob).run.round == true
+		and #Runs.round().queue == 2 and not table.find(Runs.round().queue, ann))
+S.bobMid = #Collection.stock(bob)
 local third = H.fetch(bob, house)
 local thirdOk = third ~= nil and H.loadAt(bob, bobVan)
 E.advance(0.3)
-check("…the pieces' prompts his now: he carries another out and loads it", thirdOk and #Collection.stock(bob) == before + 2, third and third.name)
+check("…the pieces' prompts his now: he carries another out and loads it", thirdOk and #Collection.stock(bob) == S.bobMid + 1, third and third.name)
 
 -- ── 6. The clock ─────────────────────────────────────────────────────────
 
@@ -375,9 +539,9 @@ local byName: { [string]: any } = {}
 for _, row in rows do
 	byName[row.name] = row
 end
-check("6. the clock: the results card, a round's: both who came ranked (Bob's 2 pieces, Ann's 1: she left, they are hers), the most value first, Bob's place his row's",
-	result ~= nil and result.round ~= nil and result.round.players == 2 and #rows == 2 and byName.Bob ~= nil and byName.Bob.count == 2 and byName.Ann ~= nil
-		and byName.Ann.count == 1 and rows[1].value >= rows[2].value and result.round.place == byName.Bob.place,
+check("6. the clock: the results card, a round's: both who came ranked (Bob's pieces, the snatched one too; Ann's: she left, they are hers), the most value first, Bob's place his row's",
+	result ~= nil and result.round ~= nil and result.round.players == 2 and #rows == 2 and byName.Bob ~= nil and byName.Bob.count == #Collection.stock(bob) and byName.Ann ~= nil
+		and byName.Ann.count == S.annClaims and rows[1].value >= rows[2].value and result.round.place == byName.Bob.place,
 	result and result.round and `{result.round.place} {#rows}`)
 check("…the round over (its view), Bob out of it", Runs.round().phase == "over" and Runs.runOf(bob) == nil and H.round(bob, endAt).phase == "over")
 local backAt = #E.sent
@@ -387,8 +551,8 @@ check("…Results s later the ride back: Bob in the lobby (the plaza), his van g
 	and SandboxMap.inLobby(E.rootOf(bob).Position.X, E.rootOf(bob).Position.Z) and Vehicles.get(bob) == nil)
 E.advance(2)
 round = Runs.round()
-check("…the next countdown: another place (never the same twice in a row), Bob and Cid in the game", round.phase == "wait" and round.house ~= nil
-	and round.house ~= S.house.id and H.round(cid).players == 2, round.house)
+check("…the next countdown: another place (never the same twice in a row), Bob (still queued: Config.Rounds.Stay) and Cid in the queue", round.phase == "wait"
+	and round.house ~= nil and round.house ~= S.house.id and H.round(cid).players == 2 and Runs.queued(bob) and Runs.queued(cid), round.house)
 local secondAt = #E.sent
 E.advance(Q.Wait + R.Fade.Out + 1)
 check("…its round takes them both (Cid too now)", Runs.runOf(bob) ~= nil and Runs.runOf(cid) ~= nil and Runs.runOf(cid).house == Runs.runOf(bob).house
@@ -397,11 +561,24 @@ check("…its round takes them both (Cid too now)", Runs.runOf(bob) ~= nil and R
 E.advance(0.5)
 E.fire(cid, "Runs", { kind = "leave" })
 E.advance(R.LeaveHold + R.Fade.Out + 1)
-check("…Cid leaves the round (the list's LEAVE): back in the lobby alone, his van gone; the round goes on, Bob's",
-	Runs.runOf(cid) == nil and SandboxMap.inLobby(E.rootOf(cid).Position.X, E.rootOf(cid).Position.Z) and Vehicles.get(cid) == nil
+check("…Cid leaves the round (the list's LEAVE): back in the lobby alone, his van gone, out of the queue; the round goes on, Bob's",
+	Runs.runOf(cid) == nil and SandboxMap.inLobby(E.rootOf(cid).Position.X, E.rootOf(cid).Position.Z) and Vehicles.get(cid) == nil and not Runs.queued(cid)
 		and Runs.runOf(bob) ~= nil and Runs.round().phase == "play" and Vehicles.get(bob) ~= nil)
+H.ask(bob, { kind = "round", on = false })
+check("…Bob's LEAVE THE QUEUE in the panel (from the round, anywhere): out of it, the round his still", not Runs.queued(bob) and #Runs.round().queue == 0
+	and Runs.runOf(bob) ~= nil)
+E.advance(Runs.round().endsAt - workspace:GetServerTimeNow() + Q.Results + R.Fade.Out + 2)
+check("…the round's clock out: nobody queued, no round after it (idle), the circle's attribute idle", Runs.round().phase == "idle" and Runs.round().house == nil
+	and Runs.runOf(bob) == nil and H.circle():GetAttribute("RoundPhase") == "idle", Runs.round().phase)
 
 check("no errors in any thread", #E.errors == 0, table.concat(E.errors, " | "))
+local mine: { string } = {}
+for _, line in E.warnings do
+	if string.find(line, "Parties", 1, true) or string.find(line, "Runs", 1, true) then
+		table.insert(mine, line)
+	end
+end
+check("no warning from the lobbies or the runs", #mine == 0, mine[1])
 if failures > 0 then
 	error(`{failures} checks failed`)
 end

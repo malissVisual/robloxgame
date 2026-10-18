@@ -40,7 +40,10 @@
 --   * The Crew remote (Config.Robust.Limits.Crew): { kind = "state" } (the window's rows), { kind = "pick", id } (who
 --     comes into your runs; saved), { kind = "discharge", id } (out of hospital now, paid); the server sends the state
 --     after every change and { kind = "open" } from his prompt.
---   HelperCrew.start()                  the remote, the lobby's stands, the loop (server/SandboxBoot.luau)
+--   * 10.4, the upgrade tree's crew branch (the run's host's levels, UpgradeRules.effect): Pads & helmets × a helper's
+--     health (helperHealth), Running shoes × his walk (helperSpeed), First aid × the revive's hold (reviveTime), Good
+--     doctors × the hospital's stay (hospital: CrewRules.toHospital's factor; a shorter stay is a cheaper discharge).
+--   HelperCrew.start()               the remote, the lobby's stands, the loop (server/SandboxBoot.luau)
 --   HelperCrew.step(dt)                 one look at the runs' rescues and the stands (the loop's; the tests')
 --   HelperCrew.crewOf(player)           a player's crew (profile.crew, made when missing)
 --   HelperCrew.sendState(player)        the CREW window's state to them
@@ -57,6 +60,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Net = require(Shared.Net)
 local CrewRules = require(Shared.CrewRules)
+local UpgradeRules = require(Shared.UpgradeRules) -- 10.4: the upgrade tree's crew branch (the host's)
 local Route = require(Shared.HouseRoute)
 local Rules = require(Shared.MovingRules)
 local Npcs = require(script.Parent.Npcs)
@@ -231,8 +235,16 @@ function HelperCrew.look(kind: any): any
 	return CrewRules.look(kind)
 end
 
+-- 10.4: an effect of a player's upgrade tree (the run's host's: UpgradeRules.effect on their levels; no save: none).
+local function upgraded(player: any, key: string): number
+	local ok, profile = pcall(PlayerData.get, player)
+	local levels = if ok and type(profile) == "table" then (profile :: any).sandboxUpgrades else nil
+	return UpgradeRules.effect(if type(levels) == "table" then levels else {}, key)
+end
+
+-- His full health: his kind's (10.4: × the host's Pads & helmets).
 function HelperCrew.health(h: any): number
-	return CrewRules.health(h.kind)
+	return math.floor(CrewRules.health(h.kind) * upgraded(h.s and h.s.owner, "helperHealth") + 0.5)
 end
 
 -- His body just made: what the map, the clients and Moving read off it.
@@ -250,7 +262,7 @@ function HelperCrew.pace(h: any): number
 		local thing = if spot then move.things[spot] else nil
 		solo = role == "carrier" and thing ~= nil and thing.class == "pair"
 	end
-	return CrewRules.pace(h.kind, solo)
+	return CrewRules.pace(h.kind, solo) * upgraded(h.s.owner, "helperSpeed") -- (10.4: × the host's Running shoes)
 end
 
 function HelperCrew.lifts(h: any): boolean
@@ -332,7 +344,7 @@ end
 local function hospital(h: any)
 	local owner: Player = h.s.owner
 	local crew = HelperCrew.crewOf(owner)
-	CrewRules.toHospital(crew, h.kind, os.time())
+	CrewRules.toHospital(crew, h.kind, os.time(), upgraded(owner, "hospital")) -- (10.4: × the host's Good doctors)
 	saveSoon(owner)
 	HelperCrew.sendState(owner)
 end
@@ -354,7 +366,7 @@ local function goOut(h: any, st: State, clock: number)
 	hospital(h)
 	if p then
 		local he = CrewRules.he(h.kind)
-		p.tell(h, `🏥 Nobody got {h.name} up in time: {he}'s out of the run and in hospital for {CrewRules.clock(C.Hospital.Seconds)} (the CREW window can discharge {CrewRules.him(h.kind)} early).`)
+		p.tell(h, `🏥 Nobody got {h.name} up in time: {he}'s out of the run and in hospital for {CrewRules.clock(CrewRules.hospitalSeconds(upgraded(h.s.owner, "hospital")))} (the CREW window can discharge {CrewRules.him(h.kind)} early).`)
 		p.setDoing(h, "out", nil)
 		p.tellCrew(h)
 	end
@@ -409,7 +421,7 @@ function HelperCrew.downed(h: any, body: any, clock: number): string?
 			prompt.Name = "RevivePrompt"
 			prompt.ActionText = `Revive {h.name}`
 			prompt.ObjectText = "🆘 Down!"
-			prompt.HoldDuration = C.Down.Revive
+			prompt.HoldDuration = C.Down.Revive * upgraded(h.s.owner, "reviveTime") -- (10.4: × the host's First aid)
 			prompt.KeyboardKeyCode = Enum.KeyCode.E
 			prompt.MaxActivationDistance = C.Down.Reach
 			prompt.RequiresLineOfSight = false

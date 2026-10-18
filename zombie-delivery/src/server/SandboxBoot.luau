@@ -6,7 +6,8 @@
 --
 -- What starts, in this order:
 --   * the folders the game puts things in (Cars, Zombies, Effects: World's build made them) and the map
---     (server/SandboxWorld.luau: the ground, the roads, the house's outside, the scenery, the lighting);
+--     (server/SandboxWorld.luau: the ground, the roads, the house's outside, the scenery, the lighting; 10.8 the
+--     floating islands) with its fall catch (IslandFall: whoever falls off an island back on its top);
 --   * 10.1's SaveSlots (the save slots: a join's save loads once the start screen picked one), PlayerData (its own saves,
 --     Config.Sandbox.Store), Analytics, Vehicles (10.6: the parked vans), Zombies (only what a run spawns), Npcs
 --     (Danny), Admin, 8.5's Clipboard (Danny's clipboard: orders mode);
@@ -16,7 +17,7 @@
 --     daily tasks (SandboxTasks) and SandboxLeaders (the player list's columns, the TOP MOVERS board), 8.3's showroom
 --     visitors (Visitors: their offers, server/VisitorOffers.luau), 8.7's trading between players (PlayerTrade: the
 --     stands' trade prompts go to it, Warehouse.onTrade), the Sprinter's model (SprinterMesh) and last
---     Moving (its hook parkVan is SandboxBoot.parkVan).
+--     Moving (its hook parkVan is SandboxBoot.parkVan), then the helpers' crew and the runs.
 --   The modules written alongside this one (SandboxWorld.build, Collection.start, Warehouse.start, SprinterMesh.start)
 --   run only when they are in the place (a FindFirstChild guard); every service through `safely` (one that fails only
 --   warns).
@@ -27,8 +28,9 @@
 --     outside the house (server/Moving.luau respawnAt);
 --   * PLAY (the Play remote): 9.7 runs: no van in the lobby (your truck, Config.Sandbox.Van, is parked at a run's house
 --     when the run starts: server/Runs.luau); it is your only vehicle (profile.car; no bike, no dealer). Marge's first
---     day is off (no Tutorial). 10.5 rounds: the player attribute InGame (server/Runs.luau takes them on the next round);
---   * no CAR (the client calls no car, nobody drives; 10.6: a van has no health, no seats): a van is parked only by
+--     day is off (no Tutorial). 10.5: the player attribute InGame (in the game now; 10.6 the quick round's queue is
+--     the PLAY panel's QUICK ROUND, server/Runs.luau Runs.queue: nobody is queued by PLAY);
+--   * no CAR (the client calls no car, nobody drives; 10.9: a van has no health, no seats): a van is parked only by
 --     parkVan (a run's, a round's);
 --   * RequestState sends the State (Main's queueState).
 --
@@ -170,7 +172,7 @@ local function remotes(queueState: (Player) -> ())
 			return
 		end
 		playing[player] = true
-		player:SetAttribute("InGame", true) -- 10.5 rounds: in the game now (server/Runs.luau takes them on the next round)
+		player:SetAttribute("InGame", true) -- 10.5: in the game now (10.6: no queue by it: the PLAY panel's QUICK ROUND queues)
 		local slots = Server:FindFirstChild("SaveSlots") -- 10.1: a PLAY with no slot picked (an old client): the slot saved last
 		if slots and slots:IsA("ModuleScript") then
 			local picked, why = pcall(function()
@@ -249,6 +251,7 @@ local function world()
 		end
 	end
 	optional("SandboxWorld", "build")
+	optional("IslandFall", "start") -- 10.8: whoever falls off an island is put back on its top (its loop only)
 end
 
 local function services()
@@ -321,7 +324,7 @@ local function sandbox()
 		Moving.start()
 	end)
 	optional("HelperCrew", "start") -- 10.1: the helpers' crew (the CREW window's remote, your helper at your warehouse)
-	optional("Runs", "start") -- 9.7: the lobby's portals and the runs (after Moving: it wraps the crews, hears the ends)
+	optional("Runs", "start") -- 9.7: the runs, 10.4 the PLAY circle's party lobbies (after Moving: it wraps the crews, hears the ends)
 end
 
 function SandboxBoot.start(queueState: (Player) -> ())

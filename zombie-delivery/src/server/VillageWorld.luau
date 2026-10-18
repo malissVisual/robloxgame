@@ -20,7 +20,8 @@
 --              the D5 going on, the railway going on; no shadows, nothing but its fields collide
 -- A piece's words (its `text`) are on its +Z face (Enum.NormalId.Back). Decoration (a piece not solid) never collides
 -- nor stops a ray; a shadow only from a mass or a tree's crown big enough to throw one you notice
--- (Config.VillageWorld.Shadow, SandboxScenery.Shadow, RenderBudget).
+-- (Config.VillageWorld.Shadow, SandboxScenery.Shadow, RenderBudget). 10.8 the floating islands: a piece's y is over its
+-- island's top (SandboxMap.groundAt; EDGE studs past an island's edge still its: the mill's waterfall).
 --
 --   VillageWorld.build(world)   builds it into workspace.Sandbox's folder `world` (before it is parented); returns
 --                               the houses (none: SandboxWorld counts its own), landmarks and trees it made
@@ -29,6 +30,8 @@
 --                               .luau's villageHouse)
 --   VillageWorld.chunk(world, key)     the Atomic chunk model Village_<key> (VillageLooks.chunkOf) in world.Village,
 --                               made when first wanted (where a place to empty goes)
+--   VillageWorld.part(parent, piece, far?, base?)   10.8: one piece's part (base: its y's zero, the world's for
+--                               shared/IslandLooks.luau's pieces; nil: the ground under it)
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -45,6 +48,7 @@ local VillageWorld = {}
 local S = SandboxScenery
 local W = Config.VillageWorld
 local WORDS = Color3.fromRGB(250, 246, 234)
+local EDGE = 16 -- 10.8: studs past an island's edge a piece still stands on its top (its y over it)
 
 local function rgb(c: { number }): Color3
 	return Color3.fromRGB(c[1], c[2], c[3])
@@ -87,8 +91,9 @@ local function label(board: BasePart, text: string)
 	words.Parent = gui
 end
 
--- A part of a piece on the map (VillageLooks.place's: at on the map, y from the ground's top, yaw then turn).
-local function part(parent: Instance, p: VillageLooks.Piece, far: boolean?): BasePart
+-- A part of a piece on the map (VillageLooks.place's: at on the map, y from the ground's top, yaw then turn; 10.8 the
+-- ground its island's top, or `base` when given).
+local function part(parent: Instance, p: VillageLooks.Piece, far: boolean?, base: number?): BasePart
 	local made: BasePart
 	if p.shape == "Wedge" then
 		made = Instance.new("WedgePart")
@@ -109,7 +114,8 @@ local function part(parent: Instance, p: VillageLooks.Piece, far: boolean?): Bas
 	end
 	local turn = p.turn or { 0, 0, 0 }
 	local size = Vector3.new(p.size[1], p.size[2], p.size[3])
-	local cframe = CFrame.new(p.at[1], SandboxMap.GroundTop + p.at[2], p.at[3]) * CFrame.Angles(0, math.rad(p.yaw), 0)
+	local ground = base or (if far then SandboxMap.GroundTop else SandboxMap.groundAt(p.at[1], p.at[3], EDGE))
+	local cframe = CFrame.new(p.at[1], ground + p.at[2], p.at[3]) * CFrame.Angles(0, math.rad(p.yaw), 0)
 		* CFrame.Angles(math.rad(turn[1]), math.rad(turn[2]), math.rad(turn[3]))
 	made.Name = p.name
 	made.Anchored = true
@@ -160,6 +166,10 @@ local function chunkOf(holder: Instance, chunks: { [string]: Model }, key: strin
 	return model :: Model
 end
 
+function VillageWorld.part(parent: Instance, p: VillageLooks.Piece, far: boolean?, base: number?): BasePart
+	return part(parent, p, far, base)
+end
+
 function VillageWorld.model(name: string, pieces: { VillageLooks.Piece }): Model
 	local model = Instance.new("Model")
 	model.Name = name
@@ -192,7 +202,7 @@ function VillageWorld.build(world: Instance): Built
 		lawn.Name = `Lawn_{r.kind}`
 		lawn.Anchored = true
 		lawn.Size = Vector3.new(r.x1 - r.x0, 2, r.z1 - r.z0)
-		lawn.CFrame = CFrame.new((r.x0 + r.x1) / 2, SandboxMap.GroundTop - 1, (r.z0 + r.z1) / 2)
+		lawn.CFrame = CFrame.new((r.x0 + r.x1) / 2, SandboxMap.groundAt((r.x0 + r.x1) / 2, (r.z0 + r.z1) / 2) - 1, (r.z0 + r.z1) / 2)
 		lawn.Color = rgb(L.Color)
 		lawn.Material = material(L.Material)
 		lawn.TopSurface = Enum.SurfaceType.Smooth

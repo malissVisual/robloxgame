@@ -17,10 +17,13 @@
 -- five other places to empty in their looks (SandboxWorld.villageHouse), each walked in as the farmstead is (its
 -- FrontDoor on its door, two leaves, the walls less a dark hall), nothing in its door's way or its walk to its curb
 -- (9.5: its eaves 8 up at least; the cabin's veranda deck walked up as a doorstep, its roof overhead no obstacle).
--- 9.7 runs (design/lobby/plan.py, design/countryside/plan.py): no Pražská, Depot Row, lanes, turnaround, markings,
--- street lamps or signpost; the asphalt is the run zones' yards (a shoulder round each); every run zone walled and
--- screened on its edge (its ZoneWalls, its ScreenHedge); no far view; the trucks find room at every house's curb; the
--- lobby itself: tests/lobby_test.luau.
+-- 9.7 runs (design/lobby/plan.py): no Pražská, Depot Row, lanes, turnaround, markings, street lamps or signpost; the
+-- asphalt is the places' yards (a shoulder round each); no far view; the trucks find room at every house's curb; the
+-- lobby itself: tests/lobby_test.luau. 10.8 the floating islands (design/islands/plan.py; tests/islands_test.luau holds
+-- the plan): every island's grass its ground (its tiles round what has its own ground, each at its island's top), its
+-- rock under it; every place, its yard, its shoulders, its walls and its house at its island's height; every map
+-- island walled on its run zone's edge (its ZoneWalls, from its top up) with a low rim hedge (decoration) on the same
+-- line; no walls on the Bounds (the sky round the islands); workspace.FallenPartsDestroyHeight Config.Islands.Destroy.
 -- Run with tests/run_tests.py.
 local Mock = require("./WorldMock")
 local G = Mock.globals
@@ -74,45 +77,63 @@ end
 -- ── The numbers ────────────────────────────────────────────────────────────
 
 do
-	-- the meadow's tiles fill the Bounds but the holes, none over another or a hole
-	local tiles, holes = SandboxScenery.meadow()
-	local area = 0
+	-- 10.8 every island's grass: its tiles fill its top but the holes on it, none over another or a hole, each at its
+	-- island's top
+	local tiles = SandboxScenery.tops()
+	local holes = SandboxScenery.holes()
 	local overlap: string? = nil
-	for i, t in tiles do
-		area += (t.x1 - t.x0) * (t.z1 - t.z0)
-		if t.x0 < B.x0 or t.x1 > B.x1 or t.z0 < B.z0 or t.z1 > B.z1 or t.x1 - t.x0 > 2048 or t.z1 - t.z0 > 2048 then
-			overlap = `tile {i} out of the Bounds or too big`
+	local areas: { [string]: number } = {}
+	for i, t in ipairs(tiles) do
+		local r = t.rect
+		local island = SandboxMap.island(t.island)
+		areas[t.island] = (areas[t.island] or 0) + (r.x1 - r.x0) * (r.z1 - r.z0)
+		if not island or r.x0 < island.rect.x0 - EPS or r.x1 > island.rect.x1 + EPS or r.z0 < island.rect.z0 - EPS or r.z1 > island.rect.z1 + EPS
+			or t.top ~= island.top or r.x1 - r.x0 > 2048 or r.z1 - r.z0 > 2048 then
+			overlap = `tile {i} off its island or too big`
 		end
-		for j, u in tiles do
-			if j > i and t.x0 < u.x1 - EPS and u.x0 < t.x1 - EPS and t.z0 < u.z1 - EPS and u.z0 < t.z1 - EPS then
+		for j, u in ipairs(tiles) do
+			local q = u.rect
+			if j > i and r.x0 < q.x1 - EPS and q.x0 < r.x1 - EPS and r.z0 < q.z1 - EPS and q.z0 < r.z1 - EPS then
 				overlap = `tiles {i} and {j}`
 			end
 		end
 		for _, h in holes do
-			if t.x0 < h.x1 - EPS and h.x0 < t.x1 - EPS and t.z0 < h.z1 - EPS and h.z0 < t.z1 - EPS then
+			if r.x0 < h.x1 - EPS and h.x0 < r.x1 - EPS and r.z0 < h.z1 - EPS and h.z0 < r.z1 - EPS then
 				overlap = `tile {i} over a hole`
 			end
 		end
 	end
-	local holeArea = 0
-	for _, h in holes do
-		holeArea += (h.x1 - h.x0) * (h.z1 - h.z0)
+	local covered = true
+	for _, island in SandboxMap.Islands do
+		local r = island.rect
+		local holeArea = 0
+		for _, h in holes do
+			local w = math.min(h.x1, r.x1) - math.max(h.x0, r.x0)
+			local d = math.min(h.z1, r.z1) - math.max(h.z0, r.z0)
+			if w > 0 and d > 0 then
+				holeArea += w * d
+			end
+		end
+		covered = covered and math.abs((areas[island.id] or 0) + holeArea - (r.x1 - r.x0) * (r.z1 - r.z0)) < 1
 	end
-	check("the meadow's tiles cover the Bounds but the pads and the lawn, none overlapping", overlap == nil and math.abs(area + holeArea - (B.x1 - B.x0) * (B.z1 - B.z0)) < 1, overlap or area)
+	check("10.8 every island's grass tiles cover its top but the pads, the plaza, the lawns, none overlapping, each at its island's top", overlap == nil and covered, overlap)
 
-	-- 8.9: the ground is flat (the Alps' mounds are gone)
+	-- 10.8: every island's top flat at its height (8.9: no mound); off the islands the lobby's level (nothing stands there)
 	local flat = true
-	for x = B.x0, B.x1, 40 do
-		for z = B.z0, B.z1, 40 do
-			flat = flat and SandboxScenery.groundAt(x, z) == GROUND
+	for _, island in SandboxMap.Islands do
+		local r = island.rect
+		for x = r.x0 + 1, r.x1 - 1, 20 do
+			for z = r.z0 + 1, r.z1 - 1, 20 do
+				flat = flat and SandboxScenery.groundAt(x, z) == island.top
+			end
 		end
 	end
-	check("8.9: the ground is flat everywhere (no mound)", flat)
+	check("10.8: every island's top flat at its height (no mound)", flat and SandboxScenery.groundAt(B.x0 + 1, B.z0 + 1) == GROUND)
 
 	-- the shoulders: wherever a wheel leaves the asphalt it rolls down a slope, never off a step
 	local ramps = SandboxScenery.ramps()
-	local function shoulder(x: number, z: number): number
-		local best = GROUND
+	local function shoulder(x: number, z: number, base: number): number
+		local best = base
 		for _, r in ramps do
 			local y = SandboxScenery.shoulderAt(r, x, z)
 			if y and y > best then
@@ -127,8 +148,9 @@ do
 			return
 		end
 		samples += 1
-		local want = GROUND + (top - GROUND) * (1 - out / RUN) - (sag or 0)
-		local margin = shoulder(x, z) - want
+		local base = top - (TOP - GROUND) -- (10.8: its island's grass)
+		local want = base + (top - base) * (1 - out / RUN) - (sag or 0)
+		local margin = shoulder(x, z, base) - want
 		if margin < worst then
 			worst, at = margin, string.format("%.1f, %.1f (%.1f out)", x, z, out)
 		end
@@ -137,29 +159,36 @@ do
 		-- (9.7: every yard's slab, each side and corner)
 		for _, r in SLABS do
 			for x = r.x0, r.x1, 5 do
-				edgePoint(x, r.z0 - out, out, TOP)
-				edgePoint(x, r.z1 + out, out, TOP)
+				edgePoint(x, r.z0 - out, out, r.top)
+				edgePoint(x, r.z1 + out, out, r.top)
 			end
 			for z = r.z0, r.z1, 4 do
-				edgePoint(r.x0 - out, z, out, TOP)
-				edgePoint(r.x1 + out, z, out, TOP)
+				edgePoint(r.x0 - out, z, out, r.top)
+				edgePoint(r.x1 + out, z, out, r.top)
 			end
 			for _, c in { { r.x0, r.z0, -1, -1 }, { r.x0, r.z1, -1, 1 }, { r.x1, r.z0, 1, -1 }, { r.x1, r.z1, 1, 1 } } do
 				for _, a in { 0.2, 0.5, 0.8 } do
 					local dx, dz = math.cos(a * math.pi / 2), math.sin(a * math.pi / 2)
-					edgePoint(c[1] + c[3] * dx * out, c[2] + c[4] * dz * out, out, TOP)
+					edgePoint(c[1] + c[3] * dx * out, c[2] + c[4] * dz * out, out, r.top)
 				end
 			end
 		end
 	end
-	check("a shoulder slopes from the asphalt down to the meadow along every edge (no step)", worst >= -0.01, string.format("%d points, worst %.3f at %s", samples, worst, at))
+	check("a shoulder slopes from the asphalt down to the grass along every edge (no step; 10.8 at its island's height)", worst >= -0.01, string.format("%d points, worst %.3f at %s", samples, worst, at))
 	local tall: string? = nil
 	for _, r in ramps do
-		if r.y + r.sy / 2 > TOP + EPS or r.y - r.sy / 2 < GROUND - EPS or r.sz ~= RUN then
+		local base = SandboxMap.groundAt(r.x, r.z)
+		if r.y + r.sy / 2 > base + TOP - GROUND + EPS or r.y - r.sy / 2 < base - EPS or r.sz ~= RUN then
 			tall = `a {r.kind} at {r.x}, {r.z}`
 		end
 	end
-	check("no shoulder rises over the asphalt or sinks under the meadow", tall == nil, tall)
+	check("no shoulder rises over the asphalt or sinks under the grass", tall == nil, tall)
+	local slabsOk = true
+	for _, r in SLABS do
+		slabsOk = slabsOk and math.abs(r.top - SandboxMap.roadAt((r.x0 + r.x1) / 2, (r.z0 + r.z1) / 2)) < EPS and SandboxMap.islandAt(r.x0, r.z0) ~= nil
+			and SandboxMap.islandAt(r.x0, r.z0) == SandboxMap.islandAt(r.x1, r.z1)
+	end
+	check("10.8 every yard's asphalt on one island, at its road level (its top RoadTop - GroundTop over the island's)", slabsOk)
 
 	-- 8.9 the trees: the countryside's (shared/VillageScenery.luau), each where the rules let it stand, apart from each other
 	local trees = VillageScenery.trees()
@@ -176,7 +205,7 @@ do
 			end
 		end
 	end
-	check(`8.9: {#trees} trees of the orchard and 9.4 the forest (9.7: the ones a run zone sees), every one where the rules let it stand`, #trees >= 60 and why == nil, why or #trees)
+	check(`8.9: {#trees} trees of the orchard and 9.4 the forest (10.8: on their islands), every one where the rules let it stand`, #trees >= 40 and why == nil, why or #trees)
 	local again = VillageScenery.trees()
 	check("the same trees every time", again == trees and #again == #trees)
 
@@ -203,6 +232,9 @@ check("a second build returns it as it is", SandboxWorld.build() == world)
 -- (cap: a buried ball's round cap, its radius at the ground; its box is the square round it)
 type Box = { part: any, name: string, x0: number, x1: number, y0: number, y1: number, z0: number, z1: number, far: boolean, cap: number? }
 local far = world:FindFirstChild("Far")
+-- (10.8: the clouds under the islands reach past the Bounds: decoration seen from afar, as the far view was)
+local islandsModel = world:FindFirstChild("Islands")
+local cloudsFolder = islandsModel and islandsModel:FindFirstChild("Clouds")
 local boxes: { Box } = {}
 local byName: { [string]: { Box } } = {} -- (the other places to empty's parts are in standBoxes, by their id)
 local standBoxes: { [string]: { Box } } = {}
@@ -234,7 +266,8 @@ for _, d in world:GetDescendants() do
 			cap = math.sqrt(math.max(0, r * r - (GROUND - y) ^ 2))
 			hx, hz, y0 = cap :: number, cap :: number, GROUND
 		end
-		local box: Box = { part = d, name = d.Name, x0 = x - hx, x1 = x + hx, y0 = y0, y1 = y1, z0 = z - hz, z1 = z + hz, far = far ~= nil and d:IsDescendantOf(far), cap = cap }
+		local box: Box = { part = d, name = d.Name, x0 = x - hx, x1 = x + hx, y0 = y0, y1 = y1, z0 = z - hz, z1 = z + hz,
+			far = (far ~= nil and d:IsDescendantOf(far)) or (cloudsFolder ~= nil and d:IsDescendantOf(cloudsFolder)), cap = cap }
 		table.insert(boxes, box)
 		local standIn = standInOf(d)
 		if standIn then
@@ -285,33 +318,30 @@ do
 			out = `{b.name} at {math.floor(b.x0)} … {math.floor(b.x1)}, {math.floor(b.z0)} … {math.floor(b.z1)}`
 		end
 	end
-	check("everything is inside SandboxMap.Bounds", out == nil and farIn == nil, out or farIn)
+	check("everything is inside SandboxMap.Bounds (but the clouds under it all)", out == nil and farIn == nil, out or farIn)
 	check("9.7: no far view (no Far model, no far field, no peak, no hill), no D5, no railway", far == nil and #named("FarField") == 0 and #named("Peak") == 0 and #named("Hill") == 0
 		and world:FindFirstChild("Motorway") == nil and world:FindFirstChild("Railway") == nil)
-	local walls = named("InvisibleWall")
-	local sides = { x0 = false, x1 = false, z0 = false, z1 = false }
-	local real = true
-	for _, w in walls do
-		local p = w.part
-		sides.x0 = sides.x0 or (math.abs(w.x0 - B.x0) < EPS and w.z0 <= B.z0 + EPS and w.z1 >= B.z1 - EPS)
-		sides.x1 = sides.x1 or (math.abs(w.x1 - B.x1) < EPS and w.z0 <= B.z0 + EPS and w.z1 >= B.z1 - EPS)
-		sides.z0 = sides.z0 or (math.abs(w.z0 - B.z0) < EPS and w.x0 <= B.x0 + EPS and w.x1 >= B.x1 - EPS)
-		sides.z1 = sides.z1 or (math.abs(w.z1 - B.z1) < EPS and w.x0 <= B.x0 + EPS and w.x1 >= B.x1 - EPS)
-		real = real and p.Transparency >= 1 and p.CanCollide and w.y0 <= GROUND and w.y1 >= 100
+	-- 10.8: no walls on the Bounds (the sky round the islands; nobody gets there); FallenPartsDestroyHeight far under
+	-- every island
+	local lowest = math.huge
+	for _, island in SandboxMap.Islands do
+		lowest = math.min(lowest, island.top - island.depth)
 	end
-	check("invisible walls stand on all four sides of the Bounds", #walls == 4 and real and sides.x0 and sides.x1 and sides.z0 and sides.z1)
-	-- 9.7 runs: every run zone walled on its edge (four ZoneWalls, unseen, solid, Config.Runs.Zone.Wall high) and
-	-- screened (CountryLooks' ScreenHedge on each side: solid, Config.Runs.Zone.Screen.Height high)
+	check("10.8: no invisible walls on the Bounds; workspace.FallenPartsDestroyHeight Config.Islands.Destroy, under every island", #named("InvisibleWall") == 0
+		and workspace.FallenPartsDestroyHeight == Config.Islands.Destroy and Config.Islands.Destroy < lowest - 100, workspace.FallenPartsDestroyHeight)
+	-- 9.7 runs: every run zone walled on its edge (four ZoneWalls, unseen, solid, Config.Runs.Zone.Wall high; 10.8 from
+	-- its island's top up) and its low rim hedge on the same line (CountryLooks' Hedge: decoration, the walls stop you)
 	local zoneWalls, zoneOk, why = named("ZoneWall"), true, nil :: string?
-	local hedges = named("ScreenHedge")
+	local hedges = named("Hedge")
 	for _, zone in SandboxMap.Zones do
 		local q = zone.rect
-		local mine, screened = 0, 0
+		local base = SandboxMap.groundAt((q.x0 + q.x1) / 2, (q.z0 + q.z1) / 2)
+		local mine, rimmed = 0, 0
 		for _, w in zoneWalls do
 			if w.part:GetAttribute("RunZone") == zone.id then
 				mine += 1
 				local onEdge = math.abs(w.x1 - q.x0) < 0.01 or math.abs(w.x0 - q.x1) < 0.01 or math.abs(w.z1 - q.z0) < 0.01 or math.abs(w.z0 - q.z1) < 0.01
-				zoneOk = zoneOk and onEdge and w.part.Transparency >= 1 and w.part.CanCollide and w.y0 <= GROUND + EPS and w.y1 >= Config.Runs.Zone.Wall - EPS
+				zoneOk = zoneOk and onEdge and w.part.Transparency >= 1 and w.part.CanCollide and math.abs(w.y0 - base) < EPS and w.y1 >= base + Config.Runs.Zone.Wall - EPS
 			end
 		end
 		for _, hb in hedges do
@@ -319,18 +349,19 @@ do
 			local onEdge = (math.abs(cx - q.x0) < 0.01 or math.abs(cx - q.x1) < 0.01) and cz > q.z0 and cz < q.z1
 				or (math.abs(cz - q.z0) < 0.01 or math.abs(cz - q.z1) < 0.01) and cx > q.x0 and cx < q.x1
 			if onEdge then
-				screened += 1
-				zoneOk = zoneOk and hb.part.CanCollide and hb.y1 >= Config.Runs.Zone.Screen.Height - EPS
+				rimmed += 1
+				zoneOk = zoneOk and not hb.part.CanCollide and math.abs(hb.y0 - base) < 0.05 and hb.y1 < base + 5
 			end
 		end
-		if mine ~= 4 or screened ~= 4 then
-			zoneOk, why = false, `{zone.id}: {mine} walls, {screened} screen hedges`
+		if mine ~= 4 or rimmed < 4 then
+			zoneOk, why = false, `{zone.id}: {mine} walls, {rimmed} rim hedges`
 		end
 	end
-	check("9.7: every run zone walled (4 ZoneWalls, unseen, solid, high) and screened (4 tall solid ScreenHedges) on its edge", zoneOk and #zoneWalls == 4 * #SandboxMap.Zones, why)
+	check("9.7, 10.8: every map island walled on its run zone's edge (4 ZoneWalls, unseen, solid, high, from its top up) with a low rim hedge (not solid) on it", zoneOk and #zoneWalls == 4 * #SandboxMap.Zones, why)
+	check("10.8: no tall screen hedges (9.7's), no meadow under everything", #named("ScreenHedge") == 0 and #named("Meadow") == 0)
 end
 
--- the asphalt covers SandboxMap.Roads and the turnaround, its top at RoadTop
+-- the asphalt covers SandboxMap.Roads, its top at its island's road level (RoadTop on the lobby's)
 do
 	local asphalt = {}
 	for _, b in named("Road") do
@@ -348,13 +379,13 @@ do
 	for _, road in SandboxMap.Roads do
 		for x = road.x0, road.x1, 2 do
 			for z = road.z0, road.z1, 2 do
-				if not covered(x, z, asphalt, TOP, EPS) then
+				if not covered(x, z, asphalt, SandboxMap.roadAt(x, z), EPS) then
 					missed = `{road.name} at {x}, {z}`
 				end
 			end
 		end
 	end
-	check(`the asphalt covers every road of SandboxMap.Roads at RoadTop ({#asphalt} slabs: 9.7 the run zones' yards)`, missed == nil and #asphalt == #SLABS and #SLABS == #SandboxMap.Roads and #SLABS == #SandboxMap.Houses, missed)
+	check(`the asphalt covers every road of SandboxMap.Roads at its road level ({#asphalt} slabs: 9.7 the places' yards)`, missed == nil and #asphalt == #SLABS and #SLABS == #SandboxMap.Roads and #SLABS == #SandboxMap.Houses, missed)
 	local labelled = true
 	for _, road in SandboxMap.Roads do
 		local found = false
@@ -372,7 +403,7 @@ end
 -- nothing that collides stands on the roads, the turnaround, the plots (their pads are the floor), the path from the
 -- curb to the door or in the door's way; the floors themselves never rise over the asphalt's top
 do
-	local FLOOR = { Road = true, Shoulder = true, Pad = true, Meadow = true, Lawn = true, Field = true, VillageLawn = true, Plaza = true }
+	local FLOOR = { Road = true, Shoulder = true, Pad = true, Meadow = true, Lawn = true, Field = true, VillageLawn = true, Plaza = true, Grass = true }
 	local areas: { { name: string, rect: Rect, circle: boolean?, top: number? } } = {}
 	for _, road in SandboxMap.Roads do
 		table.insert(areas, { name = road.name, rect = road :: any })
@@ -383,10 +414,9 @@ do
 	table.insert(areas, { name = "the path from the curb to the door", rect = { x0 = SandboxScenery.Path.x0, x1 = SandboxScenery.Path.x1, z0 = SandboxScenery.Path.z0, z1 = HOUSE.door.z - 0.01 } })
 	local d = HOUSE.door
 	table.insert(areas, { name = "the front door's way", rect = { x0 = d.x - 2.5, x1 = d.x + 2.5, z0 = d.z - 5, z1 = d.z - 0.01 } })
-	-- 9.7 runs: every portal's pad (a party stands there) and every zone's arrival spot (somebody lands there)
-	for _, portal in SandboxMap.Lobby.portals do
-		table.insert(areas, { name = `{portal.name}'s pad`, rect = portal.pad })
-	end
+	-- every zone's arrival spot (somebody lands there); 10.4 the PLAY circle (a party gathers there; 9.7: the portals'
+	-- pads): its own check below (a circle)
+	local play = SandboxMap.Lobby.play
 	for _, zone in SandboxMap.Zones do
 		local a = zone.arrive
 		table.insert(areas, { name = `{zone.id}'s arrival`, rect = { x0 = a.x - 6, x1 = a.x + 6, z0 = a.z - 6, z1 = a.z + 6 }, top = 8 })
@@ -411,18 +441,19 @@ do
 		if b.far or not b.part.CanCollide or (barrier and b.part:IsDescendantOf(barrier)) or b.name == "InvisibleWall" then
 			continue -- (the Bounds' wall ends the map; 8.9's barrier, none now)
 		end
+		local base = SandboxMap.groundAt((b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2) -- (10.8: its island's top)
 		if FLOOR[b.name] then
-			if b.y1 > TOP + EPS then
+			if b.y1 > base + TOP - GROUND + EPS then
 				floorHigh = `{b.name} at {math.floor(b.x0)}, {math.floor(b.z0)}`
 			end
 			continue
 		end
-		if b.y1 <= GROUND + 0.05 or b.y0 >= 14 or (b.name == "Step" and b.y1 <= GROUND + 0.45) or (b.name == "Deck" and b.y1 <= GROUND + 0.55) then
+		if b.y1 <= base + 0.05 or b.y0 >= base + 14 or (b.name == "Step" and b.y1 <= base + 0.45) or (b.name == "Deck" and b.y1 <= base + 0.55) then
 			continue -- (a place's doorstep, 0.4 high, walked up; 9.5 the cabin's veranda deck, its plinth's 0.5)
 		end
 		for _, a in areas do
 			local r = a.rect
-			if a.top and b.y0 >= a.top then
+			if a.top and b.y0 >= base + a.top then
 				continue
 			end
 			if b.x0 < r.x1 - EPS and b.x1 > r.x0 + EPS and b.z0 < r.z1 - EPS and b.z1 > r.z0 + EPS then
@@ -430,8 +461,19 @@ do
 			end
 		end
 	end
-	check("nothing that collides on the yards, the plots, the path to the door, the doors' ways, 9.7 the portals' pads or the zones' arrival spots", blocked == nil and barrier == nil, blocked)
-	check("no floor (asphalt, shoulder, pad, meadow, lawn, field) rises over RoadTop", floorHigh == nil, floorHigh)
+	check("nothing that collides on the yards, the plots, the path to the door, the doors' ways or the zones' arrival spots", blocked == nil and barrier == nil, blocked)
+	local inPlay: string? = nil
+	for _, b in boxes do
+		if not b.far and b.part.CanCollide and b.y1 > GROUND + 0.05 and b.y0 < 14 then
+			local dx = math.max(b.x0 - play.x, 0, play.x - b.x1)
+			local dz = math.max(b.z0 - play.z, 0, play.z - b.z1)
+			if dx * dx + dz * dz < play.r * play.r then
+				inPlay = `{b.name} at {math.floor(b.x0)}, {math.floor(b.z0)}`
+			end
+		end
+	end
+	check("10.4 nothing that collides in the PLAY circle (its lit posts outside its ring): you walk in from every side", inPlay == nil, inPlay)
+	check("no floor (asphalt, shoulder, pad, grass, lawn, field) rises over its island's road level", floorHigh == nil, floorHigh)
 	local pads = named("Pad")
 	local padOk = #pads == #SandboxMap.Plots
 	for _, plot in SandboxMap.Plots do
@@ -444,7 +486,7 @@ do
 		end
 		padOk = padOk and found
 	end
-	check("a concrete pad on every plot's rect, flush with the meadow", padOk)
+	check("a concrete pad on every plot's rect, flush with the lobby's grass", padOk)
 end
 
 -- the trees keep off the roads (and their shoulders), the turnaround, the plots, the house's lot, the path and the vans'
@@ -750,10 +792,12 @@ do
 		body ~= nil and body.part.CanCollide == false and body.part.CanQuery == false and #solids == 7 and inBox
 			and math.abs(volume - (h.sx * h.sy * h.sz - hallVolume)) < 0.01 and depth >= 10 and depth < h.sz / 2,
 		`{volume} of {h.sx * h.sy * h.sz - hallVolume}`)
-	-- what collides in a box x0 … x1, y0 … y1, z0 … z1 (the floors under y 0.05: the lawn the hall stands on)
+	-- what collides in a box x0 … x1, y0 … y1 (over the house's island's top: 10.8), z0 … z1 (the floors under y 0.05:
+	-- the lawn the hall stands on)
+	local g = h.y
 	local function solidIn(x0: number, x1: number, y0: number, y1: number, z0: number, z1: number): string?
 		for _, b in boxes do
-			if b.part.CanCollide and not b.far and b.x0 < x1 - EPS and b.x1 > x0 + EPS and b.y0 < y1 - EPS and b.y1 > y0 + EPS and b.z0 < z1 - EPS and b.z1 > z0 + EPS then
+			if b.part.CanCollide and not b.far and b.x0 < x1 - EPS and b.x1 > x0 + EPS and b.y0 < g + y1 - EPS and b.y1 > g + y0 + EPS and b.z0 < z1 - EPS and b.z1 > z0 + EPS then
 				return b.name
 			end
 		end
@@ -783,7 +827,7 @@ do
 		local inside = false
 		for _, hall in halls do
 			inside = inside or (b.x0 >= hall.x - hall.half - EPS and b.x1 <= hall.x + hall.half + EPS and b.z0 >= hall.z0 - EPS and b.z1 <= hall.z1 + EPS
-				and b.y0 >= -EPS and b.y1 <= top + EPS)
+				and b.y0 >= g - EPS and b.y1 <= g + top + EPS)
 		end
 		liningOk = liningOk and inside and b.part.Parent == holder and not b.part.CanCollide and not b.part.CanQuery and not b.part.CastShadow
 			and b.part.Transparency == 0 and math.abs(c.R * 255 - D.Hall.Color[1]) < 1 and math.abs(c.G * 255 - D.Hall.Color[2]) < 1 and math.abs(c.B * 255 - D.Hall.Color[3]) < 1
@@ -881,7 +925,7 @@ do
 			ok = door.part:GetAttribute("SandboxDoor") == true and not door.part.CanCollide and door.part.Transparency == 1
 				and math.abs((dx - h.door.x) * oz - (dz - h.door.z) * ox) < 0.1 -- (across: its middle on the door's)
 				and along < 0 and along > -0.5 -- (its outer face on the door, just outside the front wall)
-				and math.abs(door.y0 - GROUND) < 0.01 and look.X * ox + look.Z * oz > 0.99 -- (on the ground, -Z out)
+				and math.abs(door.y0 - h.door.y) < 0.01 and look.X * ox + look.Z * oz > 0.99 -- (on the ground, -Z out; 10.8 its island's)
 			for _, leaf in { west[1], east[1] } do
 				ok = ok and leaf.part:GetAttribute("DoorSwing") == -1 and leaf.part:GetAttribute("DoorDark") == true and not leaf.part.CanCollide
 					and leaf.part.Transparency == 0
@@ -898,10 +942,11 @@ do
 			local doorX, doorZ = (door.x0 + door.x1) / 2, (door.z0 + door.z1) / 2
 			local half = SandboxScenery.FrontDoor.Width / 2
 			-- what collides in a box `a0 … a1` along out of the door (from its middle), `c0 … c1` across it, y0 … y1
+			local g = h.door.y -- (10.8: its island's top)
 			local function solidIn(a0: number, a1: number, c0: number, c1: number, y0: number, y1: number, skipStep: boolean): string?
 				for _, b in boxes do
-					if b.part.CanCollide and not b.far and b.y1 > y0 and b.y0 < y1
-						and not (skipStep and ((b.name == "Step" and b.y1 <= GROUND + 0.45) or (b.name == "Deck" and b.y1 <= GROUND + 0.55))) then
+					if b.part.CanCollide and not b.far and b.y1 > g + y0 and b.y0 < g + y1
+						and not (skipStep and ((b.name == "Step" and b.y1 <= g + 0.45) or (b.name == "Deck" and b.y1 <= g + 0.55))) then
 						local cx, cz = (b.x0 + b.x1) / 2 - doorX, (b.z0 + b.z1) / 2 - doorZ
 						local hxb, hzb = (b.x1 - b.x0) / 2, (b.z1 - b.z0) / 2
 						local a, aHalf = cx * ox + cz * oz, math.abs(ox) * hxb + math.abs(oz) * hzb
@@ -914,7 +959,7 @@ do
 				return nil
 			end
 			local inner = -door.part.Size.Z / 2 -- (the front wall, from the door's middle: the door's piece just outside it)
-			blocked = solidIn(inner - hallDepth + 0.2, 5, -half + 0.2, half - 0.2, GROUND + 0.05, 6, true)
+			blocked = solidIn(inner - hallDepth + 0.2, 5, -half + 0.2, half - 0.2, 0.05, 6, true)
 			local mid = inner - hallDepth / 2
 			local sides = solidIn(mid - 0.5, mid + 0.5, -half - 1, -half - 0.5, 1, 6, false) ~= nil and solidIn(mid - 0.5, mid + 0.5, half + 0.5, half + 1, 1, 6, false) ~= nil
 				and solidIn(mid - 0.5, mid + 0.5, -half + 0.5, half - 0.5, door.part.Size.Y + 0.5, door.part.Size.Y + 1, false) ~= nil
@@ -929,11 +974,11 @@ do
 			local floorTop = -math.huge
 			for _, b in lining do
 				ok = ok and not b.part.CanCollide and not b.part.CanQuery and b.part.Parent ~= nil and b.part.Parent.Name == "DoorHalls"
-				if b.y0 < GROUND + 0.01 and b.y1 < 3 then -- (its floor)
+				if b.y0 < h.door.y + 0.01 and b.y1 < h.door.y + 3 then -- (its floor)
 					floorTop = math.max(floorTop, b.y1)
 				end
 			end
-			local plinthTop = if plinths[1] then plinths[1].y1 else GROUND
+			local plinthTop = if plinths[1] then plinths[1].y1 else h.door.y
 			local texts: { string } = {}
 			for _, d in model:GetDescendants() do
 				if d.ClassName == "TextLabel" and d.Parent and d.Parent.Parent and d.Parent.Parent.Name == "Mailbox" then
@@ -1138,7 +1183,7 @@ do
 			grounded += 1
 		end
 		-- a player standing there (their body's box: 2 wide, 1 deep, 5 tall on the ground)
-		local feet = TOP
+		local feet = spot.y -- (10.8: its island's road level)
 		local body: Solid = { name = "a player", x0 = spot.x - 1, x1 = spot.x + 1, y0 = feet, y1 = feet + 5, z0 = spot.z - 0.5, z1 = spot.z + 0.5, passed = false }
 		local taken, whyTaken = firstTry(spot, { body }, true)
 		check(`… a player standing at {at.name} takes it`, not taken and whyTaken == "a player in the way", whyTaken)

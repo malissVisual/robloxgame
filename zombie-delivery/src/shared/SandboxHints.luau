@@ -19,12 +19,16 @@
 --   deal   8.7 another player's offer for your piece (the "PlayerTrade" remote's { kind = "offer", player = true }: it
 --          waits while its offer card is open)  "Players pay more than the game: a piece they lack is worth more to them."
 --   (visit, price and deal only while trading is on: SandboxHints.tradeOn)
+-- 10.4, the PLAY circle's party lobbies:
+--   lobby  you are in a party lobby and away from the PLAY circle for the first time (client/RunUi.luau's PLAY view:
+--          its lobby, circle false)  "👥 In a lobby you can walk anywhere: only LEAVE takes you out."
 -- The words name this device's way (shared/SandboxPad.luau: a key on a computer, the D-pad with a gamepad, the chip on a
 -- touch screen). Each once a session (the seen flags live in the client, as the guide's done steps do: a new session
 -- may say "tasks" and "fill" again, "book" never), never two at once (Config.SandboxHud.Hints.Gap s apart, Delay s after
 -- what made it matter), and never while something covers the screen (a grip check, the move's cards with its result, a
 -- sandbox window, the start screen): it waits for it.
---   SandboxHints.Ids                              "book", "tasks", "fill"; 8.9: "orders", "visit", "price", "deal"
+--   SandboxHints.Ids                              "book", "tasks", "fill"; 8.9: "orders", "visit", "price", "deal";
+--                                                 10.4: "lobby"
 --   SandboxHints.new() -> Queue                   nothing seen, nothing waiting
 --   SandboxHints.offer(q, id, now) -> boolean     wait to show `id` from now + Delay (false: seen, waiting already or
 --                                                 no hint of ours)
@@ -67,7 +71,7 @@ export type Rect = { x0: number, x1: number, z0: number, z1: number }
 -- 8.9: a trade prompt on (a piece on show on its stand): where the stand is and its owner's UserId.
 export type Spot = { x: number, z: number, seller: number }
 
-SandboxHints.Ids = { "book", "tasks", "fill", "orders", "visit", "price", "deal" }
+SandboxHints.Ids = { "book", "tasks", "fill", "orders", "visit", "price", "deal", "lobby" }
 
 local function tune()
 	return Config.SandboxHud.Hints
@@ -159,6 +163,8 @@ function SandboxHints.text(id: string, device: SandboxPad.Device): string
 		return "🏷 Put a price on a piece and other players can buy it, even while you're away."
 	elseif id == "deal" then
 		return "Players pay more than the game: a piece they lack is worth more to them."
+	elseif id == "lobby" then -- 10.4
+		return "👥 In a lobby you can walk anywhere: only LEAVE takes you out."
 	end
 	return ""
 end

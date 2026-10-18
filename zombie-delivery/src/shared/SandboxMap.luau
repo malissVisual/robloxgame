@@ -1,58 +1,63 @@
 --!strict
 -- 8.0 SANDBOX (design/sandbox/KONTRAKT.md): the owner's small test world in place of the city. 9.7 runs (the owner:
--- "shrink the map ... one little lobby, like Dungeon Quest: there you go into a dungeon, here you go into a house"):
--- the LOBBY (design/lobby/plan.py, plan.json; its section below) is the whole visible world, a compact square with the
--- plaza, the spawn, the ZDC dispatch, the four player plots (each with a ZDC warehouse, its display stands), the
--- shops and six house portals; the six places to empty (Houses) each stand in a RUN ZONE of their own far off
--- (design/countryside/plan.py, plan.json; its section below: Zones), fenced, out of sight of the lobby and of each
--- other, their truck parked at the curb by the door (no driving any more: no lanes, no Depot Row, no Pražská). Plain
--- data (numbers only: the pure tests run it outside Roblox); the builders read it.
+-- "shrink the map ... one little lobby, like Dungeon Quest: there you go into a dungeon, here you go into a house"): the
+-- LOBBY (design/lobby/plan.py, plan.json; its section below) where everybody is between runs, a compact square with the
+-- plaza, the spawn, the Deliveros dispatch, the four player plots (each with a warehouse, its display stands), the shops
+-- and (10.4) one PLAY circle where parties gather for a run. 10.8 the floating islands (the owner: "the world is made of
+-- blocks: the lobby one big block, each map a smaller block that holds only that map ... floating islands in the sky";
+-- design/islands/plan.py, plan.json; its section below): the lobby stands on the biggest island, each of the six places
+-- to empty (Houses) on an island of its own round it, at its own height, the sky all round and under them; a run's fade
+-- takes you across (no roads, no driving), its truck parked at the curb by the door. Plain data (numbers only: the pure
+-- tests run it outside Roblox); the builders read it.
 --
--- Coordinates: studs, y up, the ground's top at GroundTop, the asphalt's (the yards') at RoadTop. A spot is { x, y, z,
--- yaw }: yaw in degrees about Y, the way its front looks: 0 looks north (-z), 90 west (-x), 180 south (+z), 270 east
--- (+x); in Roblox: CFrame.new(x, y, z) * CFrame.Angles(0, math.rad(yaw), 0) (SandboxMap.cframe).
+-- Coordinates: studs, y up. The lobby's ground's top at GroundTop, the asphalt's at RoadTop; 10.8 a map island's ground
+-- at its own `top` (its yard's asphalt RoadTop - GroundTop over it: SandboxMap.groundAt, roadAt), every spot of its place
+-- with its y on it. A spot is { x, y, z, yaw }: yaw in degrees about Y, the way its front looks: 0 looks north (-z), 90
+-- west (-x), 180 south (+z), 270 east (+x); in Roblox: CFrame.new(x, y, z) * CFrame.Angles(0, math.rad(yaw), 0)
+-- (SandboxMap.cframe).
 --
 --   9.7 the lobby (design/lobby/plan.json; tools/lobby/sandboxmap.py writes Lobby between the BEGIN LOBBY and END
 --   LOBBY lines: change the plan, run it again):
---   Lobby            bounds (the square: a hedge `hedge` in from it, invisible walls on it), far (studs to every run
---                    zone at least), plaza, spawn (a Spot; spawnApart: the players' spawns apart), dispatch (the ZDC
---                    dispatch kiosk), fountain, plots ({ id, x, wall, rect }: Plots below), portals ({ house, name, x, z,
---                    yaw, pad, foot, back }: a gate per place to empty, its glowing pad in front of it, its footprint,
---                    where its party comes back), shops (paint, leaders, auction: their spots and rects; paint's stand
---                    at its counter), lamps, trees
---   9.4 the countryside (design/countryside/plan.json; tools/countryside/sandboxmap.py writes Bounds, Roads and these
---   between the BEGIN COUNTRYSIDE and END COUNTRYSIDE lines: change the plan, run it again):
---   Bounds           the world's edge round the run zones and the lobby (the meadow under all of it; nothing you play
---                    with is outside a zone or the lobby)
---   Roads            9.7 the yards: each place's yard where its truck stands (name: the road its place stood on, its
---                    words' "on Pond Lane"; lane, yard: true)
+--   Lobby            bounds (the square: a low hedge `hedge` in from it, invisible walls on it; 10.8 its island's top a
+--                    rim of grass round it), far (studs from its island to every other island at least), plaza, spawn
+--                    (a Spot; spawnApart: the players' spawns apart), dispatch (the Deliveros dispatch kiosk), fountain,
+--                    plots ({ id, x, wall, rect }: Plots below), 10.4 play ({ x, z, r, back }: the PLAY circle's middle
+--                    on the ground and its radius, config Runs.Play.Radius; back: a Spot just off it facing it, where a
+--                    party comes back from a run), shops (paint, leaders, auction: their spots and rects; paint's stand at
+--                    its counter), lamps, trees
+--   10.8 the islands (design/islands/plan.json; tools/islands/sandboxmap.py writes these between the BEGIN ISLANDS and
+--   END ISLANDS lines: change the plan, run it again; 9.4 – 10.5's countryside section went with its plan):
+--   Islands          one per island, the lobby's first: id, house (the place to empty on it; none: the lobby's), name,
+--                    x, z (its top's middle), sx, sz (its top's size), top (its top's height), depth (from its top to the
+--                    tip of the rock under it: its bottom is top - depth), rect (its top), walls (the walled area on it:
+--                    the lobby's bounds; a map island's run zone), home (where the fall catch puts somebody back when
+--                    where they stood last is no good: the lobby's spawn, a zone's arrive), look (its grass, dirt, stone
+--                    and rock colours: shared/IslandLooks.luau), seed (its rock's dice)
+--   Rocks            the decorative floating rocks round the islands (x, z, top, size, depth, seed; nothing on them)
+--   Bounds           round every island and rock: nothing of the world is outside them
+--   Roads            the yards: each place's yard in front of its door where its truck stands, big enough for a round's
+--                    vans side by side and in rows (name: the road its place stood on, its words' "on Pond Lane"; lane,
+--                    yard: true)
 --   Landmarks        each place's surroundings (id, name, kind, rect, yaw: the way its front looks): the farm's barn, old
---                    tractor and trailer, stackyard of bales, paddock and muck heap; the fish pond with its jetty and
---                    boat; the lone house's garden; the lodge's woodpile; the millrace's weir and footbridge; the
---                    orchard's beehives (shared/CountryLooks.luau draws them)
---   Fields           (9.7: none)
---   Lawns            ground tiles of their own (kind, rect): the forest's floor
---   TreeLines        the orchard's fence, 9.7 the zones' screen hedges (kind, points)
---   Woods            the forest: its rect (its trees on a jittered grid) and its clearings (the lodge's: no tree)
---   Orchard          the orchard's rect (its fruit trees in rows; the cottage on its east edge)
---   Streams          the millrace from the forest past the mill into the pond (id, width, its middle line's points)
---   Zones            9.7 the run zones: id (its place's), rect (the fenced area round it: a screen hedge and invisible
---                    walls on its edge), arrive (where a run's party arrives: its front yard, facing the door)
---   Plots            four players' plots in the lobby's north row (SandboxPlots claims one per player), from Lobby.plots:
---                      rect        the plot's ground (x0, x1, z0, z1)
---                      warehouse   the building: its middle at the ground and its size (x across, y up, z deep);
---                                  its roller door in the south wall, DoorWidth wide, in the middle
---                      door        outside the roller door's middle, looking out (south)
---                      vanSpot     where the van stood before 9.7 (the UNLOAD HERE bay's middle; no van parks there now)
---                      unload      the bay's circle (shared/WarehouseLayout.luau's paint)
---                      spawn       a spot in front of the warehouse (the admin's TO WAREHOUSE)
---                      board       (8.0's Moving contracts board's spot: none is built since 9.7)
---   Houses           the six places to empty (design/countryside/plan.json `spots`; tests/sandboxhouses_test.luau holds
---                    them to it), each a run's house (Config.Moving.Sandbox.Houses, by id; server/Runs.luau: a portal
---                    each in the lobby). In this order: the farmstead, the pond cabin, the lone house, the forest
---                    lodge, the old mill, the orchard cottage. Each:
+--                    tractor, stackyard, paddock and muck heap; the fish pond with its jetty and boat; the lone house's
+--                    garden; the lodge's woodpile; the mill's spring, weir, footbridge and waterfall (its millrace off its
+--                    island's edge); the orchard's beehives (shared/CountryLooks.luau draws them)
+--   Fields           (none)
+--   Lawns            ground tiles of their own (kind, rect): the lodge's forest floor
+--   TreeLines        the orchard's fence, the lone house's windbreak, every map island's low rim hedge on its walls
+--                    (kind, points)
+--   Woods            the lodge's forest: its rect (its trees on a jittered grid) and its clearings (the lodge's: no tree)
+--   Orchard          the orchard's rect (its fruit trees in rows; the cottage on its east side)
+--   Streams          the mill's millrace from its spring past the mill and off its island's edge (id, width, its middle
+--                    line's points)
+--   Zones            9.7 the run zones, 10.8 the map islands' walled areas: id (its place's), rect (invisible walls and a
+--                    low hedge on its edge), arrive (where a run's party arrives: its front yard, facing the door)
+--   Houses           the six places to empty, each on its island (design/islands/plan.json `spots`;
+--                    tests/sandboxhouses_test.luau holds them to it), each a run's house (Config.Moving.Sandbox.Houses, by
+--                    id; 10.4: a party's lobby at the PLAY circle picks one: server/Parties.luau). In this order: the
+--                    farmstead, the pond cabin, the lone house, the forest lodge, the old mill, the orchard cottage. Each:
 --                      id          the spot's (the farmstead's sandbox_house as ever)
---                      name        what the portal, the guide and its signs call it (made up, in English words)
+--                      name        what the PLAY panel, the guide and the signs call it (made up, in English words)
 --                      street      the road it stood on (its yard's name: the contract's address, the guide's words)
 --                      number      none (a spot of its own has no house number)
 --                      kind        its inside's plan's kind (shared/HouseLayout.luau; its contract's, Config.Moving
@@ -61,16 +66,18 @@
 --                      look        its outside's kind: "farmstead" (server/SandboxWorld.luau's, the owner's Blender
 --                                  house), else shared/VillageLooks.luau house's ("cabin", "old", "lodge", "mill",
 --                                  "cottage": shared/VillageScenery.luau builds each in its own)
+--                      island      10.8 the island it stands on (Islands' id)
 --                      box         its footprint (x0, x1, z0, z1): sx along its front × sz deep, turned with its yaw
---                      lot         its garden: the box, LOT round it, its front up to its yard's edge (10 studs:
---                                  the front garden; the mill's west side stops at its wall: the millrace runs there)
---                      house       the walls' box: its footprint's middle, its bottom, its size (sx along x, sy the
---                                  walls' height, sz along z; the roof over it)
+--                      lot         its garden: the box, 6 round it, its front up to its yard's edge (10 studs: the front
+--                                  garden; the mill's west side stops at its wall: the millrace runs there)
+--                      house       the walls' box: its footprint's middle, its bottom (its island's top), its size (sx
+--                                  along x, sy the walls' height, sz along z; the roof over it)
 --                      yaw         the way its front looks (its front door's)
---                      door        outside its front door, looking out to its yard (DOOR_IN in from its box's front
---                                  edge: the look's front wall 1.5 in, its door 0.3 out of it)
+--                      door        outside its front door, looking out to its yard (1.2 in from its box's front edge:
+--                                  the look's front wall 1.5 in, its door 0.3 out of it)
 --                      curb        the truck's pivot in its yard (the Sprinter, 21.8 long: its back 2 studs in from the
---                                  yard's edge nearest the door, its nose away from the door): a run parks it there
+--                                  yard's edge nearest the door, its nose away from the door): a run parks it there (its y
+--                                  the yard's asphalt)
 --                      back        only where the house has a back door (the farmstead's): outside it, looking out
 --   House            Houses[1], The Old Farmstead: what only the farmstead has reads it (server/HouseMesh.luau dresses
 --                    only it, the menu's drift shows it). 8.1: the box is the owner's Blender house's (server/HouseMesh
@@ -82,8 +89,14 @@
 --   SandboxMap.houseAt(x, z, margin)   the first house whose lot holds the point or lies within `margin` of it (nil: none)
 --   SandboxMap.zone(id)       9.7: the run zone of that house id (nil: none)
 --   SandboxMap.zoneAt(x, z, margin?)   9.7: the run zone whose rect (grown by `margin`) holds the point (nil: none)
---   SandboxMap.portal(id)     9.7: the lobby's portal of that house id (nil: none)
+--   SandboxMap.inPlay(x, z, margin?)   10.4: is the point in the PLAY circle (its radius grown by `margin`)?
 --   SandboxMap.inLobby(x, z, margin?)  9.7: is the point in the lobby's bounds (grown by `margin`)?
+--   SandboxMap.island(id)     10.8: the island of that id (nil: none)
+--   SandboxMap.islandAt(x, z, margin?)   10.8: the island whose top (grown by `margin`) holds the point (nil: none)
+--   SandboxMap.islandOf(houseId)   10.8: the island a place to empty stands on (nil: none)
+--   SandboxMap.groundAt(x, z, margin?)  10.8: the ground's top there: its island's top (its top grown by `margin`: a
+--                             piece hanging just past its edge; GroundTop off every island)
+--   SandboxMap.roadAt(x, z)    10.8: a yard's asphalt's top there (groundAt and RoadTop - GroundTop over it)
 --   SandboxMap.cframe(spot)   (Roblox only) a spot's CFrame
 
 local SandboxMap = {}
@@ -109,6 +122,7 @@ export type House = {
 	number: number?,
 	kind: string,
 	look: string,
+	island: string,
 	box: Rect,
 	lot: Rect,
 	house: { x: number, y: number, z: number, sx: number, sy: number, sz: number },
@@ -126,10 +140,10 @@ export type Lawn = { kind: string, x0: number, x1: number, z0: number, z1: numbe
 export type TreeLine = { kind: string, points: { { x: number, z: number } } }
 export type Wood = { id: string, x0: number, x1: number, z0: number, z1: number, clearings: { Rect } }
 export type Stream = { id: string, width: number, points: { { x: number, z: number } } }
--- 9.7: a run zone, the lobby's plot, portal and shops, the lobby
+-- 9.7: a run zone, the lobby's plot and shops, the lobby; 10.4 the PLAY circle
 export type Zone = { id: string, rect: Rect, arrive: Spot }
 export type LobbyPlot = { id: number, x: number, wall: number, rect: Rect }
-export type Portal = { house: string, name: string, x: number, z: number, yaw: number, pad: Rect, foot: Rect, back: Spot }
+export type Play = { x: number, z: number, r: number, back: Spot }
 export type Lobby = {
 	bounds: Rect,
 	hedge: number,
@@ -140,114 +154,157 @@ export type Lobby = {
 	dispatch: Spot,
 	fountain: { x: number, z: number, r: number },
 	plots: { LobbyPlot },
-	portals: { Portal },
+	play: Play,
 	shops: { paint: { spot: Spot, rect: Rect, stand: Spot }, leaders: { spot: Spot, rect: Rect }, auction: { spot: Spot, rect: Rect } },
 	lamps: { { x: number, z: number } },
 	trees: { { kind: string, x: number, z: number } },
 }
+-- 10.8 an island (its look's colours { r, g, b }), a floating rock
+export type IslandLook = { grass: { number }, dirt: { number }, stone: { number }, rock: { number } }
+export type Island = {
+	id: string,
+	house: string?,
+	name: string,
+	x: number,
+	z: number,
+	sx: number,
+	sz: number,
+	top: number,
+	depth: number,
+	rect: Rect,
+	walls: Rect,
+	home: Spot,
+	look: IslandLook,
+	seed: number,
+}
+export type Rock = { x: number, z: number, top: number, size: number, depth: number, seed: number }
 
 SandboxMap.GroundTop = 0
 SandboxMap.RoadTop = 0.4
 
 -- BEGIN LOBBY (tools/lobby/sandboxmap.py writes these lines from design/lobby/plan.json: do not edit them)
 SandboxMap.Lobby = {
-	bounds = { x0 = 1560, x1 = 2040, z0 = -200, z1 = 200 },
+	bounds = { x0 = 1572, x1 = 2028, z0 = -128, z1 = 98 },
 	hedge = 2,
-	far = 1000,
-	plaza = { x0 = 1635, x1 = 1965, z0 = -54, z1 = 150 },
-	spawn = { x = 1800, y = 3, z = 10, yaw = 180 },
+	far = 300,
+	plaza = { x0 = 1600, x1 = 2000, z0 = 6, z1 = 92 },
+	spawn = { x = 1800, y = 3, z = 80, yaw = 0 },
 	spawnApart = 6,
-	dispatch = { x = 1800, y = 0, z = -44, yaw = 180 },
-	fountain = { x = 1800, z = 70, r = 9 },
+	dispatch = { x = 1760, y = 0, z = 44, yaw = 270 },
+	fountain = { x = 1630, z = 48, r = 9 },
 	plots = {
-		{ id = 1, x = 1626, wall = -100, rect = { x0 = 1570, x1 = 1682, z0 = -190, z1 = -60 } },
-		{ id = 2, x = 1742, wall = -100, rect = { x0 = 1686, x1 = 1798, z0 = -190, z1 = -60 } },
-		{ id = 3, x = 1858, wall = -100, rect = { x0 = 1802, x1 = 1914, z0 = -190, z1 = -60 } },
-		{ id = 4, x = 1974, wall = -100, rect = { x0 = 1918, x1 = 2030, z0 = -190, z1 = -60 } },
+		{ id = 1, x = 1632, wall = -33, rect = { x0 = 1577, x1 = 1687, z0 = -123, z1 = 3 } },
+		{ id = 2, x = 1744, wall = -33, rect = { x0 = 1689, x1 = 1799, z0 = -123, z1 = 3 } },
+		{ id = 3, x = 1856, wall = -33, rect = { x0 = 1801, x1 = 1911, z0 = -123, z1 = 3 } },
+		{ id = 4, x = 1968, wall = -33, rect = { x0 = 1913, x1 = 2023, z0 = -123, z1 = 3 } },
 	},
-	portals = {
-		{ house = "pond_cabin", name = "The Pond Cabin", x = 1595, z = 0, yaw = 270, pad = { x0 = 1600, x1 = 1614, z0 = -7, z1 = 7 }, foot = { x0 = 1582, x1 = 1597, z0 = -10, z1 = 10 }, back = { x = 1618, y = 3, z = 0, yaw = 270 } },
-		{ house = "old_mill", name = "The Old Mill", x = 1595, z = 96, yaw = 270, pad = { x0 = 1600, x1 = 1614, z0 = 89, z1 = 103 }, foot = { x0 = 1582, x1 = 1597, z0 = 86, z1 = 106 }, back = { x = 1618, y = 3, z = 96, yaw = 270 } },
-		{ house = "sandbox_house", name = "The Old Farmstead", x = 1692, z = 176, yaw = 0, pad = { x0 = 1685, x1 = 1699, z0 = 157, z1 = 171 }, foot = { x0 = 1682, x1 = 1702, z0 = 174, z1 = 189 }, back = { x = 1692, y = 3, z = 153, yaw = 0 } },
-		{ house = "lone_house", name = "The Lone House", x = 1908, z = 176, yaw = 0, pad = { x0 = 1901, x1 = 1915, z0 = 157, z1 = 171 }, foot = { x0 = 1898, x1 = 1918, z0 = 174, z1 = 189 }, back = { x = 1908, y = 3, z = 153, yaw = 0 } },
-		{ house = "forest_lodge", name = "The Forest Lodge", x = 2005, z = 96, yaw = 90, pad = { x0 = 1986, x1 = 2000, z0 = 89, z1 = 103 }, foot = { x0 = 2003, x1 = 2018, z0 = 86, z1 = 106 }, back = { x = 1982, y = 3, z = 96, yaw = 90 } },
-		{ house = "orchard_cottage", name = "The Orchard Cottage", x = 2005, z = 0, yaw = 90, pad = { x0 = 1986, x1 = 2000, z0 = -7, z1 = 7 }, foot = { x0 = 2003, x1 = 2018, z0 = -10, z1 = 10 }, back = { x = 1982, y = 3, z = 0, yaw = 90 } },
-	},
+	play = { x = 1800, z = 44, r = 16, back = { x = 1800, y = 3, z = 68, yaw = 0 } },
 	shops = {
-		paint = { spot = { x = 2006, y = 0, z = -40, yaw = 90 }, rect = { x0 = 2006, x1 = 2018, z0 = -51, z1 = -29 }, stand = { x = 2002, y = 3, z = -40, yaw = 270 } },
-		leaders = { spot = { x = 1594, y = 0, z = -40, yaw = 270 }, rect = { x0 = 1591.5, x1 = 1596.5, z0 = -52, z1 = -28 } },
-		auction = { spot = { x = 1800, y = 0, z = 156, yaw = 0 }, rect = { x0 = 1774, x1 = 1826, z0 = 152, z1 = 190 } },
+		paint = { spot = { x = 1864, y = 0, z = 44, yaw = 90 }, rect = { x0 = 1864, x1 = 1876, z0 = 33, z1 = 55 }, stand = { x = 1860, y = 3, z = 44, yaw = 270 } },
+		leaders = { spot = { x = 1680, y = 0, z = 50, yaw = 270 }, rect = { x0 = 1677.5, x1 = 1682.5, z0 = 38, z1 = 62 } },
+		auction = { spot = { x = 1930, y = 0, z = 44, yaw = 90 }, rect = { x0 = 1926, x1 = 1964, z0 = 18, z1 = 70 } },
 	},
-	lamps = { { x = 1635, z = -54 }, { x = 1965, z = -54 }, { x = 1635, z = 150 }, { x = 1965, z = 150 }, { x = 1740, z = -54 }, { x = 1860, z = -54 }, { x = 1635, z = 48 }, { x = 1965, z = 48 } },
+	lamps = { { x = 1600, z = 6 }, { x = 2000, z = 6 }, { x = 1600, z = 92 }, { x = 2000, z = 92 }, { x = 1710, z = 6 }, { x = 1890, z = 6 }, { x = 1710, z = 92 }, { x = 1890, z = 92 } },
 	trees = {
-		{ kind = "linden", x = 1575, z = 180 },
-		{ kind = "oak", x = 2025, z = 180 },
-		{ kind = "birch", x = 1640, z = 186 },
-		{ kind = "birch", x = 1960, z = 186 },
-		{ kind = "linden", x = 1572, z = 140 },
-		{ kind = "oak", x = 2028, z = 140 },
-		{ kind = "birch", x = 1574, z = -30 },
-		{ kind = "birch", x = 2026, z = -30 },
+		{ kind = "linden", x = 1586, z = 20 },
+		{ kind = "oak", x = 2014, z = 20 },
+		{ kind = "birch", x = 1586, z = 52 },
+		{ kind = "birch", x = 2014, z = 52 },
+		{ kind = "oak", x = 1586, z = 84 },
+		{ kind = "linden", x = 2014, z = 84 },
 	},
 } :: Lobby
 -- END LOBBY
 
--- BEGIN COUNTRYSIDE (tools/countryside/sandboxmap.py writes these lines from design/countryside/plan.json: do not edit them)
-SandboxMap.Bounds = { x0 = -1180, x1 = 2080, z0 = -680, z1 = 760 } :: Rect
+-- BEGIN ISLANDS (tools/islands/sandboxmap.py writes these lines from design/islands/plan.json: do not edit them)
+SandboxMap.Islands = {
+	{ id = "lobby", name = "The Lobby", x = 1800, z = -15, sx = 492, sz = 262, top = 0, depth = 170, rect = { x0 = 1554, x1 = 2046, z0 = -146, z1 = 116 }, walls = { x0 = 1572, x1 = 2028, z0 = -128, z1 = 98 }, home = { x = 1800, y = 3, z = 80, yaw = 0 }, look = { grass = { 96, 138, 60 }, dirt = { 118, 88, 60 }, stone = { 132, 126, 118 }, rock = { 104, 98, 92 } }, seed = 11 },
+	{ id = "farm", house = "sandbox_house", name = "The Old Farmstead", x = 1100, z = -620, sx = 384, sz = 260, top = 28, depth = 150, rect = { x0 = 908, x1 = 1292, z0 = -750, z1 = -490 }, walls = { x0 = 920, x1 = 1280, z0 = -738, z1 = -502 }, home = { x = 1100, y = 31, z = -664, yaw = 180 }, look = { grass = { 108, 142, 62 }, dirt = { 124, 90, 58 }, stone = { 138, 130, 120 }, rock = { 108, 100, 92 } }, seed = 21 },
+	{ id = "pond", house = "pond_cabin", name = "The Pond Cabin", x = 1060, z = 380, sx = 336, sz = 224, top = 10, depth = 120, rect = { x0 = 892, x1 = 1228, z0 = 268, z1 = 492 }, walls = { x0 = 904, x1 = 1216, z0 = 280, z1 = 480 }, home = { x = 1150.8, y = 13, z = 380, yaw = 90 }, look = { grass = { 88, 140, 66 }, dirt = { 112, 86, 58 }, stone = { 126, 124, 118 }, rock = { 98, 96, 92 } }, seed = 22 },
+	{ id = "lone", house = "lone_house", name = "The Lone House", x = 1900, z = 690, sx = 168, sz = 184, top = 52, depth = 110, rect = { x0 = 1816, x1 = 1984, z0 = 598, z1 = 782 }, walls = { x0 = 1828, x1 = 1972, z0 = 610, z1 = 770 }, home = { x = 1904.8, y = 55, z = 690, yaw = 90 }, look = { grass = { 102, 146, 64 }, dirt = { 122, 92, 62 }, stone = { 140, 134, 124 }, rock = { 110, 104, 96 } }, seed = 23 },
+	{ id = "lodge", house = "forest_lodge", name = "The Forest Lodge", x = 1950, z = -770, sx = 284, sz = 242, top = 74, depth = 140, rect = { x0 = 1808, x1 = 2092, z0 = -891, z1 = -649 }, walls = { x0 = 1820, x1 = 2080, z0 = -879, z1 = -661 }, home = { x = 1950, y = 77, z = -770.2, yaw = 0 }, look = { grass = { 76, 114, 54 }, dirt = { 104, 80, 56 }, stone = { 118, 116, 110 }, rock = { 92, 90, 86 } }, seed = 24 },
+	{ id = "mill", house = "old_mill", name = "The Old Mill", x = 2610, z = -440, sx = 244, sz = 212, top = 40, depth = 120, rect = { x0 = 2488, x1 = 2732, z0 = -546, z1 = -334 }, walls = { x0 = 2500, x1 = 2720, z0 = -534, z1 = -346 }, home = { x = 2610, y = 43, z = -466.8, yaw = 180 }, look = { grass = { 92, 136, 62 }, dirt = { 116, 88, 60 }, stone = { 130, 128, 122 }, rock = { 100, 98, 94 } }, seed = 25 },
+	{ id = "orchard", house = "orchard_cottage", name = "The Orchard Cottage", x = 2620, z = 420, sx = 294, sz = 228, top = 18, depth = 120, rect = { x0 = 2473, x1 = 2767, z0 = 306, z1 = 534 }, walls = { x0 = 2485, x1 = 2755, z0 = 318, z1 = 522 }, home = { x = 2685.8, y = 21, z = 420, yaw = 90 }, look = { grass = { 112, 152, 70 }, dirt = { 126, 94, 62 }, stone = { 142, 136, 126 }, rock = { 112, 106, 98 } }, seed = 26 },
+} :: { Island }
+SandboxMap.Rocks = {
+	{ x = 836, z = -836, top = 40, size = 26, depth = 34, seed = 1 },
+	{ x = 1330, z = -440, top = 18, size = 18, depth = 24, seed = 2 },
+	{ x = 2150, z = -910, top = 88, size = 22, depth = 30, seed = 3 },
+	{ x = 2780, z = -290, top = 54, size = 20, depth = 26, seed = 4 },
+	{ x = 2416, z = 604, top = 30, size = 24, depth = 30, seed = 5 },
+	{ x = 2830, z = 270, top = 6, size = 16, depth = 22, seed = 6 },
+	{ x = 1770, z = 820, top = 64, size = 18, depth = 24, seed = 7 },
+	{ x = 826, z = 566, top = 22, size = 22, depth = 28, seed = 8 },
+	{ x = 1500, z = 190, top = 14, size = 20, depth = 26, seed = 9 },
+	{ x = 2110, z = -230, top = 26, size = 16, depth = 22, seed = 10 },
+	{ x = 1500, z = -240, top = -18, size = 24, depth = 30, seed = 11 },
+} :: { Rock }
+SandboxMap.Bounds = { x0 = 760, x1 = 2900, z0 = -980, z1 = 880 } :: Rect
 SandboxMap.Roads = {
-	{ name = "Pražská", x0 = -30, x1 = 30, z0 = 452, z1 = 504, lane = true, yard = true },
-	{ name = "Mill Lane", x0 = -1066, x1 = -1012, z0 = -84, z1 = -36, lane = true, yard = true },
-	{ name = "Wood Lane", x0 = -967, x1 = -913, z0 = -452, z1 = -404, lane = true, yard = true },
-	{ name = "Hill Road", x0 = -583, x1 = -531, z0 = -460, z1 = -412, lane = true, yard = true },
-	{ name = "Orchard Lane", x0 = 222, x1 = 270, z0 = -494, z1 = -446, lane = true, yard = true },
-	{ name = "Pond Lane", x0 = -922, x1 = -874, z0 = 446, z1 = 494, lane = true, yard = true },
+	{ name = "Pražská", x0 = 1036, x1 = 1164, z0 = -729, z1 = -673, lane = true, yard = true },
+	{ name = "Pond Lane", x0 = 1152, x1 = 1208, z0 = 316, z1 = 444, lane = true, yard = true },
+	{ name = "Hill Road", x0 = 1906, x1 = 1962, z0 = 626, z1 = 754, lane = true, yard = true },
+	{ name = "Wood Lane", x0 = 1886, x1 = 2014, z0 = -769, z1 = -713, lane = true, yard = true },
+	{ name = "Mill Lane", x0 = 2546, x1 = 2674, z0 = -524, z1 = -468, lane = true, yard = true },
+	{ name = "Orchard Lane", x0 = 2687, x1 = 2743, z0 = 356, z1 = 484, lane = true, yard = true },
 } :: { Road }
 SandboxMap.Landmarks = {
-	{ id = "barn", name = "The Barn", kind = "barn", x0 = -144, x1 = -88, z0 = 500, z1 = 548, yaw = 270 },
-	{ id = "tractor", name = "The Old Tractor", kind = "tractor", x0 = -170, x1 = -106, z0 = 460, z1 = 490, yaw = 270 },
-	{ id = "bales", name = "The Stackyard", kind = "bales", x0 = 82, x1 = 150, z0 = 508, z1 = 572, yaw = 0 },
-	{ id = "paddock", name = "The Paddock", kind = "paddock", x0 = -56, x1 = 64, z0 = 618, z1 = 690, yaw = 0 },
-	{ id = "muckheap", name = "The Muck Heap", kind = "muckheap", x0 = -144, x1 = -100, z0 = 560, z1 = 590, yaw = 270 },
-	{ id = "pond", name = "The Fish Pond", kind = "fishpond", x0 = -1160, x1 = -957, z0 = 380, z1 = 560, yaw = 270 },
-	{ id = "garden", name = "The Garden", kind = "garden", x0 = -625, x1 = -583, z0 = -510, z1 = -466, yaw = 270 },
-	{ id = "woodyard", name = "The Woodpile", kind = "woodyard", x0 = -999, x1 = -973, z0 = -480, z1 = -456, yaw = 180 },
-	{ id = "weir", name = "The Weir", kind = "weir", x0 = -1088, x1 = -1068, z0 = -134, z1 = -122, yaw = 0 },
-	{ id = "footbridge", name = "The Footbridge", kind = "footbridge", x0 = -1090, x1 = -1066, z0 = 12, z1 = 20, yaw = 0 },
-	{ id = "apiary", name = "The Beehives", kind = "apiary", x0 = 150, x1 = 186, z0 = -432, z1 = -414, yaw = 270 },
+	{ id = "barn", name = "The Barn", kind = "barn", x0 = 950, x1 = 1006, z0 = -670, z1 = -622, yaw = 270 },
+	{ id = "muckheap", name = "The Muck Heap", kind = "muckheap", x0 = 950, x1 = 994, z0 = -610, z1 = -580, yaw = 270 },
+	{ id = "bales", name = "The Stackyard", kind = "bales", x0 = 1182, x1 = 1250, z0 = -654, z1 = -590, yaw = 0 },
+	{ id = "tractor", name = "The Old Tractor", kind = "tractor", x0 = 1190, x1 = 1254, z0 = -574, z1 = -544, yaw = 270 },
+	{ id = "paddock", name = "The Paddock", kind = "paddock", x0 = 1060, x1 = 1160, z0 = -570, z1 = -512, yaw = 0 },
+	{ id = "pond", name = "The Fish Pond", kind = "fishpond", x0 = 914, x1 = 1117, z0 = 290, z1 = 470, yaw = 270 },
+	{ id = "garden", name = "The Garden", kind = "garden", x0 = 1858, x1 = 1900, z0 = 618, z1 = 662, yaw = 270 },
+	{ id = "woodyard", name = "The Woodpile", kind = "woodyard", x0 = 1888, x1 = 1914, z0 = -807, z1 = -783, yaw = 180 },
+	{ id = "spring", name = "The Spring", kind = "spring", x0 = 2576, x1 = 2608, z0 = -382, z1 = -352, yaw = 0 },
+	{ id = "weir", name = "The Weir", kind = "weir", x0 = 2582, x1 = 2602, z0 = -414, z1 = -402, yaw = 180 },
+	{ id = "footbridge", name = "The Footbridge", kind = "footbridge", x0 = 2520, x1 = 2528, z0 = -470, z1 = -446, yaw = 90 },
+	{ id = "waterfall", name = "The Waterfall", kind = "waterfall", x0 = 2478, x1 = 2498, z0 = -466, z1 = -450, yaw = 90 },
+	{ id = "apiary", name = "The Beehives", kind = "apiary", x0 = 2647, x1 = 2683, z0 = 452, z1 = 470, yaw = 270 },
 } :: { Landmark }
 SandboxMap.Fields = {
 } :: { Field }
 SandboxMap.Lawns = {
-	{ kind = "forest", x0 = -1160, x1 = -760, z0 = -672, z1 = -500 },
-	{ kind = "forest", x0 = -1160, x1 = -760, z0 = -392, z1 = -250 },
-	{ kind = "forest", x0 = -1160, x1 = -1005, z0 = -500, z1 = -392 },
-	{ kind = "forest", x0 = -895, x1 = -760, z0 = -500, z1 = -392 },
+	{ kind = "forest", x0 = 1820, x1 = 2080, z0 = -879, z1 = -823 },
+	{ kind = "forest", x0 = 1820, x1 = 2080, z0 = -695, z1 = -661 },
+	{ kind = "forest", x0 = 1820, x1 = 1872, z0 = -823, z1 = -695 },
+	{ kind = "forest", x0 = 2028, x1 = 2080, z0 = -823, z1 = -695 },
 } :: { Lawn }
 SandboxMap.TreeLines = {
-	{ kind = "fence", points = { { x = 217, z = -495 }, { x = 217, z = -650 }, { x = 30, z = -650 }, { x = 30, z = -300 }, { x = 217, z = -300 }, { x = 217, z = -445 } } },
-	{ kind = "screen", points = { { x = -190, z = 440 }, { x = 170, z = 440 }, { x = 170, z = 712 }, { x = -190, z = 712 }, { x = -190, z = 440 } } },
-	{ kind = "screen", points = { { x = -1170, z = 368 }, { x = -860, z = 368 }, { x = -860, z = 580 }, { x = -1170, z = 580 }, { x = -1170, z = 368 } } },
-	{ kind = "screen", points = { { x = -650, z = -525 }, { x = -515, z = -525 }, { x = -515, z = -395 }, { x = -650, z = -395 }, { x = -650, z = -525 } } },
-	{ kind = "screen", points = { { x = -1015, z = -512 }, { x = -885, z = -512 }, { x = -885, z = -386 }, { x = -1015, z = -386 }, { x = -1015, z = -512 } } },
-	{ kind = "screen", points = { { x = -1112, z = -150 }, { x = -995, z = -150 }, { x = -995, z = 46 }, { x = -1112, z = 46 }, { x = -1112, z = -150 } } },
-	{ kind = "screen", points = { { x = 108, z = -548 }, { x = 292, z = -548 }, { x = 292, z = -384 }, { x = 108, z = -384 }, { x = 108, z = -548 } } },
+	{ kind = "hedge", points = { { x = 920, z = -738 }, { x = 1280, z = -738 }, { x = 1280, z = -502 }, { x = 920, z = -502 }, { x = 920, z = -738 } } },
+	{ kind = "hedge", points = { { x = 904, z = 280 }, { x = 1216, z = 280 }, { x = 1216, z = 480 }, { x = 904, z = 480 }, { x = 904, z = 280 } } },
+	{ kind = "windbreak", points = { { x = 1844, z = 680 }, { x = 1844, z = 756 } } },
+	{ kind = "hedge", points = { { x = 1828, z = 610 }, { x = 1972, z = 610 }, { x = 1972, z = 770 }, { x = 1828, z = 770 }, { x = 1828, z = 610 } } },
+	{ kind = "hedge", points = { { x = 1820, z = -879 }, { x = 2080, z = -879 }, { x = 2080, z = -661 }, { x = 1820, z = -661 }, { x = 1820, z = -879 } } },
+	{ kind = "hedge", points = { { x = 2500, z = -464 }, { x = 2500, z = -534 }, { x = 2720, z = -534 }, { x = 2720, z = -346 }, { x = 2500, z = -346 }, { x = 2500, z = -452 } } },
+	{ kind = "fence", points = { { x = 2643, z = 410 }, { x = 2643, z = 328 }, { x = 2495, z = 328 }, { x = 2495, z = 512 }, { x = 2643, z = 512 }, { x = 2643, z = 430 } } },
+	{ kind = "hedge", points = { { x = 2485, z = 318 }, { x = 2755, z = 318 }, { x = 2755, z = 522 }, { x = 2485, z = 522 }, { x = 2485, z = 318 } } },
 } :: { TreeLine }
 SandboxMap.Woods = {
-	{ id = "forest", x0 = -1160, x1 = -760, z0 = -672, z1 = -250, clearings = { { x0 = -1005, x1 = -895, z0 = -500, z1 = -392 } } },
+	{ id = "forest", x0 = 1820, x1 = 2080, z0 = -879, z1 = -661, clearings = { { x0 = 1872, x1 = 2028, z0 = -823, z1 = -695 } } },
 } :: { Wood }
-SandboxMap.Orchard = { x0 = 30, x1 = 216, z0 = -650, z1 = -300 } :: Rect
+SandboxMap.Orchard = { x0 = 2497, x1 = 2641, z0 = 330, z1 = 510 } :: Rect
 SandboxMap.Streams = {
-	{ id = "millrace", width = 8, points = { { x = -1110, z = -676 }, { x = -1096, z = -560 }, { x = -1104, z = -440 }, { x = -1090, z = -320 }, { x = -1092, z = -200 }, { x = -1078, z = -134 }, { x = -1078, z = 10 }, { x = -1082, z = 120 }, { x = -1070, z = 250 }, { x = -1060, z = 386 } } },
+	{ id = "millrace", width = 8, points = { { x = 2592, z = -372 }, { x = 2592, z = -408 }, { x = 2592, z = -458 }, { x = 2550, z = -458 }, { x = 2488.5, z = -458 } } },
 } :: { Stream }
 SandboxMap.Zones = {
-	{ id = "sandbox_house", rect = { x0 = -190, x1 = 170, z0 = 440, z1 = 712 }, arrive = { x = 0, y = 3, z = 513, yaw = 180 } },
-	{ id = "pond_cabin", rect = { x0 = -1170, x1 = -860, z0 = 368, z1 = 580 }, arrive = { x = -923.2, y = 3, z = 470, yaw = 90 } },
-	{ id = "lone_house", rect = { x0 = -650, x1 = -515, z0 = -525, z1 = -395 }, arrive = { x = -584.2, y = 3, z = -436, yaw = 90 } },
-	{ id = "forest_lodge", rect = { x0 = -1015, x1 = -885, z0 = -512, z1 = -386 }, arrive = { x = -940, y = 3, z = -453.2, yaw = 0 } },
-	{ id = "old_mill", rect = { x0 = -1112, x1 = -995, z0 = -150, z1 = 46 }, arrive = { x = -1060, y = 3, z = -34.8, yaw = 180 } },
-	{ id = "orchard_cottage", rect = { x0 = 108, x1 = 292, z0 = -548, z1 = -384 }, arrive = { x = 220.8, y = 3, z = -470, yaw = 90 } },
+	{ id = "sandbox_house", rect = { x0 = 920, x1 = 1280, z0 = -738, z1 = -502 }, arrive = { x = 1100, y = 31, z = -664, yaw = 180 } },
+	{ id = "pond_cabin", rect = { x0 = 904, x1 = 1216, z0 = 280, z1 = 480 }, arrive = { x = 1150.8, y = 13, z = 380, yaw = 90 } },
+	{ id = "lone_house", rect = { x0 = 1828, x1 = 1972, z0 = 610, z1 = 770 }, arrive = { x = 1904.8, y = 55, z = 690, yaw = 90 } },
+	{ id = "forest_lodge", rect = { x0 = 1820, x1 = 2080, z0 = -879, z1 = -661 }, arrive = { x = 1950, y = 77, z = -770.2, yaw = 0 } },
+	{ id = "old_mill", rect = { x0 = 2500, x1 = 2720, z0 = -534, z1 = -346 }, arrive = { x = 2610, y = 43, z = -466.8, yaw = 180 } },
+	{ id = "orchard_cottage", rect = { x0 = 2485, x1 = 2755, z0 = 318, z1 = 522 }, arrive = { x = 2685.8, y = 21, z = 420, yaw = 90 } },
 } :: { Zone }
--- END COUNTRYSIDE
+SandboxMap.Houses = {
+	{ id = "sandbox_house", name = "The Old Farmstead", street = "Pražská", kind = "big", look = "farmstead", island = "farm", box = { x0 = 1078, x1 = 1122, z0 = -654, z1 = -620 }, lot = { x0 = 1040, x1 = 1160, z0 = -673, z1 = -577 }, house = { x = 1100, y = 28, z = -637, sx = 44, sy = 14.5, sz = 34 }, yaw = 0, door = { x = 1100, y = 28, z = -654, yaw = 0 }, curb = { x = 1100, y = 28.4, z = -685, yaw = 0 }, back = { x = 1100, y = 28, z = -620, yaw = 180 } },
+	{ id = "pond_cabin", name = "The Pond Cabin", street = "Pond Lane", kind = "cabin", look = "cabin", island = "pond", box = { x0 = 1124, x1 = 1142, z0 = 368, z1 = 392 }, lot = { x0 = 1118, x1 = 1152, z0 = 362, z1 = 398 }, house = { x = 1133, y = 10, z = 380, sx = 18, sy = 10, sz = 24 }, yaw = 270, door = { x = 1140.8, y = 10, z = 380, yaw = 270 }, curb = { x = 1165, y = 10.4, z = 380, yaw = 270 } },
+	{ id = "lone_house", name = "The Lone House", street = "Hill Road", kind = "house", look = "old", island = "lone", box = { x0 = 1872, x1 = 1896, z0 = 675, z1 = 705 }, lot = { x0 = 1866, x1 = 1906, z0 = 669, z1 = 711 }, house = { x = 1884, y = 52, z = 690, sx = 24, sy = 10, sz = 30 }, yaw = 270, door = { x = 1894.8, y = 52, z = 690, yaw = 270 }, curb = { x = 1919, y = 52.4, z = 690, yaw = 270 } },
+	{ id = "forest_lodge", name = "The Forest Lodge", street = "Wood Lane", kind = "lodge", look = "lodge", island = "lodge", box = { x0 = 1936, x1 = 1964, z0 = -801, z1 = -779 }, lot = { x0 = 1930, x1 = 1970, z0 = -807, z1 = -769 }, house = { x = 1950, y = 74, z = -790, sx = 28, sy = 10, sz = 22 }, yaw = 180, door = { x = 1950, y = 74, z = -780.2, yaw = 180 }, curb = { x = 1950, y = 74.4, z = -756, yaw = 180 } },
+	{ id = "old_mill", name = "The Old Mill", street = "Mill Lane", kind = "mill", look = "mill", island = "mill", box = { x0 = 2598, x1 = 2622, z0 = -458, z1 = -432 }, lot = { x0 = 2598, x1 = 2628, z0 = -468, z1 = -426 }, house = { x = 2610, y = 40, z = -445, sx = 24, sy = 10, sz = 26 }, yaw = 0, door = { x = 2610, y = 40, z = -456.8, yaw = 0 }, curb = { x = 2610, y = 40.4, z = -481, yaw = 0 } },
+	{ id = "orchard_cottage", name = "The Orchard Cottage", street = "Orchard Lane", kind = "cottage", look = "cottage", island = "orchard", box = { x0 = 2657, x1 = 2677, z0 = 407, z1 = 433 }, lot = { x0 = 2651, x1 = 2687, z0 = 401, z1 = 439 }, house = { x = 2667, y = 18, z = 420, sx = 20, sy = 10, sz = 26 }, yaw = 270, door = { x = 2675.8, y = 18, z = 420, yaw = 270 }, curb = { x = 2700, y = 18.4, z = 420, yaw = 270 } },
+} :: { House }
+-- END ISLANDS
 
 SandboxMap.DoorWidth = 26 -- the warehouse's roller door
 SandboxMap.VanGap = 6 -- studs from the warehouse's front wall to where the van's back stood (the bay's middle)
@@ -269,78 +326,6 @@ for _, p in SandboxMap.Lobby.plots do
 	}
 end
 SandboxMap.Plots = plots
-
-local TOP = SandboxMap.RoadTop
-
--- A spot of the countryside (plan.json `spots`): its look, kind, box and yaw as the plan has them, the rest made from
--- them the way the plan makes them (design/countryside/plan.py spots(); tests/sandboxhouses_test.luau holds them
--- together): its door DOOR_IN in from its box's front edge (a look stands its front wall Config.Village.Front, 1.5, in
--- from it, its door 0.3 out of that wall: the spot just outside it, VillageLooks.doorSpots), its curb CURB_IN from
--- `edge` (its yard's edge nearest the door: the van's back 2 in, its middle 11 on, its nose away from the door), its
--- walls WALLS high, its lot LOT round its box and its front to `edge`.
-local WALLS, LOT, DOOR_IN, CURB_IN = 10, 6, 1.2, 13
-local OUT = { [0] = { 0, -1 }, [90] = { -1, 0 }, [180] = { 0, 1 }, [270] = { 1, 0 } } :: { [number]: { number } } -- (a yaw's look)
-local function spot(id: string, name: string, street: string, look: string, kind: string, box: Rect, yaw: number, edge: number): House
-	local out = OUT[yaw]
-	local mx, mz = (box.x0 + box.x1) / 2, (box.z0 + box.z1) / 2
-	-- (the front edge's middle: the box's side the yaw looks out of)
-	local fx = if out[1] < 0 then box.x0 elseif out[1] > 0 then box.x1 else mx
-	local fz = if out[2] < 0 then box.z0 elseif out[2] > 0 then box.z1 else mz
-	local lot = { x0 = box.x0 - LOT, x1 = box.x1 + LOT, z0 = box.z0 - LOT, z1 = box.z1 + LOT }
-	if yaw == 0 then -- (its front looks north: its yard's south edge north of it)
-		lot.z0 = edge
-	elseif yaw == 180 then
-		lot.z1 = edge
-	elseif yaw == 90 then
-		lot.x0 = edge
-	else
-		lot.x1 = edge
-	end
-	return {
-		id = id,
-		name = name,
-		street = street,
-		number = nil,
-		kind = kind,
-		look = look,
-		box = box,
-		lot = lot,
-		house = { x = mx, y = 0, z = mz, sx = box.x1 - box.x0, sy = WALLS, sz = box.z1 - box.z0 },
-		yaw = yaw,
-		door = { x = fx - out[1] * DOOR_IN, y = 0, z = fz - out[2] * DOOR_IN, yaw = yaw },
-		curb = { x = if out[1] ~= 0 then edge + out[1] * CURB_IN else mx, y = TOP, z = if out[2] ~= 0 then edge + out[2] * CURB_IN else mz, yaw = yaw },
-	}
-end
-
--- The old mill: the millrace runs past its right-hand side (its west wall, seen facing its door from outside), its lot
--- stops at that wall.
-local mill = spot("old_mill", "The Old Mill", "Mill Lane", "mill", "mill", { x0 = -1072, x1 = -1048, z0 = -26, z1 = 0 }, 0, -36)
-mill.lot.x0 = mill.box.x0
-
-SandboxMap.Houses = {
-	{
-		id = "sandbox_house",
-		name = "The Old Farmstead",
-		street = "Pražská", -- (the road it stands on, one of SandboxMap.Roads: the contract's address, the guide's words)
-		kind = "big",
-		look = "farmstead",
-		box = { x0 = -22, x1 = 22, z0 = 523, z1 = 557 } :: Rect,
-		lot = { x0 = -60, x1 = 60, z0 = 504, z1 = 600 } :: Rect,
-		-- (the front wall at the door, z 523; the house's box back from it: tools/house-art/check.py, house.py's TARGETS
-		-- "sandbox" box; sy the walls' height, the roof over it up to 26)
-		house = { x = 0, y = 0, z = 523 + 34 / 2, sx = 44, sy = 14.5, sz = 34 },
-		yaw = 0,
-		door = { x = 0, y = 0, z = 523, yaw = 0 } :: Spot, -- outside the front door, looking north to the road
-		curb = { x = 0, y = TOP, z = 492, yaw = 0 } :: Spot, -- the van's pivot: nose north, back to the door
-		back = { x = 0, y = 0, z = 523 + 34, yaw = 180 } :: Spot, -- 8.3: outside the back door, looking south into the garden
-	},
-	-- 9.4 the countryside: five spots of their own (plan.json `spots` 2 … 6), each `edge` its yard's edge by its door
-	spot("pond_cabin", "The Pond Cabin", "Pond Lane", "cabin", "cabin", { x0 = -950, x1 = -932, z0 = 458, z1 = 482 }, 270, -922),
-	spot("lone_house", "The Lone House", "Hill Road", "old", "house", { x0 = -617, x1 = -593, z0 = -451, z1 = -421 }, 270, -583),
-	spot("forest_lodge", "The Forest Lodge", "Wood Lane", "lodge", "lodge", { x0 = -954, x1 = -926, z0 = -484, z1 = -462 }, 180, -452),
-	mill,
-	spot("orchard_cottage", "The Orchard Cottage", "Orchard Lane", "cottage", "cottage", { x0 = 192, x1 = 212, z0 = -483, z1 = -457 }, 270, 222),
-} :: { House }
 
 -- The one house before the six (The Old Farmstead): what only it has reads it (HouseMesh's import, the menu's drift).
 SandboxMap.House = SandboxMap.Houses[1]
@@ -378,10 +363,6 @@ local zoneOf: { [string]: Zone } = {}
 for _, z in SandboxMap.Zones do
 	zoneOf[z.id] = z
 end
-local portalOf: { [string]: Portal } = {}
-for _, p in SandboxMap.Lobby.portals do
-	portalOf[p.house] = p
-end
 
 function SandboxMap.zone(id: any): Zone?
 	return if type(id) == "string" then zoneOf[id] else nil
@@ -398,14 +379,52 @@ function SandboxMap.zoneAt(x: number, z: number, margin: number?): Zone?
 	return nil
 end
 
-function SandboxMap.portal(id: any): Portal?
-	return if type(id) == "string" then portalOf[id] else nil
+function SandboxMap.inPlay(x: number, z: number, margin: number?): boolean
+	local p = SandboxMap.Lobby.play
+	local r = p.r + (margin or 0)
+	return (x - p.x) ^ 2 + (z - p.z) ^ 2 <= r * r
 end
 
 function SandboxMap.inLobby(x: number, z: number, margin: number?): boolean
 	local m = margin or 0
 	local b = SandboxMap.Lobby.bounds
 	return x >= b.x0 - m and x <= b.x1 + m and z >= b.z0 - m and z <= b.z1 + m
+end
+
+-- ── 10.8 the islands ───────────────────────────────────────────────────────
+
+local islandById: { [string]: Island } = {}
+for _, i in SandboxMap.Islands do
+	islandById[i.id] = i
+end
+
+function SandboxMap.island(id: any): Island?
+	return if type(id) == "string" then islandById[id] else nil
+end
+
+function SandboxMap.islandAt(x: number, z: number, margin: number?): Island?
+	local m = margin or 0
+	for _, i in SandboxMap.Islands do
+		local r = i.rect
+		if x >= r.x0 - m and x <= r.x1 + m and z >= r.z0 - m and z <= r.z1 + m then
+			return i
+		end
+	end
+	return nil
+end
+
+function SandboxMap.islandOf(houseId: any): Island?
+	local h = SandboxMap.house(houseId)
+	return if h then islandById[h.island] else nil
+end
+
+function SandboxMap.groundAt(x: number, z: number, margin: number?): number
+	local i = SandboxMap.islandAt(x, z, margin)
+	return if i then i.top else SandboxMap.GroundTop
+end
+
+function SandboxMap.roadAt(x: number, z: number): number
+	return SandboxMap.groundAt(x, z) + SandboxMap.RoadTop - SandboxMap.GroundTop
 end
 
 function SandboxMap.cframe(spot: Spot): any

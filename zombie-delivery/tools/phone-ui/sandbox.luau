@@ -32,6 +32,10 @@
 -- (the demand's line, hot, cold) and sends the price it showed (expect), SELL…'s totals one piece after the other with
 -- the demand's hint and the total sent (expect), never a guessed price; the HUD's "🔥 Hot today: …" toast once a day,
 -- held back while the HUD is hidden.
+-- 10.4 (the warehouse in two, Config.Showroom): a tile's placement row over SELL: 🏛 HALL and 🏷 FOR SALE (the picker's
+-- stand's own area green: onto that stand, { kind = "display" }; the other: { kind = "place", uid, area }, the first free
+-- stand there); the picker at a showroom plinth ("SHOWROOM 1 · CHOOSE A PIECE"); the STOCK list's HALL · STAND n ribbon,
+-- the other area's button and TAKE DOWN; TOO BIG on the hall's button at a small stand.
 local dump = select(1, ...) == "dump"
 local M = require("./sandbox_mock")
 local Config = require("./Config")
@@ -450,7 +454,9 @@ local clock = named(grid, "Tile_a1")
 local clockValues = WarehouseUi.values(STOCK[1])
 check("the clock's tile: 87%, its values (WarehouseUi.values)", named(clock, "Condition").Text == "87%" and named(clock, "PerMinute").Text == `+{WarehouseLayout.money(clockValues.perMinute)}/min` and named(clock, "SellPrice").Text == `Sell {M.MUi.money(clockValues.sell)}`)
 check("… its rarity colour (WarehouseUi.Rarity)", named(clock, "RarityBar").BackgroundColor3 == WarehouseUi.Rarity[clockValues.rarity])
-check("… DISPLAY and SELL", named(clock, "Display") ~= nil and named(clock, "Sell") ~= nil and named(clock, "Display").Text == "DISPLAY" and named(clock, "Sell").Text == "SELL")
+check("… 10.4: its two places over SELL: 🏛 HALL (green: this hall stand) and 🏷 FOR SALE", named(clock, "Hall") ~= nil and named(clock, "Show") ~= nil and named(clock, "Sell") ~= nil
+	and named(clock, "Hall").Text == "🏛 HALL" and named(clock, "Show").Text == "🏷 FOR SALE" and named(clock, "Sell").Text == "SELL" and named(clock, "Display") == nil
+	and named(clock, "Hall").BackgroundColor3 ~= named(clock, "Show").BackgroundColor3)
 
 local function pickerChecks(label)
 	picker = named(gui, "Picker")
@@ -458,7 +464,7 @@ local function pickerChecks(label)
 	check(`{label}: the picker's card on the screen`, inside(cardBox), show(cardBox))
 	check(`{label}: … its texts fit`, #badTexts(picker) == 0, badTexts(picker)[1])
 	if M.touch then
-		check(`{label}: … every button a finger's size (DISPLAY, SELL, ✕, the chips)`, #smallButtons(picker) == 0, smallButtons(picker)[1])
+		check(`{label}: … every button a finger's size (HALL, FOR SALE, SELL, ✕, the chips)`, #smallButtons(picker) == 0, smallButtons(picker)[1])
 	end
 	local first = tilesOf()[1]
 	if first then
@@ -470,11 +476,35 @@ pickerChecks("844 x 390")
 check("… the 3D pictures: on the tiles on screen only", WarehouseUi.views() > 0 and WarehouseUi.views() <= Config.SandboxHud.MaxViews, WarehouseUi.views())
 scene("phone-picker")
 
--- DISPLAY
-press(named(clock, "Display"))
+-- 🏛 HALL at hall stand 3: onto it
+press(named(clock, "Hall"))
 local sent = sentOn("Collection")
-check("DISPLAY sends { kind = \"display\", uid, stand = 3 } and closes the picker", sent[#sent][1].kind == "display" and sent[#sent][1].uid == "a1" and sent[#sent][1].stand == 3 and not WarehouseUi.isOpen())
+check("🏛 HALL (this hall stand's) sends { kind = \"display\", uid, stand = 3 } and closes the picker", sent[#sent][1].kind == "display" and sent[#sent][1].uid == "a1" and sent[#sent][1].stand == 3 and not WarehouseUi.isOpen())
 check("… its pictures given back", WarehouseUi.views() == 0)
+-- 🏷 FOR SALE at a hall stand: the showroom's first free plinth
+collection.OnClientEvent:Fire({ kind = "pick", stand = 3 })
+press(named(named(named(gui, "Picker"), "Grid"), "Tile_a1"):FindFirstChild("Show"))
+sent = sentOn("Collection")
+check("10.4: 🏷 FOR SALE there sends { kind = \"place\", uid, area = \"show\" } (the showroom's first free plinth) and closes the picker", sent[#sent][1].kind == "place"
+	and sent[#sent][1].uid == "a1" and sent[#sent][1].area == "show" and not WarehouseUi.isOpen())
+collection.OnClientEvent:Fire({ kind = "placed", uid = "a1", area = "show", stand = Config.Showroom.Base + 1 })
+check("… the server's \"placed\": a toast where it went", type(M.toasts[#M.toasts]) == "string" and string.find(M.toasts[#M.toasts], "S1", 1, true) ~= nil, M.toasts[#M.toasts])
+-- the picker at a showroom plinth
+collection.OnClientEvent:Fire({ kind = "pick", stand = Config.Showroom.Base + 1 })
+M.flush()
+picker = named(gui, "Picker")
+local showClock = named(named(picker, "Grid"), "Tile_a4") -- (the Gold Record: another piece than the clock just sent)
+check("10.4: \"pick\" at showroom plinth 1: SHOWROOM 1 · CHOOSE A PIECE, 🏷 FOR SALE the green one", named(picker, "Title").Text == "SHOWROOM 1 · CHOOSE A PIECE"
+	and showClock ~= nil and named(showClock, "Show").BackgroundColor3 == require("./CardKit").Buttons.good.face, named(picker, "Title").Text)
+pickerChecks("844 x 390, a showroom plinth")
+scene("phone-picker-showroom")
+press(named(showClock, "Show"))
+sent = sentOn("Collection")
+check("… 🏷 FOR SALE there: { kind = \"display\", uid, stand = Base + 1 }", sent[#sent][1].kind == "display" and sent[#sent][1].uid == "a4" and sent[#sent][1].stand == Config.Showroom.Base + 1)
+collection.OnClientEvent:Fire({ kind = "pick", stand = Config.Showroom.Base + 1 })
+press(named(named(named(gui, "Picker"), "Grid"), "Tile_a3"):FindFirstChild("Hall"))
+sent = sentOn("Collection")
+check("… 🏛 HALL there: { kind = \"place\", uid, area = \"hall\" }", sent[#sent][1].kind == "place" and sent[#sent][1].uid == "a3" and sent[#sent][1].area == "hall" and not WarehouseUi.isOpen())
 
 -- SELL: asked first
 collection.OnClientEvent:Fire({ kind = "pick", stand = 3 })
@@ -541,8 +571,10 @@ picker = named(gui, "Picker")
 grid = named(picker, "Grid")
 check("the stock chip opens the STOCK list: YOUR STOCK, every piece", WarehouseUi.showing() == "stock" and named(picker, "Title").Text == "YOUR STOCK" and #tilesOf() == 8)
 local painting = named(grid, "Tile_a5")
-check("… a piece on show marked ON STAND 2, with TAKE DOWN and SELL", named(painting, "OnStand").Text == "ON STAND 2" and named(painting, "TakeDown") ~= nil and named(painting, "Sell") ~= nil and named(painting, "Display") == nil)
-check("… the others: SELL only", named(named(grid, "Tile_a1"), "Display") == nil and named(named(grid, "Tile_a1"), "Sell") ~= nil)
+check("… a piece in the hall marked HALL · STAND 2, with 🏷 FOR SALE (a move), TAKE DOWN and SELL", named(painting, "OnStand").Text == "HALL · STAND 2" and named(painting, "Show") ~= nil
+	and named(painting, "Hall") == nil and named(painting, "TakeDown") ~= nil and named(painting, "Sell") ~= nil, named(painting, "OnStand").Text)
+check("… the others (in the stock): 🏛 HALL, 🏷 FOR SALE and SELL", named(named(grid, "Tile_a1"), "Hall") ~= nil and named(named(grid, "Tile_a1"), "Show") ~= nil
+	and named(named(grid, "Tile_a1"), "Sell") ~= nil and named(named(grid, "Tile_a1"), "TakeDown") == nil)
 check("… its subtitle: 8 pieces · 1 on show · +$36/min", named(picker, "Subtitle").Text == "8 pieces · 1 on show · +$36/min", named(picker, "Subtitle").Text)
 pickerChecks("844 x 390, the STOCK list")
 scene("phone-stock")
@@ -941,20 +973,20 @@ for _, tile in tilesOf() do
 end
 check("small stand 13: the pieces that fit first (the piano, the radio), the bed, the hay wagon and the wheelbarrow last", table.concat(order, ",") == "Tile_s4,Tile_s3,Tile_s2,Tile_s1,Tile_s5", table.concat(order, ","))
 local bed = named(grid, "Tile_s1")
-check("… a bed's tile greyed: \"Too big for this stand\" over its picture, TOO BIG for DISPLAY", bed:GetAttribute("TooBig") == true and named(bed, "TooBigWords").Text == "Too big for this stand" and named(bed, "TooBigWords").TextWrapped and named(bed, "Display").Text == "TOO BIG"
+check("… a bed's tile greyed: \"Too big for this stand\" over its picture, TOO BIG for its 🏛 HALL", bed:GetAttribute("TooBig") == true and named(bed, "TooBigWords").Text == "Too big for this stand" and named(bed, "TooBigWords").TextWrapped and named(bed, "Hall").Text == "TOO BIG"
 	and named(bed, "PieceName").TextTransparency > 0 and bed.BackgroundTransparency > 0)
-check("… the piano's not: DISPLAY", named(named(grid, "Tile_s4"), "Display").Text == "DISPLAY" and named(grid, "Tile_s4"):GetAttribute("TooBig") == false and named(named(grid, "Tile_s4"), "TooBig") == nil)
+check("… the piano's not: 🏛 HALL", named(named(grid, "Tile_s4"), "Hall").Text == "🏛 HALL" and named(grid, "Tile_s4"):GetAttribute("TooBig") == false and named(named(grid, "Tile_s4"), "TooBig") == nil)
 pickerChecks("844 x 390, small stand 13")
 scene("phone-toobig")
 before = #sentOn("Collection")
-press(named(bed, "Display"))
+press(named(bed, "Hall"))
 check("… TOO BIG sends nothing, says where it goes (stands 1 – 12), the picker stays", #sentOn("Collection") == before and WarehouseUi.isOpen() and M.toasts[#M.toasts] == "Your Double Bed is too big for small stand 13: show it on stands 1 – 12.", M.toasts[#M.toasts])
 press(named(bed, "Sell"))
 check("… its SELL still asks", named(picker, "Confirm") ~= nil)
 key("Escape")
-press(named(named(grid, "Tile_s4"), "Display"))
+press(named(named(grid, "Tile_s4"), "Hall"))
 sent = sentOn("Collection")
-check("… DISPLAY on a piece that fits: { kind = \"display\", uid, stand = 13 }", sent[#sent][1].kind == "display" and sent[#sent][1].uid == "s4" and sent[#sent][1].stand == 13)
+check("… 🏛 HALL on a piece that fits: { kind = \"display\", uid, stand = 13 }", sent[#sent][1].kind == "display" and sent[#sent][1].uid == "s4" and sent[#sent][1].stand == 13)
 collection.OnClientEvent:Fire({ kind = "pick", stand = 3 })
 picker = named(gui, "Picker")
 grid = named(picker, "Grid")
@@ -1175,7 +1207,7 @@ do
 		check(`{label}: … each on its piece's picture, its words fitting`, within(box(hotTag), box(named(hotTile, "Picture"))) and #badTexts(hotTile) == 0 and #badTexts(named(grid, "Tile_m4")) == 0, badTexts(hotTile)[1])
 		local onStand = named(grid, "Tile_m8")
 		local ribbon, juke = named(onStand, "OnStand"), named(onStand, "MarketTag")
-		check(`{label}: … on a piece on show: under ON STAND n, not on it`, ribbon ~= nil and juke ~= nil and not overlap(box(ribbon), box(juke)) and box(juke).y0 >= box(ribbon).y1 - 0.5
+		check(`{label}: … on a piece on show: under its ribbon (HALL · STAND n), not on it`, ribbon ~= nil and juke ~= nil and not overlap(box(ribbon), box(juke)) and box(juke).y0 >= box(ribbon).y1 - 0.5
 			and within(box(juke), box(named(onStand, "Picture"))))
 		local chairs = named(grid, "Tile_m5") -- (the coffee tables)
 		check(`{label}: … the prices are the market's (the server's): the record player's "Sell {M.MUi.money(byUid.m1.price)}"`, named(hotTile, "SellPrice").Text == `Sell {M.MUi.money(byUid.m1.price)}`

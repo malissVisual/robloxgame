@@ -141,6 +141,38 @@ do
 	check("10.5 (the owner: \"zombies I don't want in the game at all\"): no zombie at any difficulty, no boss, no bat", none)
 end
 
+-- ── 10.6 both in PLAY: the round's places (RoundRules.places): no lobby's run, no lobby's house while another is free ──
+do
+	local ids = { "a", "b", "c", "d" }
+	local none = function(_: string): boolean
+		return false
+	end
+	local inRun = function(id: string): boolean
+		return id == "b"
+	end
+	local held = function(id: string): boolean
+		return id == "c"
+	end
+	local list = RoundRules.places(ids, "a", inRun, held)
+	check("10.6 places: not the run's house (b), not a lobby's house (c), not the last (a): only d", #list == 1 and list[1] == "d", table.concat(list, ","))
+	list = RoundRules.places(ids, nil, inRun, none)
+	check("…no lobby holding any: every house but the run's", table.concat(list, ",") == "a,c,d")
+	list = RoundRules.places({ "a", "b", "c" }, "a", inRun, held)
+	check("…only a lobby's house free besides the last: it then (the lobby's START waits for the round)", #list == 1 and list[1] == "c", table.concat(list, ","))
+	list = RoundRules.places({ "a", "b" }, "a", inRun, none)
+	check("…only the last free: the last again (better than no round)", #list == 1 and list[1] == "a")
+	list = RoundRules.places({ "b" }, nil, inRun, none)
+	check("NEG. …every house in a run: none (the round waits for one)", #list == 0 and RoundRules.pick(list, nil, 0.5) == nil)
+	local picks: { [string]: boolean } = {}
+	for n = 0, 9 do
+		local id = RoundRules.pick(RoundRules.places(ids, "d", inRun, held), "d", n / 10)
+		picks[id or "none"] = true
+	end
+	check("…picked from them: never the run's or the lobby's house, never the last", picks.a == true and not picks.b and not picks.c and not picks.d and not picks.none)
+	check("Config.Rounds 10.6: Stay (still queued after a round), the banner's touch scale", type(Config.Rounds.Stay) == "boolean" and Config.Rounds.Banner.TouchScale >= 0.75
+		and Config.Rounds.Banner.TouchScale <= 1)
+end
+
 if failures > 0 then
 	error(`{failures} checks failed`)
 end

@@ -33,12 +33,15 @@ PURE += ("VillageScenery",)  # 8.9 sandbox on the map, 9.4 the countryside: wher
 PURE += ("CountryLooks",)  # 9.4 sandbox, the countryside's art kit (tests/countrylooks_test.luau)
 PURE += ("HouseRoute",)  # 9.0 Danny's way inside a house, on its plan's grid (tests/houseroute_test.luau, tests/dannynav_runtime_test.luau; 9.3 his walk along it, audited against the built parts: tests/movehelper_stuck_runtime_test.luau)
 PURE += ("CharacterLooks", "SaveSlotRules")  # 10.1 the start: the courier you make, the save slots (tests/characterlooks_test.luau, tests/saveslots_test.luau, tests/saveslots_runtime_test.luau)
-PURE += ("RunRules",)  # 9.7 runs: the difficulties and their unlocks, the pads, the votes, whose stock (tests/runrules_test.luau)
-PURE += ("RoundRules",)  # 10.5 rounds: the place, the table, the vans' spots, the landing (tests/roundrules_test.luau)
+PURE += ("RunRules",)  # 9.7 runs: the difficulties and their unlocks, the votes, whose stock; 10.6 the house busy (tests/runrules_test.luau)
+PURE += ("PartyRules",)  # 10.4 the party lobbies at the PLAY circle: make, join, leave, kick, READY, START, the map's copy (tests/partyrules_test.luau)
+PURE += ("RoundRules",)  # 10.5 rounds: the place, the table, the vans' spots, the landing; 10.6 the queue's places (tests/roundrules_test.luau)
+PURE += ("TugRules",)  # 10.6 snatching: the tug of war, who may be snatched from (tests/tugrules_test.luau)
 PURE += ("LootRules",)  # 9.x loot: a house's pieces' rarities by the difficulty, the stars, the toasts (tests/loot_test.luau)
 PURE += ("SandboxMapRules",)  # 10.x the map: the plan's code, the frames, the yard, the fog, the words, the layout (tests/sandboxmaprules_test.luau)
 PURE += ("DangerRules",)  # 10.x danger: a run's locks, keys, vault and hazards on the real plans (tests/danger_test.luau; it requires FurnitureLooks, the recorder's copy below)
 PURE += ("CrewRules",)  # 10.1 the helpers' crew: the kinds, what they carry, the save, the hospital, the rescue, who comes (tests/crewrules_test.luau)
+PURE += ("IslandLooks",)  # 10.8 the floating islands: their rock, the floating rocks, the clouds (tests/islands_test.luau)
 luau = sys.argv[1] if len(sys.argv) > 1 else shutil.which("luau") or "luau"
 
 ok = True
@@ -385,6 +388,13 @@ with tempfile.TemporaryDirectory() as tmp:
     source = source.replace("require(script.Parent.VillageWorld)", 'require("./VillageWorldServer")')
     assert "script.Parent" not in source, "server/LobbyWorld.luau requires a module tests/run_tests.py does not give it"
     open(os.path.join(tmp, "LobbyWorldServer.luau"), "w", encoding="utf-8").write('setfenv(1, require("./WorldMock").env)\n' + source)
+    # 10.8 the floating islands: the real server/IslandFall.luau (the fall catch) on the same mock as IslandFallServer.luau
+    # for tests/islandfall_runtime_test.luau, its shared modules the copies above, its Net a stand-in (the test sets its
+    # own hooks: the bodies, the fades, the drop, the words).
+    source = open(os.path.join(os.path.dirname(SHARED), "server", "IslandFall.luau"), encoding="utf-8").read()
+    source = source.replace("require(Shared.Net)", "{ get = function() return { FireClient = function() end } end }")
+    source = re.sub(r"require\(Shared\.(\w+)\)", r'require("./\1")', source)
+    open(os.path.join(tmp, "IslandFallServer.luau"), "w", encoding="utf-8").write('setfenv(1, require("./WorldMock").env)\n' + source)
     # 8.9 Jinočany: its server/VillageWorld.luau (the village, the D5, the far view) on the same mock as
     # VillageWorldServer.luau (tests/villageworld_test.luau), its shared modules the copies above.
     source = open(os.path.join(os.path.dirname(SHARED), "server", "VillageWorld.luau"), encoding="utf-8").read()
@@ -445,12 +455,13 @@ with tempfile.TemporaryDirectory() as tmp:
         "enter = {\n%s\n},\nvillage = {\n%s\n},\nturnaround = { x = %r, z = %r, r = %r },\n}\n"
         % (rect(plan["bounds"]), "\n".join(lines), "\n".join(trees), "\n".join(houses), "\n".join(marks), "\n".join(roads), "\n".join(fields), "\n".join(paths),
            "\n".join(enter), "\n".join(village), plan["turnaround"]["x"], plan["turnaround"]["z"], plan["turnaround"]["r"]))
-    # 9.4 the countryside (design/countryside/plan.json, design/countryside/plan.py writes it) as CountryPlan.luau for
+    # 9.4 the countryside (10.8: design/islands/plan.json, design/islands/plan.py writes it: the map islands' places in
+    # the countryside plan's shape) as CountryPlan.luau for
     # tests/sandboxhouses_test.luau, tests/villageworld_test.luau, tests/auctionhouse_test.luau and tests/soundplan_test.luau:
     # its bounds, roads (yards marked), spots (the six places to empty: box, yaw, door, curb, lot), landmarks, fields,
     # lawns, woods, orchard, streams and tree lines, and every area it keeps (areas: a road's, a landmark's, a field's, a
     # spot's box and lot) for the Auction House's check.
-    country = json.load(open(os.path.join(os.path.dirname(HERE), "design", "countryside", "plan.json"), encoding="utf-8"))
+    country = json.load(open(os.path.join(os.path.dirname(HERE), "design", "islands", "plan.json"), encoding="utf-8"))
     def spot_text(s):
         return "{ x = %r, z = %r, yaw = %r }" % (s["x"], s["z"], s["yaw"])
     def points_text(points):
@@ -459,9 +470,9 @@ with tempfile.TemporaryDirectory() as tmp:
     c_areas += [("field " + f["kind"], f["rect"]) for f in country["fields"]] + [("spot " + h["id"], h["box"]) for h in country["spots"]]
     c_areas += [("lot " + h["id"], h["lot"]) for h in country["spots"]]
     c_roads = ["\t{ name = %s, rect = %s, yard = %s }," % (q(r["name"]), rect(r["rect"]), "true" if r["yard"] else "false") for r in country["roads"]]
-    c_spots = ["\t{ id = %s, name = %s, street = %s, look = %s, kind = %s, box = %s, yaw = %r, door = %s, curb = %s, lot = %s%s }," % (
+    c_spots = ["\t{ id = %s, name = %s, street = %s, look = %s, kind = %s, box = %s, yaw = %r, door = %s, curb = %s, lot = %s, island = %s%s }," % (
         q(h["id"]), q(h["name"]), q(h["street"]), q(h["look"]), q(h["kind"]), rect(h["box"]), h["yaw"], spot_text(h["door"]), spot_text(h["curb"]),
-        rect(h["lot"]), (", back = " + spot_text(h["back"])) if h.get("back") else "") for h in country["spots"]]
+        rect(h["lot"]), q(h.get("island", "")), (", back = " + spot_text(h["back"])) if h.get("back") else "") for h in country["spots"]]
     c_marks = ["\t{ id = %s, name = %s, kind = %s, rect = %s, yaw = %r, spot = %s }," % (q(l["id"]), q(l["name"]), q(l["kind"]), rect(l["rect"]), l["yaw"],
                q(l["spot"]) if l["spot"] else "nil") for l in country["landmarks"]]
     c_fields = ["\t{ kind = %s, rect = %s }," % (q(f["kind"]), rect(f["rect"])) for f in country["fields"]]
@@ -479,13 +490,27 @@ with tempfile.TemporaryDirectory() as tmp:
         % (rect(country["bounds"]), "\n".join(c_roads),
            "\n".join(c_spots), "\n".join(c_marks), "\n".join(c_fields), "\n".join(c_lawns), "\n".join(c_woods), rect(country["orchard"]),
            "\n".join(c_streams), "\n".join(c_lines), "\n".join(c_area_lines), "\n".join(c_zones)))
+    # 10.8 the floating islands (design/islands/plan.json) as IslandPlan.luau for tests/islands_test.luau: every island
+    # (id, house, its top's rect, top, depth, walls, home), the rocks, the destroy height, the vans a round parks (vans,
+    # park: shared/RoundRules.luau's numbers on the rounds branch) and each place's van spots' count as the plan found
+    def i_spot(s):
+        return "{ x = %r, y = %r, z = %r, yaw = %r }" % (s["x"], s["y"], s["z"], s["yaw"])
+    i_islands = ["\t{ id = %s, house = %s, rect = %s, top = %r, depth = %r, walls = %s, home = %s }," % (q(i["id"]), q(i["house"]) if i.get("house") else "nil",
+                 rect(i["rect"]), i["top"], i["depth"], rect(i["walls"]), i_spot(i["home"])) for i in country["islands"]]
+    i_rocks = ["\t{ x = %r, z = %r, top = %r, size = %r, depth = %r }," % (r["x"], r["z"], r["top"], r["size"], r["depth"]) for r in country["rocks"]]
+    i_vans = ["\t[%s] = %r," % (q(sp["id"]), sp["vans"]) for sp in country["spots"]]
+    park = country["park"]
+    open(os.path.join(tmp, "IslandPlan.luau"), "w", encoding="utf-8").write(
+        "return {\nislands = {\n%s\n},\nrocks = {\n%s\n},\ndestroy = %r,\nvans = %r,\npark = { Across = %r, Along = %r, Cols = %r, Rows = %r, Margin = %r, Width = %r, Length = %r },\n"
+        "found = {\n%s\n},\n}\n" % ("\n".join(i_islands), "\n".join(i_rocks), country["destroy"], country["vans"], park["Across"], park["Along"], park["Cols"],
+                                     park["Rows"], park["Margin"], park["Width"], park["Length"], "\n".join(i_vans)))
     # 9.7 runs: the lobby's plan (design/lobby/plan.json, design/lobby/plan.py writes it) as LobbyPlan.luau for
-    # tests/lobby_test.luau (SandboxMap.Lobby against it, the Auction House and the TOP MOVERS board in it)
+    # tests/lobby_test.luau (SandboxMap.Lobby against it: 10.4 its PLAY circle; the Auction House and the TOP MOVERS board in it)
     lobby_plan = json.load(open(os.path.join(os.path.dirname(HERE), "design", "lobby", "plan.json"), encoding="utf-8"))
     open(os.path.join(tmp, "LobbyPlan.luau"), "w", encoding="utf-8").write(
-        "return {\nbounds = %s,\nfar = %r,\nportals = {\n%s\n},\nauction = %s,\nleaders = %s,\npaint = %s,\n}\n"
-        % (rect(lobby_plan["bounds"]), lobby_plan["far"],
-           "\n".join("\t{ house = %s, x = %r, z = %r, yaw = %r, pad = %s }," % (q(p["house"]), p["x"], p["z"], p["yaw"], rect(p["pad"])) for p in lobby_plan["portals"]),
+        "return {\nbounds = %s,\nfar = %r,\nplay = { x = %r, z = %r, r = %r, back = %s },\nauction = %s,\nleaders = %s,\npaint = %s,\n}\n"
+        % (rect(lobby_plan["bounds"]), lobby_plan["far"], lobby_plan["play"]["x"], lobby_plan["play"]["z"], lobby_plan["play"]["r"],
+           spot_text(lobby_plan["play"]["back"]),
            spot_text(lobby_plan["shops"]["auction"]["spot"]), spot_text(lobby_plan["shops"]["leaders"]["spot"]), rect(lobby_plan["shops"]["paint"]["rect"])))
     # 8.0.1 review: the real server/SandboxPlots.luau as SandboxPlotsServer.luau for tests/sandboxplots_runtime_test.luau:
     # a function of the globals it reads (the test's own Players, ReplicatedStorage and task, and a `require` that gives
@@ -508,7 +533,11 @@ with tempfile.TemporaryDirectory() as tmp:
         open(os.path.join(tmp, "E2E" + module + ".luau"), "w", encoding="utf-8").write(e2e_env + source)
     source = open(os.path.join(SHARED, "Net.luau"), encoding="utf-8").read()
     open(os.path.join(tmp, "E2ENet.luau"), "w", encoding="utf-8").write(e2e_env + source)
+    # (TESTS_ONLY=name,name … runs only those test files and none of the checks after them: a quick look while working)
+    only = [n.strip() for n in os.environ.get("TESTS_ONLY", "").split(",") if n.strip()]
     for path in sorted(glob.glob(os.path.join(HERE, "*_test.luau"))):
+        if only and not any(os.path.basename(path).startswith(n + "_test") or os.path.basename(path) == n for n in only):
+            continue
         shutil.copy(path, os.path.join(tmp, "test.luau"))
         print(f"== {os.path.basename(path)}")
         result = subprocess.run([luau, "test.luau"], cwd=tmp, capture_output=True, text=True)
@@ -516,6 +545,9 @@ with tempfile.TemporaryDirectory() as tmp:
         sys.stderr.write(result.stderr)
         if result.returncode != 0 or "ALL CHECKS PASSED" not in result.stdout:
             ok = False
+    if only:
+        print("== TESTS_ONLY: " + ("these passed" if ok else "SOME FAILED"))
+        sys.exit(0 if ok else 1)
 # 3.3 - 3.5 (10.6: only the Sprinter is built: server/Vehicles.luau's STYLE, read as text): the van every player has
 # (Config.Sandbox.Van) is a Config.Cars entry on the style "sprinter", its capacity exactly the cargo slots STYLE lists,
 # and it has a back that opens (STYLE's leaves).
@@ -779,9 +811,9 @@ def audio_length_check():
 if not audio_length_check():
     ok = False
 
-# 9.4 the countryside: shared/SandboxMap.luau's map section is design/countryside/plan.json's (tools/countryside/sandboxmap.py
-# writes it; a plan changed but not written again shows here).
-village = subprocess.run([sys.executable, os.path.join(os.path.dirname(HERE), "tools", "countryside", "sandboxmap.py"), "--check"], capture_output=True, text=True)
+# 9.4 the countryside, 10.8 the floating islands: shared/SandboxMap.luau's islands section is design/islands/plan.json's
+# (tools/islands/sandboxmap.py writes it; a plan changed but not written again shows here).
+village = subprocess.run([sys.executable, os.path.join(os.path.dirname(HERE), "tools", "islands", "sandboxmap.py"), "--check"], capture_output=True, text=True)
 print("== map data: " + (village.stdout.strip() or village.stderr.strip())[:200])
 if village.returncode != 0:
     ok = False

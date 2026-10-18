@@ -53,7 +53,7 @@ local function warehouseLevel(id: number, mine: boolean): number
 end
 
 -- 8.0: the slow drift over the game's world (shared/SandboxMap.luau), looped. 9.7 runs: over the lobby (its
--- plaza from the south, its portals from the west, your plot's warehouse (the player's Plot attribute; the first plot
+-- plaza from the south, 10.4 its PLAY circle from the west, your plot's warehouse (the player's Plot attribute; the first plot
 -- before the server gave you one; 8.3: the building of its level, the shot pulling back with its footprint), its bay
 -- and the plaza from high up).
 local function sandboxShots(): { { Vector3 } }
@@ -67,7 +67,7 @@ local function sandboxShots(): { { Vector3 } }
 	local front, far = w.z + w.sz / 2, math.sqrt(w.sx * w.sx + w.sz * w.sz) / 100
 	return {
 		{ Vector3.new(cx + 150, 60, b.z1 + 40), plaza },
-		{ Vector3.new(b.x0 - 30, 45, cz + 60), Vector3.new(b.x0 + 60, 6, cz + 40) },
+		{ Vector3.new(L.play.x - 70, 30, L.play.z + 40), Vector3.new(L.play.x, 2, L.play.z) },
 		{ Vector3.new(w.x + 60 * far, 40 * far, front + 87 * far), Vector3.new(w.x, w.sy * 0.4, front) },
 		{ Vector3.new(w.x - 50, 26, front + 50), Vector3.new(w.x, 6, front + 10) },
 		{ Vector3.new(cx - 40, 110, b.z1 + 110), Vector3.new(cx, 0, cz) },

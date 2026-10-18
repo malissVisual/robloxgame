@@ -115,14 +115,14 @@ local function photo(emoji: string, caption: string, sky: { number }): { Words }
 	return { { face = "Front", back = sky, inset = 0.07, lines = { line(emoji, INK, 0.6), line(caption, CHARCOAL, 0.2, "Bold") } } }
 end
 
--- The corkboard (four columns, two rows): the houses to empty, what to do with them (9.7: the lobby's dispatch; its
--- portals take you to the places, SandboxMap.Houses).
+-- The corkboard (four columns, two rows): the houses to empty, what to do with them (9.7: the lobby's dispatch; 10.4
+-- the PLAY circle by it takes a party to the six places, SandboxMap.Houses).
 local function sandboxPins(p: { Piece }, top: number, low: number)
 	local count = #SandboxMap.Houses
 	pinned(p, "PhotoHouse", { 1.3, 1.15 }, -2.55, top, 3, PAPER, photo("🏡", `{count} PLACES TO EMPTY`, { 148, 196, 228 }), RED)
 	pinned(p, "FlyerHouse", { 1.3, 1.5 }, -0.85, top, -2, PAPER, { { face = "Front", lines = {
 		line("THE COUNTRYSIDE", RED, 0.16, "Black"),
-		line("WALK TO A PORTAL", CHARCOAL, 0.12, "Bold"),
+		line("STEP INTO PLAY", CHARCOAL, 0.12, "Bold"),
 		line("Bring it home to your warehouse.", CHARCOAL, 0.1),
 	} } }, YELLOW)
 	pinned(p, "PhotoStand", { 1.3, 1.15 }, 0.85, top, -4, PAPER, photo("🏺", "PUT IT ON SHOW", { 170, 206, 140 }), { 60, 110, 200 })

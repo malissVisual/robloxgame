@@ -78,6 +78,7 @@ local facts = { plots = {}, house = SandboxMap.House, roads = SandboxMap.Roads, 
 facts.landmarks = SandboxMap.Landmarks
 facts.orchard = SandboxMap.Orchard
 facts.woods = SandboxMap.Woods
+facts.islands = SandboxMap.Islands -- (10.8 the floating islands: each place on its own)
 facts.enter = {}
 for _, h in SandboxMap.Houses do
 	table.insert(facts.enter, { id = h.id, name = h.name, street = h.street, box = h.box })

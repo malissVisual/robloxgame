@@ -34,7 +34,8 @@
 --   CrewRules.toSave(crew) -> table        what a save writes (a copy)
 --   CrewRules.has(crew, id) / add(crew, id) -> new?   in the crew / one more (true when he is new)
 -- The hospital (a helper out of a run: Config.Crew.Hospital; `now` is os.time()):
---   CrewRules.toHospital(crew, id, now)    out of the crew until now + Seconds
+--   CrewRules.toHospital(crew, id, now, factor?)   out of the crew until now + Seconds (10.4: × factor, the owner's
+--                                          upgrade tree's Good doctors: hospitalSeconds(factor))
 --   CrewRules.hospitalLeft(crew, id, now) -> s    seconds left (0: not in hospital)
 --   CrewRules.ready(crew, id, now)         in the crew and not in hospital
 --   CrewRules.heal(crew, now) -> changed   the hospital times past dropped
@@ -266,10 +267,17 @@ end
 
 -- ── The hospital ───────────────────────────────────────────────────────────
 
-function CrewRules.toHospital(crew: Saved, id: string, now: number)
+-- (10.4: × `factor`, the owner's upgrade tree's Good doctors: UpgradeRules.effect(levels, "hospital"); none: 1)
+function CrewRules.toHospital(crew: Saved, id: string, now: number, factor: number?)
 	if CrewRules.has(crew, id) then
-		crew.hospital[id] = math.floor(now) + C.Hospital.Seconds
+		crew.hospital[id] = math.floor(now) + CrewRules.hospitalSeconds(factor)
 	end
+end
+
+-- 10.4: a hospital stay's seconds (Hospital.Seconds × factor, 0.1 … 1 of it; none: all of it).
+function CrewRules.hospitalSeconds(factor: number?): number
+	local f = if type(factor) == "number" and factor == factor then math.clamp(factor, 0.1, 1) else 1
+	return math.max(1, math.floor(C.Hospital.Seconds * f + 0.5))
 end
 
 function CrewRules.hospitalLeft(crew: Saved, id: any, now: number): number

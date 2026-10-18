@@ -7,7 +7,7 @@
 --                        server/LobbyWorld.luau, counted under world/); the row stays, empty, for sandbox_count.py
 --   warehouses/building  the four ZDC warehouses (server/Warehouse.luau): the hall, every stand open, the prompts
 --   warehouses/shown     the pieces on show in them: every stand full, the heaviest pieces (FurnitureLooks' part count;
---                        8.3: each on a stand it fits, WarehouseLayout.fits)
+--                        8.3: each on a stand it fits, WarehouseLayout.fits; 10.4: the showroom's plinths full too)
 --   interior             the house's inside while a move runs (server/HouseInterior.luau): the largest of SEEDS plans
 --                        (8.3: the sandbox's house's kind: the big plan; 8.9: the biggest of the houses' kinds,
 --                        the farmstead's, Config.Moving.Sandbox.Houses)
@@ -101,18 +101,27 @@ end)
 -- the stand-in Upgrades gives every owner that)
 local LEVEL = WarehouseLayout.Levels
 local stands = WarehouseLayout.capacity(LEVEL)
+-- 10.4: and its showroom's plinths, every one (Config.Showroom's Most there), numbered past its Base
+local show = WarehouseLayout.showCapacity(LEVEL)
+local numbers: { number } = {}
+for i = 1, stands do
+	table.insert(numbers, i)
+end
+for k = 1, show do
+	table.insert(numbers, WarehouseLayout.ShowBase + k)
+end
 -- 8.3: each piece where it may stand (WarehouseLayout.fits at that level: a piece only on a stand it fits), the heaviest
 -- first, each on the smallest free stand it fits (so the big stands stay free for the big pieces): the heaviest the hall
 -- can show
 local onStand: { [number]: { id: string, n: number } } = {}
 local shownParts, placed, lightest = 0, 0, nil :: { id: string, n: number }?
 for _, piece in pieces do
-	if placed >= stands then
+	if placed >= #numbers then
 		break
 	end
 	local size = FurnitureLooks.Items[piece.id].size
 	local best, bestArea = nil :: number?, math.huge
-	for i = 1, stands do
+	for _, i in numbers do
 		local sx, sz = WarehouseLayout.standSize(i, LEVEL)
 		if not onStand[i] and sx and sz and WarehouseLayout.fits(i, size, LEVEL) and sx * sz < bestArea then
 			best, bestArea = i, sx * sz
@@ -129,13 +138,13 @@ print(string.format("INFO pieces\t%d pieces, %.1f parts each on average; the %d 
 for _, plot in SandboxMap.Plots do
 	local owner = { UserId = plot.id, DisplayName = `Player{plot.id}`, Name = `Player{plot.id}`, Parent = workspace }
 	local entries = {}
-	for i = 1, stands do
+	for _, i in numbers do
 		local piece = onStand[i]
 		if piece then
 			table.insert(entries, { uid = `p{plot.id}s{i}`, item = piece.id, variant = 1, condition = 1, name = piece.id, stand = i })
 		end
 	end
-	Collection.__own(owner, entries, stands)
+	Collection.__own(owner, entries, stands, show)
 	SandboxPlots.__own(plot.id, owner)
 end
 local Warehouse = require("./server/Warehouse")

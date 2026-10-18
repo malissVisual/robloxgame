@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "10.6"
+Config.Version = "10.9"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -1900,13 +1900,14 @@ Config.Soundscape = {
 		Reverb = { warehouse = "Room" } :: { [string]: string },
 		-- Now and then outdoors, each on its own clock (Gap: seconds between two, a random pick), 3D (you hear where):
 		-- Volume within Near studs, nothing past Range.
-		--   Woodpecker  a woodpecker drumming in the forest (woodpecker_far, one drum) from its middle (SandboxMap's
-		--             wood "forest": X, Z; Y up in the crowns), Drums drums Every s apart
+		--   Woodpecker  a woodpecker drumming in the forest (woodpecker_far, one drum) in it (SandboxMap's wood
+		--             "forest", 10.8 on the Forest Lodge's island, out of its clearing: X, Z; Y up in the crowns over
+		--             the island's top), Drums drums Every s apart
 		--   Dog       a dog barking far off (dog_far), Far studs (a random pick) a random way round you
 		--   Tractor   a tractor on the fields (tractor_far, a loop), Far studs a random way round you at the middle of
 		--             its pass: it drives across your view at Speed studs a second for Seconds s, fading in and out
 		--             over Fade s
-		Woodpecker = { X = -960, Z = -560, Y = 26, Gap = { 90, 200 } :: { number }, Drums = 3, Every = 0.9, Volume = 0.7, Near = 120, Range = 1500 },
+		Woodpecker = { X = 1846, Z = -760, Y = 100, Gap = { 90, 200 } :: { number }, Drums = 3, Every = 0.9, Volume = 0.7, Near = 120, Range = 1500 },
 		Dog = { Gap = { 45, 110 } :: { number }, Far = { 90, 170 } :: { number }, Volume = 0.8, Near = 30, Range = 260 },
 		Tractor = { Gap = { 80, 170 } :: { number }, Far = { 150, 240 } :: { number }, Seconds = 16, Fade = 4, Speed = 5, Volume = 0.9, Near = 40, Range = 360 },
 		Display = 0.7, -- a piece put on a stand (stand_display: a soft thunk and a sparkle)
@@ -2397,7 +2398,9 @@ Config.Robust = {
 		PlayerTrade = 4, -- 8.7: the PlayerTrade remote's offer / answer / price / buy (server/PlayerTrade.luau)
 		TradeOffer = 0.2, -- 8.7: and a new offer to a player on top: one every 5 s at most (no offer spam)
 		Slots = 4, -- 10.1: the Slots remote's list / play / new (the start screen's save slots: server/SaveSlots.luau)
-		Runs = 4, -- 9.7: the Runs remote's state / difficulty / vote / leave (a run's pad and the run: server/Runs.luau)
+		Runs = 4, -- 9.7: the Runs remote's state / vote / leave (the run: server/Runs.luau; 10.6 the banner's queue)
+		Party = 6, -- 10.4: the Party remote's state / create / join / leave / ready / house / difficulty / kick / start / cancel (server/Parties.luau; 10.6 round)
+		Tug = 16, -- 10.6: the Tug remote's pulls (a tug of war's presses: Config.Rounds.Tug.Rate of them are heard)
 		Crew = 4, -- 10.1: the Crew remote's state / pick / discharge (the CREW window: server/HelperCrew.luau)
 	},
 }
@@ -3964,25 +3967,29 @@ Config.Collection = {
 	IdleShare = 0.25,
 	IdleMove = 4,
 	IdleRemotes = { "Collection", "Moving", "Upgrades", "SandboxTasks", "Visitors", "VanPaint", "PlayerTrade" } :: { string }, -- (8.7: PlayerTrade)
+	SetSize = 3, -- 10.4: a room set in the hall: this many different pieces of one room (the tree's Room sets)
+	MaxSets = 6, -- 10.4: the room sets that count at most
 }
 
 -- 9.7 RUNS (the owner: "like Dungeon Quest: from the lobby you go into a house, alone, with friends or with Danny. In
 -- the house you carry loot into the truck standing right at the house. When you leave, the loot is taken to your
--- warehouse in the lobby on its own"): the lobby's portals (shared/SandboxMap.luau Lobby.portals, design/lobby/plan.py),
--- the runs (server/Runs.luau; their rules shared/RunRules.luau, tests/runrules_test.luau; client/RunUi.luau). A run is
--- a sandbox move (server/Moving.luau) of one house by a party, its truck parked at the house's curb, no driving.
+-- warehouse in the lobby on its own"; 10.4: "on the map just one circle where you'd stand, like PLAY, and you'd create a
+-- lobby"): the lobby's PLAY circle (shared/SandboxMap.luau Lobby.play, design/lobby/plan.py), its party lobbies
+-- (server/Parties.luau; their rules shared/PartyRules.luau, tests/partyrules_test.luau; the PLAY panel
+-- client/PlayUi.luau), the runs (server/Runs.luau; their rules shared/RunRules.luau, tests/runrules_test.luau;
+-- client/RunUi.luau). A run is a sandbox move (server/Moving.luau) of one house by a party, its truck parked at the
+-- house's curb, no driving.
 --   Difficulties   in order: id (the run's contract.difficulty, the house's RunDifficulty attribute), name, time (× the
---                  house's clock, Config.Moving.Sandbox.Houses' Time), color (the pad panel's and the results card's).
+--                  house's clock, Config.Moving.Sandbox.Houses' Time), color (the PLAY panel's and the results card's).
 --                  The difficulty does nothing else yet: traps and zombies (harder ones) and the loot's rarity read it
 --   Default        a run's difficulty when nobody picked one
 --   Open           the difficulties open from the start (Easy, Normal); each next one opens for a player who finished
 --                  a run at the one before it (any house: a run ended done or late, with something home)
 --   Flag           the save's mark: profile.runUnlocked (how many are open) is read only from a real save written with it
---   Countdown      s from the first player on a portal's pad to the run (everybody on the pad then goes)
---   MaxParty       the players a run takes at most (the first on the pad first)
---   PadHeight      studs over the pad a body's root may be and still stand on it
---   Every          s between two looks at the pads (the server's loop)
---   Apart          studs between the party's arrival spots in the house's front yard (across the way they look)
+--   MaxParty       the players a run takes at most (a party lobby's members, the host first)
+--   Every          s between two looks at the PLAY circle and the lobbies (server/Parties.luau's loop)
+--   Apart          studs between the party's arrival spots in the house's front yard and beside the PLAY circle on the
+--                  way back (across the way they look)
 --   Fade           s: the screen's fade out before a jump (the run's start, its end, leaving), its fade in after
 --   EndHold        s from a run's end (its results card) to the fade back to the lobby (the house's own door trips of
 --                  whoever was inside, Config.Moving.Doors' FadeOut + Margin + Stream, are over by then)
@@ -3990,19 +3997,36 @@ Config.Collection = {
 --   Truck          Attribute: the truck's model attribute while it stands at a run's house (client/CarVisuals.luau: no
 --                  Drive or Ride along prompt; its driver's seat is Disabled); Reach: its FINISH / VOTE prompts' reach;
 --                  At: their place on its chassis (x across, y up, z along: the driver's side behind the cab)
---   Zone           a run zone's edge (SandboxMap.Zones): Screen (CountryLooks' "screen" hedge: Height, Width, its colour),
---                  Wall (the invisible walls' height on it), View (studs: the forest's and the orchard's trees, the
---                  stream's pieces kept within this of a zone, the rest of them never built)
---   Portal         the lobby's gates (server/LobbyWorld.luau): Gate { width, height }, the pad's glow by its state (Free,
---                  Waiting: a countdown, InUse: a run in that house), Styles: each house's colours for its gate and
---                  facade (wall, trim, roof, accent: RGB), SignRange (its words' MaxDistance)
---   Panel          the pad panel (client/RunUi.luau): Width (px at scale 1), TouchScale (its least scale on a phone)
+--   Zone           a run zone's edge (SandboxMap.Zones; 10.8 a map island's walls, its low rim hedge on them): Wall (the
+--                  invisible walls' height on it; the lobby's on its bounds too)
+--   Play           10.4 the PLAY circle (server/LobbyWorld.luau builds it, server/Parties.luau watches it): Radius
+--                  (studs: SandboxMap.Lobby.play.r, the same), Height (studs over the ground a body's root may be and
+--                  still stand in it), Ring (studs: the glowing ring's width), its glow's colours (Free: no lobby
+--                  counting down; Waiting: one is), Letters (studs: PLAY on the ground in it, a letter's height), Sign
+--                  (the floating PLAY sign: Height studs over the ground, Range its MaxDistance, Size { w, h } studs),
+--                  Pulse (s: a breath of its glow, client/PlayUi.luau)
+--   Party          10.4 the party lobbies (shared/PartyRules.luau): Countdown (s from START to the run), MaxLobbies (open
+--                  at once), Friends (s a "friends?" answer is kept: Player:IsFriendsWithAsync), Kicked (s a kicked player
+--                  cannot join that lobby again), Attribute (the PLAY circle's attribute with the lobbies and the runs
+--                  for the map: PartyRules.encode)
+--   Houses         10.4 each house's card in the PLAY panel: icon (an emoji), line (a short line about it), wall and
+--                  roof (RGB: the card's little picture)
+--   Panel          10.4 the PLAY panel (client/PlayUi.luau): Width × Height (px at scale 1), Margin (px to the screen's
+--                  edge), Bar (the lobby bar's width: you in a lobby with the panel shut), TouchScale (its least scale
+--                  on a phone: its buttons a finger's size)
 --   Result         the results card: Width, Rows (pieces listed at most; the rest summed up), TouchScale
--- The Runs remote (Config.Robust.Limits.Runs): client → server { kind = "state" } | { kind = "difficulty", id } (the
--- host on the pad) | { kind = "vote" } (to finish) | { kind = "leave" } (out of your run alone); server → client
--- { kind = "pad", ... } | { kind = "pad" } (off a pad), { kind = "run", ... } | { kind = "run" } (not in a run),
--- { kind = "result", ... } (the results card), { kind = "unlocked", id } (a difficulty opened). 10.x danger: server →
+-- The Runs remote (Config.Robust.Limits.Runs): client → server { kind = "state" } | { kind = "vote" } (to finish) |
+-- { kind = "leave" } (out of your run alone) | 10.6 { kind = "queue", on = false } (the round's banner's LEAVE QUEUE);
+-- server → client { kind = "run", ... } | { kind = "run" } (not in a run), { kind = "result", ... } (the results card;
+-- 10.5 a round's with its `round` ranking), { kind = "unlocked", id } (a difficulty opened), 10.5 { kind = "round", ... }
+-- and { kind = "claim", ... } (the quick round: client/RoundUi.luau), { kind = "ride", ... }. 10.x danger: server →
 -- client { kind = "danger", ... } (the run's keys, vault, zombies and its events: client/RunDangerUi.luau).
+-- 10.4 the Party remote (Config.Robust.Limits.Party): client → server { kind = "state" } | { kind = "create", house,
+-- difficulty, friends } | { kind = "join", id } | { kind = "leave" } | { kind = "ready", on } | { kind = "house", id }
+-- | { kind = "difficulty", id } | { kind = "kick", id } | { kind = "start" } | { kind = "cancel" } (the last four the
+-- host's) | 10.6 { kind = "round", on } (the QUICK ROUND's queue: JOIN in the circle, LEAVE anywhere); server → client
+-- { kind = "play", circle, houses, open, lobbies, lobby?, round? } (you in the circle or in a lobby: server/Parties.luau's
+-- view; round: the quick round, server/Runs.luau's Runs.roundOf) | { kind = "play" } (neither).
 -- 10.x DANGER (the owner: "both: on the easier difficulties only a timer and traps, on the harder ones zombies too ... it
 -- has to be designed to be fun"; the pure rules shared/DangerRules.luau, tests/danger_test.luau; the server
 -- server/RunDanger.luau, tests/danger_runtime_test.luau; the HUD client/RunDangerUi.luau):
@@ -4069,35 +4093,38 @@ Config.Runs = {
 	Default = "normal",
 	Open = 2,
 	Flag = "runUnlockedKept",
-	Countdown = 10,
 	MaxParty = 4,
-	PadHeight = 8,
 	Every = 0.2,
 	Apart = 3.5,
 	Fade = { Out = 0.45, In = 0.6 },
-	-- 10.4 the ride (client/RideUi.luau): s the van drives on its way to a house (To) and back (Back), over the fade;
-	-- Home: the lobby's name on the way back; Out: s the ride fades into the place
-	Ride = { To = 3.4, Back = 2.4, Out = 0.5, Home = "the Deliveros depot" },
+	-- 10.4 the ride (client/RideUi.luau; 10.8 a card over the fade: "→ THE POND CABIN"): s it shows on the way to a
+	-- house (To: its island streams in behind it) and back (Back); Home: the lobby's name on the way back; Out: s it
+	-- fades into the place
+	Ride = { To = 3, Back = 2.2, Out = 0.5, Home = "the lobby" },
 	EndHold = 3.5,
 	LeaveHold = 3,
 	Truck = { Attribute = "RunParked", Reach = 9, At = { -4.6, 3.4, -1.5 } :: { number } },
-	Zone = { Screen = { Height = 14, Width = 4, Color = { 44, 82, 38 } :: { number } }, Wall = 80, View = 110 },
-	Portal = {
-		Gate = { 16, 15 } :: { number },
+	Zone = { Wall = 80 },
+	Play = {
+		Radius = 16,
+		Height = 8,
+		Ring = 1.6,
 		Free = { 90, 210, 255 } :: { number },
 		Waiting = { 255, 190, 70 } :: { number },
-		InUse = { 220, 64, 64 } :: { number },
-		SignRange = 180,
-		Styles = {
-			sandbox_house = { wall = { 226, 214, 186 }, trim = { 120, 58, 44 }, roof = { 150, 62, 44 }, accent = { 196, 160, 96 } },
-			pond_cabin = { wall = { 132, 94, 60 }, trim = { 60, 96, 120 }, roof = { 72, 76, 82 }, accent = { 176, 72, 52 } },
-			lone_house = { wall = { 236, 226, 200 }, trim = { 110, 80, 56 }, roof = { 172, 72, 52 }, accent = { 90, 130, 70 } },
-			forest_lodge = { wall = { 112, 76, 46 }, trim = { 60, 42, 28 }, roof = { 74, 92, 60 }, accent = { 226, 214, 186 } },
-			old_mill = { wall = { 150, 148, 142 }, trim = { 96, 70, 48 }, roof = { 92, 88, 86 }, accent = { 120, 90, 60 } },
-			orchard_cottage = { wall = { 244, 240, 230 }, trim = { 80, 112, 60 }, roof = { 198, 166, 98 }, accent = { 200, 60, 60 } },
-		} :: { [string]: { wall: { number }, trim: { number }, roof: { number }, accent: { number } } },
+		Letters = 6,
+		Sign = { Height = 12, Range = 260, Size = { 18, 7 } :: { number } },
+		Pulse = 1.6,
 	},
-	Panel = { Width = 380, TouchScale = 0.8 },
+	Party = { Countdown = 5, MaxLobbies = 6, Friends = 120, Kicked = 30, Attribute = "RunLobbies" },
+	Houses = {
+		sandbox_house = { icon = "🚜", line = "The big farm: ten rooms and a barn", wall = { 226, 214, 186 }, roof = { 150, 62, 44 } },
+		pond_cabin = { icon = "🎣", line = "A fishing cabin by the pond: rods, nets, a boat", wall = { 132, 94, 60 }, roof = { 72, 76, 82 } },
+		lone_house = { icon = "🏡", line = "A family house alone among the fields", wall = { 236, 226, 200 }, roof = { 172, 72, 52 } },
+		forest_lodge = { icon = "🦌", line = "A log lodge deep in the forest", wall = { 112, 76, 46 }, roof = { 74, 92, 60 } },
+		old_mill = { icon = "🌾", line = "A stone watermill: millstones and flour", wall = { 150, 148, 142 }, roof = { 92, 88, 86 } },
+		orchard_cottage = { icon = "🍎", line = "A thatched cottage among the apple trees", wall = { 244, 240, 230 }, roof = { 198, 166, 98 } },
+	} :: { [string]: { icon: string, line: string, wall: { number }, roof: { number } } },
+	Panel = { Width = 720, Height = 408, Margin = 6, Bar = 400, TouchScale = 0.8 },
 	Result = { Width = 420, Rows = 8, TouchScale = 0.8 },
 	-- 10.x DANGER (the block above Config.Runs): per difficulty, what a run's house holds besides the loot
 	Danger = {
@@ -4160,8 +4187,15 @@ Config.Runs = {
 -- client/RoundUi.luau). A countdown in the lobby (the next place named), then everybody in the game rides there, every
 -- player's own van parked at its curb; whatever you carry to YOUR van and load is yours at once (into your warehouse's
 -- stock); the clock ends it, the results card ranks everybody, the ride back, the next countdown.
---   On            the rounds (false: the portals' runs as before 10.5)
---   Wait          s of the countdown in the lobby (it runs while somebody is in the game: pressed PLAY)
+-- 10.6 BOTH IN PLAY (the owner: "Both in the PLAY circle"): the rounds are the PLAY panel's QUICK ROUND beside its
+-- PRIVATE LOBBY (the party lobbies, Config.Runs.Party): nobody goes on a round before they join its queue there (in the
+-- PLAY circle; LEAVE QUEUE in the panel or on the banner takes them out), no queue no round; a round and a lobby's run
+-- never share a house (RunRules.houseBusy).
+--   On            the rounds (false: no QUICK ROUND in the PLAY panel, only the private lobbies)
+--   Wait          s of the countdown in the lobby (it runs while somebody is in the queue)
+--   Stay          10.6: after a round its players stay in the queue for the next one (false: out of it, PLAY again)
+--   Banner        10.6: the lobby's banner (client/RoundUi.luau): TouchScale (its least scale on a phone: LEAVE QUEUE a
+--                 finger's size)
 --   Seconds       a round's clock
 --   Difficulties  a round's difficulty, one at random (its locks, vault and floor hazards: Config.Runs.Danger; its loot:
 --                 Config.Loot); never a zombie since 10.5
@@ -4174,9 +4208,19 @@ Config.Runs = {
 --   Results       s the results card shows before the ride back
 --   Top           the HUD's live table: its first Top rows (yours under them when you are further down)
 --   Every         s between the loop's looks
+--   Tug           10.6 snatching (the owner: "you can take it out of somebody's hands, but not so that you could just take
+--                 it … not somebody waiting at your car"; shared/TugRules.luau, client/TugUi.luau): On; Reach / Hold: the
+--                 Snatch prompt on a carrier (E held Hold s within Reach studs, the others in the round see it); a tug
+--                 lasts Seconds at most, its mark from Start (the carrier's side), each press Pull (the carrier's Boost
+--                 times as far), Rate presses a second heard at most; both stand still while it goes on and the loser
+--                 Stun s more; nobody is snatched from within Protect s of picking it up (the winner too), within SafeVan
+--                 studs of their own van's back or SafeDoor of the house's door, nor again within Target s; a snatcher
+--                 tries again only after Again s; Every s between the tugs' looks (and the views sent)
 Config.Rounds = {
 	On = true,
 	Wait = 45,
+	Stay = true,
+	Banner = { TouchScale = 0.8 },
 	Seconds = 300,
 	Difficulties = { "normal", "hard", "insane" } :: { string },
 	Park = { Across = 13, Along = 28, Cols = 17, Rows = 5, Margin = 10, Width = 9.6, Length = 22, Height = 8 },
@@ -4185,6 +4229,8 @@ Config.Rounds = {
 	Results = 8,
 	Top = 5,
 	Every = 0.25,
+	Tug = { On = true, Reach = 7, Hold = 0.25, Seconds = 3, Start = -0.2, Pull = 0.1, Boost = 1.35, Rate = 10, Protect = 3, SafeVan = 12, SafeDoor = 8, Stun = 1.5,
+		Again = 4, Target = 2, Every = 0.1 },
 }
 
 -- 9.x LOOT (the owner: "like Dungeon Quest: you go into a house and you get loot there ... outlines with their own colour
@@ -4194,7 +4240,7 @@ Config.Rounds = {
 -- .rarityOf: a collectible's own, uncommon … legendary; the furniture's by its value), and the contract's difficulty
 -- (contract.difficulty; nil or unknown: Default) rolls on it. The house's seed and the difficulty decide the dice: the
 -- same house at the same difficulty always holds the same loot (giving up and taking it again rolls nothing new).
---   Order        the difficulties, the easiest first (the lobby's portals: "easy" … "nightmare")
+--   Order        the difficulties, the easiest first (the PLAY panel's: "easy" … "nightmare")
 --   Default      a contract without one (and the city's moves): Normal, the rarities as before 9.x
 --   Difficulty   per difficulty: Down, the chance a piece comes a tier under its own (never under Common; a collectible
 --                never under Least); Up, the chance a roll lifts it a tier, Again the chance of each tier more, Most tiers
@@ -4389,7 +4435,7 @@ Config.Warehouse = {
 	PromptDistance = 8,
 	SellHold = 1,
 	Rebuild = 0.15,
-	MaxParts = 400,
+	MaxParts = 470, -- (10.4: + the showroom's plinths, carpet and signs)
 	ArtLevel = 4,
 	Levels = {
 		{ name = "Garage", size = { 26, 12, 22 }, door = { 14, 9.5 }, roof = "shed", rise = 2.5, stands = 2 },
@@ -4511,42 +4557,242 @@ Config.Sprinter = {
 -- in your warehouse (server/Warehouse.luau builds it, client/UpgradeUi.luau is its window, server/Upgrades.luau decides
 -- every purchase; shared/UpgradeRules.luau has the rules, tests/upgrades_test.luau and tests/upgrades_runtime_test.luau
 -- check them). The levels are per player in the save (profile.sandboxUpgrades: Config.Upgrades and profile.upgrades are
--- the city's gun and car tracks). Each upgrade:
---   name, icon     its card's title and picture (an emoji)
---   max            its top level; prices: the price of each level (prices[n] buys level n)
---   step           what one level gives: warehouse (8.3) the next warehouse level (Config.Warehouse.Levels: its upgrade
---                  level k is warehouse level k + 1, a new player's Garage is 0); stands +step small display stands
---                  (from Config.Warehouse.MoreFrom: the level's big stands + these); lights the
---                  income × (1 + step) a level (compounding: CollectionRules' income, so the HUD, the stands' tags and
---                  the picker show it); engine the van's top speed + step a level (its SpeedMult attribute,
---                  client/Drive.luau); danny his walk + step a level (shared/MoveHelperBrain.luau trained)
--- (A bigger cargo bay was not done: the moves' packing, Config.Moving.Beds.sprinter, and the Sprinter's walk-in body
--- are one size; the engine is the safe van upgrade.)
--- The tuning (8.3 economy: saving up): a first haul on show earns about $40 – 50 a minute on 12 stands
--- (Config.Collection) and a move takes about 20 minutes, so the first level of each comes after a move or two, the top
--- ones after 10 – 15 hours of play; the lights, the engine and Danny cost $161,500 in all, More stands $52,000 and the
--- warehouse's levels $138,500 (8.3 economy: the Workshop after a move or two, the Big Warehouse, today's, after hours,
--- the Logistics Center the long goal): everything bought $352,000.
---   Order          the cards' order in the window
+-- the city's gun and car tracks).
+-- 10.4 THE UPGRADE TREE (the owner: "not a skill tree, but an upgrade tree … and later on more looks for it"): the five
+-- tracks of 8.1 – 8.3 are nodes of one tree now (shared/UpgradeRules.luau, tests/upgrades_test.luau; the window
+-- client/UpgradeUi.luau draws it full screen). The trunk is the warehouse: its tiers 1 … 5 (the Garage … the Logistics
+-- Center) open the branches' deeper nodes. Five branches grow from it: the HALL (income: the collection hall's stands,
+-- its income), the SHOWROOM (selling: its stands, its visitors, their offers), RUNS (the clock, the key, the loot), the
+-- CREW (the helpers) and LOOKS (cosmetic: the warehouse's paint and sign; later more). A node has ranks (1 … max); its
+-- id is the save's key, so 8.1's five ids are nodes as they were (their levels are the nodes' ranks: nobody loses
+-- anything). Each node (List):
+--   name, icon     its tile's title and picture (an emoji)
+--   max            its top rank; prices: the price of each rank (prices[n] buys rank n; they grow along the branch)
+--   step           what one rank adds to its effect (Effects: its mode says how ranks add up)
+--   branch         its branch's id (Branches)
+--   effect         the effect it feeds (Effects' key; the other systems read UpgradeRules.effect(levels, key))
+--   needs          { [parent id] = rank }: the parent nodes and the rank each must have before rank 1 can be bought
+--   tiers          the warehouse tier each rank needs (tiers[n] for rank n; none listed: 1); the trunk's own rank r
+--                  needs tier r (the tier it has: always)
+--   at             its place in the tree's grid { column, row } (the trunk's tiers at the odd columns of its row)
+--   blurb          the details' line (what it does, in a sentence)
+--   soon           shown in the tree, never sold yet: the reason ("Comes with …")
+--   look           LOOKS: what it paints when owned { kind = "wall" | "sign", color = RGB }
+--   auction        true: locked while Config.Auction.On is false ("The Auction House opens later")
+-- The legacy five keep their 8.1 – 8.3 prices and their rules: warehouse (8.3: its rank k is warehouse tier k + 1),
+-- stands (More hall stands: +2 small stands a rank, from Config.Warehouse.MoreFrom), lights (the hall's income ×1.1 a
+-- rank, compounding), engine (the van's top speed +5 % a rank), danny (Danny's walk +10 % a rank).
+--   Order          the nodes in the tree's order (the trunk first, then each branch from its root out)
+--   Branches       in the window's order: id, name, colour (RGB), row (its lane's first row in the grid), blurb
+--   Effects        key → { base, mode, min?, max? }: base the value with no rank; mode "add" (base + Σ step × rank),
+--                  "pow" (base × Π (1 + step) ^ rank); min / max clamp it
+--   Grid           the tree's grid: Columns, Rows (its size), the trunk's Row
+--   Balance        the pure balance test's reference (tests/upgrades_test.luau): Earn[t] the $ a minute a player at
+--                  warehouse tier t makes (the hall's income and the sales: Config.Collection's tuning), Hall[t] the
+--                  hall's income alone; every rank must cost MinMinutes … MaxMinutes of Earn at the tier it needs, an
+--                  income node must pay back within Payback hours of its tier's Hall, the whole tree within TotalHours
+--                  of Earn[5], each branch's first rank within FirstMinutes of Earn[1]
 --   Flag           the save's mark: profile.sandboxUpgrades is read only from a real save written with it
+--   TreeFlag       10.4: the tree's mark: a real save written without it (8.1 – 10.3: the five tracks) is migrated
+--                  (Migrate: an old track's id → its node, its level the node's rank) and the tree's nodes an older
+--                  server dropped come back from `rewards`' short keys ("up:<id>:<rank>": UpgradeRules.mirror)
+--   Migrate        old track id → node id
 --   Danny          the player attribute server/Upgrades.luau keeps Danny's training level in (the helper reads it)
 --   WarehouseFlag  8.3: the save's mark of the warehouse level: a real save without it (from before 8.3) had today's
 --                  warehouse, so it gets warehouse level 4 (UpgradeRules.fromSave); WarehouseAttribute the player
 --                  attribute server/Upgrades.luau keeps their warehouse level (1 … 5) in (the client reads it)
-export type SandboxUpgradeDef = { name: string, icon: string, max: number, step: number, prices: { number } }
+--   Attributes     10.4: the player attributes server/Upgrades.luau keeps the effects other scripts read in: the
+--                  showroom's and the hall's stands (the picker), the looks (the warehouse's paint)
+--   Window         the tree's window (client/UpgradeUi.luau): Node { w, h } (px at zoom 1), Gap { x, y } between two
+--                  nodes (a column is half a node and its gap wide: the nodes stand on the even columns, the trunk's tiers
+--                  on the odd ones between them, their lines down the gaps), Pad (the canvas's margin), Zooms (the − / + steps), DefaultZoom (a fresh window's step at
+--                  least), Panel (the details' width), Header, TouchScale (the least scale on a phone)
+-- The tuning (8.3 economy: saving up; 10.4: a long goal): a first haul on show earns about $40 – 50 a minute on 12
+-- stands (Config.Collection) and a run takes about 20 minutes, so a branch's first node comes after a run or two, the
+-- deep ones after hours; the legacy five cost $352,000 as before, the whole tree about $1.1 million (the balance test
+-- holds every price to the reference incomes in Balance).
+export type SandboxUpgradeDef = {
+	name: string,
+	icon: string,
+	max: number,
+	step: number,
+	prices: { number },
+	branch: string?,
+	effect: string?,
+	needs: { [string]: number }?,
+	tiers: { number }?,
+	at: { number }?,
+	blurb: string?,
+	soon: string?,
+	look: { kind: string, color: { number } }?,
+	auction: boolean?,
+}
+export type UpgradeBranch = { id: string, name: string, color: { number }, row: number, blurb: string }
+export type UpgradeEffect = { base: number, mode: string, min: number?, max: number? }
 Config.SandboxUpgrades = {
-	Order = { "warehouse", "stands", "lights", "engine", "danny" } :: { string },
+	Order = {
+		"warehouse",
+		"lights", "idle", "rare", "sets", "stands",
+		"showstands", "traffic", "haggle", "vip", "auction",
+		"engine", "clock", "key", "truck", "luck", "helperslot",
+		"danny", "toughness", "medic", "pace", "hospital",
+		"paint", "sign",
+	} :: { string },
 	List = {
-		warehouse = { name = "Deliveros Warehouse", icon = "🏭", max = 4, step = 1, prices = { 1000, 7500, 30000, 100000 } },
-		stands = { name = "More stands", icon = "🏛️", max = 4, step = 2, prices = { 4000, 8000, 15000, 25000 } },
-		lights = { name = "Showroom lights", icon = "💡", max = 5, step = 0.1, prices = { 1500, 4000, 12000, 30000, 75000 } },
-		engine = { name = "Van engine", icon = "🚐", max = 3, step = 0.05, prices = { 1500, 5000, 15000 } },
-		danny = { name = "Danny's training", icon = "🏃", max = 3, step = 0.1, prices = { 1500, 4000, 12000 } },
+		-- the trunk
+		warehouse = { name = "Deliveros Warehouse", icon = "🏭", max = 4, step = 1, prices = { 1000, 7500, 30000, 100000 }, branch = "warehouse", effect = "tier", at = { 1, 4 },
+			blurb = "A bigger building: more hall stands, more showroom stands, and every branch's deeper nodes." },
+		-- the hall (income)
+		lights = { name = "Hall spotlights", icon = "💡", max = 5, step = 0.1, prices = { 1500, 4000, 12000, 30000, 75000 }, branch = "hall", effect = "hallIncome", tiers = { 1, 1, 2, 3, 4 }, at = { 2, 3 },
+			blurb = "Everything in your collection hall earns 10% more a rank (it adds up: ×1.61 at rank 5)." },
+		idle = { name = "Night watchman", icon = "🌙", max = 2, step = 0.15, prices = { 5000, 18000 }, branch = "hall", effect = "idleShare", needs = { lights = 1 }, tiers = { 2, 3 }, at = { 4, 2 },
+			blurb = "While you're idle the hall still pays more of its income (25% → 40% → 55%)." },
+		rare = { name = "Collector's corner", icon = "💎", max = 3, step = 0.2, prices = { 4000, 12000, 30000 }, branch = "hall", effect = "rareIncome", needs = { lights = 2 }, tiers = { 2, 3, 4 }, at = { 4, 3 },
+			blurb = "Epic and Legendary pieces in the hall earn 20% more a rank." },
+		sets = { name = "Room sets", icon = "🛋️", max = 3, step = 0.04, prices = { 8000, 22000, 45000 }, branch = "hall", effect = "setBonus", needs = { rare = 1 }, tiers = { 3, 4, 5 }, at = { 6, 3 },
+			blurb = "Three different pieces from one room (kitchen, bedroom …) in the hall make a set: each set adds 4% a rank." },
+		stands = { name = "More hall stands", icon = "🏛️", max = 4, step = 2, prices = { 4000, 8000, 15000, 25000 }, branch = "hall", effect = "hallStands", tiers = { 4, 4, 4, 4 }, at = { 8, 3 },
+			blurb = "Two more small stands in the collection hall a rank." },
+		-- the showroom (selling)
+		showstands = { name = "Showroom stands", icon = "🏷️", max = 3, step = 1, prices = { 2500, 12000, 40000 }, branch = "showroom", effect = "showStands", tiers = { 1, 3, 5 }, at = { 2, 5 },
+			blurb = "One more stand in the showroom a rank (as many as your building has room for)." },
+		traffic = { name = "Shop window", icon = "🪟", max = 3, step = 0.2, prices = { 3000, 9000, 24000 }, branch = "showroom", effect = "visitorRate", needs = { showstands = 1 }, tiers = { 2, 2, 3 }, at = { 4, 5 },
+			blurb = "Visitors come 20% more often a rank." },
+		haggle = { name = "Sales pitch", icon = "🤝", max = 3, step = 0.06, prices = { 6000, 18000, 45000 }, branch = "showroom", effect = "showPrice", needs = { traffic = 1 }, tiers = { 3, 3, 4 }, at = { 6, 5 },
+			blurb = "Pieces in the showroom sell for 6% more a rank, and the visitors offer 6% more." },
+		vip = { name = "VIP buyers", icon = "🎩", max = 1, step = 1, prices = { 55000 }, branch = "showroom", effect = "vip", needs = { haggle = 2 }, tiers = { 4 }, at = { 8, 5 },
+			blurb = "VIP buyers visit too: they pay 25% extra for Rare, Epic and Legendary pieces." },
+		auction = { name = "Auction fast lane", icon = "🔨", max = 1, step = 0.25, prices = { 75000 }, branch = "showroom", effect = "auctionSpeed", needs = { vip = 1 }, tiers = { 5 }, at = { 10, 5 }, auction = true,
+			blurb = "Your lots come up first at the Auction House." },
+		-- runs
+		engine = { name = "Van engine", icon = "🚐", max = 3, step = 0.05, prices = { 1500, 5000, 15000 }, branch = "runs", effect = "vanSpeed", tiers = { 1, 1, 2 }, at = { 2, 6 },
+			blurb = "Your van's top speed +5% a rank." },
+		clock = { name = "Overtime", icon = "⏱️", max = 3, step = 0.08, prices = { 4000, 12000, 30000 }, branch = "runs", effect = "runClock", tiers = { 2, 3, 4 }, at = { 4, 6 },
+			blurb = "Every run you host gets 8% more time on its clock a rank." },
+		key = { name = "Spare keys", icon = "🔑", max = 1, step = 1, prices = { 18000 }, branch = "runs", effect = "startKey", needs = { clock = 1 }, tiers = { 3 }, at = { 6, 6 },
+			blurb = "Your runs start with one locked room's key already in the party's hands." },
+		truck = { name = "Bigger truck", icon = "🚚", max = 2, step = 0.15, prices = { 45000, 110000 }, branch = "runs", effect = "truckSize", needs = { clock = 1 }, tiers = { 3, 5 }, at = { 6, 7 },
+			blurb = "A truck with room for more loot.", soon = "Comes with the bigger run trucks" },
+		luck = { name = "Keen eye", icon = "🍀", max = 2, step = 0.03, prices = { 25000, 70000 }, branch = "runs", effect = "lootLuck", needs = { key = 1 }, tiers = { 4, 5 }, at = { 8, 6 },
+			blurb = "In the runs you host, a piece is 3% more likely a rank to come one rarity higher." },
+		helperslot = { name = "Second helper", icon = "👥", max = 1, step = 1, prices = { 120000 }, branch = "runs", effect = "helperSlots", needs = { luck = 1 }, tiers = { 5 }, at = { 10, 6 },
+			blurb = "Two helpers come into your runs.", soon = "Comes later" },
+		-- the crew
+		danny = { name = "Danny's training", icon = "🏃", max = 3, step = 0.1, prices = { 1500, 4000, 12000 }, branch = "crew", effect = "dannySpeed", at = { 2, 8 },
+			blurb = "Danny walks 10% faster a rank." },
+		toughness = { name = "Pads & helmets", icon = "⛑️", max = 3, step = 0.15, prices = { 3000, 9000, 22000 }, branch = "crew", effect = "helperHealth", needs = { danny = 1 }, tiers = { 2, 2, 3 }, at = { 4, 8 },
+			blurb = "Your helpers have 15% more health a rank." },
+		medic = { name = "First aid", icon = "🩹", max = 2, step = -0.25, prices = { 5000, 15000 }, branch = "crew", effect = "reviveTime", needs = { toughness = 1 }, tiers = { 3, 3 }, at = { 6, 8 },
+			blurb = "Getting a helper back up takes 25% less time a rank." },
+		pace = { name = "Running shoes", icon = "👟", max = 2, step = 0.05, prices = { 7000, 20000 }, branch = "crew", effect = "helperSpeed", needs = { toughness = 1 }, tiers = { 3, 4 }, at = { 6, 9 },
+			blurb = "Every helper walks 5% faster a rank." },
+		hospital = { name = "Good doctors", icon = "🏥", max = 2, step = -0.25, prices = { 9000, 26000 }, branch = "crew", effect = "hospital", needs = { medic = 1 }, tiers = { 4, 4 }, at = { 8, 8 },
+			blurb = "A helper's hospital stay is 25% shorter a rank (and so an early discharge cheaper)." },
+		-- looks (cosmetic; later more: a node a look)
+		paint = { name = "Fresh paint", icon = "🎨", max = 1, step = 1, prices = { 2000 }, branch = "looks", effect = "wallPaint", at = { 2, 1 }, look = { kind = "wall", color = { 46, 74, 120 } },
+			blurb = "Your warehouse's walls in Deliveros navy." },
+		sign = { name = "Gold sign", icon = "✨", max = 1, step = 1, prices = { 5000 }, branch = "looks", effect = "signPaint", needs = { paint = 1 }, tiers = { 2 }, at = { 4, 1 }, look = { kind = "sign", color = { 214, 168, 52 } },
+			blurb = "Your name over the door in gold." },
 	} :: { [string]: SandboxUpgradeDef },
+	Branches = {
+		{ id = "warehouse", name = "WAREHOUSE", color = { 240, 132, 44 }, row = 4, blurb = "The building: its tiers open the deeper nodes" },
+		{ id = "looks", name = "LOOKS", color = { 232, 112, 176 }, row = 1, blurb = "Your warehouse's looks (more to come)" },
+		{ id = "hall", name = "COLLECTION HALL", color = { 255, 196, 64 }, row = 2, blurb = "Income: the pieces in the hall earn every minute" },
+		{ id = "showroom", name = "SHOWROOM", color = { 86, 164, 255 }, row = 5, blurb = "Selling: visitors, offers and prices" },
+		{ id = "runs", name = "RUNS", color = { 255, 120, 60 }, row = 6, blurb = "The runs you host: time, keys and loot" },
+		{ id = "crew", name = "CREW", color = { 92, 210, 180 }, row = 8, blurb = "Your helpers: health, speed, the hospital" },
+	} :: { UpgradeBranch },
+	Effects = {
+		tier = { base = 1, mode = "add", min = 1, max = 5 },
+		hallIncome = { base = 1, mode = "pow" },
+		idleShare = { base = 0, mode = "add", min = 0, max = 0.75 },
+		rareIncome = { base = 1, mode = "add" },
+		setBonus = { base = 0, mode = "add", min = 0 },
+		hallStands = { base = 0, mode = "add", min = 0 },
+		showStands = { base = 0, mode = "add", min = 0 },
+		visitorRate = { base = 1, mode = "add", min = 0.25 },
+		showPrice = { base = 1, mode = "add", min = 1 },
+		vip = { base = 0, mode = "add", min = 0, max = 1 },
+		auctionSpeed = { base = 1, mode = "add", min = 1 },
+		vanSpeed = { base = 1, mode = "add" },
+		runClock = { base = 1, mode = "add", min = 1, max = 2 },
+		startKey = { base = 0, mode = "add", min = 0, max = 1 },
+		truckSize = { base = 1, mode = "add", min = 1 },
+		lootLuck = { base = 0, mode = "add", min = 0, max = 0.25 },
+		helperSlots = { base = 0, mode = "add", min = 0 },
+		dannySpeed = { base = 1, mode = "add" },
+		helperHealth = { base = 1, mode = "add", min = 1 },
+		reviveTime = { base = 1, mode = "add", min = 0.2, max = 1 },
+		helperSpeed = { base = 1, mode = "add", min = 1 },
+		hospital = { base = 1, mode = "add", min = 0.2, max = 1 },
+		wallPaint = { base = 0, mode = "add", min = 0, max = 1 },
+		signPaint = { base = 0, mode = "add", min = 0, max = 1 },
+	} :: { [string]: UpgradeEffect },
+	Grid = { Columns = 10, Rows = 9, TrunkRow = 4 },
+	Balance = {
+		Earn = { 20, 45, 90, 180, 350 } :: { number },
+		Hall = { 12, 30, 60, 120, 250 } :: { number },
+		MinMinutes = 10,
+		MaxMinutes = 720,
+		Payback = 36,
+		TotalHours = 80,
+		FirstMinutes = 150,
+		EpicShare = 0.35, -- (the share of a hall's income its Epic and Legendary pieces earn: the rarity node's payback)
+		Sets = 3, -- (the room sets a hall at the node's tier holds: its payback)
+	},
 	Flag = "sandboxUpgradesKept",
+	TreeFlag = "upgradeTreeKept",
+	Migrate = { warehouse = "warehouse", stands = "stands", lights = "lights", engine = "engine", danny = "danny" } :: { [string]: string },
 	Danny = "DannyTraining",
 	WarehouseFlag = "warehouseLevelKept",
 	WarehouseAttribute = "WarehouseLevel",
+	Attributes = { Show = "ShowroomStands", Hall = "HallStands", Wall = "WarehouseWall", Sign = "WarehouseSign" },
+	Window = {
+		Node = { 184, 84 } :: { number },
+		Gap = { 28, 20 } :: { number },
+		Pad = 28,
+		Zooms = { 0.55, 0.7, 0.85, 1, 1.2 } :: { number },
+		DefaultZoom = 3, -- (the step a fresh window starts at, at least: 0.85, the words readable on a phone)
+		Panel = 300,
+		Header = 56,
+		TouchScale = 0.8,
+	},
+}
+
+-- 10.4 SANDBOX, the warehouse in two (the owner: "the warehouse has an exhibition area for selling, and then something
+-- for generating money: split it a bit, so it's better"). A warehouse holds two areas, laid out per level by
+-- shared/WarehouseLayout.luau (its showroom stands by the door, the collection hall's stands behind and round them,
+-- each with its own floor and signs):
+--   * the COLLECTION HALL (the stands 1 … of 8.0 – 10.3, Collection.stands): its pieces earn every minute you play
+--     (Config.Collection); no visitor and no player buys them;
+--   * the SHOWROOM (the stands Base + 1 …): its pieces are on sale: the visitors look at them and make offers
+--     (server/VisitorOffers.luau), other players buy them (FOR SALE signs, offers: server/PlayerTrade.luau), they sell
+--     for SellBonus × the market's price (and the tree's Sales pitch); they earn nothing a minute.
+-- Each piece goes where its owner puts it (the stand picker's and the STOCK list's PUT IN THE HALL / SHOW FOR SALE).
+--   Base        the showroom's stand numbers start after this (101, 102 …: a piece's `stand`, saved as before)
+--   Levels      per warehouse level: Stands (the showroom stands it comes with), Most (how many it has room for: the
+--               tree's Showroom stands add up to this)
+--   SellBonus   × a showroom piece's sale price (the market's) and the base of a visitor's offer for it
+--   Vip         the VIP buyers (the tree's vip node): Pay (+ the offer's × for a Rare or rarer piece), Kind (the visitor
+--               kind's id, Config.Visitors.Kinds), Weight (how often one comes while the node is owned)
+--   Flag        the save's mark: a real save written without it (8.0 – 10.3) had every piece on a stand earning: they stay
+--               in the hall (their stands are the hall's), any FOR SALE sign comes down (a sign is the showroom's)
+--   Carpet      the showroom's floor (RGB) and the hall's sign colour (RGB)
+export type ShowroomLevel = { Stands: number, Most: number }
+Config.Showroom = {
+	Base = 100,
+	Levels = {
+		{ Stands = 1, Most = 2 },
+		{ Stands = 1, Most = 2 },
+		{ Stands = 2, Most = 4 },
+		{ Stands = 2, Most = 4 },
+		{ Stands = 3, Most = 6 },
+	} :: { ShowroomLevel },
+	SellBonus = 1.2,
+	Vip = { Pay = 0.25, Kind = "vip", Weight = 3 },
+	Flag = "showroomKept",
+	Carpet = { 38, 70, 128 } :: { number },
+	HallSign = { 255, 196, 64 } :: { number },
 }
 
 -- 8.2 SANDBOX, the collection book (the owner: collectors want to know what they have found and what is still out
@@ -4732,7 +4978,7 @@ Config.SandboxLeaders = {
 -- (client/SandboxMapUi.luau, client/SandboxMiniMap.luau, drawn by client/SandboxMapDraw.luau from what
 -- client/SandboxMapData.luau reads of the world; the pure rules shared/SandboxMapRules.luau, tests/sandboxmaprules_test.luau).
 -- In the lobby a plan of it from SandboxMap.Lobby (the plaza, the hedge, the plots and your warehouse, the shops and
--- desks, the six portals with their live state, the players, you); in a run the house's floor plan (its interior's
+-- desks, 10.4 the PLAY circle and the open lobbies, the players, you); in a run the house's floor plan (its interior's
 -- MapPlan: server/HouseInterior.luau) over a strip of its front yard with the truck, who is where, the loot under fog
 -- and the danger markers (the CollectionService tags Danger: none there, none drawn).
 --   Key / Button   M opens and closes it; the gamepad's Button (on foot: L2 is the brake only in a seat; the D-pad is
@@ -4751,10 +4997,8 @@ Config.SandboxLeaders = {
 --                  nearest first); it stays until carried out (in the truck, home or lost)
 --   Pulse          the uncarried pieces of From's tier and up pulse (Seconds a beat)
 --   Zombies        studs: the zombies within this of you show (a run's), the others not
---   Names          most names on a portal's line before "+n" (the side column's HOUSES); MapNames on the map, where a
---                  portal's line keeps LineEm × its text size px (its words cut at their end past it) on a lobby drawn
---                  at LongScale px a stud or more; a smaller one's (a phone's) says only its state (FREE, STARTING IN 7,
---                  IN USE · HARD): its labels would cover each other, the side column says who
+--   Rows           10.4: the side column's OPEN LOBBIES and IN A RUN rows at most (the lobbies and the runs now:
+--                  server/Parties.luau's attribute on the PLAY circle)
 --   Mini           the minimap in a run (its plan, you, your party, the loot you saw near you): Size px at the HUD's
 --                  scale (a computer: the bottom right corner), TouchSize px on a touch screen (its top right), shrunk by
 --                  Step to Least to keep clear of the HUD (else none); Scale px a stud (TouchScale on a touch screen);
@@ -4762,6 +5006,7 @@ Config.SandboxLeaders = {
 --                  the HUD, under a window and during a grip check
 --   Danger         the tags another worker's runs put on the house's dangers (none: nothing drawn): their icon; RunLock
 --                  (a locked doorway: its attribute Open), RunKey, RunVault (Open), RunHazard (its Kind: Hazards), RunRescue
+--   Edge           10.8 studs of the lobby island's rock edge drawn round its rim of grass (Colors Cliff, Rim)
 --   Colors         { r, g, b } of the drawing
 Config.SandboxMapUi = {
 	Key = "M",
@@ -4773,13 +5018,11 @@ Config.SandboxMapUi = {
 	Below = 6,
 	Above = 8,
 	Yard = { Depth = 6, Truck = 22, Half = 20 },
+	Edge = 3,
 	Fog = { See = 40, Eye = 1.5, Every = 0.25, Most = 16 },
 	Pulse = { From = "epic", Seconds = 0.7 },
 	Zombies = 60,
-	Names = 3,
-	MapNames = 2,
-	LineEm = 17,
-	LongScale = 1.2,
+	Rows = 12,
 	Mini = { Size = 190, TouchSize = 140, Least = 96, Step = 8, Scale = 2.4, TouchScale = 2, Margin = 16, Top = 8, Every = 0.15 },
 	Danger = {
 		RunLock = { icon = "🔒", open = "🔓", name = "LOCKED DOOR" },
@@ -4793,7 +5036,10 @@ Config.SandboxMapUi = {
 		Back = { 16, 19, 23 },
 		Meadow = { 74, 112, 62 },
 		Hedge = { 38, 70, 34 },
+		Cliff = { 104, 92, 80 }, -- (10.8: the lobby island's rock edge)
+		Rim = { 84, 124, 66 }, -- (… its rim of grass outside the hedge)
 		Plaza = { 178, 170, 156 },
+		PlayFloor = { 44, 66, 86 }, -- (10.4: the PLAY circle's floor; its ring Config.Runs.Play's)
 		Water = { 76, 140, 190 },
 		Tree = { 54, 96, 48 },
 		Lamp = { 240, 232, 200 },
@@ -4951,6 +5197,9 @@ Config.Visitors = {
 			look = { hat = "none", shirt = { 138, 106, 72 }, vest = { 112, 86, 58 }, tie = { 124, 36, 42 }, pants = { 84, 74, 62 }, hair = { 172, 172, 168 } } },
 		{ id = "dealer", title = "Antique dealer", weight = 1, chance = 1.3, pay = 0.05, names = { "Mrs. Moretti", "Mr. Okafor" },
 			look = { hat = "none", coat = { 52, 66, 58 }, shirt = { 226, 220, 204 }, tie = { 40, 40, 46 }, pants = { 50, 50, 56 } } },
+		-- 10.4: the VIP buyer (weight 0: only for an owner with the upgrade tree's VIP buyers, Config.Showroom.Vip)
+		{ id = "vip", title = "VIP buyer", weight = 0, chance = 1.8, pay = 0.1, names = { "Sir Pemberton", "Ms. Vandermeer", "Count Orlov" },
+			look = { hat = "none", coat = { 24, 24, 30 }, shirt = { 240, 238, 230 }, tie = { 186, 150, 52 }, pants = { 28, 28, 34 } } },
 	} :: { VisitorKind },
 }
 
@@ -5095,7 +5344,9 @@ Config.VanPaint = {
 --              Outdoor (OutdoorAmbient), ShiftTop / ShiftBottom (ColorShift_Top / _Bottom), Diffuse / Specular
 --              (EnvironmentDiffuseScale / SpecularScale), Softness (ShadowSoftness); the Atmosphere: Air (its Color and
 --              the fog's), Decay, Density, Offset, Glare, Haze; Fog (FogStart, FogEnd: only without an Atmosphere); the
---              grade SandboxGrade: Tint, Saturation, Contrast, Lift (its Brightness); Clouds; Sun (the sun's size, deg)
+--              grade SandboxGrade: Tint, Saturation, Contrast, Lift (its Brightness); Clouds; Sun (the sun's size, deg).
+--              10.8 the floating islands: the air light enough that the far islands read (Config.Islands: the clouds
+--              under them are parts, the sky's Clouds over them)
 --   Places     the eyes (client/SandboxLight.luau): each place's look, eased in whenever you walk into it ("outdoors",
 --              "house": the move's house inside, "warehouse": a plot's hall, "van": a Sprinter's walk-in bay):
 --                Exposure   added to Sky.Exposure (Lighting.ExposureCompensation, stops; Roblox takes -3 … 3)
@@ -5146,10 +5397,10 @@ Config.SandboxLight = {
 		Softness = 0.3,
 		Air = { 200, 204, 212 } :: { number },
 		Decay = { 132, 136, 150 } :: { number },
-		Density = 0.26,
+		Density = 0.2, -- (10.8: the other islands 400 … 1 500 studs off the lobby in a light haze, not lost in it)
 		Offset = 0.12,
 		Glare = 0.4,
-		Haze = 1.3,
+		Haze = 1.1,
 		Fog = { 1200, 4000 } :: { number },
 		Tint = { 255, 246, 232 } :: { number },
 		Saturation = 0.06,
@@ -5296,7 +5547,7 @@ Config.Auction = {
 	Salt = 8808,
 	Grand = { On = false, Hour = 19, Lots = 3, Reserve = 1.5, Items = {} :: { string } },
 	House = {
-		Spot = { x = 1800, y = 0, z = 156, yaw = 0 } :: AuctionSpot, -- (9.7: the lobby's, SandboxMap.Lobby.shops.auction)
+		Spot = { x = 1930, y = 0, z = 44, yaw = 90 } :: AuctionSpot, -- (9.7: the lobby's, SandboxMap.Lobby.shops.auction; 10.4 east of the PLAY circle, its door to it)
 		Width = 48,
 		Depth = 32,
 		Wall = 16,
@@ -5573,11 +5824,73 @@ Config.Country = {
 		apiary = 16,
 		railway = 10,
 		halt = 14,
+		spring = 10, -- 10.8
+		waterfall = 6, -- 10.8
 	} :: { [string]: number },
 	Woods = { Spacing = 26, Jitter = 5, Mix = { "oak", "linden", "oak", "birch", "linden" } :: { string } },
 	Lines = { Post = 24, Rails = { 1.5, 2.9 } :: { number }, Hedge = { Height = 3.4, Width = 2.6 } },
 	Streams = { Water = 0.22, Bank = 1.5, BankTop = 0.12, Clear = 2 },
 	Far = { Rails = 900 },
+	-- 10.8 the mill's spring (a round pool on its bank, a few stones) and its waterfall (the millrace over its island's
+	-- edge: Drop studs down its side, Wide studs wide, its spray Mist studs round at its foot)
+	Spring = { Bank = 3, Stones = 5 },
+	Waterfall = { Drop = 70, Wide = 7, Mist = 14 },
+}
+
+-- 10.8 THE FLOATING ISLANDS (the owner: "the world is made of blocks: the lobby is one big block, each map a smaller
+-- block that holds only that map ... floating islands in the sky: grass on top, dirt and stone sides with tapering rock
+-- underneath, the sky all round and below; the other islands seen in the distance from the lobby"; travel: "a fade").
+-- design/islands/plan.py lays the islands out (shared/SandboxMap.luau Islands, Rocks: their places, sizes, heights and
+-- colours), shared/IslandLooks.luau draws their rock, server/SandboxWorld.luau builds it (the grass on top:
+-- shared/SandboxScenery.luau tops), server/IslandFall.luau catches whoever falls off.
+--   Destroy    workspace.FallenPartsDestroyHeight in the sandbox: far under every island's bottom (design/islands/plan.py
+--              DESTROY: the same); the fall catch has a body long before it gets there
+--   LobbyHedge the lobby's hedge's height (server/LobbyWorld.luau: low, the other islands seen over it; a map island's
+--              rim hedge is Config.Country.Lines.Hedge's)
+--   Body       an island's rock under its grass (Grass deep: shared/SandboxScenery.luau tops' tiles): Dirt studs of dirt,
+--              Inset studs in from the grass's edge (the
+--              grass's lip over it), Stone studs of stone under it (Narrow: its sides that much further in); the rest of
+--              its depth Taper blocks, each Shrink of the one over it (Share of what is left), turned Turn degrees at most
+--              and off its middle Shift of its size at most, the last an upside-down pyramid down to the tip; Bulges: a
+--              boulder out of a side every that many studs of it (Out studs out); Hanging: rocks hanging under its edge
+--              (one every that many studs round it, Size studs across at most, Long studs down at most); Tint: each piece's
+--              colour up to that much lighter or darker
+--   Rock       a floating rock: its stone block (Cap: a grass cap on every other one), its pyramid under it
+--   Clouds     the soft clouds under the islands (decoration: nothing collides, no shadow): Count banks of Puffs puffs
+--              each, a puff Size studs across (its least, its most), Flat × as tall, the banks Height studs high (± Rise),
+--              Spread studs past the Bounds round them; Color, Alpha (its transparency)
+--   Fall       the fall catch (server/IslandFall.luau): Every s between two looks at every body (the players, their
+--              helpers in workspace.Npcs); a body Below studs under its island's bottom (its top less its depth: the
+--              island it stood on last, else the one under it, else the lobby's) is caught: put back on that island's
+--              top where it stood last (Inset studs inside its walls at least, else at its home: the lobby's spawn, the
+--              run zone's arrive: a root's height over the ground both), Up studs over it, still; a player behind the
+--              doors' fade (Fade out, In: the
+--              Moving remote's) and what they carried dropped there (server/Moving.luau runDrop); Hold s before a caught
+--              body may be caught again; Notice: the words a caught player gets
+Config.Islands = {
+	Destroy = -1000,
+	LobbyHedge = 3,
+	Body = {
+		Grass = 2,
+		Dirt = 6,
+		Inset = 1.2,
+		Stone = 14,
+		Narrow = 3,
+		Taper = 3,
+		Shrink = 0.72,
+		Share = 0.55,
+		Turn = 9,
+		Shift = 0.05,
+		Bulges = 110,
+		Out = 3.5,
+		Hanging = 150,
+		Size = 30,
+		Long = 34,
+		Tint = 8,
+	},
+	Rock = { Cap = 2 },
+	Clouds = { Count = 14, Puffs = 3, Size = { 70, 150 } :: { number }, Flat = 0.32, Height = -230, Rise = 30, Spread = 260, Color = { 252, 252, 255 } :: { number }, Alpha = 0.35 },
+	Fall = { Every = 0.25, Below = 6, Inset = 10, Up = 0.5, Fade = { Out = 0.35, In = 0.6 }, Hold = 2, Notice = "You fell off the island: back on top." },
 }
 
 -- 8.3 SANDBOX, Roblox badges for the sandbox's milestones (the owner's guide: design/sandbox/BADGES.md).

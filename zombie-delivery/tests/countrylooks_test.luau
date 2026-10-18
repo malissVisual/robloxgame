@@ -1,7 +1,8 @@
--- 9.4 SANDBOX, the countryside's art kit (shared/CountryLooks.luau; design/countryside/plan.py): every landmark kind
+-- 9.4 SANDBOX, the countryside's art kit (shared/CountryLooks.luau; design/countryside/plan.py, 10.8
+-- design/islands/plan.py): every landmark kind
 -- built in the map's own boxes (SandboxMap.Landmarks: each at its yaw) and in a few others, within its budget
 -- (Config.Country.Budget), every piece inside its box and nothing under the ground (the haystack's rounded top's lower
--- half the one piece that reaches under it), its pieces sane (sizes, colours, materials, shapes VillageLooks knows),
+-- half the one piece that reaches under it; 10.8 the waterfall's fall down its island's side), its pieces sane (sizes, colours, materials, shapes VillageLooks knows),
 -- the same every time; the jetty out over the pond's water, the boat on it, the bench and the willows on its bank; the
 -- railway's portal at its back; the halt's MEADOW HALT sign; the lines (hedges, fences: posts at most Lines.Post apart, one
 -- at each bend) and the stream (its water on its bed, every other segment a hair higher, its ends at its points) on the
@@ -29,7 +30,7 @@ local SHAPES: { [string]: boolean } = {}
 for _, s in VillageLooks.Shapes do
 	SHAPES[s] = true
 end
-local UNDER = { HaystackTop = true } -- (its rounded top's lower half in its straight sides, under the ground)
+local UNDER = { HaystackTop = true, Waterfall = true, FallStrand = true, FallSpray = true } -- (the haystack's rounded top's lower half in its straight sides, under the ground; 10.8 the waterfall down its island's side)
 
 local function rect(r: any): Box
 	return { x0 = r.x0, x1 = r.x1, z0 = r.z0, z1 = r.z1 }

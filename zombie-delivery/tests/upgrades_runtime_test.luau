@@ -246,7 +246,7 @@ end
 check("More stands to its top: 20 stands", Rules.level(profileA.sandboxUpgrades, "stands") == 4 and Collection.stands(A) == 20)
 local cash = profileA.money
 ok, why = Upgrades.buy(A, "stands")
-check("… at its top: refused, says so, nothing taken", ok == false and why == "More stands is at its top level." and profileA.money == cash, why)
+check("… at its top: refused, says so, nothing taken", ok == false and why == "More hall stands is at its top level." and profileA.money == cash, why) -- (10.4: its name in the tree)
 
 -- ── The window ──────────────────────────────────────────────────────────────
 mark = #E.sent

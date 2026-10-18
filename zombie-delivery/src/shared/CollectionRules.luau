@@ -63,6 +63,56 @@
 --                                        SALE signs go with them
 --   CollectionRules.saleOf(value)        8.7: a sign's price as the save keeps it: a whole number 1 … 2^40, else nil
 --   CollectionRules.uid(userId, n)       a piece's uid: "<userId>-<n>" (unique among every player's)
+-- 10.4 THE WAREHOUSE IN TWO (Config.Showroom): a stand is the collection HALL's (1 … standsFor: its pieces earn every
+-- minute) or the SHOWROOM's (Config.Showroom.Base + 1 …: its pieces are on sale, they earn nothing a minute and sell
+-- for more). A piece's `stand` is saved as before; which area it is in is its number's:
+--   CollectionRules.ShowBase             Config.Showroom.Base (a showroom stand's number is past it); ShowFlag its flag
+--   CollectionRules.area(stand)          "hall", "show" or nil (no stand); isShow(stand) a showroom stand's number?
+--   CollectionRules.showStandsFor(profile)  the showroom stands a player has (shared/UpgradeRules.luau showStands: their
+--                                        level's own and the tree's Showroom stands)
+--   CollectionRules.open(profile, stand) does the player have that stand (a hall one 1 … standsFor, a showroom one
+--                                        Base + 1 … Base + showStandsFor)?
+--   CollectionRules.bonus(profile, entries?)  the hall's income multipliers: { all (Hall spotlights × the room sets'
+--                                        bonus: setBonus × the sets of `entries` in the hall), rare (Collector's corner:
+--                                        × an Epic or Legendary piece's), sets (how many) }; a Bonus goes wherever a
+--                                        boost (a number) went: income, view, totals
+--   CollectionRules.sets(entries, open?) the room sets in the hall: rooms (FurnitureLooks' room) with
+--                                        Config.Collection.SetSize different items on hall stands (open(stand): the
+--                                        stands the player has; nil: any), MaxSets at most
+--   CollectionRules.showFactor(profile)  × a showroom piece's price: Config.Showroom.SellBonus × the tree's Sales pitch
+--   sell / view / totals take that factor (`show`) too: a showroom piece's price is × it (its income is what it would
+--                                        earn in the hall: the picker's $/min); totals' income counts the hall only
+--   fitStands(collection, stands, fits?, show?)   + the showroom's: a piece on a showroom stand past Base + show goes
+--                                        back to the stock (its sign with it)
+--   fromSave(saved)                      + the showroom's migration: a real save written without Config.Showroom.Flag
+--                                        (8.0 – 10.3) keeps every piece on its stand: the hall's, earning as before; its
+--                                        FOR SALE sign comes down (a sign is the showroom's: clean keeps one only there)
+-- 10.4 THE WAREHOUSE IN TWO (Config.Showroom): a stand is the collection HALL's (1 … standsFor: its pieces earn every
+-- minute) or the SHOWROOM's (Config.Showroom.Base + 1 …: its pieces are on sale, they earn nothing a minute and sell
+-- for more). A piece's `stand` is saved as before; which area it is in is its number's:
+--   CollectionRules.ShowBase             Config.Showroom.Base (a showroom stand's number is past it)
+--   CollectionRules.area(stand)          "hall", "show" or nil (no stand)
+--   CollectionRules.isShow(stand)        a showroom stand's number?
+--   CollectionRules.showStandsFor(profile)  the showroom stands a player has (shared/UpgradeRules.luau showStands: their
+--                                        level's own and the tree's Showroom stands)
+--   CollectionRules.open(profile, stand) does the player have that stand (a hall one 1 … standsFor, a showroom one
+--                                        Base + 1 … Base + showStandsFor)?
+--   CollectionRules.bonus(profile, entries?)  the hall's income multipliers: { all (Hall spotlights × the room sets'
+--                                        bonus: setBonus × the sets of `entries` in the hall), rare (Collector's corner:
+--                                        × an Epic or Legendary piece's), sets (how many) }; a Bonus goes wherever a
+--                                        boost (a number) went: income, view, totals
+--   CollectionRules.sets(entries, open?) the room sets in the hall: rooms (FurnitureLooks' room) with SetSize different
+--                                        items on hall stands (open(stand): the stands the player has; nil: any)
+--   CollectionRules.showFactor(profile)  × a showroom piece's price: Config.Showroom.SellBonus × the tree's Sales pitch
+--   CollectionRules.income / sell / view / totals take that factor (`show`) too: a showroom piece's price is × it
+--                                        (its income is what it would earn in the hall: the picker's $/min), totals'
+--                                        income counts the hall's pieces only
+--   CollectionRules.fitStands(collection, stands, fits?, show?)   + the showroom's: a piece on a showroom stand past
+--                                        Base + show goes back to the stock (its sign with it)
+--   CollectionRules.fromSave(saved)      + the showroom's migration: a real save written without Config.Showroom.Flag
+--                                        (8.0 – 10.3) keeps every piece on its stand: the hall's, earning as before, and
+--                                        its FOR SALE sign comes down (a sign is the showroom's); a showroom number in
+--                                        it (none can be) back to the stock
 
 local Config = require(script.Parent.Config)
 local FurnitureLooks = require(script.Parent.FurnitureLooks)
@@ -99,11 +149,22 @@ export type View = {
 	base: number, -- 8.3: $ it sells for without the market (Market.batch prices a bulk sale from it)
 	market: string?, -- 8.3: "hot", "cold" or nil (Market.tag)
 	sale: number?, -- 8.7: its FOR SALE sign's price (nil: none)
+	area: string?, -- 10.4: "hall" or "show" (its stand's area; nil: in the stock)
 }
 export type Totals = { count: number, shown: number, value: number, income: number, sell: number }
+-- 10.4: the hall's income multipliers (CollectionRules.bonus): all its pieces' (Hall spotlights, the room sets), an Epic
+-- or Legendary piece's on top (Collector's corner), and how many room sets the hall holds
+export type Bonus = { all: number, rare: number, sets: number }
+export type Boost = number | Bonus
 
 -- The flag a save carries once it holds a collection (server/PlayerData.luau writes it with every save).
 CollectionRules.SaveFlag = "collectionKept"
+-- 10.4: the showroom's (Config.Showroom): its stand numbers' base and the save's mark of the split.
+CollectionRules.ShowBase = Config.Showroom.Base :: number
+CollectionRules.ShowFlag = Config.Showroom.Flag :: string
+-- 10.4: the showroom's (Config.Showroom): its stand numbers' base and the save's mark of the split.
+CollectionRules.ShowBase = Config.Showroom.Base :: number
+CollectionRules.ShowFlag = Config.Showroom.Flag :: string
 
 local EPS = 1e-6
 local MAX_ID = 40 -- an item id or a uid longer than this is no piece of ours
@@ -212,34 +273,53 @@ function CollectionRules.broken(entry: { condition: number }): boolean
 	return condition(entry) <= tune().BrokenAt + EPS
 end
 
--- A boost as given (8.1: CollectionRules.boost's), 1 for none or junk.
-local function boostOf(boost: number?): number
+-- A boost as given (8.1: CollectionRules.boost's), 1 for none or junk; 10.4: a Bonus (CollectionRules.bonus): all its
+-- pieces' ×, an Epic or Legendary piece's rare × on top.
+local function factorOf(entry: { item: string }, boost: Boost?): number
+	if type(boost) == "table" then
+		local all = if finite(boost.all) and boost.all > 0 then boost.all else 1
+		local rare = if finite(boost.rare) and boost.rare > 0 then boost.rare else 1
+		return if CollectionRules.tierOf(entry).rank >= 4 then all * rare else all
+	end
 	return if finite(boost) and (boost :: number) > 0 then boost :: number else 1
 end
 
--- $ a minute while it stands on show (0 when broken), × the owner's boost (8.1: the Showroom lights), × the market's
--- (8.3: a hot kind's).
-function CollectionRules.income(entry: { item: string, condition: number }, boost: number?, market: Market.View?): number
+-- 10.4: a showroom factor as given (CollectionRules.showFactor's), 1 for none or junk.
+local function showOf(show: number?): number
+	return if finite(show) and (show :: number) > 0 then show :: number else 1
+end
+
+-- $ a minute while it stands on show (0 when broken), × the owner's boost (8.1: the Showroom lights; 10.4 the hall's
+-- Bonus), × the market's (8.3: a hot kind's). (10.4: only the hall's pieces are paid it: server/Collection.luau.)
+function CollectionRules.income(entry: { item: string, condition: number }, boost: Boost?, market: Market.View?): number
 	if CollectionRules.broken(entry) then
 		return 0
 	end
-	return CollectionRules.valueOf(entry) * CollectionRules.tierOf(entry).income * condition(entry) * boostOf(boost) * Market.incomeFactor(market, entry.item)
+	return CollectionRules.valueOf(entry) * CollectionRules.tierOf(entry).income * condition(entry) * factorOf(entry, boost) * Market.incomeFactor(market, entry.item)
 end
 
 -- $ it sells for (a whole number, at least 1): its tier's share of its worth, scrap when broken; 8.3: with the
--- market's View, the market's price for it now (Market.price).
-function CollectionRules.sell(entry: { item: string, condition: number }, market: Market.View?): number
+-- market's View, the market's price for it now (Market.price). 10.4: a piece on a showroom stand × `show`
+-- (CollectionRules.showFactor; never a broken one's scrap).
+function CollectionRules.sell(entry: { item: string, condition: number }, market: Market.View?, show: number?): number
 	local value = CollectionRules.valueOf(entry)
-	local price = if CollectionRules.broken(entry)
+	local broken = CollectionRules.broken(entry)
+	local price = if broken
 		then value * tune().Scrap
 		else value * CollectionRules.tierOf(entry).sell * condition(entry)
 	local base = math.max(1, math.floor(price + 0.5))
-	return if market then Market.price(base, market, entry.item) else base
+	local out = if market then Market.price(base, market, entry.item) else base
+	local factor = showOf(show)
+	if factor ~= 1 and not broken and CollectionRules.isShow((entry :: any).stand) then
+		out = math.max(1, math.floor(out * factor + 0.5))
+	end
+	return out
 end
 
 -- A copy of the piece with what the client shows: its rarity, value, $ a minute on show (to the cent, × the boost and
--- the market's), price (the market's), broken; 8.3: its price without the market and its market tag.
-function CollectionRules.view(entry: Entry, boost: number?, market: Market.View?): View
+-- the market's), price (the market's), broken; 8.3: its price without the market and its market tag. 10.4: its area,
+-- its price × `show` in the showroom.
+function CollectionRules.view(entry: Entry, boost: Boost?, market: Market.View?, show: number?): View
 	local base = CollectionRules.sell(entry)
 	return {
 		uid = entry.uid,
@@ -252,25 +332,28 @@ function CollectionRules.view(entry: Entry, boost: number?, market: Market.View?
 		rarity = CollectionRules.pieceRarity(entry), -- (9.x loot: its own roll)
 		value = CollectionRules.valueOf(entry),
 		income = math.floor(CollectionRules.income(entry, boost, market) * 100 + 0.5) / 100,
-		price = if market then Market.price(base, market, entry.item) else base,
+		price = CollectionRules.sell(entry, market, show),
 		broken = CollectionRules.broken(entry),
 		base = base,
 		market = Market.tag(market, entry.item),
 		sale = entry.sale,
+		area = CollectionRules.area(entry.stand),
 	}
 end
 
 -- The pieces' count, how many stand on show, their value, the income of the ones on show (× the boost, the market's)
 -- and the price of them all (each at the market's price alone).
-function CollectionRules.totals(entries: { Entry }, boost: number?, market: Market.View?): Totals
+function CollectionRules.totals(entries: { Entry }, boost: Boost?, market: Market.View?, show: number?): Totals
 	local out: Totals = { count = 0, shown = 0, value = 0, income = 0, sell = 0 }
 	for _, entry in entries do
 		out.count += 1
 		out.value += CollectionRules.valueOf(entry)
-		out.sell += CollectionRules.sell(entry, market)
+		out.sell += CollectionRules.sell(entry, market, show)
 		if entry.stand ~= nil then
 			out.shown += 1
-			out.income += CollectionRules.income(entry, boost, market)
+			if not CollectionRules.isShow(entry.stand) then -- (10.4: the hall's pieces earn, the showroom's are on sale)
+				out.income += CollectionRules.income(entry, boost, market)
+			end
 		end
 	end
 	return out
@@ -304,9 +387,85 @@ function CollectionRules.standsFor(profile: any?): number
 	return math.min(base + extra, math.max(base, most))
 end
 
--- 8.1: the stands' income × this for the player (their Showroom lights: shared/UpgradeRules.luau incomeBoost).
+-- 8.1: the stands' income × this for the player (their Showroom lights: shared/UpgradeRules.luau incomeBoost; 10.4
+-- the Hall spotlights).
 function CollectionRules.boost(profile: any?): number
 	return UpgradeRules.incomeBoost(levelsOf(profile))
+end
+
+-- ── 10.4: the hall and the showroom ────────────────────────────────────────
+
+function CollectionRules.isShow(stand: any): boolean
+	return finite(stand) and stand > CollectionRules.ShowBase
+end
+
+function CollectionRules.area(stand: any): string?
+	if not finite(stand) then
+		return nil
+	end
+	return if stand > CollectionRules.ShowBase then "show" else "hall"
+end
+
+function CollectionRules.showStandsFor(profile: any?): number
+	return UpgradeRules.showStands(levelsOf(profile))
+end
+
+function CollectionRules.open(profile: any?, stand: any): boolean
+	if not finite(stand) or stand ~= math.floor(stand) or stand < 1 then
+		return false
+	end
+	if stand > CollectionRules.ShowBase then
+		return stand <= CollectionRules.ShowBase + CollectionRules.showStandsFor(profile)
+	end
+	return stand <= CollectionRules.standsFor(profile)
+end
+
+function CollectionRules.showFactor(profile: any?): number
+	local bonus = Config.Showroom.SellBonus
+	return (if finite(bonus) and bonus > 0 then bonus else 1) * UpgradeRules.effect(levelsOf(profile), "showPrice")
+end
+
+function CollectionRules.sets(entries: { Entry }, open: ((number) -> boolean)?): number
+	local need = math.max(1, math.floor(tune().SetSize or 3))
+	local seen: { [string]: { [string]: boolean } } = {}
+	local count: { [string]: number } = {}
+	for _, entry in entries do
+		local stand = entry.stand
+		if stand ~= nil and not CollectionRules.isShow(stand) and (open == nil or open(stand)) then
+			local def = CollectionRules.defOf(entry.item)
+			local room = if def then def.room else nil
+			if type(room) == "string" then
+				local items = seen[room] or {}
+				seen[room] = items
+				if not items[entry.item] then
+					items[entry.item] = true
+					count[room] = (count[room] or 0) + 1
+				end
+			end
+		end
+	end
+	local sets = 0
+	for _, n in count do
+		if n >= need then
+			sets += 1
+		end
+	end
+	return math.min(sets, math.max(0, math.floor(tune().MaxSets or sets)))
+end
+
+function CollectionRules.bonus(profile: any?, entries: { Entry }?): Bonus
+	local levels = levelsOf(profile)
+	local sets = 0
+	if entries then
+		sets = CollectionRules.sets(entries, function(stand: number): boolean
+			return CollectionRules.open(profile, stand)
+		end)
+	end
+	return {
+		all = UpgradeRules.effect(levels, "hallIncome") * (1 + UpgradeRules.effect(levels, "setBonus") * sets),
+		rare = UpgradeRules.effect(levels, "rareIncome"),
+		sets = sets,
+	}
 end
 
 -- ── The save ───────────────────────────────────────────────────────────────
@@ -370,7 +529,7 @@ function CollectionRules.clean(raw: any): Saved
 				name = name,
 				stand = stand,
 				got = if finite(e.got) then math.clamp(math.floor(e.got), 0, 2 ^ 40) else 0,
-				sale = if stand ~= nil then CollectionRules.saleOf(e.sale) else nil, -- (8.7: a sign only on a stand)
+				sale = if stand ~= nil and CollectionRules.isShow(stand) then CollectionRules.saleOf(e.sale) else nil, -- (8.7: a sign only on a stand; 10.4 a showroom's)
 				rarity = CollectionRules.keepRarity(e.item, e.rarity), -- (9.x loot: none reads as its item's own)
 			})
 		end
@@ -387,17 +546,33 @@ function CollectionRules.fromSave(saved: any): Saved
 	if type(saved) ~= "table" or saved.money == nil or saved[CollectionRules.SaveFlag] ~= true then
 		return CollectionRules.empty()
 	end
-	return CollectionRules.clean(saved.collection)
+	local out = CollectionRules.clean(saved.collection)
+	if saved[CollectionRules.ShowFlag] ~= true then
+		-- 10.4: a save from before the showroom: every piece on a stand stays there, in the hall (its stand is the
+		-- hall's, its income as before); a showroom number (none can be there) back to the stock, and no sign stays
+		-- (clean keeps a sign only in the showroom)
+		for _, entry in out.entries do
+			if CollectionRules.isShow(entry.stand) then
+				entry.stand = nil
+			end
+			entry.sale = nil
+		end
+	end
+	return out
 end
 
 -- Pieces on a stand the warehouse does not have (past `stands`) back to the stock; returns how many. 8.3: with `fits`
 -- (whether a piece of that item stands on that stand: WarehouseLayout.fits at the owner's level), a piece too big for
 -- its stand now goes back too (a level down made it a small stand).
-function CollectionRules.fitStands(collection: Saved, stands: number, fits: ((number, string) -> boolean)?): number
+function CollectionRules.fitStands(collection: Saved, stands: number, fits: ((number, string) -> boolean)?, show: number?): number
 	local moved = 0
+	local shows = if finite(show) then math.max(0, math.floor(show :: number)) else 0
 	for _, entry in collection.entries do
 		local stand = entry.stand
-		if stand ~= nil and (stand < 1 or stand > stands or (fits ~= nil and not fits(stand, entry.item))) then
+		local had = if stand == nil then true
+			elseif stand > CollectionRules.ShowBase then stand <= CollectionRules.ShowBase + shows
+			else stand >= 1 and stand <= stands
+		if stand ~= nil and (not had or (fits ~= nil and not fits(stand, entry.item))) then
 			entry.stand = nil
 			entry.sale = nil -- (8.7: its FOR SALE sign goes with it)
 			moved += 1

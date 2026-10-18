@@ -1,11 +1,10 @@
 -- 9.7 RUNS: shared/RunRules.luau, the rules of a run (Config.Runs): the difficulties in order (Easy and Normal open
 -- from the start, each next one opened by a run finished at the one before it, any house), the clock per difficulty,
--- the save's migration (a real save written with the flag keeps its count), a host's pick; a portal's pad (joining in
--- the order you stepped on, the first the host, the countdown from the first one on, who goes: MaxParty at most, the
--- host's place to the next when the host steps off); in a run: the party's vote to finish, whose stock a piece in the
--- truck goes into (whoever loaded it, else the host), the results card's sums. The server's side of it (the pads in the
--- lobby, the runs, the jumps): tests/runs_runtime_test.luau and tests/sandbox_e2e_runtime_test.luau. Run with
--- tests/run_tests.py.
+-- the save's migration (a real save written with the flag keeps its count), a host's pick; in a run: the party's vote to
+-- finish, whose stock a piece in the truck goes into (whoever loaded it, else the host), the results card's sums. 10.4:
+-- the party gathers in a lobby at the PLAY circle first (tests/partyrules_test.luau; the portals' pads are gone). The
+-- server's side of it (the lobbies, the runs, the jumps): tests/party_runtime_test.luau and
+-- tests/sandbox_e2e_runtime_test.luau. Run with tests/run_tests.py.
 local Config = require("./Config")
 local RunRules = require("./RunRules")
 
@@ -98,42 +97,6 @@ do
 		and RunRules.fromSave({ money = 1, runUnlocked = 0, [R.Flag] = true }) == R.Open and RunRules.fromSave({ money = 1, runUnlocked = "5", [R.Flag] = true }) == R.Open)
 end
 
--- ── A portal's pad: joining, the host, the countdown ───────────────────────
-
-do
-	local pad = RunRules.newPad()
-	check("a new pad: nobody, no countdown, the default difficulty", #pad.order == 0 and pad.endsAt == nil and pad.host == nil and pad.difficulty == R.Default
-		and not RunRules.due(pad, 0) and RunRules.left(pad, 0) == 0)
-	check("…nobody stepping on changes nothing", not RunRules.padStep(pad, {}, 100, R.Countdown))
-	check("Ann (11) steps on: she is the host, the countdown starts (Countdown s)", RunRules.padStep(pad, { 11 }, 100, R.Countdown) and pad.host == 11
-		and pad.endsAt == 100 + R.Countdown and RunRules.left(pad, 100) == R.Countdown and R.Countdown == 10)
-	check("…the same look again: nothing changes", not RunRules.padStep(pad, { 11 }, 101, R.Countdown))
-	RunRules.padStep(pad, { 22, 11 }, 102, R.Countdown)
-	check("Bob (22) joins: behind her in the line (whatever order a look finds them in), the countdown not restarted", table.concat(pad.order, ",") == "11,22"
-		and pad.host == 11 and pad.endsAt == 100 + R.Countdown)
-	RunRules.padStep(pad, { 33, 22, 11, 44, 55 }, 103, R.Countdown)
-	check("Cid, Dee and Eve join: five on the pad, in the order they came (newcomers in the look's order)", table.concat(pad.order, ",") == "11,22,33,44,55")
-	check("…who goes: the first MaxParty (4) of them, the fifth waits", R.MaxParty == 4 and table.concat(RunRules.party(pad, R.MaxParty), ",") == "11,22,33,44")
-	pad.difficulty = "easy"
-	RunRules.padStep(pad, { 22, 33, 44, 55 }, 104, R.Countdown)
-	check("the host steps off: the next in line is the host (Bob), the countdown goes on, the pick stays (the server checks it again)",
-		pad.host == 22 and table.concat(pad.order, ",") == "22,33,44,55" and pad.endsAt == 100 + R.Countdown and pad.difficulty == "easy")
-	check("…Eve goes now (four left)", table.concat(RunRules.party(pad, R.MaxParty), ",") == "22,33,44,55")
-	RunRules.padStep(pad, { 22, 33, 44, 55, 11 }, 105, R.Countdown)
-	check("Ann back on it: at the end of the line now", table.concat(pad.order, ",") == "22,33,44,55,11" and pad.host == 22)
-	check("the countdown: seconds left, then due", RunRules.left(pad, 105.2) == 5 and not RunRules.due(pad, 109.9) and RunRules.due(pad, 110)
-		and RunRules.left(pad, 111) == 0)
-	RunRules.padStep(pad, {}, 106, R.Countdown)
-	check("everybody off: the pad empty again (no host, no countdown, the default difficulty)", #pad.order == 0 and pad.host == nil and pad.endsAt == nil
-		and pad.difficulty == R.Default and not RunRules.due(pad, 200))
-	RunRules.padStep(pad, { 44 }, 300, R.Countdown)
-	check("…the next one on starts a countdown of their own", pad.host == 44 and pad.endsAt == 300 + R.Countdown)
-	check("RunRules.party never more than asked, nobody twice", #RunRules.party(pad, 0) == 0 and #RunRules.party(pad, 9) == 1)
-	local twice = RunRules.newPad()
-	RunRules.padStep(twice, { 7, 7, 8 }, 0, R.Countdown)
-	check("…an id seen twice in one look stands once", table.concat(twice.order, ",") == "7,8")
-end
-
 -- ── In a run ───────────────────────────────────────────────────────────────
 
 do
@@ -154,17 +117,35 @@ end
 -- ── Config.Runs' numbers ───────────────────────────────────────────────────
 
 do
-	check("Config.Runs: a 10 s countdown, 4 at most, a pad you stand on, the remote's rate limit", R.Countdown == 10 and R.MaxParty == 4 and R.PadHeight > 3
+	check("Config.Runs: 4 at most, the PLAY circle you stand in, the remote's rate limit", R.MaxParty == 4 and R.Play.Height > 3 and R.Play.Radius >= 10
 		and type(Config.Robust.Limits.Runs) == "number" and Config.Robust.Limits.Runs >= 2 and Config.Robust.Limits.Runs <= 10)
 	check("…the fades, the holds, the truck's prompts", R.Fade.Out > 0 and R.Fade.In > 0 and R.EndHold > R.Fade.Out and R.LeaveHold > 0 and R.Truck.Reach >= 6
 		and #R.Truck.At == 3 and type(R.Truck.Attribute) == "string")
-	local styled = true
+	local carded = true
 	for _, h in { "sandbox_house", "pond_cabin", "lone_house", "forest_lodge", "old_mill", "orchard_cottage" } do
-		local style = R.Portal.Styles[h]
-		styled = styled and style ~= nil and #style.wall == 3 and #style.trim == 3 and #style.roof == 3 and #style.accent == 3
+		local card = R.Houses[h]
+		carded = carded and card ~= nil and #card.wall == 3 and #card.roof == 3 and card.icon ~= "" and card.line ~= ""
 	end
-	check("…a portal's look for each of the six places, its pad's three colours (free, waiting, in use)", styled and #R.Portal.Free == 3 and #R.Portal.Waiting == 3
-		and #R.Portal.InUse == 3 and #R.Portal.Gate == 2)
+	check("…10.4 a PLAY panel card for each of the six places, the circle's two colours (free, counting down); no portals any more", carded
+		and #R.Play.Free == 3 and #R.Play.Waiting == 3 and (R :: any).Portal == nil and (R :: any).Countdown == nil)
+end
+
+-- ── 10.6 both in PLAY: one "house busy" check (RunRules.houseBusy) for the lobbies and the quick round ────────────
+do
+	local inRun = function(house: string): boolean
+		return house == "pond_cabin"
+	end
+	local waiting = { house = "old_mill", phase = "wait" }
+	check("10.6 houseBusy: the quick round's place while it counts down to it: \"round\" (a lobby picks another)", RunRules.houseBusy("old_mill", inRun, waiting) == "round")
+	check("…while it plays there and while it rides back (over): \"round\" too", RunRules.houseBusy("old_mill", inRun, { house = "old_mill", phase = "play" }) == "round"
+		and RunRules.houseBusy("old_mill", inRun, { house = "old_mill", phase = "over" }) == "round")
+	check("…a house a run is in (a lobby's or the round's): \"run\"; any other: free (nil)", RunRules.houseBusy("pond_cabin", inRun, waiting) == "run"
+		and RunRules.houseBusy("lone_house", inRun, waiting) == nil)
+	check("…nobody queued (idle) or the rounds off (no round): the place is nobody's", RunRules.houseBusy("old_mill", inRun, { house = "old_mill", phase = "idle" }) == nil
+		and RunRules.houseBusy("old_mill", inRun, nil) == nil)
+	check("…the round's own pick (no round given) sees only the runs: never a house a lobby's run is in", RunRules.houseBusy("pond_cabin", inRun, nil) == "run"
+		and RunRules.houseBusy("old_mill", inRun, nil) == nil)
+	check("NEG. …junk (no house, a number): nil, no error", RunRules.houseBusy(nil, inRun, waiting) == nil and RunRules.houseBusy(5, inRun, waiting) == nil)
 end
 
 if failures == 0 then

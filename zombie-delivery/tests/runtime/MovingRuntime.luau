@@ -46,7 +46,8 @@ local Runtime: any = {
 	zombies = {}, -- every zombie spawned
 	marched = 0,
 	tags = {},
-	floor = 0, -- the floor's height the rays find (the interiors' own: Runtime.interiorFloor near them)
+	floor = 0, -- the floor's height the rays find (the interiors' own: Runtime.interiorFloor near them; 10.8 over an
+	-- island this far over its top: SandboxMap.groundAt, the lobby's at 0, a run zone's up in the sky)
 	-- 7.0 planning
 	zombieHits = {}, -- { { z, amount, by, info } } what Zombies.damage was asked
 	stoodUp = 0,
@@ -317,12 +318,15 @@ local function sightRay(origin: any, direction: any, params: any): any
 end
 Runtime.sightRay = sightRay
 
--- The floor under a point: an interior's (Runtime.interiorFloor within 400 studs of an interior's origin), else 0.
+-- The floor under a point: an interior's (Runtime.interiorFloor within 400 studs of an interior's origin), else
+-- Runtime.floor (10.8 over an island that far over its top: shared/SandboxMap.luau's groundAt less GroundTop).
+local islandMap: any = nil
 workspace.Raycast = function(_, origin: any, direction: any, params: any): any
 	if direction and (math.abs(direction.X) > 1e-6 or math.abs(direction.Z) > 1e-6) then
 		return sightRay(origin, direction, params) -- 9.0
 	end
-	local floor = Runtime.floor
+	islandMap = islandMap or require("./SandboxMap") :: any
+	local floor = Runtime.floor + islandMap.groundAt(origin.X, origin.Z) - islandMap.GroundTop
 	for _, at in Runtime.interiors do
 		if (origin - at.Position).Magnitude < 400 then
 			floor = at.Position.Y
@@ -671,8 +675,9 @@ function Runtime.parkVan(player: any, spot: any): (string?, any)
 	if old then
 		old.model:Destroy()
 	end
-	local car = makeCar(player, Runtime.carId, Mock.Vector3.new(spot.x, 2, spot.z))
-	car.chassis.CFrame = Mock.CFrame.new(spot.x, 2, spot.z) * Mock.CFrame.Angles(0, math.rad(spot.yaw or 0), 0)
+	local y = (spot.y or 0) + 2 -- (10.8 the islands: a curb's y its island's top)
+	local car = makeCar(player, Runtime.carId, Mock.Vector3.new(spot.x, y, spot.z))
+	car.chassis.CFrame = Mock.CFrame.new(spot.x, y, spot.z) * Mock.CFrame.Angles(0, math.rad(spot.yaw or 0), 0)
 	Runtime.cars[player] = car
 	return nil, car
 end
@@ -708,7 +713,7 @@ end
 function Runtime.doorOf(h: any): (any, any, any)
 	local r = math.rad(h.door.yaw)
 	local facing = Mock.Vector3.new(-math.sin(r), 0, -math.cos(r))
-	local door = Mock.Vector3.new(h.door.x, 3, h.door.z)
+	local door = Mock.Vector3.new(h.door.x, (h.door.y or 0) + 3, h.door.z) -- (10.8 the islands: a door's y its island's top)
 	return door, facing, door + facing * 3
 end
 

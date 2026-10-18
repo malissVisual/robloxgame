@@ -185,9 +185,9 @@ check("a collectible came home during the move: CollectibleFound (its rarity, it
 -- 8.7 review: a collectible bought from another player meanwhile (a deal: Collection.transfer) came home with no move
 local seller = E.join(102, "Bob")
 local jukebox = Collection.add(seller, { item = "jukebox", condition = 1 }) :: string
-Collection.display(seller, jukebox, 1)
+Collection.display(seller, jukebox, Config.Showroom.Base + 1) -- (10.4: a deal is a showroom piece's)
 before = #custom
-local bought = Collection.transfer(seller, ann, jukebox, 1, 1, 0)
+local bought = Collection.transfer(seller, ann, jukebox, Config.Showroom.Base + 1, 1, 0)
 E.flush()
 check("8.7 review: a collectible bought from a player during her move: no CollectibleFound (it is in her stock all the same)", bought ~= nil and bought.item == "jukebox"
 	and #events(ann, "CollectibleFound", before) == 0, #events(ann, "CollectibleFound", before))

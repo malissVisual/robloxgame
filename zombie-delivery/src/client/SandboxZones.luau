@@ -1,7 +1,7 @@
 --!strict
 -- 8.0 SANDBOX: the admin panel's 🔍 SHOW ZONES (client/AdminPanel.luau's SANDBOX tab): see-through debug marks, on this
 -- screen only, for what the sandbox's code measures against:
---   * 9.7 each portal's pad (light blue: where a run's party stands) and every house's curb (yellow: the truck's spot,
+--   * 10.4 the lobby's PLAY circle (green: where a party gathers) and every house's curb (yellow: the truck's spot,
 --     a van's footprint, its nose marked), from shared/SandboxAdmin.luau's zones;
 --   * the warehouses' display stands (violet boxes): the parts that hold a Display / Take down / Sell prompt
 --     (server/Warehouse.luau's, design/sandbox/KONTRAKT.md), looked for again every STANDS_EVERY s;
@@ -25,7 +25,6 @@ local REFRESH = 1 -- s between looks for the vans
 local STANDS_EVERY = 5 -- s between looks for the stands (one pass over the world's descendants: not often)
 local COLORS = {
 	unload = Color3.fromRGB(90, 220, 120),
-	pad = Color3.fromRGB(90, 210, 255), -- (9.7: a portal's pad)
 	curb = Color3.fromRGB(255, 205, 70),
 	stand = Color3.fromRGB(190, 120, 255),
 	bay = Color3.fromRGB(80, 170, 255),
@@ -78,7 +77,7 @@ local function mark(parent: Instance, name: string, size: Vector3, at: CFrame, c
 	return part
 end
 
--- The fixed marks: the portals' pads (9.7; before: the unload circles) and the houses' curbs.
+-- The fixed marks: the PLAY circle (10.4; 9.7: the portals' pads; before: the unload circles) and the houses' curbs.
 local function drawZones(folder: Folder)
 	for _, zone in SandboxAdmin.zones() do
 		if zone.shape == "circle" then
@@ -87,7 +86,7 @@ local function drawZones(folder: Folder)
 			tag(disc, zone.label, COLORS.unload, disc, 3)
 		else
 			local at = CFrame.new(zone.x, zone.y + zone.sy / 2 + 0.05, zone.z) * CFrame.Angles(0, math.rad(zone.yaw), 0)
-			local color = if zone.kind == "pad" then COLORS.pad else COLORS.curb
+			local color = COLORS.curb
 			local box = mark(folder, zone.label, Vector3.new(zone.sx, zone.sy, zone.sz), at, color)
 			if zone.kind == "curb" then -- its nose (the spot's look, -Z): a brighter bar across the front end
 				mark(box, "Nose", Vector3.new(zone.sx, zone.sy + 0.1, 1), at * CFrame.new(0, 0.05, -zone.sz / 2 + 0.5), color).Transparency = 0.2

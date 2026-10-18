@@ -100,7 +100,8 @@ function render(scene, fonts) {
       const ts = n.ts || d.ts || 14;
       const tc = n.tc || d.tc || [0, 0, 0];
       const justify = n.xa === 'Left' ? 'flex-start' : n.xa === 'Right' ? 'flex-end' : 'center';
-      box.style.cssText = `position:absolute;left:${padL}px;right:${padR}px;top:0;bottom:0;display:flex;align-items:center;justify-content:${justify};` +
+      const align = n.ya === 'Top' ? 'flex-start' : n.ya === 'Bottom' ? 'flex-end' : 'center'; // (10.4: a TextYAlignment dumped)
+      box.style.cssText = `position:absolute;left:${padL}px;right:${padR}px;top:0;bottom:0;display:flex;align-items:${align};justify-content:${justify};` +
         `font-family:${FONTS};font-weight:${weight(n.font)};font-size:${ts}px;line-height:1.15;color:${rgba(tc, n.tt || 0)};`;
       if (n.stroke && (n.tst ?? 1) < 1) { // 10.x the map: a TextStroke (a dark edge round the words)
         const s = rgba(n.stroke, n.tst);
@@ -108,7 +109,7 @@ function render(scene, fonts) {
       }
       const span = document.createElement('span');
       span.textContent = n.text;
-      span.style.cssText = n.wrap ? `white-space:normal;text-align:${n.xa === 'Left' ? 'left' : n.xa === 'Right' ? 'right' : 'center'};` :
+      span.style.cssText = n.wrap ? `white-space:pre-line;text-align:${n.xa === 'Left' ? 'left' : n.xa === 'Right' ? 'right' : 'center'};` :
         n.trunc ? 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;' : 'white-space:nowrap;';
       box.appendChild(span);
       el.appendChild(box);

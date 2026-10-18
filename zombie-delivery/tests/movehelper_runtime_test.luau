@@ -648,7 +648,7 @@ local function stopped(): boolean
 	return danny.call == nil and sol:GetAttribute("MoveHelperCall") == nil and promptIn(sofa, "Stop waiting") == nil and promptIn(sofa, "Lift") ~= nil
 		and character:GetAttribute("MoveCarry") == nil and stateNow(3) == "ground"
 end
-body.root.CFrame = M.CFrame.new(back.X - 40, 3, back.Z - 40)
+body.root.CFrame = M.CFrame.new(back.X - 40, outside.Y, back.Z - 40) -- (10.8 the islands: on the house's island, its ground)
 trigger(promptIn(sofa, "Lift"), sol)
 run(0.2)
 check("8.3 Lift: Sol waits, Danny on his way", waitingNow() and danny.action == "come")
@@ -671,7 +671,7 @@ E.place(sol, solAt)
 run(0.5)
 check("…and he is back about his work (no call left for him)", danny.call == nil and danny.action ~= "come", danny.action)
 -- lifted again with Danny near: he sprints over (no fade)
-body.root.CFrame = M.CFrame.new(back.X + 18, 3, back.Z + 14)
+body.root.CFrame = M.CFrame.new(back.X + 18, outside.Y, back.Z + 14)
 said = #E.said
 trigger(promptIn(sofa, "Lift"), sol)
 took = 0

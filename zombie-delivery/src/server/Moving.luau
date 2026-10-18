@@ -3415,7 +3415,7 @@ local function finishMove(player: Player)
 	finish(s, "deliver", "Finished: what was in the truck went home") -- 9.7 runs: the host's FINISH (SB.unloadAll)
 end
 
--- ── 9.7 RUNS (server/Runs.luau: the lobby's portals; Config.Runs, shared/RunRules.luau) ───────────────────────────
+-- ── 9.7 RUNS (server/Runs.luau: 10.4 the PLAY circle's lobbies; Config.Runs, shared/RunRules.luau) ───────────────────────────
 -- A run is a sandbox move whose contract has a difficulty: one house, its party the host's (Runs wraps Crew.members and
 -- Crew.ownerOf), its truck the host's van parked at the house's curb (Runs parks it there before Moving.startRun: no
 -- driving). Nothing is unloaded at a plot: at the run's end (the host's FINISH, the party's vote, the clock, GIVE UP,
@@ -3600,6 +3600,9 @@ function Moving.startRun(host: Player, house: string, difficulty: string, round:
 	made.seed = seed :: number
 	made.difficulty = RunRules.clean(difficulty)
 	made.time = if round then round else RunRules.time(if own then own.Time else (base.time or T.Time), made.difficulty)
+	if not round then -- 10.4: the host's upgrade tree's Overtime (10.5 rounds: everybody's clock the same)
+		made.time = math.floor((made.time :: number) * require(Shared.UpgradeRules).effect((PlayerData.get(host) or {} :: any).sandboxUpgrades, "runClock") + 0.5)
+	end
 	made.hordeAt = if T.Sandbox.Horde and not round then T.Sandbox.HordeAt else 0
 	made.round = if round then true else nil
 	local failed = startMove(host, made)
@@ -3643,6 +3646,13 @@ end
 --                                 round); every MoveOwner = old becomes new's: true when it did
 --   Moving.onHandOver(fn)         fn(old, new) after the host left the game and the round went on (Runs: the run's host)
 --   Moving.roundVan               Runs' hook: a player's van at the round's house (respawnAt)
+--   10.6 snatching (server/Runs.luau's tugs; shared/TugRules.luau):
+--   Moving.held(player)           what `player` carries as its carrier on a round: { spot, name, icon, class, alone (no
+--                                 helper, not a two-person piece), value }, nil none
+--   Moving.snatch(from, to, dry?) the piece `from` carries goes into `to`'s hands (welded, their walk; `from`'s hands and
+--                                 grip free): its name, or nil and why (`dry`: only whether it could: `to`'s reach, no
+--                                 wall between them)
+--   Moving.traveling(player)      on a door's trip now (the fade)
 
 -- The move's truck off the session (a round's: the host's van is just theirs): its Load / Take out prompts gone, its
 -- back as it was.
@@ -3796,6 +3806,63 @@ function Moving.handOver(old: Player, new: Player): boolean
 	new:SetAttribute("MoveWith", to)
 	s.dirty = true
 	return true
+end
+
+function Moving.held(player: Player): { [string]: any }?
+	local s = sessionOf(player)
+	if not s or s.ended or not s.contract.round then
+		return nil
+	end
+	local spot, role = Rules.holding(s.move, player.UserId)
+	if not spot or role ~= "carrier" then
+		return nil
+	end
+	local thing = s.move.things[spot]
+	return { spot = spot, name = thing.name, icon = thing.icon, class = thing.class, alone = thing.helper == nil and thing.class ~= "pair", value = thing.value * thing.condition }
+end
+
+function Moving.snatch(from: Player, to: Player, dry: boolean?): (string?, string?)
+	local s = sessionOf(from)
+	if not s or s.ended or not s.contract.round or sessionOf(to) ~= s or from == to then
+		return nil, nil
+	end
+	local spot, role = Rules.holding(s.move, from.UserId)
+	local thing = if spot then s.move.things[spot] else nil
+	local item = if spot then s.items[spot] else nil
+	if not spot or role ~= "carrier" or not thing or not item or not item.model.Parent then
+		return nil, "They let go of it."
+	elseif thing.helper ~= nil or thing.class == "pair" then
+		return nil, "Two carry that one: it can't be snatched."
+	elseif Rules.holding(s.move, to.UserId) then
+		return nil, SB.why("full")
+	end
+	local character, humanoid, root = bodyOf(to)
+	if not character or not humanoid or not root or humanoid.SeatPart then
+		return nil, nil
+	elseif character:GetAttribute("Carrying") ~= nil or character:GetAttribute("Pushing") ~= nil then
+		return nil, SB.why("full")
+	elseif traveling[to] or traveling[from] then
+		return nil, nil
+	elseif Moving.walled(s, root.Position, item) then
+		return nil, "There's a wall between you."
+	end
+	if dry then
+		return thing.name, nil
+	end
+	local hold = Grip.holds[from] -- (the grip goes with the hands: a new one for the snatcher, from scratch)
+	if hold then
+		Grip.close(from, hold)
+		Grip.holds[from] = nil
+	end
+	thing.carrier = to.UserId
+	clearHands(from)
+	carry(s, item)
+	s.dirty = true
+	return thing.name, nil
+end
+
+function Moving.traveling(player: Player): boolean
+	return traveling[player] == true
 end
 
 function Moving.onHandOver(fn: (Player, Player) -> ())
@@ -4396,7 +4463,7 @@ function Moving.start()
 	made.Name = "Moves"
 	made.Parent = workspace
 	folder = made
-	-- the houses (a contract and a site each; no board: the lobby's portals start the runs, server/Runs.luau)
+	-- the houses (a contract and a site each; no board: 10.4 the PLAY circle's lobbies start the runs, server/Parties.luau)
 	for _, h in SandboxMap.Houses do
 		local house = SB.newContract(h)
 		SB.contracts[house.id] = house

@@ -1,12 +1,13 @@
--- 8.9 six houses, 9.4 the countryside (design/countryside/plan.py, plan.json): shared/SandboxMap.luau's Houses (the six
--- places to empty), its Bounds and Roads against design/countryside/plan.json (CountryPlan.luau, tests/run_tests.py
--- writes it from the plan), and their contracts (Config.Moving.Sandbox.Houses) with the economy's numbers
--- (Config.Furniture, shared/HouseLayout.luau):
+-- 8.9 six houses, 9.4 the countryside, 10.8 the floating islands (design/islands/plan.py, plan.json): shared/SandboxMap.luau's
+-- Houses (the six places to empty, each on its island), its Bounds and Roads against design/islands/plan.json
+-- (CountryPlan.luau, tests/run_tests.py writes it from the plan), and their contracts (Config.Moving.Sandbox.Houses) with
+-- the economy's numbers (Config.Furniture, shared/HouseLayout.luau):
 --   * the data: the plan's six (`spots`, in its order: the farmstead first, SandboxMap.House, then the pond cabin, the
 --     lone house, the forest lodge, the old mill, the orchard cottage) with their ids, names, roads, looks, boxes (the
 --     owner's sizes: sx along its front × sz deep), doors, curbs, lots and yaws as the plan has them (a place's door
 --     its look's: shared/VillageLooks.luau's door spot, Config.Village.Front less the door's 0.3 in from its box's
---     front edge); the back door only the farmstead's; each place's walls' box on its box, its lot round it up to its
+--     front edge; 10.8 its door's and its walls' height its island's top, its curb's its yard's asphalt); the back door
+--     only the farmstead's; each place's walls' box on its box, its lot round it up to its
 --     yard, clear of every road, plot, other lot, landmark, field and the stream; the world's Bounds and roads the plan's
 --     (9.7 runs: the roads only the places' front yards, one a place, its curb in it; no lane, no Depot Row, no
 --     turnaround: nobody drives)
@@ -19,7 +20,7 @@
 --     holds fewer pieces than the big house (Config.Furniture's Spots and collectibles, and the plans themselves:
 --     HouseLayout.plan), gets less time, about the same minutes a piece
 --   * the guide's words and places per house: its name ("The Pond Cabin"), at the place by its own lot
---   * the places spread apart (each its own spot, 250 studs and more); 9.7 the lobby's portals a short walk from its
+--   * the places spread apart (each its own spot, 250 studs and more); 10.4 the lobby's PLAY circle a short walk from its
 --     spawn
 -- Run with tests/run_tests.py.
 local Config = require("./Config")
@@ -132,8 +133,9 @@ do
 			bad = `{h.id}: its door or curb`
 		elseif index > 1 and (spot == nil or math.abs(spot.x - d.x) > 1e-3 or math.abs(spot.z - d.z) > 1e-3 or spot.yaw ~= d.yaw) then
 			bad = `{h.id}: its door not its look's ({spot and spot.x}, {spot and spot.z})`
-		elseif d.y ~= SandboxMap.GroundTop or c.y ~= SandboxMap.RoadTop or h.yaw ~= d.yaw or h.yaw ~= p.yaw then
-			bad = `{h.id}: its door's or curb's height, its yaw`
+		elseif SandboxMap.islandOf(h.id) == nil or h.island ~= p.island or d.y ~= (SandboxMap.islandOf(h.id) :: any).top
+			or math.abs(c.y - SandboxMap.roadAt(c.x, c.z)) > EPS or h.yaw ~= d.yaw or h.yaw ~= p.yaw then
+			bad = `{h.id}: its island, its door's or curb's height (its island's top, its yard's asphalt), its yaw`
 		elseif names[h.name] or names[h.id] then
 			bad = `{h.id}: a name twice`
 		elseif SandboxMap.house(h.id) ~= h then
@@ -160,9 +162,11 @@ check("the farmstead: big, on Pražská, its look its own, its back door in its 
 		end
 		return true
 	end)())
-check("…the farmstead's box the owner's Blender house's as before (44 × 14.5 × 34, its lot, door, curb unmoved)", (function(): boolean
+check("…the farmstead's box the owner's Blender house's as before (44 × 14.5 × 34; 10.8 moved to its island: its lot, door, curb round its box as before)", (function(): boolean
 	local f = Houses[1]
-	return f.house.sx == 44 and f.house.sy == 14.5 and f.house.sz == 34 and f.house.z == 540 and f.door.z == 523 and f.curb.z == 492 and f.lot.z0 == 504
+	local front = f.box.z0
+	return f.house.sx == 44 and f.house.sy == 14.5 and f.house.sz == 34 and f.house.z == front + 17 and f.door.z == front and f.curb.z == front - 31 and f.lot.z0 == front - 19
+		and f.lot.z1 == front + 77 and f.lot.x1 - f.lot.x0 == 120 and f.back ~= nil and f.back.z == front + 34 and f.door.x == f.house.x and f.island == "farm"
 end)())
 check("an old save's village house (8.9's Hlavní_n_5, Školní_e_20 …) is no place now: SandboxMap.house says none", SandboxMap.house("Hlavní_n_5") == nil
 	and SandboxMap.house("Školní_e_20") == nil and SandboxMap.house("Smetanova_w_84") == nil)
@@ -171,7 +175,7 @@ do
 	for _, h in Houses do
 		local b, w = h.box, h.house
 		if math.abs(w.x - (b.x0 + b.x1) / 2) > EPS or math.abs(w.z - (b.z0 + b.z1) / 2) > EPS or math.abs(w.sx - (b.x1 - b.x0)) > EPS
-			or math.abs(w.sz - (b.z1 - b.z0)) > EPS or w.y ~= SandboxMap.GroundTop or w.sy < 9 then
+			or math.abs(w.sz - (b.z1 - b.z0)) > EPS or w.y ~= SandboxMap.groundAt(w.x, w.z) or w.sy < 9 then
 			bad = `{h.id}: its walls' box`
 		elseif not (h.lot.x0 <= b.x0 and h.lot.x1 >= b.x1 and h.lot.z0 <= b.z0 and h.lot.z1 >= b.z1) or not inRect(h.lot, h.door.x, h.door.z) then
 			bad = `{h.id}: its lot round it`
@@ -214,7 +218,7 @@ do
 	check("each place's walls on its box (its middle, its size; walls 9 high at least), its lot round it and its door, clear of every road, plot, other lot, landmark, field and the stream",
 		bad == nil, bad)
 end
-check("the world's Bounds the plan's (3 260 × 1 440: 9.7 the lobby east of the countryside)", same(SandboxMap.Bounds, Plan.bounds))
+check("the world's Bounds the plan's (10.8: round every island)", same(SandboxMap.Bounds, Plan.bounds))
 check("9.7: the roads the plan's, each a place's front yard (Pražská the farmstead's)", (function(): boolean
 	if #Roads ~= #Plan.roads or #Roads ~= #Houses then
 		return false
@@ -324,19 +328,20 @@ do
 	end
 	check("every door on its box's face (a place's 1.2 behind it), looking out to its own yard (9.7 the farmstead's too: no turnaround), its curb there", bad == nil, bad)
 end
--- 9.7 runs: nobody drives; the guide's path is straight (in the lobby to a portal, in a zone to the door or the truck)
+-- 9.7 runs: nobody drives; the guide's path is straight (10.4 in the lobby to the PLAY circle, in a zone to the door or the
+-- truck)
 do
 	local out: { number } = {}
 	local bad: string? = nil
 	local spawn = SandboxMap.Lobby.spawn
 	local farthest = 0
-	for _, portal in SandboxMap.Lobby.portals do
-		local px, pz = (portal.pad.x0 + portal.pad.x1) / 2, (portal.pad.z0 + portal.pad.z1) / 2
+	do
+		local px, pz = SandboxMap.Lobby.play.x, SandboxMap.Lobby.play.z
 		local n = SandboxSteps.route(spawn.x, spawn.z, px, pz, out, Config.SandboxGuide.Direct)
 		if n ~= 2 or out[3] ~= px or out[4] ~= pz then
-			bad = `to {portal.house}'s pad: {n} points`
+			bad = `to the PLAY circle: {n} points`
 		end
-		farthest = math.max(farthest, math.sqrt((px - spawn.x) ^ 2 + (pz - spawn.z) ^ 2))
+		farthest = math.sqrt((px - spawn.x) ^ 2 + (pz - spawn.z) ^ 2)
 	end
 	for _, z in SandboxMap.Zones do
 		local h = SandboxMap.house(z.id) :: SandboxMap.House
@@ -345,8 +350,8 @@ do
 			bad = `{z.id}: from its arrival to its curb {n} points`
 		end
 	end
-	check("9.7: the guide's path straight (no road to follow): from the lobby's spawn to every portal's pad, from a zone's arrival to its truck", bad == nil, bad)
-	check(`…every portal a short walk from the spawn (the farthest {math.floor(farthest)} studs: under 15 s on foot)`, farthest < 15 * 16, farthest)
+	check("9.7: the guide's path straight (no road to follow): 10.4 from the lobby's spawn to the PLAY circle, from a zone's arrival to its truck", bad == nil, bad)
+	check(`…10.4 the PLAY circle a short walk from the spawn ({math.floor(farthest)} studs: under 4 s on foot)`, farthest < 4 * Config.Movement.Walk, farthest)
 end
 
 -- ── The contracts and the economy ──────────────────────────────────────────
@@ -440,7 +445,8 @@ do
 	check("the guide names the move's place (SandboxSteps.houseWords: \"The Pond Cabin\"; 9.7 no road to drive along), at the place by its own lot only", bad == nil, bad)
 	check("…no house known (or an old save's village house): the farmstead's words, as before", SandboxSteps.houseWords(nil) == "The Old Farmstead"
 		and SandboxSteps.houseWords("nowhere") == "The Old Farmstead" and SandboxSteps.houseWords("Hlavní_n_5") == "The Old Farmstead"
-		and SandboxSteps.atHouse(0, 523, 0))end
+		and SandboxSteps.atHouse(SandboxMap.House.door.x, SandboxMap.House.door.z, 0))
+end
 
 if failures == 0 then
 	print("ALL CHECKS PASSED")

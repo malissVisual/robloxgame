@@ -445,21 +445,24 @@ TradeUi.onBack = WarehouseUi.openStock
 local collection = M.remotes.Collection
 local MARKET = { day = 20372, hot = { "gramophone" }, cold = { "sofa" }, left = 3600, demand = { gramophone = { n = 1, sold = 2 } } }
 local STOCK = {
-	{ uid = "s1", item = "gramophone", variant = 1, condition = 0.92, name = "Gramophone", got = 1, stand = 12, rarity = "rare", income = 6.4, price = 120, base = 800, sale = 12000, market = "hot" },
-	{ uid = "s2", item = "sofa", variant = 1, condition = 1, name = "Sofa", got = 2, stand = 3, rarity = "uncommon", income = 2.1, price = 80, base = 90 },
+	-- (10.4: a sign is the showroom's: the gramophone and the sofa on its plinths S2 and S1; the radio in the hall)
+	{ uid = "s1", item = "gramophone", variant = 1, condition = 0.92, name = "Gramophone", got = 1, stand = Config.Showroom.Base + 2, rarity = "rare", income = 6.4, price = 120, base = 800, sale = 12000, market = "hot" },
+	{ uid = "s2", item = "sofa", variant = 1, condition = 1, name = "Sofa", got = 2, stand = Config.Showroom.Base + 1, rarity = "uncommon", income = 2.1, price = 80, base = 90 },
 	{ uid = "s3", item = "piano", variant = 1, condition = 1, name = "Upright Piano", got = 3, rarity = "rare", income = 9.6, price = 144, base = 144 },
+	{ uid = "s4", item = "radio", variant = 1, condition = 1, name = "Radio", got = 4, stand = 12, rarity = "common", income = 0.4, price = 6, base = 6 },
 }
 for _, s in SCREENS do
 	screen(s.touch, s.w, s.h)
 	local L = s.label
-	collection.OnClientEvent:Fire({ kind = "state", stock = STOCK, income = 8.5, stands = 12, market = MARKET })
+	collection.OnClientEvent:Fire({ kind = "state", stock = STOCK, income = 8.5, stands = 12, showStands = 2, showBase = Config.Showroom.Base, market = MARKET })
 	M.flush()
 	WarehouseUi.openStock()
 	M.flush()
 	local gui = M.gui:FindFirstChild("WarehouseUi")
 	local onShow, plain, inStock = named(gui, "Tile_s1"), named(gui, "Tile_s2"), named(gui, "Tile_s3")
 	local tag, untagged = named(onShow, "Price"), named(plain, "Price")
-	check(`{L}: the STOCK list's 🏷 on the pieces on show only`, tag ~= nil and untagged ~= nil and named(inStock, "Price") == nil)
+	check(`{L}: the STOCK list's 🏷 on the showroom's pieces only (10.4: none in the hall, none in the stock)`, tag ~= nil and untagged ~= nil and named(inStock, "Price") == nil
+		and named(gui, "Tile_s4") ~= nil and named(named(gui, "Tile_s4"), "Price") == nil)
 	local picture = box(named(onShow, "Picture"))
 	local t = box(tag)
 	check(`{L}: … inside the picture`, t.x0 >= picture.x0 - 0.5 and t.x1 <= picture.x1 + 0.5 and t.y0 >= picture.y0 - 0.5 and t.y1 <= picture.y1 + 0.5, `{show(t)} in {show(picture)}`)
@@ -468,9 +471,9 @@ for _, s in SCREENS do
 		check(`{L}: … clear of {name}`, other == nil or not overlap(t, box(other)), other and show(box(other)))
 	end
 	local gold = require("./CardKit").Color.gold
-	check(`{L}: … with a sign: a gold 🏷, its price line "🏷 For sale $12,000" in gold; without: a grey 🏷, "Sell $80"`, tag:GetAttribute("Sale") == 12000 and tag.Text == "🏷"
+	check(`{L}: … with a sign: a gold 🏷, its price line "🏷 For sale $12,000" in gold; without: a grey 🏷, its showroom price "🏷 $80" and what it would earn in the hall (10.4)`, tag:GetAttribute("Sale") == 12000 and tag.Text == "🏷"
 		and tag.BackgroundColor3 == gold and named(onShow, "SellPrice").Text == "🏷 For sale $12,000" and named(onShow, "SellPrice").TextColor3 == gold
-		and untagged.Text == "🏷" and untagged:GetAttribute("Sale") == nil and untagged.BackgroundColor3 ~= gold and named(plain, "SellPrice").Text == "Sell $80",
+		and untagged.Text == "🏷" and untagged:GetAttribute("Sale") == nil and untagged.BackgroundColor3 ~= gold and named(plain, "PerMinute").Text == "🏷 $80" and string.find(named(plain, "SellPrice").Text, "In the hall ", 1, true) == 1,
 		named(onShow, "SellPrice").Text)
 	check(`{L}: … its words fit (the sign's price uncut)`, #badTexts(onShow) == 0 and #badTexts(plain) == 0, badTexts(onShow)[1])
 	if M.touch then

@@ -12,7 +12,8 @@
 --                                          your clipboard out, orders mode): "orders"; where you stand: in another
 --                                          player's warehouse (SandboxHints.hallAt at its level, workspace.Warehouses'
 --                                          Level<id>) with a piece of theirs on show (a stand's trade prompt on, tagged
---                                          Config.PlayerTrade.PromptTag with its owner's UserId): "visit"
+--                                          Config.PlayerTrade.PromptTag with its owner's UserId): "visit"; 10.4: in
+--                                          a party lobby away from the PLAY circle (client/RunUi.luau's play()): "lobby"
 -- (8.9: visit, price and deal only while trading is on, Config.PlayerTrade.On.)
 -- A hint is one toast (SandboxHintsUi.notify: client/SandboxHud.luau's), in this device's words (client/PadGlyph.luau),
 -- once a session, one at a time, never while something covers the screen: a grip check (client/CarryGripUi.luau active),
@@ -65,6 +66,7 @@ local fillNow = false -- the Collection's last state: FILL BEST would put someth
 local priceNow = false -- 8.9: the Collection's last state: PriceShown on show, no FOR SALE sign yet
 local clipboardOut = false -- 8.9: your clipboard out at the last look
 local visitNow = false -- 8.9: in another player's warehouse with a piece of theirs on show at the last look
+local lobbyAway = false -- 10.4: in a party lobby, away from the PLAY circle, at the last look
 local watching = false -- 8.9: the look's loop runs
 local spots: { SandboxHints.Spot } = {} -- 8.9: the trade prompts on (refilled by a look in a warehouse)
 
@@ -110,6 +112,9 @@ local LOADERS: { [string]: () -> any } = {
 	end,
 	TradeUi = function(): any -- (8.9: the trade's window, 8.7)
 		return require(script.Parent.TradeUi)
+	end,
+	RunUi = function(): any -- (10.4: the PLAY view, the "lobby" hint)
+		return require(script.Parent.RunUi)
 	end,
 }
 local modules: { [string]: any } = {}
@@ -191,6 +196,8 @@ local function still(id: string): boolean
 		return clipboardOut
 	elseif id == "visit" then -- (8.9: out of that warehouse meanwhile)
 		return visitNow
+	elseif id == "lobby" then -- (10.4: out of the lobby, or back in the circle, meanwhile)
+		return lobbyAway
 	end
 	return true
 end
@@ -360,11 +367,20 @@ function SandboxHintsUi.around()
 			offer("visit")
 		end
 	end
+	-- 10.4: in a party lobby, away from the PLAY circle (client/RunUi.luau's PLAY view)
+	local runUi = client("RunUi")
+	local ok, play = pcall(function(): any
+		return if runUi and type(runUi.play) == "function" then runUi.play() else nil
+	end)
+	lobbyAway = ok and type(play) == "table" and type(play.lobby) == "table" and play.circle ~= true
+	if lobbyAway then
+		offer("lobby")
+	end
 end
 
 -- The look's loop: every Hints.Look s until the clipboard's hint and a visit's are both said (then it stops).
 local function done(): boolean
-	return SandboxHints.seen(queue, "orders") and (SandboxHints.seen(queue, "visit") or not SandboxHints.tradeOn())
+	return SandboxHints.seen(queue, "orders") and (SandboxHints.seen(queue, "visit") or not SandboxHints.tradeOn()) and SandboxHints.seen(queue, "lobby")
 end
 
 local function watch()

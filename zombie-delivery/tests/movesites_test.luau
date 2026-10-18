@@ -36,9 +36,9 @@ for _, p in pieces do
 	end
 end
 local text = table.concat(all, " | ")
-check(`the corkboard: {#SandboxMap.Houses} PLACES TO EMPTY, THE COUNTRYSIDE, WALK TO A PORTAL, the header DELIVEROS DISPATCH, "Bring it home to your warehouse." (no place by name)`,
+check(`the corkboard: {#SandboxMap.Houses} PLACES TO EMPTY, THE COUNTRYSIDE, STEP INTO PLAY, the header DELIVEROS DISPATCH, "Bring it home to your warehouse." (no place by name)`,
 	string.find(text, `{#SandboxMap.Houses} PLACES TO EMPTY`, 1, true) ~= nil and string.find(text, "THE COUNTRYSIDE", 1, true) ~= nil
-	and string.find(text, "WALK TO A PORTAL", 1, true) ~= nil and string.find(text, "DELIVEROS DISPATCH", 1, true) ~= nil
+	and string.find(text, "STEP INTO PLAY", 1, true) ~= nil and string.find(text, "DELIVEROS DISPATCH", 1, true) ~= nil
 	and string.find(text, "MOVING CONTRACTS", 1, true) == nil and string.find(text, "THE OLD FARMSTEAD", 1, true) == nil
 	and string.find(text, "Bring it home to your warehouse.", 1, true) ~= nil, text)
 check("…no Marge, no Walt, no Wall, no evacuation", string.find(text, "MARGE", 1, true) == nil and string.find(text, "WALT", 1, true) == nil

@@ -42,6 +42,13 @@
 --     (8.7 review: its prompts' attachment, where PlayerTrade checks the buyer still stands at SEND / BUY). A piece with
 --     a sign shows it on its tag, a third line "🏷 FOR SALE $X" for everybody (the tag a little taller: still under the
 --     roof).
+--   * 10.4, the warehouse in two (Config.Showroom, shared/WarehouseLayout.luau): the SHOWROOM's plinths by the door
+--     (stand numbers Base + 1 …, plates S1 …; the owner's Collection.showStands stand there, a free plot's its level's
+--     own) on their blue carpet with the showroom's sign, and the COLLECTION HALL (the stands of before) with its own;
+--     a showroom piece's tag shows its price ("RARE · 🏷 $450"), a hall piece's its $/min; only a showroom stand has the
+--     trade prompts (Set price, Make an offer, Buy $X) and its empty stand's prompt says "Show for sale"; the STOCK
+--     board counts the hall's stands. The owner's LOOKS (the upgrade tree's Fresh paint, Gold sign: UpgradeRules.looks)
+--     paint the walls (the layout's cladding and the Blender model's sheet) and the owner's sign.
 -- A collection's changes (Collection.onChanged) rebuild only the stands whose piece changed, Config.Warehouse.Rebuild
 -- apart at most; an owner who leaves takes their pieces with them (the plot is FOR RENT again). Nothing runs per frame.
 -- The van's unloading is the moves' (the plot's unload circle); here only its bay is painted.
@@ -114,16 +121,19 @@ type PlotState = {
 	parent: Instance, -- 8.3: workspace.Warehouses (a rebuilt Model goes there)
 	model: Model,
 	pieces: Folder,
-	stands: { Stand },
+	stands: { [number]: Stand }, -- (10.4: by stand number: the hall's 1 …, the showroom's Base + 1 …)
 	desk: BasePart, -- 8.1: the UPGRADES desk (its prompt's anchor)
 	deskPrompt: ProximityPrompt?,
 	owner: Player?,
 	ownerLabels: { TextLabel },
 	stockLabels: { TextLabel },
 	pending: boolean,
+	looks: string?, -- 10.4: what its walls and sign wear now (paint's key)
+	painted: { [BasePart]: Color3 }, -- 10.4: their colours as built
 }
 
 local states: { [number]: PlotState } = {}
+local paint: (state: PlotState) -> () -- 10.4: the owner's looks (below)
 local busy: { [Player]: number } = {} -- a player's next prompt use (os.clock): a double press does one thing
 local notice = Net.get("Notice")
 local started = false
@@ -348,6 +358,13 @@ local function freeLevel(): number
 	return math.clamp(math.floor(want), 1, WarehouseLayout.Levels)
 end
 
+-- 10.4: the showroom stands a level comes with (Config.Showroom.Levels' Stands: a free plot's; an owner's are
+-- Collection.showStands).
+local function freeShow(level: number): number
+	local def = Config.Showroom.Levels[level]
+	return if def then math.max(0, def.Stands) else 0
+end
+
 -- 8.3: the level a plot's warehouse is built at: its owner's (their ZDC Warehouse upgrade; none before their save
 -- loads: the garage) or a free plot's.
 local function levelFor(owner: Player?): number
@@ -395,9 +412,17 @@ local function buildModel(state: PlotState, level: number)
 	local pieces = Instance.new("Folder")
 	pieces.Name = "Shown"
 	pieces.Parent = model
-	local stands: { Stand } = {}
+	local stands: { [number]: Stand } = {}
 	local open = WarehouseLayout.count(level)
+	local openShow = WarehouseLayout.ShowBase + freeShow(level) -- 10.4: a free plot's showroom (refresh: the owner's)
+	local numbers: { number } = {}
 	for i = 1, WarehouseLayout.capacity(level) do
+		table.insert(numbers, i)
+	end
+	for k = 1, WarehouseLayout.showCapacity(level) do -- 10.4: the showroom's plinths
+		table.insert(numbers, WarehouseLayout.ShowBase + k)
+	end
+	for _, i in numbers do
 		local podium = podiums[i]
 		local spot = WarehouseLayout.stand(site, i) :: WarehouseLayout.Stand
 		-- the prompts at the podium's front edge (the aisle its piece looks at), at hand height
@@ -407,7 +432,7 @@ local function buildModel(state: PlotState, level: number)
 		anchor.Parent = podium
 		local tag, tagLabels, saleLabel = makeTag(podium)
 		local stand: Stand = { index = i, podium = podium, parts = standParts[i] or { podium }, solid = solid, open = true, anchor = anchor, prompts = nil, tag = tag, tagLabels = tagLabels, saleLabel = saleLabel, shown = nil }
-		setOpen(stand, i <= open) -- (an upgrade stand: its spot only, until an owner has it)
+		setOpen(stand, if WarehouseLayout.isShow(i) then i <= openShow else i <= open) -- (an upgrade stand: its spot only, until an owner has it)
 		stands[i] = stand
 	end
 	-- 8.1: the UPGRADES desk's prompt at its front edge (the hall it faces: WarehouseLayout.terminal's yaw), at hand height
@@ -423,6 +448,7 @@ local function buildModel(state: PlotState, level: number)
 	model.Parent = state.parent
 	state.parent:SetAttribute(`Level{plot.id}`, level) -- 8.3: the clients' copy of the level
 	state.site, state.level, state.model, state.pieces, state.stands = site, level, model, pieces, stands
+	state.looks, state.painted = nil, {} -- (10.4: a new building wears its looks anew)
 	state.desk, state.ownerLabels, state.stockLabels = terminal, ownerLabels, stockLabels
 end
 
@@ -441,6 +467,8 @@ local function buildPlot(parent: Instance, plot: SandboxMap.Plot, level: number)
 		ownerLabels = {},
 		stockLabels = {},
 		pending = false,
+		looks = nil,
+		painted = {},
 	}
 	buildModel(state, level)
 	return state
@@ -454,12 +482,20 @@ local function rarityOf(entry: Collection.Entry): string?
 	return CollectionRules.pieceRarity(entry :: any) -- (9.x loot: its own roll)
 end
 
-local function ratesOf(onStand: { [number]: Collection.Entry }, boost: number): { [number]: number }
+local function ratesOf(onStand: { [number]: Collection.Entry }, boost: CollectionRules.Boost): { [number]: number }
 	local rates: { [number]: number } = {}
 	for index, entry in onStand do
 		rates[index] = CollectionRules.income(entry :: any, boost) * Collection.marketIncome(entry.item) -- (8.3 hook: a hot kind's)
 	end
 	return rates
+end
+
+-- 10.4: what a showroom piece sells for now (its owner's market × the showroom's factor: the tag's price).
+local function priceOf(owner: Player?, entry: Collection.Entry): number
+	if not owner then
+		return CollectionRules.sell(entry :: any)
+	end
+	return CollectionRules.sell(entry :: any, Collection.market(owner), Collection.showFactor(owner))
 end
 
 -- ── The stands ───────────────────────────────────────────────────────────────
@@ -496,21 +532,25 @@ local function refresh(state: PlotState)
 	local owner = state.owner
 	local entries: { Collection.Entry } = if owner then Collection.stock(owner) else {}
 	local onStand: { [number]: Collection.Entry } = {}
-	local stock, shown = 0, 0
+	local stock = 0
+	local hallOn: { [number]: Collection.Entry } = {} -- (10.4: the hall's pieces: the ones that earn)
 	for _, entry in entries do
 		local at = entry.stand
 		if at == nil then
 			stock += 1
 		elseif state.stands[at] and onStand[at] == nil then
 			onStand[at] = entry
-			shown += 1
+			if not WarehouseLayout.isShow(at) then
+				hallOn[at] = entry
+			end
 		end
 	end
 	local income = if owner then Collection.incomePerMinute(owner) else 0
-	local rates = ratesOf(onStand, if owner then Collection.boost(owner) else 1)
+	local rates = ratesOf(hallOn, if owner then Collection.bonus(owner) else 1)
 	local count = if owner then Collection.stands(owner) else WarehouseLayout.count(state.level) -- (8.3: a free plot's level)
+	local showCount = if owner then Collection.showStands(owner) else freeShow(state.level) -- (10.4: the showroom's)
 	for index, stand in state.stands do
-		setOpen(stand, index <= count)
+		setOpen(stand, if WarehouseLayout.isShow(index) then index <= WarehouseLayout.ShowBase + showCount else index <= count)
 		local entry = if stand.open then onStand[index] else nil
 		local current = stand.shown
 		if current and (entry == nil or current.uid ~= entry.uid or current.item ~= entry.item or current.variant ~= entry.variant) then
@@ -527,7 +567,11 @@ local function refresh(state: PlotState)
 		end
 		local now = stand.shown
 		if entry and now then
-			setLines(stand.tagLabels, WarehouseLayout.tagLines(entry.name, rarityOf(entry), rates[index] or 0))
+			if WarehouseLayout.isShow(index) then -- (10.4: a showroom piece: its price, it earns nothing a minute)
+				setLines(stand.tagLabels, WarehouseLayout.showTagLines(entry.name, rarityOf(entry), priceOf(owner, entry)))
+			else
+				setLines(stand.tagLabels, WarehouseLayout.tagLines(entry.name, rarityOf(entry), rates[index] or 0))
+			end
 			local sale = if TRADE and TRADE.On then entry.sale else nil -- 8.7: its FOR SALE sign
 			setSale(stand, sale)
 			-- (over the piece: from the podium's middle up past its top; 8.3: its top under the hall's roof where its half
@@ -550,7 +594,8 @@ local function refresh(state: PlotState)
 			prompts.display.Enabled = stand.open and entry == nil
 			prompts.takeDown.Enabled = entry ~= nil
 			prompts.sell.Enabled = entry ~= nil
-			prompts.display.ObjectText = `Stand {index}`
+			prompts.display.ObjectText = if WarehouseLayout.isShow(index) then `Showroom {index - WarehouseLayout.ShowBase}` else `Stand {index}`
+			prompts.display.ActionText = if WarehouseLayout.isShow(index) then "Show for sale" else "Display" -- (10.4)
 			prompts.takeDown.ObjectText = if entry then entry.name else ""
 			prompts.sell.ObjectText = if entry then entry.name else ""
 			-- 8.7: Set price (the owner), Make an offer and Buy $X (everybody else)
@@ -573,7 +618,53 @@ local function refresh(state: PlotState)
 			end
 		end
 	end
-	setLines(state.stockLabels, WarehouseLayout.stockLines(stock, income, shown, math.min(count, #state.stands)))
+	local hallShown = 0
+	for _ in hallOn do
+		hallShown += 1
+	end
+	-- (the hall's stands on the board, as before 10.4: the showroom's are counted by its own plinths)
+	setLines(state.stockLabels, WarehouseLayout.stockLines(stock, income, hallShown, count))
+	paint(state)
+end
+
+-- 10.4: the owner's LOOKS (the upgrade tree's, UpgradeRules.looks): the walls in their paint (the layout's cladding and,
+-- once dressed, the Blender model's sheet: "_metal" pieces), the owner's sign in its colour with dark letters; none (or a
+-- free plot): as built. Only when what it wears changes (state.looks: its key), never each refresh.
+local WALL_PARTS: { [string]: boolean } = {
+	WallBack = true, WallWest = true, WallEast = true, WallSlopeWest = true, WallSlopeEast = true, WallFrontWest = true,
+	WallFrontEast = true, Header = true, GableFrontWest = true, GableFrontEast = true, GableBackWest = true, GableBackEast = true,
+}
+local SIGN_INK = Color3.fromRGB(26, 27, 29)
+
+paint = function(state: PlotState)
+	local owner = state.owner
+	local looks: { wall: { number }?, sign: { number }? } = if owner then UpgradeRules.looks(Upgrades.levels(owner)) else {}
+	local wall, sign = looks.wall, looks.sign
+	local key = `{if wall then table.concat(wall, ",") else "-"}|{if sign then table.concat(sign, ",") else "-"}`
+	if state.looks == key then
+		return
+	end
+	state.looks = key
+	local painted = state.painted
+	for _, part in state.model:GetDescendants() do
+		if part:IsA("BasePart") and (WALL_PARTS[part.Name] or string.match(part.Name, "_metal$") ~= nil) then
+			local was = painted[part] or part.Color
+			painted[part] = was
+			part.Color = if wall then rgb(wall) else was
+		end
+	end
+	local board = state.model:FindFirstChild("OwnerSign")
+	if board and board:IsA("BasePart") then
+		local was = painted[board] or board.Color
+		painted[board] = was
+		board.Color = if sign then rgb(sign) else was
+		setLines(state.ownerLabels, WarehouseLayout.ownerLines(if owner then owner.DisplayName else nil, state.plot.id))
+		if sign then
+			for _, label in state.ownerLabels do
+				label.TextColor3 = SIGN_INK
+			end
+		end
+	end
 end
 
 -- A refresh soon (the changes of one collection this close together: one).
@@ -753,7 +844,7 @@ local function remakePrompts(state: PlotState, owner: Player?)
 			made.sell.Triggered:Connect(function(by: Player)
 				use(state, stand, by, "sell")
 			end)
-			if TRADE and TRADE.On then -- 8.7: trading between players
+			if TRADE and TRADE.On and WarehouseLayout.isShow(stand.index) then -- 8.7: trading between players (10.4: the showroom's)
 				local price = prompt(stand, "SetPrice", "Set price", Enum.KeyCode.V, Enum.KeyCode.ButtonR1, 0, owner)
 				local offer = tradePrompt(stand, "MakeOffer", "Make an offer", Enum.KeyCode.E, Enum.KeyCode.ButtonX, owner)
 				local buy = tradePrompt(stand, "Buy", "Buy", Enum.KeyCode.F, Enum.KeyCode.ButtonY, owner)
@@ -778,6 +869,7 @@ local function dressOwner(state: PlotState)
 	local owner = state.owner
 	setLines(state.ownerLabels, WarehouseLayout.ownerLines(if owner then owner.DisplayName else nil, state.plot.id))
 	remakePrompts(state, owner)
+	state.looks = nil -- (10.4: the new owner's looks, the sign's letters with them)
 	refresh(state)
 end
 

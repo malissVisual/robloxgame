@@ -1,17 +1,18 @@
 # Deliveros
 
-**Deliveros** is a Roblox moving game. You start in a small **lobby** with your own **warehouse**. Every few minutes a
-**round** starts for the whole server: everybody rides out to the same house in the countryside, each with their own
-van, and **empties it against the clock**: what you carry out and load into YOUR van is yours, past locked rooms and
-traps. Everything you bring home is **loot**: each piece has a rarity, an outline in its colour and its stars. At home
-you put the best pieces **on show**, where they earn money every minute you play, or sell them, trade them with other
-players, fill the **collection book**, grow the warehouse from a garage to a logistics centre and build up a **crew**
-of helpers.
+**Deliveros** is a Roblox moving game on **floating islands** in the sky. You start on the lobby's island with your
+own **warehouse**. Step into the **PLAY** circle: a **QUICK ROUND** for everybody in its queue (each loads into their own
+van; what you carry out is yours, and somebody may snatch it out of your hands) or a **PRIVATE LOBBY** with your party
+(a co-op run with Danny and the crew at a chosen difficulty). Either way you ride over to a house on its own island and
+**empty it against the clock**, past locked rooms and traps. Everything you bring home is **loot**: each piece has a
+rarity, an outline in its colour and its stars. At home you put the best pieces **on show** in the collection hall
+(they earn money every minute you play) or in the showroom (for sale), sell them, trade them with other players, fill
+the **collection book**, grow the warehouse along the **upgrade tree** and build up a **crew** of helpers.
 
-> **10.6: only the sandbox.** The old city game (Zombie Delivery 1.0 – 7.x: deliveries, missions, the city map, the
+> **10.9: only the sandbox.** The old city game (Zombie Delivery 1.0 – 7.x: deliveries, missions, the city map, the
 > phone, the guns, the bikes, the traffic, the day and night) is gone. The owner (17. 10. 2026): "remove everything
 > that is not active now, only the sandbox; that will be the game". Its code, tests, tools, art and designs are in
-> git's history up to 10.6 (main's Deliveros 10.6). What was the 8.0 "sandbox" is the whole game now; the code still
+> git's history up to 10.8 (main's Deliveros 10.8). What was the 8.0 "sandbox" is the whole game now; the code still
 > calls many of its parts Sandbox… (`SandboxBoot`, `SandboxMap`, `Config.Sandbox`).
 
 Everything is built in code (the world, the houses, the truck, the people, the interface), so the game needs no assets
@@ -143,6 +144,36 @@ portals' runs** (`Config.Rounds`; `server/Runs.luau`'s block "10.5 ROUNDS", `sha
   `Runs.admin(…, "round")` starts the countdown's round now.
 - **No zombies** at any difficulty, no bat, no boss (`Config.Runs.Danger`; their code stays switched off). The locks,
   the vault and the floor's hazards stay.
+
+## Snatching, the PLAY circle, the warehouse in two, the upgrade tree, the islands (10.6 – 10.8)
+
+- **Snatching** (10.6; `Config.Rounds.Tug`, `shared/TugRules.luau`, `server/Runs.luau`'s block "10.6 snatching",
+  `Moving.snatch`, `client/TugUi.luau`): somebody carrying a piece alone in a round wears a **Snatch** prompt (only the
+  others in the round see it). It is off for 3 s after the pick-up, near their own van's back (12 studs), near the
+  house's door (8) and for 2 s after a tug. With empty hands you start a **tug of war**: both stand still, every press
+  pulls (E, Space, a click, A or X, the PULL button on a phone; 10 a second count at most). The carrier is favoured (the
+  mark starts on their side, their pulls count 1.35×, a tie keeps it). After 3 s at most the winner keeps or takes the
+  piece (protected 3 s), the loser is stunned 1.5 s, and the round's feed tells everybody. A snatcher tries again after
+  4 s; a piece carried in two can't be snatched.
+- **One PLAY circle** (10.7; `client/PlayUi.luau`, `server/Parties.luau`, `shared/PartyRules.luau`, `Config.Runs.Play`):
+  in the lobby's middle, in place of the six portals. Its panel offers **QUICK ROUND** (⚡ JOIN THE QUEUE: the rounds
+  above run while somebody is queued; you stay queued after a round, `Config.Rounds.Stay`) and **PRIVATE LOBBY** (CREATE
+  A LOBBY: a house, a difficulty you have opened, public or friends only; or JOIN one; everybody READY, the host START:
+  5 s, then the run). You are in the queue or in a lobby, never both; `RunRules.houseBusy` keeps a round and a lobby
+  out of each other's house. `Config.Rounds.On = false` hides QUICK ROUND.
+- **The warehouse in two** (10.7; `Config.Showroom`, `CollectionRules`, `WarehouseLayout`, `Collection.place`): every
+  level has a **SHOWROOM** by the door (its plinths S1, S2 …: what stands there is for sale to visitors, VIP buyers and
+  players, × 1.2, but earns nothing) and behind it the **COLLECTION HALL** (earns every minute, nothing for sale). Old
+  saves keep their pieces on show in the hall (`showroomKept`).
+- **The upgrade tree** (10.7; `client/UpgradeUi.luau`, `shared/UpgradeRules.luau`, `Config.SandboxUpgrades`): the
+  warehouse's five tiers as its trunk and branches for LOOKS, the HALL, the SHOWROOM, RUNS and the CREW; each node needs
+  its parents and a tier; drag, zoom, tap a node for its details and BUY. Old saves keep their levels
+  (`upgradeTreeKept`; `rewards`' "up:<id>:<rank>" keys for an older server).
+- **The floating islands** (10.8; `design/islands/plan.py` → `plan.json`, `tools/islands/sandboxmap.py` writes
+  `shared/SandboxMap.luau`'s ISLANDS section, `shared/IslandLooks.luau`, `Config.Islands`): the lobby is the biggest
+  island and each of the six places to empty stands on its own smaller island round it. Travel is a fade with a card
+  ("ON THE WAY TO …", `client/RideUi.luau`). Whoever falls off an island lands back on top where they last stood
+  (`server/IslandFall.luau`, `Config.Islands.Fall`; `workspace.FallenPartsDestroyHeight` -1000).
 
 ## The runs (10.0)
 
@@ -486,7 +517,7 @@ python3 tools/check-requires.py
 ## History
 
 - **1.0 – 7.x, Zombie Delivery:** a delivery game in a zombie city (jobs, missions, the phone, the guns, cars and bikes,
-  traffic, the day and night, real estate, 7.x's moving rework). Gone in 10.6; git's history up to 10.5 has it all.
+  traffic, the day and night, real estate, 7.x's moving rework). Gone in 10.9; git's history up to 10.8 has it all.
 - **8.0, the sandbox:** a small test world in place of the city (an alpine meadow with one road, one house to empty,
   four plots with a warehouse each, the walk-in Sprinter you drove home), then the collection, the book, the tasks, the
   warehouse's levels, the market, the visitors, the PAINT shop, trading (8.1 – 8.7).
@@ -494,4 +525,6 @@ python3 tools/check-requires.py
 - **10.0, the lobby and the runs:** no more driving, loot with rarities; 10.1 the intro, save slots and the character
   creator; 10.2 the danger, the map and the crew; 10.3 a quieter guide; 10.4 the ride.
 - **10.5, rounds:** one round for the whole server, everybody loading into their own van; no zombies.
-- **10.6:** only the sandbox is the game.
+- **10.6 – 10.8:** snatching in the rounds; one PLAY circle with QUICK ROUND and PRIVATE LOBBY, the warehouse in two,
+  the upgrade tree; the floating islands.
+- **10.9:** only the sandbox is the game.
