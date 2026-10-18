@@ -188,7 +188,9 @@ do
 	check("what a run's map shows: the plan and the yard's strip under it, as wide as the plan", box.x0 == plan.box.x0 and box.x1 == plan.box.x1 and box.z1 == plan.box.z1 and box.z0 == yard.strip.z0
 		and yard.strip.x0 == plan.box.x0 and yard.strip.x1 == plan.box.x1)
 	local lobby = Rules.lobbyBox()
-	check("the lobby's map: its bounds", lobby.x0 == SandboxMap.Lobby.bounds.x0 and lobby.z1 == SandboxMap.Lobby.bounds.z1)
+	local island = SandboxMap.Islands[1].rect
+	check("the lobby's map: its island (10.8: its bounds and the rim of grass round them)", lobby.x0 == island.x0 and lobby.z1 == island.z1 and lobby.x0 < SandboxMap.Lobby.bounds.x0
+		and lobby.x1 > SandboxMap.Lobby.bounds.x1 and lobby.z0 < SandboxMap.Lobby.bounds.z0 and lobby.z1 > SandboxMap.Lobby.bounds.z1)
 end
 
 -- ── Drawing ──────────────────────────────────────────────────────────────────

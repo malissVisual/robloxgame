@@ -32,10 +32,14 @@
 --                   at its back (-Z: the D5's embankment); kept on every client (chunk "far")
 --     "halt"        the lone halt: the platform and its edge, a ramp up, a shelter with its bench, the MEADOW HALT sign,
 --                   a lamp
+--     "spring"      10.8 the mill's spring: a round pool on its grassy bank, stones round it but on its front (+Z: where
+--                   its stream leaves), reeds
+--     "waterfall"   10.8 a stream off its island's edge: the edge across its middle (its +Z out over the sky), the water
+--                   going over it, the fall down the island's side (Config.Country.Waterfall: Drop studs down, Wide), a
+--                   thinner strand beside it, the spray at its foot; the one landmark that hangs under the ground
 --   The lines (SandboxMap.TreeLines' kinds that are not trees, CountryLooks.line): "hedge" (a low hedge along each
---   segment), "fence" (a post-and-rail fence: its posts Lines.Post apart at most, two rails), 9.7 "screen" (a run
---   zone's screen hedge on its edge, Config.Runs.Zone.Screen: tall, dense and solid, one part a segment, its corners
---   closed: out of sight of the other zones, nobody through it)
+--   segment: 10.8 every map island's rim hedge on its walls), "fence" (a post-and-rail fence: its posts Lines.Post apart
+--   at most, two rails); 9.7's "screen" (a run zone's tall screen hedge) went with the run zones in 10.8
 --   The stream (SandboxMap.Streams, CountryLooks.stream): its bed (Bank wider each side) and its water along each
 --   segment, a hair higher every other one (no two tops on one plane where they meet)
 --   The far view (CountryLooks.farRails): the railway going on past the Bounds at the ends it meets them
@@ -59,8 +63,8 @@ type Frame = VillageLooks.Frame
 local C = Config.Country
 local P = C.Palette
 
-CountryLooks.Landmarks = { "barn", "tractor", "bales", "paddock", "muckheap", "fishpond", "garden", "woodyard", "weir", "footbridge", "apiary", "railway", "halt" }
-CountryLooks.Lines = { "hedge", "fence", "screen" }
+CountryLooks.Landmarks = { "barn", "tractor", "bales", "paddock", "muckheap", "fishpond", "garden", "woodyard", "weir", "footbridge", "apiary", "railway", "halt", "spring", "waterfall" }
+CountryLooks.Lines = { "hedge", "fence" }
 
 -- A roof's numbers (as VillageLooks' houses): its overhang over the walls and the gables, its slabs' thickness.
 local EAVE, VERGE, SLAB = 0.9, 0.7, 0.45
@@ -420,6 +424,39 @@ local function apiary(k: Kit, f: Frame, roll: () -> number)
 	end
 end
 
+-- ── 10.8 The spring and the waterfall ───────────────────────────────────────
+
+-- "spring": its grassy bank and the round pool in it (each its own height: no two tops on one plane), Spring.Stones
+-- stones round its rim but on its front (+Z: its stream leaves there), two clumps of reeds (9 parts).
+local function spring(k: Kit, f: Frame, roll: () -> number)
+	local S = C.Spring
+	local r = math.min(f.w, f.d) / 2 - 1
+	disc(k, "SpringBank", 0, 0, r, 0.2, 0.16, P.Bank, "Grass")
+	disc(k, "SpringPool", 0, 0, r - S.Bank, 0.36, 0.24, P.Water, "Glass")
+	for n = 1, S.Stones do
+		-- (round the rim from its left to its right the long way: never over the stream at +Z, angle 90°)
+		local a = math.rad(90 + 40 + (n - 0.5) / S.Stones * 280 + (roll() - 0.5) * 12)
+		local size = 1.6 + roll() * 1.6
+		put(k, "SpringStone", { size * 1.3, size * 0.8, size }, { math.cos(a) * (r - 1), size * 0.4, math.sin(a) * (r - 1) }, P.Stone, "Slate", { shape = "Ellipsoid" })
+	end
+	for _, side in { -1, 1 } do
+		put(k, "Reeds", { 3.6, 6, 3.6 }, { side * (r - 3) * 0.7, 3, -(r - 3) * 0.7 }, pick(roll, P.Reeds), "LeafyGrass", { shape = "Ellipsoid" })
+	end
+end
+
+-- "waterfall": the island's edge across its middle (z 0), +Z out over the sky: the water going over the edge, its foam on
+-- the lip, the fall down the island's side (Waterfall.Drop down, Wide), a thinner strand beside it, the spray at its foot
+-- (5 parts; decoration, see-through water).
+local function waterfall(k: Kit, f: Frame, roll: () -> number)
+	local F = C.Waterfall
+	local water = { math.min(255, P.Water[1] + 40), math.min(255, P.Water[2] + 50), math.min(255, P.Water[3] + 50) }
+	put(k, "FallLip", { F.Wide, 0.12, f.d / 2 + 1 }, { 0, C.Streams.Water + 0.02, -(f.d / 2 + 1) / 2 + 1 }, P.Water, "Glass")
+	put(k, "FallFoam", { F.Wide + 1, 0.3, 1.4 }, { 0, C.Streams.Water + 0.1, 0.4 }, P.Foam, "SmoothPlastic", { alpha = 0.2 })
+	put(k, "Waterfall", { F.Wide, F.Drop, 0.4 }, { 0, -F.Drop / 2 + 0.2, 1.1 }, water, "Glass", { alpha = 0.25 })
+	put(k, "FallStrand", { F.Wide * 0.35, F.Drop * 0.7, 0.3 }, { F.Wide * 0.55 * (if roll() < 0.5 then -1 else 1), -F.Drop * 0.35, 1.6 }, water, "Glass", { alpha = 0.4 })
+	put(k, "FallSpray", { F.Mist, F.Mist * 0.6, F.Mist }, { 0, -F.Drop + 1, 2.5 }, P.Foam, "SmoothPlastic", { shape = "Ellipsoid", alpha = 0.55 })
+end
+
 -- ── The railway ────────────────────────────────────────────────────────────
 
 -- "railway": the ballast, the sleepers and the two rails along Z, the underpass's portal at its back (-Z) (8 parts).
@@ -468,6 +505,8 @@ local KINDS: { [string]: (Kit, Frame, () -> number) -> () } = {
 	apiary = apiary,
 	railway = railway,
 	halt = halt,
+	spring = spring,
+	waterfall = waterfall,
 }
 
 function CountryLooks.landmark(kind: string, box: Box, yaw: number, seed: number): { Piece }
@@ -505,16 +544,6 @@ function CountryLooks.line(kind: string, points: { { x: number, z: number } }, s
 			local k: Kit = { out = out, chunk = VillageLooks.chunkOf((a.x + b.x) / 2, (a.z + b.z) / 2) }
 			local tall = H.Height + (i % 2) * 0.15
 			put(k, "Hedge", { length + (if #points > 2 then H.Width else 0), tall, H.Width }, { (a.x + b.x) / 2, tall / 2, (a.z + b.z) / 2 }, P.Hedge, "LeafyGrass", { turn = heading(dx, dz) })
-		end
-	elseif kind == "screen" then -- 9.7: a run zone's screen hedge (Config.Runs.Zone.Screen)
-		local Sc = Config.Runs.Zone.Screen
-		for i = 1, #points - 1 do
-			local a, b = points[i], points[i + 1]
-			local dx, dz = b.x - a.x, b.z - a.z
-			local length = math.sqrt(dx * dx + dz * dz)
-			local k: Kit = { out = out, chunk = VillageLooks.chunkOf((a.x + b.x) / 2, (a.z + b.z) / 2) }
-			put(k, "ScreenHedge", { length + Sc.Width, Sc.Height, Sc.Width }, { (a.x + b.x) / 2, Sc.Height / 2, (a.z + b.z) / 2 }, Sc.Color, "LeafyGrass",
-				{ turn = heading(dx, dz), solid = true })
 		end
 	elseif kind == "fence" then
 		local seen: { [string]: boolean } = {}

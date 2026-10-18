@@ -992,7 +992,7 @@ do
 		return client(remote, kind, a, b, c, ...)
 	end
 	local fadeAt = #E.sent
-	local wayIn = { from = V3(House.door.x, 3, House.door.z) + H.yawLook(House.door.yaw) * 14, to = V3(House.door.x, 3, House.door.z) - H.yawLook(House.door.yaw) * (D.Hall.Depth - 1) }
+	local wayIn = { from = V3(House.door.x, House.door.y + 3, House.door.z) + H.yawLook(House.door.yaw) * 14, to = V3(House.door.x, House.door.y + 3, House.door.z) - H.yawLook(House.door.yaw) * (D.Hall.Depth - 1) }
 	local solidIn = H.solidOn(wayIn.from, wayIn.to, 1)
 	check("…walked up to the front door and on through it without a stop (8.5): inside, no E", H.enterHouse(ann), E.rootOf(ann).Position)
 	E.clients[ann] = client
@@ -1321,7 +1321,7 @@ do
 	local homeAt = #E.sent
 	H.backHome()
 	local back = E.lastKind(ann, "Runs", "ride", homeAt)
-	check("10.4 the ride back: to the depot (Config.Runs.Ride.Home), no difficulty, Config.Runs.Ride.Back s", back ~= nil and back.back == true
+	check("10.4 the ride back: to the lobby (Config.Runs.Ride.Home), no difficulty, Config.Runs.Ride.Back s", back ~= nil and back.back == true
 		and back.to == Config.Runs.Ride.Home and back.difficulty == nil and back.seconds == Config.Runs.Ride.Back, back and back.to)
 end
 

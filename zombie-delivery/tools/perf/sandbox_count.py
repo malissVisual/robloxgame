@@ -23,7 +23,9 @@ big move: its inside is counted for every player at once too (4 moves running: a
 8.9: the map is server/VillageWorld.luau's; 9.4 the countryside (design/countryside/plan.py): world/Village (the
 places' surroundings, the trees of the tree lines, the orchard and the forest, the hedges, fences and the stream; the
 five other places to empty among them, rich, with their walk-in doors' leaves, solid pieces and dark halls:
-server/SandboxWorld.luau's villageHouse), world/Motorway, world/Railway, world/Far; then the
+server/SandboxWorld.luau's villageHouse), world/Motorway, world/Railway, world/Far; 10.8 the floating islands
+(design/islands/plan.py): no motorway, railway or far view any more, world/Islands (each island's rock under its grass,
+the floating rocks, the clouds: shared/IslandLooks.luau), world/Ground (the islands' grass); then the
 map with 8.8's Auction House (built once Config.Auction.On) against SandboxScenery.Budget: over it, the run fails.
 
     python3 tools/perf/sandbox_count.py <path to the luau binary> [zombie-delivery dir]

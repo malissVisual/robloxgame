@@ -951,8 +951,8 @@ local function onStream(x: number, z: number): boolean
 end
 
 -- A spot in the run's yard for a zombie: in its zone (Edge studs in), off the house, its landmarks and the stream, on
--- the ground, YardAway from everybody and the party's arrival, Truck studs off the truck; `door` with `far`: that far
--- from the door at least.
+-- the ground (10.8 its island's top: SandboxMap.groundAt), YardAway from everybody and the party's arrival, Truck studs
+-- off the truck; `door` with `far`: that far from the door at least.
 local function yardSpot(st: State, door: Vector3?, far: number?): Vector3?
 	local id = st.s.contract.id
 	local zone = SandboxMap.zone(id)
@@ -961,13 +961,14 @@ local function yardSpot(st: State, door: Vector3?, far: number?): Vector3?
 		return nil
 	end
 	local r = zone.rect
-	local arrive = Vector3.new(zone.arrive.x, SandboxMap.GroundTop, zone.arrive.z)
+	local top = SandboxMap.groundAt(zone.arrive.x, zone.arrive.z)
+	local arrive = Vector3.new(zone.arrive.x, top, zone.arrive.z)
 	local truck = st.s.truck
 	local truckAt: Vector3? = if truck and truck.chassis and truck.chassis.Parent then truck.chassis.Position else nil
 	for _ = 1, Z.Tries do
 		local x = between(st, r.x0 + Z.Edge, math.max(r.x0 + Z.Edge, r.x1 - Z.Edge))
 		local z = between(st, r.z0 + Z.Edge, math.max(r.z0 + Z.Edge, r.z1 - Z.Edge))
-		local at = Vector3.new(x, SandboxMap.GroundTop, z)
+		local at = Vector3.new(x, top, z)
 		local box = house and house.box
 		if box and x > box.x0 - 4 and x < box.x1 + 4 and z > box.z0 - 4 and z < box.z1 + 4 then
 			continue
@@ -991,7 +992,7 @@ local function yardSpot(st: State, door: Vector3?, far: number?): Vector3?
 		local ok, hit = pcall(function(): RaycastResult?
 			return workspace:Raycast(at + Vector3.new(0, 40, 0), Vector3.new(0, -80, 0))
 		end)
-		if ok and hit and (hit.Material == Enum.Material.Water or hit.Position.Y > SandboxMap.GroundTop + 3) then
+		if ok and hit and (hit.Material == Enum.Material.Water or hit.Position.Y > top + 3) then
 			continue
 		end
 		return at

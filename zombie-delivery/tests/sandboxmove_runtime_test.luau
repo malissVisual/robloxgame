@@ -183,7 +183,7 @@ end
 local frontDoor = M.Instance.new("Part")
 frontDoor.Name = "FrontDoor"
 frontDoor.Size = V3(4, 7, 0.4)
-frontDoor.CFrame = CF(House.door.x, 3.5, House.door.z + 0.5)
+frontDoor.CFrame = CF(House.door.x, House.door.y + 3.5, House.door.z + 0.5) -- (10.8 on its island: over its door's height)
 frontDoor:SetAttribute("SandboxDoor", true)
 frontDoor:SetAttribute("DoorLeaf", 1) -- (8.3: a leaf swinging into the house, as SandboxWorld's chalet door's)
 frontDoor:SetAttribute("DoorSwing", 1)
@@ -199,7 +199,7 @@ for index, h in SandboxMap.Houses do
 		holder.Name = `StandIn_{index}`
 		holder:SetAttribute("SandboxHouse", h.id)
 		holder.Parent = workspace
-		local look = M.CFrame.new(h.door.x, 3.5, h.door.z) * M.CFrame.Angles(0, math.rad(h.door.yaw), 0)
+		local look = M.CFrame.new(h.door.x, h.door.y + 3.5, h.door.z) * M.CFrame.Angles(0, math.rad(h.door.yaw), 0)
 		local door = M.Instance.new("Part")
 		door.Name = "FrontDoor"
 		door.Size = V3(4, 7, 0.4)
@@ -216,13 +216,13 @@ local function houseNow(player: any): any
 end
 local function outsideOf(h: any): any
 	local r = math.rad(h.door.yaw)
-	return V3(h.door.x, 3, h.door.z) + V3(-math.sin(r), 0, -math.cos(r)) * 3
+	return V3(h.door.x, h.door.y + 3, h.door.z) + V3(-math.sin(r), 0, -math.cos(r)) * 3
 end
 -- 8.3 the back door's leaf (server/SandboxWorld.luau's BackLeaf: a door leaf in the back wall at House.back)
 local backLeaf = M.Instance.new("Part")
 backLeaf.Name = "BackLeaf"
 backLeaf.Size = V3(3, 7, 0.4)
-backLeaf.CFrame = CF(House.back.x, 3.5, House.back.z - 0.2)
+backLeaf.CFrame = CF(House.back.x, House.back.y + 3.5, House.back.z - 0.2)
 backLeaf:SetAttribute("DoorLeaf", -1)
 backLeaf:SetAttribute("DoorSwing", 1)
 backLeaf:SetAttribute("DoorDark", true)
@@ -330,7 +330,7 @@ check("…looking at the back doors", again.LookVector:Dot(toBack) > 0.95, `{aga
 truck.wrecked = true
 local out = Moving.respawnAt(ann)
 check("…the van wrecked: 6 studs out of the house's front door (SandboxMap.House.door), looking out", out ~= nil
-	and flatDistance(out.Position, V3(House.door.x, 0, House.door.z - 6)) < 1e-6 and math.abs(out.Position.Y - 3) < 1e-6 and out.LookVector.Z < -0.99, out and out.Position)
+	and flatDistance(out.Position, V3(House.door.x, 0, House.door.z - 6)) < 1e-6 and math.abs(out.Position.Y - House.door.y - 3) < 1e-6 and out.LookVector.Z < -0.99, out and out.Position)
 truck.wrecked = false
 check("…off a move: nil (home, the plot's spawn)", Moving.respawnAt(bob) == nil and Moving.respawnAt(cid) == nil)
 check("the van's prompts say Sprinter (or the car's name), and a Load for the walk-in bay", promptIn(truck.model, "Load") ~= nil
@@ -341,7 +341,7 @@ check("the van's prompts say Sprinter (or the car's name), and a Load for the wa
 local enter = promptIn(frontDoor, "Enter house")
 check("Enter house on the map's front door (SandboxDoor), the move's own", enter ~= nil and enter:GetAttribute("MoveOwner") == 11)
 local facing = V3(0, 0, -1) -- (House.door yaw 0: out to the road, north)
-local outside = V3(House.door.x, 3, House.door.z) + facing * 3
+local outside = V3(House.door.x, House.door.y + 3, House.door.z) + facing * 3
 E.place(ann, outside)
 trigger(enter, ann)
 local origin = E.interiors[1]

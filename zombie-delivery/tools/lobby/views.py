@@ -25,9 +25,9 @@ HERE = Path(__file__).resolve().parent
 GAME = HERE.parents[1]
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(GAME / "tools" / "sandbox-map"))
-sys.path.insert(0, str(GAME / "tools" / "countryside"))
+sys.path.insert(0, str(GAME / "tools" / "islands"))
 import render as sandbox_map  # noqa: E402  (tools/sandbox-map/render.py: export_world)
-from views import shape_of  # noqa: E402  (tools/countryside/views.py: a part's shape for render.html)
+from views import shape_of  # noqa: E402  (tools/islands/views.py: a part's shape for render.html)
 
 # The lobby's middle (design/lobby/plan.py OX, OZ: its bounds' middle): the views are placed from it.
 BOUNDS = json.loads((GAME / "design" / "lobby" / "plan.json").read_text(encoding="utf-8"))["bounds"]
@@ -55,7 +55,7 @@ def main():
         tmp = Path(folder)
         sandbox_map.export_world(luau, tmp)
         world = json.loads((tmp / "world.json").read_text())
-        near = 900  # (only what stands near the lobby: the run zones are far west)
+        near = 900  # (only what stands near the lobby: 10.8 the other islands are hundreds of studs off it)
         parts = [{"p": p["p"], "r": p["r"], "s": p["s"], "c": p["c"], "t": p["t"], "mat": p["mat"], "shape": shape_of(p)}
                  for p in world if not p["group"].startswith("Sandbox/Boundary") and p["t"] < 0.95
                  and abs(p["p"][0] - OX) < near and abs(p["p"][2] - OZ) < near]

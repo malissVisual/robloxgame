@@ -408,7 +408,7 @@ if pick and backDoor then
 	carried = model
 	local y = origin.Position.Y + 3
 	local site = workspace:FindFirstChild("Moves"):FindFirstChild(`Move_{House.id}`)
-	local back = V3(House.back.x, 3, House.back.z)
+	local back = V3(House.back.x, House.back.y + 3, House.back.z)
 	E.place(ann, back + V3(0, 0, 4))
 	trigger(promptIn(site, "Enter by the back door"), ann)
 	check("Ann in by the back door: inside, by the corridor's east end", distance(E.rootOf(ann).Position, origin * exits[2]) < Config.Furniture.EntryIn + 1.5,
@@ -497,8 +497,8 @@ if pick and backDoor then
 	run(0.3)
 	local out = E.rootOf(ann).Position
 	check("out of the back door together (the door nearer; walked into it, no E): behind the house (south of it), Danny with it at its far end, on the ground",
-		inZone and distance(out, V3(House.back.x, 0, House.back.z)) < 6 and out.Z > House.back.z and distance(danny.body.root.Position, farEnd()) < 0.05
-		and math.abs(danny.body.root.Position.Y - out.Y) < 0.5 and helped(), `{out.X}, {out.Y}, {out.Z}`)
+		inZone and distance(out, V3(House.back.x, House.back.y, House.back.z)) < 6 and out.Z > House.back.z and distance(danny.body.root.Position, farEnd()) < 0.05
+		and math.abs(danny.body.root.Position.Y - out.Y) < 0.5 and helped(), `{out.X}, {out.Y}, {out.Z}; Danny {danny.body.root.Position.Y}, {distance(danny.body.root.Position, farEnd())}; {inZone}`)
 	-- round the house to the van's back
 	local backAt = cargoDoor.WorldPosition
 	local away = V3(backAt.X - truck.chassis.Position.X, 0, backAt.Z - truck.chassis.Position.Z).Unit

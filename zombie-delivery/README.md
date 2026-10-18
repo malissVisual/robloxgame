@@ -3,12 +3,12 @@
 > **8.0 SANDBOX (the game the owner tests now).** With `Config.Sandbox.On = true` (the default) the server builds a
 > test world instead of the city (`shared/SandboxMap.luau`, `server/SandboxWorld.luau`). **Since 10.0 a small lobby
 > like Dungeon Quest** (`design/lobby/`, `server/LobbyWorld.luau`: the plaza, the four warehouses, the shops and, since
-> 10.7, one PLAY circle where you make a party lobby) from which a party goes into a house to empty at a chosen
+> 10.7, one PLAY circle where you make a party lobby; since 10.8 on the biggest floating island) from which a party goes into a house to empty at a chosen
 > difficulty (`server/Runs.luau`, see the 10.0 note
 > below; its pieces wear their rarity's outline and stars; **since 10.7 the PLAY circle offers a QUICK ROUND too (10.5's
 > rounds with 10.6's snatching), one round at a time for everybody in its queue, each loading into their own van: the
-> 10.5 – 10.7 notes**); the houses stand in
-> their own fenced run zones of the
+> 10.5 – 10.7 notes**); **since 10.8 the world is floating islands** (the lobby the biggest one, every place to empty
+> on its own smaller island round it, travel by a fade: see the 10.8 note); the places are those of the
 > 9.0 countryside: since 9.0 **open countryside**
 > (`design/countryside/`; 8.9: the village of Jinočany, 8.0 – 8.8: an alpine meadow with one road) with **six places to
 > empty**, each on its own country lane (`SandboxMap.Houses`, a contract each in `Config.Moving.Sandbox.Houses`; every
@@ -444,6 +444,27 @@
 > ROUND), and the round picks a house no lobby run is in (and none a lobby holds while another is free:
 > `RoundRules.places`). `Config.Rounds.On = false` hides the QUICK ROUND (the lobbies only). The guide says "Step into
 > PLAY to start" (queued: "In the QUICK ROUND queue: the next round starts by itself"). No zombies anywhere.
+>
+> **10.8** (the owner: "the world is made of blocks: the lobby is one big block, each map a smaller block that holds
+> only that map … floating islands in the sky: grass on top, dirt and stone sides with tapering rock underneath, the sky
+> all round and below; the other islands seen in the distance from the lobby"; travel: "a fade"): **the floating
+> islands.** The world is islands in the sky (`design/islands/plan.py` → `plan.json`, `plan.png`;
+> `tools/islands/sandboxmap.py` writes them into `shared/SandboxMap.luau`'s ISLANDS section). **The lobby is the
+> biggest island** (the plaza, the four warehouses, the shops and the PLAY circle as before, its hedge low now:
+> `Config.Islands.LobbyHedge`, so the other islands show over it), and each of the **six places to empty stands on its
+> own smaller island** round it, at its own height: The Old Farmstead, The Pond Cabin, The Lone House, The Forest
+> Lodge, The Old Mill (its millrace runs off the island's edge as a waterfall) and The Orchard Cottage, each with its
+> yard, its trees, its fields and a low rim hedge (9.7's tall screen hedges and the meadow under everything are gone).
+> Every island has grass on top and dirt, stone and a tapering rock under it with boulders and hanging rocks
+> (`shared/IslandLooks.luau`, `Config.Islands.Body`); a few small floating rocks and soft clouds below fill the sky
+> (`Config.Islands.Rock`, `Clouds`); the haze is light enough that the far islands read. **Travel is a fade only**: the
+> ride (`client/RideUi.luau`) is now a clean card over the jump's fade, "ON THE WAY TO" ("BACK TO" on the way home)
+> over "→ THE OLD FARMSTEAD", the difficulty in its colour, who comes along and a round's movers, a thin line filling
+> while the island streams in. **Falling off** an island (`server/IslandFall.luau`, `Config.Islands.Fall`): you go
+> black, land back on top where you last stood (what you carried goes down there) and are told "You fell off the
+> island: back on top."; helpers are put back too. `workspace.FallenPartsDestroyHeight` is -1000
+> (`Config.Islands.Destroy`), far under every island. The map is 1,378 parts (1,479 with the Auction House) of the
+> 2,500 budget.
 
 The active Roblox game in this repository (Merge Blades is preserved in `../archive/merge-blades`). **You run a delivery company** in a world
 gone wrong: take a job, carry the cargo to your vehicle with your own hands (or lead the horses on a rope), drive it
