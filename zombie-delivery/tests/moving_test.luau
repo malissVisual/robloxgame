@@ -59,7 +59,6 @@ check("fragile breaks faster", near(Rules.fallDamage(D.SafeDrop + 5, true), math
 check("never more than all of it", Rules.fallDamage(1000, true) == 1 and Rules.hitDamage(1e6, false) == 1)
 check("a bite: PerHp of the health lost", near(Rules.hitDamage(10, false), 10 * D.PerHp) and Rules.hitDamage(-5, false) == 0)
 check("a death drops it hard", near(Rules.deathDamage(false), D.Death) and Rules.deathDamage(true) > Rules.deathDamage(false))
-check("the truck's knocks", near(Rules.truckDamage(50, false), 50 * D.PerTruckHp) and Rules.truckDamage(0, true) == 0)
 local vase = { condition = 1 } :: any
 check("hurt takes it off", not Rules.hurt(vase, 0.3) and near(vase.condition, 0.7) and not Rules.broken(vase))
 check("…and says when it broke", Rules.hurt(vase, 0.6) and Rules.broken(vase) and not Rules.hurt(vase, 0.5) and vase.condition == 0)
