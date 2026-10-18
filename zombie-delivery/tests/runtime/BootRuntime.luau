@@ -6,12 +6,11 @@
 -- logged (Runtime.log, in order, with its arguments) and returns a recorder, any assignment is kept (a hook: read back
 -- as set; Runtime.log has "set World.x"). A few names are answered: GetService, WaitForChild / FindFirstChild (nil for
 -- a name in Runtime.absent), GetPlayers / GetChildren, IsA (true), Connect (the handler kept: Runtime.fire runs it).
--- Config, Economy and SandboxMap are the real modules (SandboxMap.cframe on tools/vehicle-preview/roblox-mock's
+-- Config and SandboxMap are the real modules (SandboxMap.cframe on tools/vehicle-preview/roblox-mock's
 -- CFrame); a test replaces a module's functions with Runtime.override. task.spawn / defer / delay only record (a
 -- server loop never ends); task.wait returns at once.
 local Mock = require("./rbxmock")
 local Config = require("./Config")
-local Economy = require("./Economy")
 local SandboxMap = require("./SandboxMap")
 
 local Runtime = {}
@@ -126,7 +125,7 @@ end
 
 -- ── The world of one run ───────────────────────────────────────────────────
 
-local REAL = { Config = true, Economy = true, SandboxMap = true }
+local REAL = { Config = true, SandboxMap = true }
 
 function Runtime.reset()
 	Runtime.log = {} -- every call and assignment, in order ("World.build", "set Zombies.ambient")
@@ -197,7 +196,7 @@ function Runtime.require(target: any): any
 	if Runtime.fakes[name] ~= nil then
 		return Runtime.fakes[name]
 	elseif REAL[name] then
-		return ({ Config = Config, Economy = Economy, SandboxMap = SandboxMap })[name]
+		return ({ Config = Config, SandboxMap = SandboxMap })[name]
 	end
 	return Runtime.module(name)
 end

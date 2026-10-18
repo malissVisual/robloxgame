@@ -1,683 +1,142 @@
 --!strict
--- The cars. Each player has at most one car in the world, built in code from its style.
--- 7.x, one car (Config.CompanyVan): a player's car is the ZDC Van (or a bike); every other style here is a body the
--- world still builds (Config.AmbientCars: the traffic, the city buses, the bandits, Earl's old van, the fleet checks).
--- A player's own car is never one of those (spawnAt falls back to the van); only an explicit company vehicle can be
--- lent by id (no job lends one any more; 7.0's moves asked for the moving truck).
+-- The vans. 10.6 (only the sandbox is the game): a player's one vehicle is the Deliveros Sprinter (Config.Sandbox.Van,
+-- its numbers Config.Sprinter, its look and walk-in bay shared/SprinterLooks.luau), at most one in the world for each
+-- player, built in code. Nobody drives (the 10.4 ride is the clients' animation, client/RideUi.luau): a van is parked
+-- where it is put and anchored there; it has no seats, no movers and no health. The city's cars, bikes and scooters,
+-- their driving, stages, upgrades, gear, roof guns, rentals, repairs and chauffeurs are gone with it.
 --
--- Driving is arcade, not wheel physics: invisible frictionless wheel colliders (they ride over curbs) and two
--- constraints on the chassis move the car. A LinearVelocity in the ground plane (gravity still works) and an
--- AngularVelocity that turns it around the vertical axis and keeps it upright. The owner's client simulates the car
--- (network owner) while the owner sits in its driver's seat and sets both constraints from the VehicleSeat's throttle /
--- steer (client/Drive.luau), the server only reads where the car is and how fast it goes (ramming, deliveries). 6.13.1:
--- an empty car is the server's (Vehicles.claim; with StreamingEnabled a far owner's client loses the ground under it).
+-- Where vans stand: server/Runs.luau parks a run's van at its house's curb and each player's own van at a round's house
+-- (Moving.parkVan: server/SandboxBoot.luau's parkVan → Vehicles.placeAt); server/Moving.luau's "Call the van to the
+-- door" moves it (Vehicles.standUp); a van goes again with Vehicles.remove (the run's end, the player leaving).
+-- 6.26, never into something: the room its hull needs is checked before it comes out and a free spot found near
+-- (findRoom: shared/SpawnSpot.luau, Config.SpawnSpot): on the ground's plane under its four wheels.
 --
--- The visible tyres hang on Motor6Ds that every client spins and steers (client/CarVisuals.luau).
--- Other players ride along in the passenger seats (a "Ride along" prompt at their door, 3.7) and shoot from there
--- (server/Gun.luau).
+-- The model (its PrimaryPart the "Chassis": its top is the bay's floor, 2.4 over the ground):
+--   * the hull: hidden boxes that collide (SprinterLooks.hull: the cab, the nose, the bulkhead, the bay's walls and roof
+--     round the hollow walk-in bay), the chassis and a hidden wheel collider at each wheel;
+--   * its look (SprinterBuild.body: SprinterLooks' skin, the cab doors' skins, the back doors' and the sliding door's),
+--     only looks (no mass, no collisions, not hit by rays), each with the attribute SprinterVisual: server/SprinterMesh
+--     .luau hides them when it dresses the van in the owner's Blender model; the painted panels are Car.paintParts
+--     (server/VanPaint.luau paints them through the hook Vehicles.onStyle, shared/VanLook.luau);
+--   * the tyres on Motor6Ds "WheelMotor" (SprinterMesh puts its wheels on them);
+--   * the back (3.2): two doors, each on a Motor6D "BackHinge" (C0 the hinge line, closed with no Transform; the
+--     attributes Axis and Angle the open turn); the model's attribute BackOpen says where they are and every client
+--     swings them there (client/CarVisuals.luau). The "BackPrompt" in the Attachment "CargoDoor" at the back opening's
+--     middle opens and closes them (toggleBack): on foot, a hand free (empty hands, or one light piece: the character
+--     attribute CarryHands = 1), the owner or whom the hook Vehicles.backAllowed lets (server/Moving.luau: the run's
+--     party). The Load prompts sit in CargoDoor too (server/Moving.luau, server/Runs.luau);
+--   * 8.0, the walk-in bay (SprinterBuild.wire): shut, the back doors' block keeps the bay closed; open, the rear step
+--     folds out behind the bumper. The sliding door (its "SidePrompt": anybody on foot, so nobody is ever shut in; the
+--     attribute SlideOpen) rolls back along the side on its Motor6D "SlideMotor" (the server tweens its C0: every client
+--     sees it), its block goes and the side step comes out (both back once it has shut). The bay's light is on while
+--     either stands open;
+--   * the load: the pieces loaded ride welded to the chassis (Vehicles.cargoHolder) in its cargo slots
+--     (Vehicles.cargoSlots, as many as Config.Cars' capacity: tests/run_tests.py counts them);
+--   * the attributes OwnerId, OwnerName, CarId, Sprinter (the clients and SprinterMesh find a van by them).
 --
--- A car has no roof gun until one is bought at Wrench Garage (Config.CarGuns, profile.carGuns, only on the cars with
--- CarDef.mount). Then a turret with that gun's look sits on the roof: the model "CarGun" inside the car, its "Barrel"
--- part holds the "Muzzle" attachment (client/Shooting.luau draws the tracers from there), and the car model carries
--- the attribute CarGun = the gun's id (the clients read it).
---
--- Lights: every car (the players', the bandits', the traffic's) has headlights and tail lights (server/DayNight.luau:
--- 10.6 their day look, the sandbox's day never turns); the headlights
--- carry SpotLights (two on a player's car, one on an NPC car: cheap). The ambulance has a roof light bar: its lenses
--- are tagged "SirenLight" and flash on every client (client/Weather.luau) while the car's attribute Siren is true
--- (a company ambulance lent for a job, or Vehicles.setSiren).
---
--- Calling the car (the CAR button: Vehicles.spawn without force) goes to server/CarCall.luau through the hook
--- Vehicles.callCar: a chauffeur drives it to you. While a chauffeur drives a car (car.chauffeured, the attribute
--- Chauffeured) the SERVER owns and drives it, nobody gets in (the door prompts refuse, the clients hide them);
--- Vehicles.handOver gives it to its owner (the chauffeur's door swings, the owner's client drives it again). The
--- instant cases stay instant (force: PLAY, a respawn, a car bought or equipped, a job's vehicle): next to you and
--- seated, or, when you spawn at home, parked at your home's garage drive-out spot (the hook Vehicles.homeGarage).
---
--- 3.2, the back that opens: every car that takes cargo by hand (all but the bus) has one, its Style.back: two rear
--- doors (the vans and the box trucks), a tailgate (the pickup, the monster truck, the fuel truck's flatbed), a trunk
--- lid (the muscle car), a horse ramp (the livestock truck). Each leaf hangs on a Motor6D "BackHinge" on the chassis
--- (C0 = the hinge line, set once when it is built; closed = no Transform; the attributes Axis and Angle = the open
--- turn). The car model's attribute BackOpen says where it is and every client swings the leaves there
--- (client/CarVisuals.luau). The "BackPrompt" at the back (Open doors / Close doors …) opens and closes it: on foot,
--- a hand free (3.7), the car standing, the owner or who the hook Vehicles.backAllowed lets (server/Cargo.luau: the
--- job's crew). While it is open nobody gets behind the wheel (the Drive prompt refuses) and the driver's client
--- holds the throttle (client/Drive.luau); server/Cargo.luau loads and unloads only through an open back. A new car
--- (a chauffeur's, a respawn) starts closed. The NPC and traffic cars and the showroom models have the leaves welded shut.
---
--- 3.3: five more vans (courier, highroof, boxtruck, armorvan, rallyvan: their STYLES below) and the upgrades you can
--- see. A player's car carries the "UpgradeKit" (buildKit) for ITS car-track levels (profile.carUpgrades, Economy
--- carLevels): Ram Plow a bull bar on the front (wider and heavier with the level), Armor side plates (window grilles
--- from level 3; not on a style that has its own, Style.armored), Engine a hood scoop and twin exhaust pipes from
--- level 3. Cosmetic: welded, massless, no collisions, not hit by rays, their own colours (never painted). It is built
--- with the car and rebuilt when the levels change (Vehicles.refreshStats). (Quick Hands, the loading track, went in
--- 4.0.1; 5.7 took out its last holds: every back's and cargo prompt's hold is Config.Cargo.HoldDuration.)
---
--- 3.4: cargo capacity. A car takes Config.Cars capacity pieces (= its STYLES cargo slots). The car's damage stays with it:
--- its share of health is kept per car in profile.carHealth (remember: every hit, every repair, when it is parked); a
--- car comes back as damaged as it went, a wrecked one with Config.Repair.WreckedHealth. A company vehicle lent for a
--- job (Car.lent) always comes fresh from its employer. No free repairs any more (the depot yard and Wrench Garage
--- healed before 3.4): server/Repair.luau runs the repair bays (Vehicles.setRepairing locks the car on the lift; the
--- hook Vehicles.beforeDrive tells it the owner got back in).
---
--- 3.5, the stages (Config.Cars stages, the car's stage in profile.carUpgrades[carId].stage): every stage after 0 has
--- a LOOK (LOOKS below, styleFor): boxes added to the style's body (painted like it when they are "body"), cosmetic
--- trim added, boxes and trim with some tags taken off (the Old Van's rust, primer patches and loose bumper go at the
--- Work Van), its own cargo slots (as many as the stage holds: tests/run_tests.py counts them), and maybe a new roof
--- height for the gun. Stage 0 is the plain style (the Old Van's is the Rusty Van). A new stage builds the live car
--- again where it stands (Vehicles.refreshStats → rebuild). The traffic drives the vans at random stages. The 3.4
--- Cargo Rack (a roof rack with extra slots in the UpgradeKit) is gone: a 3.4 save got the stage that covers it.
---
--- 3.7, the doors (doorsOf below): you get in at a door. The E shows only there and only close (Config.Cargo.DoorReach):
--- "Drive" at the driver's door on the left for the owner, "Ride along" at a passenger door (the front passenger's on
--- the right, a rear seat's at its own side, the bus's folding door) for everybody else, so a passenger on the right
--- never gets the driver's seat. The seats never take you by touch (CanTouch off), only through these prompts. A cabin
--- door swings open as you get in or out (the Motor6D "DoorHinge", client/CarVisuals.luau) and you step out at your
--- own door. 3.7 too, a free hand: one light piece in your hands (the character attribute CarryHands = 1, server/
--- Cargo.luau) and you open and close the back yourself; two pieces or a heavy one, put one down first (G).
--- 3.10, getting in and out (shared/Boarding.luau): the E at a door reserves the seat (its attribute Reserved) and
--- starts the move (the character's attributes Boarding = "ownerId:door:seat", BoardAt, BoardReach); the player's
--- own client plays it (client/CarBoarding.luau: a step to the handle, the hand on it, the slide in) and THIS server
--- seats them Config.Cargo.BoardSeconds after the E, when they are still there (else it is cancelled: they stand at
--- the door). Out (E in a seat: the CarDoor remote; Space; an eject) the client slides out at its door in
--- AlightSeconds (the attribute AlightAt for the others' arm); somebody still over the car after that is put out at
--- the door. The doors swing from their DoorOpenAt / DoorCloseAt attributes (server times).
--- 5.7: onto a bike's saddle (or a scooter's deck) the move is Config.Interact.BikeMount long (a step to its side and
--- the leg over: client/CarBoarding.luau); Vehicles.mount starts it for a ZDC RIDE rental, after its slide off the dock.
---
--- 4.0, Freight (the vehicles):
--- * The Rusty Van looks the part (STYLES.van): big corroded rust patches, a primer-grey driver's door (Style.primerDoor),
---   a dented crooked bumper (Box.tilt), a cracked windscreen ("crack" trim), bald grey tyres (Style.bald), a yellowed
---   dim headlight (Style.dimHead) and a smoking exhaust (Style.smoky: the model's attribute Smoky till Engine 1;
---   client/CarVisuals.luau puffs at the Attachment "Exhaust"). Later stages fix it (Look.fresh).
--- * A look may STRETCH the body (Look.stretch, stretchStyle): the Work Van +1.5, the Long Cargo Van +3.5, the Box
---   Truck's Freight Hauler +3. Everything behind the style's split moves back, the long boxes across it grow, the car
---   stays centred on its chassis; the stretched style is cached per look (its doors with it).
--- * The UpgradeKit also shows Tyres & Suspension (new tyres with tread rings from 1, alloy rims from 3; the stance at 5
---   lowers the body: Car.lower, a rebuild) and the Hand Trolley folded inside the back (the model "FoldedTrolley" and
---   the chassis Attachment "TrolleyMount"; 4.6: gear, Vehicles.hasGear(car, "trolley")).
---
--- 4.6, GEAR (Config.Gear, bought per car and installed in its gear slots at Wrench Garage: profile.carGear, Economy
--- installedGear). The live car keeps what is installed (Car.gear; Vehicles.hasGear) and the UpgradeKit shows it, cheap
--- (massless, not colliding, not hit by rays, at most 6 parts a piece; the FleetArt skin's pieces, VehicleArt.gear):
--- the Hand Trolley folded in the back, Ratchet Straps (two orange bands across the load), the Cooler Box (a white box
--- at the front of the load) and the Roof Rack (rails on the roof; a car with a rack of its own keeps that one) with
--- the Attachment "RoofRackSlot" on the chassis where its light piece rides (server/Cargo.luau; Vehicles.capacity with
--- the cargo's look counts its slot). A company vehicle has no gear.
--- * The Freight Truck (STYLES.freighttruck): a cab-over truck with a long box, 12 slots in three pallet bays, a
---   roll-up door (rollUpDoor), twin rear tyres (Style.dual) and the Attachment "JackMount" inside the back (its pallet
---   jack: server/Cargo.luau). A long car comes out of a garage further from the door (Vehicles.placeAt).
---
--- 5.1, THE BIKES (CarDef.bike: rustbike, citybike, cargobike, ebike; the styles "bike" and "cargobike", Style.bike):
--- * The physics are a car's: the style's own boxes and the chassis are a hidden, low, 2.4-wide hull with four hidden
---   frictionless wheel colliders (no balance physics), and an AlignOrientation "KeepUpright" keeps its right side level
---   (no roll; it still pitches up a hill). One doorless driver seat (the saddle), no passengers, no back: "Load" puts a
---   piece straight onto the rack or into the box (server/Cargo.luau: no back, never shut).
--- * The look is Codex's (server/BikeArt/Geometry.luau through server/ModelArt/Builder.luau): its Frame is welded to a
---   hidden part "BikeFrame" on the Motor6D "BikeLean" (pivot on the ground under the bike: every client tilts it into
---   the turns, client/CarVisuals.luau), its wheels to the two hidden Tyres on their WheelMotors (on the BikeFrame: they
---   spin and lean with it), its cranks and pedals to the hidden "Crank" on the Motor6D "CrankMotor" (turned by the
---   speed). The saddle (the DriverSeat) sits on the BikeFrame, so the rider leans too (client/BikeRider.luau poses
---   the arms forward and pumps the legs). The art's NightLamp parts glow at night; a player's bike throws a small beam.
--- * 6.19: the art is built at BikeArt.Scale (smaller, to Roblox's classic R15 rider: the feet reach the pedals, the
---   hands the grips; client/BikeRider.luau's leg IK). The saddle (the DriverSeat), the rack's / box's slots and the Load
---   point follow the art (bikeArt); the hidden hull, the four colliders and every number of the ride stay 5.1's.
--- * Bike gear (Config.Gear bikeOnly: basket, panniers, trailer; Vehicles.hasGear) shows in the UpgradeKit from the
---   same art, and adds its light slots to Vehicles.cargoSlots (the art's slot points; the trailer hangs rigidly at the
---   rear Hitch, its wheels on WheelMotors too). None of the car kit (plow, armour, engine, tyres, car gear) on a bike.
--- * Never traffic, a bandit car or a chauffeur's: the CAR button (Vehicles.spawn) puts it by the kerb next to you at
---   once and seats you (Vehicles.placeNear); buildNpc / buildTraffic take the van instead of a bike.
--- 5.1.1, THE E-SCOOTER (CarDef escooter, style "scooter", Style.stand): a bike by every rule above on its own small
--- art (server/ScooterArt/Geometry.luau, the same ModelArt convention: a deck, a tall stem, two small wheels, no crank).
--- Its hull is low and short, its wheel colliders small (radius 0.6); the rider STANDS: the DriverSeat sits a hip's
--- height over the deck (the model's attribute BikeStand: client/BikeRider.luau straightens the legs onto the deck).
--- One gear slot for the basket on the stem; the rear rack's one light slot.
--- 5.6, ZDC RIDE (server/Rental.luau): Vehicles.spawnAt(…, rental = true) puts a rental E-Scooter out as the player's
--- vehicle: Car.rental and Car.lent (its damage never kept; Jobs.returnLent takes it back when you call your own car or
--- bike, buy one, or respawn), the plain numbers (no upgrades, stage, gear, paint or car gun of yours), the model's
--- attribute Rental. Vehicles.repaint and Vehicles.refreshStats leave it alone; Vehicles.displayModel takes a colour
--- for the docked ones.
--- 6.10, THE E-SCOOTER'S QUICK HOP (the owner: "don't teleport me onto the scooter, I want to grab it and jump on it
--- quickly"): its Drive prompt sits just left of the deck and reaches Config.Interact.ScooterReach (you are right next
--- to it); the E starts a hop from where you stand onto the deck (client/CarBoarding.luau) and the server seats you
--- ScooterHop later (boardSeconds); off it is a hop down to its left side. MY BIKE (and PLAY, a respawn) puts the
--- scooter right beside you when there is room (placeNear) and you hop on (spawnAt → Vehicles.mount), a rental's slide
--- off its dock plays while you hop. Its load rides on the BikeFrame (Vehicles.cargoHolder: it leans with the deck,
--- client/CarVisuals.luau). The bikes keep their step and leg over.
--- 6.16, THE BODY SWAYS (the owner: "upgrade the visuals and the feel"): a player's car (not a bike) hangs what you see
--- of its body on the hidden part "BodyRoot" on the Motor6D "BodyRoll" (build, bodyRoot): the skin, the trim, the doors'
--- and the back's hinges (still children of the chassis), the lamps, the UpgradeKit, the roof gun, the load
--- (Vehicles.cargoHolder) and the style decals (Vehicles.bodyPart). Every client rolls it out of a turn, dips its nose on
--- the brake and squats it as it pulls away (client/CarSway.luau); the server never moves it, so it sits on the chassis
--- there. The hull (the physics), the wheel colliders, the tyres and the seats stay on the chassis: nothing that
--- collides moves (a hull box you see on a car without the fleet's skin is hidden behind a non-colliding twin).
--- 6.24, A BIKE NO LONGER ROLLS OVER (the owner's screenshot: a bike lying flat on its side, its rider on it). 6.19 put
--- the saddle (and so the rider's torso) inside the pedal bikes' hidden hull box; the body passes through the bike on
--- the moves on and off only on its own client (the group "Boarding"), so the server, which runs an empty bike, pushed
--- the light bike out from under it, and the body (moved in the bike's own space) followed: over it went. Lying flat,
--- KeepUpright has no turn to give (its right side points straight up). Now the pedal bikes' hull boxes only take
--- hits (CanCollide off), the owner's body never collides with their bike (passRider: NoCollisionConstraints), and
--- server/BikeRighting.luau (6.26: server/CarRighting.luau) stands a bike tipped over for a second back up (its
--- AlignOrientation "Righting"; Vehicles.standUp when it is wedged).
--- 6.26, CARS SPAWN CLEAR AND STAND BACK UP (the owner's screenshot: a new ZDC Van in the depot tilted 20–25°, a back
--- wheel in the air, its nose down on the front right, and it stayed so; "it happens when I spawn something", bikes and
--- the other vehicles too). Why it stays: the Steer (an AngularVelocity in world space, (0, yaw, 0), MaxTorque 6000 ×
--- the mass, set in spawnAt) holds every turn still, the pitch and the roll too, and gravity's torque on a car propped
--- on one end is about mass × 196 × 4 (studs from the prop to its middle), an eighth of that: whatever tips a car
--- leaves it tipped, parked or driven.
--- What tips it: (1) a car was put down where it was asked (freeSpot only kept it off the players' cars; one ray at its
--- middle for the ground): onto a crate, a counter, a kerb, a traffic car, a body; (2) since 6.13.1 a parked car is the
--- server's (Vehicles.claim) while a body is its own player's: on the server that body cannot be moved, so the body
--- getting in or out (client/CarBoarding.luau moves it through the car in the group "Boarding", on its own screen
--- only) shoved the car with all the force it took. 6.24 said "a car is too heavy for that": on the server the body
--- counts as immovable, the car's mass does not matter. Now: the room a car needs is checked before it comes out and a
--- free spot found near (findRoom, Vehicles.clearFor, Config.SpawnSpot, shared/SpawnSpot.luau), a body passes through
--- the car while it gets in or out on the server too (passBody, NoCollisionConstraints for the move) and
--- server/CarRighting.luau turns any vehicle that is down back onto its wheels (Vehicles.righting, Vehicles.standUp).
--- The ZDC Van's bumper boxes hung 0.155 under its chassis (0.70 over the wheels' ground, the fleet's lowest hull; its
--- nose came to rest on its bumper at 18°): they start at the chassis' bottom now, like the Old Van's lowest hull.
+--   Vehicles.placeAt(player, spot)      the player's van parked at `spot` (its middle there, facing its look; the old
+--                                       one goes), on free ground near it: the Car (nil while the save loads)
+--   Vehicles.spawnAt(player, ground)    the same at `ground` as it is given (on the ground, Drop over it)
+--   Vehicles.get(player) / remove(player)
+--   Vehicles.standUp(car, heading)      the van stood where it is on free ground, facing `heading` (the van called to
+--                                       a door)
+--   Vehicles.groundY(x, z, refY?)       the top of the ground there (a ray from above: no van, body or zombie)
+--   Vehicles.cargoDoor / cargoSlots / cargoHolder, Vehicles.backPrompt / hasBack / backOpen / backVerb / setBack
+--   Vehicles.carDef(id)                 a Config.Cars entry by its id (the van's name on the prompts)
 
-local CollectionService = game:GetService("CollectionService")
-local PhysicsService = game:GetService("PhysicsService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
-local Economy = require(Shared.Economy)
 local Net = require(Shared.Net)
 local PlayerData = require(script.Parent.PlayerData)
-local DayNight = require(script.Parent.DayNight) -- (10.6: only the lamps' day look: the sandbox's day never turns)
-local Boarding = require(Shared.Boarding)
-local SpawnSpot = require(Shared.SpawnSpot) -- 6.26: a vehicle never comes out into something (findRoom)
-local VehicleArt = require(script.Parent.VehicleArt.Builder)
-local VanMesh = require(script.Parent.VanMesh) -- 6.25: the ZDC Van in the owner's Blender model
-VanMesh.ready("zdcvan") -- (at the start: the imported model leaves the world before anybody sees it)
-local BikeArt = require(script.Parent.BikeArt.Geometry) -- 5.1: Codex's bikes and bike gear (pure geometry)
-local ScooterArt = require(script.Parent.ScooterArt.Geometry) -- 5.1.1: the E-Scooter (pure geometry, the same convention)
+local DayNight = require(script.Parent.DayNight) -- (only the lamps' day look: the game's day never turns)
+local SpawnSpot = require(Shared.SpawnSpot) -- 6.26: a van never comes out into something (findRoom)
+local RenderBudget = require(Shared.RenderBudget) -- 6.13.1: only the pieces big enough throw a shadow
+local Sprinter = require(Shared.SprinterLooks)
 
--- 10.5 (the city's server/World.luau and shared/Map.luau went): the old road level (World.RoadTop: the ground's
--- fallback where a ray finds nothing), the water's level (Map.WaterLevel: a ground ray looks 6 below it) and a garage's
--- apron (Map.GarageApron: how far a long car stands out of a door, driveOut).
+-- 10.5 (the city's server/World.luau and shared/Map.luau went): the old road level (the ground's fallback where a ray
+-- finds nothing) and the water's level (a ground ray looks 6 below it).
 local ROAD_TOP = 0.4
 local WATER_LEVEL = -3
-local GARAGE_APRON = 8
-local ModelArt = require(script.Parent.ModelArt.Builder) -- 5.1: welds that geometry to our hidden roots
-local Sprinter = require(Shared.SprinterLooks) -- 8.0 SANDBOX: the ZDC Sprinter's parts look and walk-in bay (STYLES.sprinter)
+local CHASSIS_HEIGHT = 1.2
 
 export type Car = {
 	owner: Player,
-	id: string,
+	id: string, -- its Config.Cars id (Config.Sandbox.Van)
 	model: Model,
-	chassis: Part,
-	seat: VehicleSeat,
-	passengers: { Seat },
-	turret: Weld?, -- the roof gun's turning joint; nil = no car gun on this car
-	turretBase: CFrame, -- where a roof gun sits (relative to the chassis), with a gun or without
-	muzzle: Attachment?,
-	gunId: string?, -- the car gun installed (Config.CarGuns)
-	paintParts: { BasePart },
-	size: Vector3, -- the hull (width, height, length) for ramming and latching
-	stats: Economy.CarStats,
-	health: number,
-	wrecked: boolean,
-	latched: { [number]: boolean }, -- taken latch slots
-	chauffeured: boolean, -- a chauffeur drives it to its owner (server/CarCall.luau): server-owned, no prompts
-	born: number, -- os.clock() when it was placed
-	kit: string, -- 3.3: the car-track levels its UpgradeKit shows (kitKey)
-	stage: number, -- 3.5: the stage its body was built at (Config.Cars stages; 0 for a company vehicle)
-	lower: number, -- 4.0: how much lower its body sits (Tyres & Suspension 5: stanceOf); a change builds it again
-	lent: boolean, -- 3.4: a company vehicle lent for a job: its damage is not kept
-	repairing: boolean, -- 3.4: on the lift of a repair bay (server/Repair.luau): anchored, nobody drives it
-	doors: { CarDoor }, -- 3.7: its doors (doorsOf): index 1 is the driver's
-	gear: { [string]: boolean }, -- 4.6: the gear installed on it (Config.Gear ids; none on a company vehicle)
-	rental: boolean, -- 5.6: a ZDC RIDE rental scooter (server/Rental.luau): lent too (never kept, never yours), no paint
-	ground: CFrame, -- 6.26: where it was put down (the spot asked for, or the free one near it: findRoom)
+	chassis: Part, -- the PrimaryPart, anchored; its top is the bay's floor
+	paintParts: { BasePart }, -- the painted panels (server/VanPaint.luau)
+	size: Vector3, -- the hull: its width, its height over the chassis' bottom, its length
+	wrecked: boolean, -- taken away (Vehicles.remove): out of the world (the name of old: a van is never wrecked now)
+	ground: CFrame, -- where it was put down (the spot asked for, or the free one near it: findRoom)
 }
 
 local Vehicles = {}
 
--- 5.0: what Vehicles.spawn (the CAR button, a job, PLAY) says to a player who owns no vehicle yet. (7.x: everybody owns
--- the ZDC Van, so only a save that is still loading hears it.)
-Vehicles.NO_VEHICLE = "Your Deliveros Van is not ready yet: try CAR again in a moment."
-
 local cars: { [Player]: Car } = {}
-local lastSpawn: { [Player]: number } = {}
 
--- Set by Main: (player, car, reason) when a car is destroyed.
-Vehicles.onWrecked = function(_player: Player, _car: Car, _reason: string) end
--- 5.4, set by server/Fuel.luau: a car was just built for its player (every spawn, call, rebuild, garage swap): its
--- tank's attributes (Fuel, Tank) are written before it is anybody's to drive.
-Vehicles.onSpawned = function(_car: Car) end
--- 6.12, set by server/StyleWear.luau: a car was built, repainted or got a new kit or gun: its STYLE looks go on (a
--- wrap over the paint, a bike's frame colour, a decal round its new parts). Never changes its physics.
+-- 6.12, set by server/VanPaint.luau: a van was built: its paint goes on. Never changes its collisions.
 Vehicles.onStyle = function(_car: Car) end
 
+-- Set by server/Moving.luau: may this player (not the owner) open and close the back of this van (the run's party)?
+Vehicles.backAllowed = function(_player: Player, _car: Car): boolean
+	return false
+end
+
 local DARK = Color3.fromRGB(34, 34, 38)
-local GLASS = Color3.fromRGB(150, 190, 210)
-local BALD = Color3.fromRGB(112, 110, 104) -- 4.0: worn, bald tyres
-local DIM_HEAD_LIT, DIM_HEAD_DIM = Color3.fromRGB(232, 196, 118), Color3.fromRGB(150, 136, 98) -- 4.0: a yellowed lamp
 
--- kind: body | dark | glass | accent | plate | white | ball | logo | wood | rail | cross | sirenred | sirenblue |
--- lightbar | hole | amber; 3.5: rust | primer | chrome | lamp | tyre; 4.0: crack (a line on cracked glass). tag (3.5): a
--- stage's look takes off the boxes with the tags it names (LOOKS drop). tilt (4.0): degrees of roll about the car's
--- length (a crooked bumper, a crack across the windscreen).
-type Box = { size: Vector3, offset: Vector3, kind: string, tag: string?, tilt: number? }
+-- A box of the van, relative to the chassis' top centre (offset = its middle); kind: "glass" the cab, "body" the rest.
+type Box = { size: Vector3, offset: Vector3, kind: string }
 
--- 3.2: one leaf of the back (a door, a tailgate, a lid, a ramp), relative to the chassis top centre, closed.
+-- 3.2: one back door, relative to the chassis' top centre, closed.
 type Leaf = {
 	size: Vector3,
 	center: Vector3,
 	hinge: Vector3, -- a point on the hinge line
-	axis: string, -- "Y": a door swinging out sideways | "X": a tailgate or a ramp dropping, a lid rising
+	axis: string, -- "Y": it swings out sideways
 	angle: number, -- degrees of the open turn about the axis
-	kind: string?, -- its look (a Box kind), default body (painted)
-	trim: { Box }?, -- welded onto the leaf: offsets from the leaf's centre
-}
--- noun: doors | tailgate | trunk | ramp; hole: the dark opening the leaves cover (the body behind them is solid).
-type Back = { noun: string, leaves: { Leaf }, hole: Box? }
-
--- Where the cargo rides (server/Cargo.luau): the slots are the bottom centres of the pieces (facing the front),
--- the door is where you load at the back, the entry is where passengers (the school kids) get in.
-type CargoSpec = {
-	slots: { Vector3 },
-	noun: string, -- "Load it into the back of the {noun}"
-	door: Vector3,
-	entry: Vector3,
 }
 
-type Style = {
-	width: number,
-	length: number,
-	wheel: number, -- radius
-	wheelWidth: number,
-	clearance: number, -- chassis bottom above the ground
-	seat: Vector3, -- the driver, relative to the chassis top centre
-	passengers: { Vector3 },
-	roof: number, -- turret height above the chassis top
-	head: Vector2?, -- the headlights' height and z (default: 1.2 up, on the front end)
-	boxes: { Box }, -- relative to the chassis top centre (offset = centre of the box)
-	cargo: CargoSpec, -- relative to the chassis top centre
-	back: Back?, -- 3.2: the back that opens (nil: the bus, nobody loads it by hand)
-	armored: boolean?, -- 3.3: plates and grilles of its own: the Armor upgrade adds none (buildKit)
-	trim: { Box }?, -- 3.5: cosmetic boxes (no collisions, not hit by rays): rust, ladders, racks, lamps …
-	hoodBusy: boolean?, -- 3.5: something sits on the hood already (a blower): the Engine upgrade adds no scoop
-	rideDoor: number?, -- 3.7: every passenger gets in through one door on the right at this z (the bus)
-	doorTrim: { Box }?, -- 3.7: on both front doors' panels: offsets from the panel's centre, +x outward
-	-- 4.0: where a look's stretch goes in (z): what lies behind it moves back, a long box across it gets longer (stretch).
-	split: number?,
-	-- 4.0, the Rusty Van's faults (a fresh stage, Look.fresh, fixes them): the door (doorsOf index) in mismatched grey
-	-- primer, one yellowed dim headlight, bald grey tyres (till Tyres & Suspension 1), a smoking exhaust (till Engine 1).
-	primerDoor: number?,
-	dimHead: boolean?,
-	bald: boolean?,
-	smoky: boolean?,
-	dual: boolean?, -- 4.0: twin tyres on the rear axle (the Freight Truck)
-	-- 5.1: a bike's body (CarDef.bike): Codex's art over a hidden hull, two wheels on the centre line, one doorless
-	-- saddle (doorsOf), no back, no car kit (buildKit), its cargo slots on the rack or in the box (bikeBody).
-	bike: boolean?,
-	stand: boolean?, -- 5.1.1: the rider stands on a deck (the E-Scooter): the seat a hip's height over it, no crank
-	jack: Vector3?, -- 4.0: the Attachment JackMount (the pallet jack, server/Cargo.luau), relative to the chassis top centre
-	-- 8.0 SANDBOX, the ZDC Sprinter: `art` its look is shared/SprinterLooks.luau's (SprinterBuild; its boxes are only
-	-- its hidden hull); `wheelAt` the wheels' x and z (±) when they do not stand where its length puts them; `doorSpan`
-	-- how far its cab doors reach before and behind the seat's middle (doorsOf; else DOOR_FRONT, DOOR_BACK)
-	art: string?,
-	wheelAt: Vector2?,
-	doorSpan: Vector2?,
-}
-
-local function box(size: Vector3, offset: Vector3, kind: string, tag: string?, tilt: number?): Box
-	return { size = size, offset = offset, kind = kind, tag = tag, tilt = tilt }
-end
-
--- 4.0: a crack across a window (a thin dark line in the plane of the glass face at z, tilted).
-local function crack(length: number, x: number, y: number, z: number, tilt: number): Box
-	return box(Vector3.new(0.05, length, 0.03), Vector3.new(x, y, z), "crack", "crack", tilt)
-end
-
--- 4.0: a box's turn (its tilt) on top of where it sits.
-local function tilted(b: Box): CFrame
-	local tilt = b.tilt
-	return if tilt then CFrame.Angles(0, 0, math.rad(tilt)) else CFrame.identity
-end
-
--- door (5.1, a bike): where its Load prompt sits instead of behind the back.
-local function cargo(noun: string, length: number, width: number, slots: { Vector3 }, entry: Vector3?, door: Vector3?): CargoSpec
-	return {
-		slots = slots,
-		noun = noun,
-		door = door or Vector3.new(0, 2.4, length / 2 + 0.6),
-		entry = entry or Vector3.new(width / 2 + 1.5, 0, 0),
-	}
-end
-
--- 6.19: a point of the bikes' art (5.1's units, from the ground under the bike) where the art is built now (at
--- BikeArt.Scale), relative to a bike's chassis top (2.1 over the ground: its clearance 0.9 + the chassis' 1.2).
-local function bikeArt(x: number, y: number, z: number): Vector3
-	local k = BikeArt.Scale
-	return Vector3.new(x * k, y * k - 2.1, z * k)
-end
-
--- 3.2: two rear doors over the back face of a box (`width` wide, from `bottom` to `top`, the face at z = `rear`),
--- hinged at the outer edges, swinging out to the sides. trim(side): what else sits on that side's door (-1 left).
--- The doors start above the tail lights (DOOR_SILL): those stay on the body below them.
-local DOOR_SILL = 0.95
-local function rearDoors(width: number, bottom: number, top: number, rear: number, trim: ((side: number) -> { Box })?): Back
-	local leafWidth = width / 2 - 0.05
-	local height = top - bottom
-	local y = (bottom + top) / 2
-	local leaves: { Leaf } = {}
-	for _, side in { -1, 1 } do
-		local extra: { Box } = if trim then trim(side) else {}
-		-- A handle at the inner edge of every door.
-		table.insert(extra, box(Vector3.new(0.3, 0.9, 0.1), Vector3.new(-side * (leafWidth / 2 - 0.45), -0.3, 0.13), "dark"))
-		table.insert(leaves, {
-			size = Vector3.new(leafWidth, height, 0.2),
-			center = Vector3.new(side * (width / 2 - leafWidth / 2), y, rear + 0.1),
-			hinge = Vector3.new(side * width / 2, y, rear + 0.2),
-			axis = "Y",
-			angle = side * 120,
-			trim = extra,
-		})
-	end
-	return { noun = "doors", leaves = leaves, hole = box(Vector3.new(width - 0.5, height - 0.3, 0.05), Vector3.new(0, y, rear + 0.04), "hole") }
-end
-
--- 3.2: a tailgate (or a ramp) hinged at its bottom back edge, dropping backward by `angle` degrees.
-local function tailgate(noun: string, size: Vector3, center: Vector3, angle: number, kind: string?, trim: { Box }?): Back
-	local hinge = Vector3.new(center.X, center.Y - size.Y / 2, center.Z + size.Z / 2)
-	return { noun = noun, leaves = { { size = size, center = center, hinge = hinge, axis = "X", angle = angle, kind = kind, trim = trim } } }
-end
-
--- 4.0: a roll-up door over the back face of a box (`width` wide, from `bottom` to `top`, the face at z = `rear`): one
--- slatted leaf hinged at its top edge that turns up and in under the roof (the noun "roll-up door").
-local function rollUpDoor(width: number, bottom: number, top: number, rear: number): Back
-	local height = top - bottom
-	local y = (bottom + top) / 2
-	local trim: { Box } = {}
-	for n = 1, math.floor(height / 0.8) do
-		table.insert(trim, box(Vector3.new(width - 0.3, 0.08, 0.04), Vector3.new(0, -height / 2 + n * 0.8, 0.12), "dark")) -- the slats
-	end
-	table.insert(trim, box(Vector3.new(1.4, 0.22, 0.16), Vector3.new(0, -height / 2 + 0.45, 0.17), "chrome")) -- the handle
-	local leaf: Leaf = {
-		size = Vector3.new(width - 0.2, height, 0.2),
-		center = Vector3.new(0, y, rear + 0.1),
-		hinge = Vector3.new(0, top, rear + 0.1),
-		axis = "X",
-		angle = 88,
-		trim = trim,
-	}
-	return { noun = "roll-up door", leaves = { leaf }, hole = box(Vector3.new(width - 0.4, height - 0.2, 0.05), Vector3.new(0, y, rear + 0.04), "hole") }
-end
-
--- 4.0, the Freight Truck: a cab-over cab (no hood: you sit over the front wheels) with a wind deflector, a long box with
--- its floor at dock height, side skirts, a fuel tank, an exhaust stack, twin rear tyres, a roll-up door at the back.
-local function freightBoxes(): { Box }
-	return {
-		box(Vector3.new(8.8, 3.0, 6.2), Vector3.new(0, 1.5, -11.9), "body"), -- the cab's lower body (the doors)
-		box(Vector3.new(8.8, 4.0, 5.8), Vector3.new(0, 5.0, -12.1), "glass"), -- the cab
-		box(Vector3.new(8.8, 4.0, 0.4), Vector3.new(0, 5.0, -9.0), "body"), -- its back wall
-		box(Vector3.new(8.8, 0.8, 6.2), Vector3.new(0, 7.4, -11.9), "body"), -- its roof
-		box(Vector3.new(8.2, 1.6, 2.6), Vector3.new(0, 8.6, -10.6), "body"), -- the wind deflector
-		box(Vector3.new(5.0, 1.2, 0.12), Vector3.new(0, 1.0, -15.06), "dark"), -- the grille
-		box(Vector3.new(9.2, 1.0, 0.7), Vector3.new(0, 0.1, -15.3), "dark"), -- the bumper
-		box(Vector3.new(9.0, 9.2, 23.6), Vector3.new(0, 4.6, 3.2), "body"), -- the box
-		box(Vector3.new(9.1, 1.0, 22.8), Vector3.new(0, 2.2, 3.2), "accent"), -- a stripe down the box
-		box(Vector3.new(9.1, 1.6, 14.0), Vector3.new(0, 6.4, 3.2), "logo"), -- the freight band
-		box(Vector3.new(9.2, 0.5, 23.6), Vector3.new(0, 0.25, 3.2), "dark"), -- the bottom rail
-		box(Vector3.new(0.3, 9.2, 0.3), Vector3.new(-4.55, 4.6, -8.45), "rail"), -- the box's corner posts
-		box(Vector3.new(0.3, 9.2, 0.3), Vector3.new(4.55, 4.6, -8.45), "rail"),
-		box(Vector3.new(0.3, 9.2, 0.3), Vector3.new(-4.55, 4.6, 14.85), "rail"),
-		box(Vector3.new(0.3, 9.2, 0.3), Vector3.new(4.55, 4.6, 14.85), "rail"),
-	}
-end
-
-local function freightTrim(): { Box }
-	local list: { Box } = {
-		box(Vector3.new(0.15, 1.1, 15.0), Vector3.new(-4.55, -0.45, 2.5), "dark"), -- side skirts
-		box(Vector3.new(0.15, 1.1, 15.0), Vector3.new(4.55, -0.45, 2.5), "dark"),
-		box(Vector3.new(1.2, 1.2, 2.6), Vector3.new(-4.0, -0.2, -7.5), "chrome"), -- the fuel tank
-		box(Vector3.new(0.45, 6.0, 0.45), Vector3.new(-4.7, 5.0, -9.5), "chrome"), -- the exhaust stack
-		box(Vector3.new(0.5, 0.25, 1.6), Vector3.new(-4.65, 0.4, -12.4), "dark"), -- the cab steps
-		box(Vector3.new(0.5, 0.25, 1.6), Vector3.new(4.65, 0.4, -12.4), "dark"),
-		box(Vector3.new(0.2, 1.3, 0.5), Vector3.new(-4.8, 4.6, -14.4), "dark"), -- the mirrors
-		box(Vector3.new(0.2, 1.3, 0.5), Vector3.new(4.8, 4.6, -14.4), "dark"),
-		box(Vector3.new(8.6, 0.4, 0.4), Vector3.new(0, -0.7, 15.3), "rail"), -- the rear underride bar
-		box(Vector3.new(5.6, 0.25, 0.5), Vector3.new(0, 0.55, 15.25), "plate"), -- the dock plate at the loading floor
-		box(Vector3.new(0.3, 0.3, 0.3), Vector3.new(-4.56, 8.9, -8.2), "amber"), -- marker lights on the box
-		box(Vector3.new(0.3, 0.3, 0.3), Vector3.new(4.56, 8.9, -8.2), "amber"),
-		box(Vector3.new(0.3, 0.3, 0.3), Vector3.new(-4.56, 8.9, 14.6), "amber"),
-		box(Vector3.new(0.3, 0.3, 0.3), Vector3.new(4.56, 8.9, 14.6), "amber"),
-	}
-	for _, x in { -2, -1, 0, 1, 2 } do
-		table.insert(list, box(Vector3.new(0.35, 0.25, 0.35), Vector3.new(x, 7.9, -14.6), "amber")) -- on the cab roof
-	end
-	for _, side in { -1, 1 } do
-		for _, z in { -10.55, 14.65 } do
-			table.insert(list, box(Vector3.new(1.6, 1.4, 0.1), Vector3.new(side * 3.4, -0.85, z), "dark")) -- mud flaps
-		end
-	end
-	return list
-end
-
--- The slatted stall box of the livestock truck: posts and boards on both sides, the horses show between them.
-local function stallBoxes(): { Box }
-	local list = {
-		box(Vector3.new(7.6, 2.4, 2.6), Vector3.new(0, 1.2, -8.7), "body"), -- hood
-		box(Vector3.new(7.6, 4.6, 3.6), Vector3.new(0, 2.3, -5.6), "glass"), -- cab
-		box(Vector3.new(7.6, 0.8, 3.6), Vector3.new(0, 5, -5.6), "body"),
-		box(Vector3.new(7.8, 0.8, 0.6), Vector3.new(0, 0.4, -10.1), "dark"), -- bumper
-		box(Vector3.new(7.6, 0.4, 13.6), Vector3.new(0, 0.2, 3), "dark"), -- stall floor
-		box(Vector3.new(7.6, 7.6, 0.5), Vector3.new(0, 3.8, -3.65), "body"), -- front wall
-		box(Vector3.new(0.25, 3.2, 12.4), Vector3.new(0, 2, 3.2), "rail"), -- divider between the two stalls
-		box(Vector3.new(7.6, 0.4, 0.5), Vector3.new(0, 7.6, 9.8), "dark"),
-	}
-	for _, x in { -3.65, 3.65 } do
-		for _, y in { 1.3, 3.1, 4.9, 6.7 } do
-			table.insert(list, box(Vector3.new(0.3, 0.8, 13.4), Vector3.new(x, y, 3), "wood"))
-		end
-		for _, z in { -3.5, 0.6, 3.6, 6.6, 9.6 } do
-			table.insert(list, box(Vector3.new(0.45, 7.8, 0.45), Vector3.new(x, 3.9, z), "dark"))
-		end
-		table.insert(list, box(Vector3.new(0.5, 0.4, 13.6), Vector3.new(x, 7.9, 3), "body"))
-	end
-	return list
-end
-
--- The fuel truck: a cab, a flatbed with stake sides and a headboard, the barrels stand in a rack.
-local function flatbedBoxes(): { Box }
-	local list = {
-		box(Vector3.new(7.2, 2.2, 5.2), Vector3.new(0, 1.1, -5.4), "body"), -- hood
-		box(Vector3.new(7.2, 4.4, 3.6), Vector3.new(0, 2.2, -1), "glass"), -- cab
-		box(Vector3.new(7.2, 0.8, 3.6), Vector3.new(0, 4.8, -1), "body"),
-		box(Vector3.new(7.4, 0.8, 0.6), Vector3.new(0, 0.4, -8.1), "dark"), -- bumper
-		box(Vector3.new(7.2, 0.5, 7.2), Vector3.new(0, 0.25, 4.4), "plate"), -- the flatbed
-		box(Vector3.new(7.2, 3.4, 0.3), Vector3.new(0, 2.2, 1), "rail"), -- headboard
-		box(Vector3.new(7.2, 0.3, 0.3), Vector3.new(0, 1.9, 4.2), "rail"), -- the rack between the rows
-		-- (3.7: the hazard plates ride on the doors now: Style.doorTrim)
-	}
-	for _, x in { -3.45, 3.45 } do
-		table.insert(list, box(Vector3.new(0.3, 0.4, 7), Vector3.new(x, 2.3, 4.4), "accent")) -- stake rails
-		table.insert(list, box(Vector3.new(0.3, 0.4, 7), Vector3.new(x, 1.3, 4.4), "accent"))
-		for _, z in { 1.2, 4.4, 7.7 } do
-			table.insert(list, box(Vector3.new(0.4, 2.4, 0.4), Vector3.new(x, 1.5, z), "rail"))
-		end
-	end
-	return list
-end
-
--- The ambulance: a white box van with red stripes and crosses, the light bar on the cab roof, the rear doors where
--- the patient gets in (the cargo entry is behind the car).
-local function ambulanceBoxes(): { Box }
-	local list = {
-		box(Vector3.new(7, 2.2, 2.6), Vector3.new(0, 1.1, -6.2), "body"), -- hood
-		box(Vector3.new(7.06, 0.6, 2.6), Vector3.new(0, 1.3, -6.2), "accent"), -- the stripe goes round the nose
-		box(Vector3.new(7, 4.4, 3.6), Vector3.new(0, 2.2, -3.2), "glass"), -- cab
-		box(Vector3.new(7, 0.6, 3.6), Vector3.new(0, 4.7, -3.2), "body"), -- cab roof
-		box(Vector3.new(7.4, 6.4, 8.6), Vector3.new(0, 3.2, 3.2), "body"), -- the patient box
-		box(Vector3.new(7.5, 0.9, 8.6), Vector3.new(0, 1.9, 3.2), "accent"), -- red stripe
-		box(Vector3.new(7.5, 0.3, 8.6), Vector3.new(0, 5.6, 3.2), "accent"), -- thin stripe up top
-		box(Vector3.new(7.2, 0.8, 0.6), Vector3.new(0, 0.4, -7.6), "dark"), -- bumper
-		box(Vector3.new(7.6, 0.3, 0.5), Vector3.new(0, 0.15, 7.6), "dark"), -- rear step
-		box(Vector3.new(5.8, 0.4, 1.3), Vector3.new(0, 5.2, -3.4), "lightbar"), -- the light bar on the cab roof
-		box(Vector3.new(2.5, 0.6, 1.1), Vector3.new(-1.45, 5.7, -3.4), "sirenred"),
-		box(Vector3.new(2.5, 0.6, 1.1), Vector3.new(1.45, 5.7, -3.4), "sirenblue"),
-		box(Vector3.new(0.8, 0.5, 0.8), Vector3.new(-3.1, 6.65, 7.1), "sirenred"), -- corner lights at the back
-		box(Vector3.new(0.8, 0.5, 0.8), Vector3.new(3.1, 6.65, 7.1), "sirenblue"),
-	}
-	-- A red cross on both sides and on the back.
-	for _, x in { -3.76, 3.76 } do
-		table.insert(list, box(Vector3.new(0.1, 2.4, 0.8), Vector3.new(x, 4.1, 3.6), "cross"))
-		table.insert(list, box(Vector3.new(0.1, 0.8, 2.4), Vector3.new(x, 4.1, 3.6), "cross"))
-	end
-	return list
-end
-
--- 3.2: the ambulance's rear doors carry the windows, the red stripes round the back and a red cross on the right one.
-local function ambulanceDoor(side: number): { Box }
-	local list = {
-		box(Vector3.new(2.4, 1.6, 0.06), Vector3.new(-side * 0.375, 0.875, 0.12), "glass"),
-		box(Vector3.new(3.65, 0.9, 0.06), Vector3.new(0, -1.625, 0.12), "accent"),
-		box(Vector3.new(3.65, 0.3, 0.06), Vector3.new(0, 2.075, 0.12), "accent"),
-	}
-	if side > 0 then
-		table.insert(list, box(Vector3.new(1.4, 0.45, 0.08), Vector3.new(-0.375, -0.725, 0.15), "cross"))
-		table.insert(list, box(Vector3.new(0.45, 1.4, 0.08), Vector3.new(-0.375, -0.725, 0.15), "cross"))
-	end
-	return list
-end
-
--- 8.0 SANDBOX, the ZDC Sprinter (Config.Cars sprinter; shared/SprinterLooks.luau: its look in the van's frame, from the
--- ground under its middle): its hull boxes, back doors and points in a style's frame (the chassis' top centre); below,
--- after the parts' helpers, its skin (SprinterBuild.body, door, leaf) and its doors' switches (SprinterBuild.wire). One
--- table: Vehicles' main chunk is near the -O0 register limit (no new top-level locals for it).
-local SprinterBuild = {}
-
-function SprinterBuild.point(at: { number }): Vector3
+-- A point of SprinterLooks (the van's frame: from the ground under its middle) in the chassis' top's frame.
+local function point(at: { number }): Vector3
 	return Vector3.new(at[1], at[2] - Sprinter.Top, at[3])
 end
 
-function SprinterBuild.boxes(): { Box }
-	local list: { Box } = {}
-	for _, b in Sprinter.hull() do
-		table.insert(list, box(Vector3.new(b.size[1], b.size[2], b.size[3]), SprinterBuild.point(b.at), b.kind))
-	end
-	return list
+local function rgb(c: { number }): Color3
+	return Color3.fromRGB(c[1], c[2], c[3])
 end
 
--- Its back doors: two leaves hinged at the body's back corners (their skin: SprinterBuild.leaf).
-function SprinterBuild.back(): Back
+-- The van's measures in the chassis' top's frame (front -Z): its hull boxes, its wheels, its back doors, its cargo.
+local STYLE = (function()
+	local boxes: { Box } = {}
+	for _, b in Sprinter.hull() do
+		table.insert(boxes, { size = Vector3.new(b.size[1], b.size[2], b.size[3]), offset = point(b.at), kind = b.kind })
+	end
 	local leaves: { Leaf } = {}
 	for _, leaf in Sprinter.leaves() do
 		table.insert(leaves, {
 			size = Vector3.new(leaf.size[1], leaf.size[2], leaf.size[3]),
-			center = SprinterBuild.point(leaf.center),
-			hinge = SprinterBuild.point(leaf.hinge),
+			center = point(leaf.center),
+			hinge = point(leaf.hinge),
 			axis = "Y",
 			angle = leaf.angle,
 		})
 	end
-	return { noun = "doors", leaves = leaves }
-end
-
--- Front of the car is -Z (the LookVector).
-local STYLES: { [string]: Style } = {
-	van = {
-		width = 6.6,
-		length = 13,
-		wheel = 1.3,
-		wheelWidth = 1,
-		clearance = 0.9,
-		seat = Vector3.new(-1.4, 0.5, -2.6),
-		passengers = { Vector3.new(1.4, 0.5, -2.6) },
-		roof = 5.4,
-		split = 2, -- 4.0: the Work Van and the Long Cargo Van grow in the middle of the cargo box
-		boxes = {
-			box(Vector3.new(6.6, 2, 2.6), Vector3.new(0, 1, -5.2), "body"), -- hood
-			box(Vector3.new(6.6, 4.4, 4), Vector3.new(0, 2.2, -2), "glass"), -- cabin
-			box(Vector3.new(6.6, 0.6, 4), Vector3.new(0, 4.7, -2), "body"), -- cabin roof
-			box(Vector3.new(6.6, 5, 6.4), Vector3.new(0, 2.5, 3.2), "body"), -- cargo box
-			-- 3.5: a loose, rusty bumper; 4.0: dented and crooked (one end hangs low).
-			box(Vector3.new(6.8, 0.7, 0.5), Vector3.new(0.25, 0.25, -6.6), "rust", "bumper", -4),
-		},
-		-- 3.5, the Rusty Van (stage 0): rust and grey primer over the dents (the Patched Van grinds the rust off, the Work
-		-- Van paints it all over). 4.0: big corroded patches (the sills, the arches, the hood, the roof), a cracked
-		-- windscreen, a dented bumper corner.
-		trim = {
-			box(Vector3.new(0.06, 1.6, 2.6), Vector3.new(-3.32, 1.2, 4.6), "rust", "rust"), -- the left side, low at the back
-			box(Vector3.new(0.06, 0.55, 5.4), Vector3.new(-3.33, 0.3, 2.9), "rust", "rust"), -- both sills
-			box(Vector3.new(0.06, 0.55, 5.8), Vector3.new(3.33, 0.3, 3.0), "rust", "rust"),
-			box(Vector3.new(0.06, 1.2, 1.9), Vector3.new(3.32, 3.6, 2.3), "rust", "rust"), -- the right side, high up
-			box(Vector3.new(0.06, 1.0, 1.4), Vector3.new(3.32, 1.2, 6.0), "rust", "rust"), -- the right rear corner
-			box(Vector3.new(0.06, 1.0, 1.3), Vector3.new(3.32, 1.1, -5.6), "rust", "rust"), -- the front arches
-			box(Vector3.new(0.06, 0.8, 1.1), Vector3.new(-3.32, 1.3, -5.0), "rust", "rust"),
-			box(Vector3.new(2.4, 0.06, 1.5), Vector3.new(1.5, 2.03, -5.4), "rust", "rust"), -- on the hood
-			box(Vector3.new(2.2, 0.06, 2.4), Vector3.new(-1.3, 5.03, 4.4), "rust", "rust"), -- on the roof
-			box(Vector3.new(0.08, 0.9, 1.3), Vector3.new(-3.33, 2.9, 1.4), "primer", "primer"),
-			box(Vector3.new(0.08, 0.7, 1.0), Vector3.new(3.33, 1.5, 4.4), "primer", "primer"),
-			box(Vector3.new(0.7, 0.3, 0.12), Vector3.new(-2.4, 0.15, -6.88), "dark", "bumper"), -- the dent in the bumper
-			-- The cracked windscreen: a few dark lines from a stone chip on the right.
-			crack(1.7, 1.55, 3.35, -4.02, 38),
-			crack(1.3, 0.75, 3.0, -4.02, -62),
-			crack(1.1, 1.95, 2.75, -4.02, -24),
-			crack(0.9, 1.05, 3.75, -4.02, 72),
-			crack(0.7, 2.35, 3.8, -4.02, 12),
-		},
-		primerDoor = 1, -- the driver's door, from another van (4.0)
-		dimHead = true,
-		bald = true,
-		smoky = true,
-		cargo = cargo("van", 13, 6.6, { Vector3.new(-1.5, 0, 4.6), Vector3.new(1.5, 0, 4.6) }),
-		back = rearDoors(6.6, DOOR_SILL, 4.8, 6.4, function(side: number): { Box }
-			return { box(Vector3.new(2.2, 1.2, 0.06), Vector3.new(-side * 0.25, 0.825, 0.12), "glass") } -- rear windows
-		end),
-	},
-	-- 6.25, the ZDC Van in the owner's Blender model (server/VanMesh.luau; design/blender-van/van.py has the same sizes):
-	-- the Old Van's size and wheels, a short sloping hood, a cab door each side where van.py's doors are (the seats in
-	-- their middle), the cargo bay behind a bulkhead and two back doors between the tail lights; a roof gun stands on the
-	-- roof rack. The hull boxes follow the model's outline.
-	zdcvan = {
-		width = 6.6,
-		length = 13,
-		wheel = 1.3,
-		wheelWidth = 1,
-		clearance = 0.9,
-		seat = Vector3.new(-1.4, 0.5, -1.55),
-		passengers = { Vector3.new(1.4, 0.5, -1.55) },
-		roof = 5.0,
-		head = Vector2.new(0.05, -6.6),
-		boxes = {
-			box(Vector3.new(6.6, 1.3, 2.45), Vector3.new(0, 0.65, -5.275), "body"), -- hood
-			box(Vector3.new(6.6, 4.1, 3.7), Vector3.new(0, 2.05, -2.2), "glass"), -- cabin
-			box(Vector3.new(6.6, 0.4, 3.7), Vector3.new(0, 4.3, -2.2), "body"), -- cabin roof
-			box(Vector3.new(6.6, 4.5, 6.85), Vector3.new(0, 2.25, 3.075), "body"), -- cargo box
-			-- the bumpers (6.26: from the chassis' bottom up, -1.2: no hull under it, 0.9 over the wheels' ground as on
-			-- the Old Van; they hung 0.155 lower, the fleet's lowest hull. Only hit boxes: the model shows the bumpers)
-			box(Vector3.new(6.9, 0.75, 0.55), Vector3.new(0, -0.825, -6.7), "dark"),
-			box(Vector3.new(6.9, 0.7, 0.6), Vector3.new(0, -0.85, 6.7), "dark"),
-		},
-		cargo = cargo("van", 13, 6.6, { Vector3.new(-1.4, 0, 4.5), Vector3.new(1.4, 0, 4.5), Vector3.new(-1.4, 0, 1.5), Vector3.new(1.4, 0, 1.5) }),
-		back = rearDoors(4.9, -0.65, 3.9, 6.3),
-	},
-	-- 8.0 SANDBOX, the ZDC Sprinter (Config.Sprinter, shared/SprinterLooks.luau): a high-roof van you walk into. Its
-	-- boxes are only its hidden hull (Style.art: the look is SprinterLooks'): the nose, the cab, the bulkhead and the
-	-- bay's walls and roof round a hollow bay whose floor is the chassis' top (2.4 over the ground). Its 13-stud
-	-- wheelbase under the 22-stud body (Style.wheelAt); the chassis 21.8 long (15° at both ends over its 1.2 clearance).
-	-- The back doors swing round the body's back corners and lie flat against its sides; the Load and back prompts at
-	-- the back opening's middle, outside it.
-	sprinter = {
+	return {
 		width = Sprinter.Width,
 		length = Sprinter.Length,
-		wheel = Config.Sprinter.Wheel,
+		wheel = Config.Sprinter.Wheel, -- radius
 		wheelWidth = 1,
-		clearance = Config.Sprinter.Clearance,
-		seat = SprinterBuild.point(Sprinter.Seat),
-		passengers = { SprinterBuild.point(Sprinter.Passenger) },
-		roof = Config.Sprinter.Height - Sprinter.Top,
-		head = Vector2.new(Sprinter.Head[1] - Sprinter.Top, Sprinter.Head[2]),
-		boxes = SprinterBuild.boxes(),
-		cargo = cargo("van", Sprinter.Length, Sprinter.Width, {
+		clearance = Config.Sprinter.Clearance, -- the chassis' bottom over the ground
+		wheelAt = Vector2.new(Sprinter.Track, Sprinter.Axle), -- the wheels' x and z (±)
+		boxes = boxes,
+		leaves = leaves,
+		door = point(Sprinter.CargoDoor), -- where you load at the back
+		-- the cargo slots: the bottom middles of the pieces, facing the front (Config.Cars capacity of them)
+		slots = {
 			Vector3.new(-1.6, 0, -1.2),
 			Vector3.new(1.6, 0, -1.2),
 			Vector3.new(-1.6, 0, 2.2),
@@ -686,1013 +145,38 @@ local STYLES: { [string]: Style } = {
 			Vector3.new(1.6, 0, 5.6),
 			Vector3.new(-1.6, 0, 9.0),
 			Vector3.new(1.6, 0, 9.0),
-		}, nil, SprinterBuild.point(Sprinter.CargoDoor)),
-		back = SprinterBuild.back(),
-		art = "sprinter",
-		wheelAt = Vector2.new(Sprinter.Track, Sprinter.Axle),
-		doorSpan = Vector2.new(Sprinter.DoorSpan[1], Sprinter.DoorSpan[2]),
-	},
-	pickup = {
-		width = 6.4,
-		length = 13,
-		wheel = 1.4,
-		wheelWidth = 1.1,
-		clearance = 1.0,
-		seat = Vector3.new(-1.3, 0.5, -1.4),
-		passengers = { Vector3.new(1.3, 0.5, -1.4), Vector3.new(-1.5, 0.4, 2.8), Vector3.new(1.5, 0.4, 2.8) },
-		roof = 4.8,
-		boxes = {
-			box(Vector3.new(6.4, 1.8, 3.6), Vector3.new(0, 0.9, -4.7), "body"),
-			box(Vector3.new(6.4, 4, 4), Vector3.new(0, 2, -0.9), "glass"),
-			box(Vector3.new(6.4, 0.6, 4), Vector3.new(0, 4.3, -0.9), "body"),
-			box(Vector3.new(0.4, 1.6, 5.4), Vector3.new(-3, 0.8, 3.8), "body"), -- bed walls
-			box(Vector3.new(0.4, 1.6, 5.4), Vector3.new(3, 0.8, 3.8), "body"),
-			box(Vector3.new(6.8, 0.9, 0.7), Vector3.new(0, 0.3, -6.7), "dark"),
 		},
-		cargo = cargo("pickup", 13, 6.4, { Vector3.new(-1.4, 0, 5.1), Vector3.new(1.4, 0, 5.1) }),
-		back = tailgate("tailgate", Vector3.new(5.6, 1.6, 0.4), Vector3.new(0, 0.8, 6.3), 92, nil, {
-			box(Vector3.new(5.0, 0.25, 0.08), Vector3.new(0, 0.45, 0.22), "dark"), -- the latch bar
-		}),
-	},
-	muscle = {
-		width = 6.4,
-		length = 13.5,
-		wheel = 1.25,
-		wheelWidth = 1.2,
-		clearance = 0.8,
-		seat = Vector3.new(-1.3, 0.2, 0.4),
-		passengers = { Vector3.new(1.3, 0.2, 0.4) },
-		roof = 3.6,
-		boxes = {
-			box(Vector3.new(6.4, 1.4, 13.5), Vector3.new(0, 0.7, 0), "body"),
-			box(Vector3.new(5.6, 2.2, 5), Vector3.new(0, 2.5, 0.6), "glass"),
-			box(Vector3.new(5.6, 0.4, 4), Vector3.new(0, 3.4, 0.8), "body"),
-			box(Vector3.new(1.6, 0.05, 13.5), Vector3.new(0.9, 1.42, 0), "accent"), -- stripes
-			box(Vector3.new(1.6, 0.05, 13.5), Vector3.new(-0.9, 1.42, 0), "accent"),
-		},
-		cargo = cargo("car", 13.5, 6.4, { Vector3.new(-1.2, 0.3, 5), Vector3.new(1.2, 0.3, 5) }), -- 6.7: two in the trunk
-		-- The trunk lid on the rear deck, hinged at its front edge; the spoiler and the stripes ride on it.
-		back = {
-			noun = "trunk",
-			leaves = {
-				{
-					size = Vector3.new(6.0, 0.12, 3.0),
-					center = Vector3.new(0, 1.46, 5.0),
-					hinge = Vector3.new(0, 1.52, 3.5),
-					axis = "X",
-					angle = -65,
-					trim = {
-						box(Vector3.new(6.4, 0.3, 1.4), Vector3.new(0, 1.14, 1.2), "dark"), -- spoiler
-						box(Vector3.new(0.4, 1.2, 0.4), Vector3.new(-2.6, 0.54, 1.2), "dark"),
-						box(Vector3.new(0.4, 1.2, 0.4), Vector3.new(2.6, 0.54, 1.2), "dark"),
-						box(Vector3.new(1.6, 0.03, 3.0), Vector3.new(0.9, 0.07, 0), "accent"), -- the stripes
-						box(Vector3.new(1.6, 0.03, 3.0), Vector3.new(-0.9, 0.07, 0), "accent"),
-					},
-				},
-			},
-			hole = box(Vector3.new(5.6, 0.02, 2.8), Vector3.new(0, 1.45, 5.0), "hole"),
-		},
-	},
-	icecream = {
-		width = 6.8,
-		length = 14,
-		wheel = 1.35,
-		wheelWidth = 1.1,
-		clearance = 0.9,
-		seat = Vector3.new(-1.4, 0.5, -2.4),
-		passengers = { Vector3.new(1.4, 0.5, -2.4) },
-		roof = 5.8,
-		boxes = {
-			box(Vector3.new(6.8, 2, 2.6), Vector3.new(0, 1, -5.7), "body"),
-			box(Vector3.new(6.8, 4.4, 4), Vector3.new(0, 2.2, -2.4), "glass"),
-			box(Vector3.new(6.8, 0.6, 4), Vector3.new(0, 4.7, -2.4), "body"),
-			box(Vector3.new(6.8, 5.6, 7.4), Vector3.new(0, 2.8, 3.3), "body"),
-			box(Vector3.new(6.9, 0.8, 7.4), Vector3.new(0, 1.2, 3.3), "accent"), -- pink stripe
-			box(Vector3.new(0.2, 2.2, 4), Vector3.new(3.45, 3.4, 3.3), "dark"), -- serving window
-			box(Vector3.new(1.4, 2.4, 1.4), Vector3.new(0, 6.6, 4.6), "white"), -- the cone
-			box(Vector3.new(2.6, 2.6, 2.6), Vector3.new(0, 8.4, 4.6), "ball"), -- the scoop
-			box(Vector3.new(7, 0.8, 0.6), Vector3.new(0, 0.4, -7.1), "dark"),
-		},
-		cargo = cargo("truck", 14, 6.8, {
-			Vector3.new(-1.6, 0, 1.4),
-			Vector3.new(1.6, 0, 1.4),
-			Vector3.new(-1.6, 0, 4.6),
-			Vector3.new(1.6, 0, 4.6),
-			Vector3.new(-1.6, 2.5, 1.4), -- 3.4: a shelf over the front pair
-			Vector3.new(1.6, 2.5, 1.4),
-		}),
-		back = rearDoors(6.8, DOOR_SILL, 5.4, 7.0, function(_side: number): { Box }
-			return { box(Vector3.new(3.35, 0.65, 0.06), Vector3.new(0, -1.9, 0.12), "accent") } -- the pink stripe goes round
-		end),
-	},
-	armored = {
-		width = 7.4,
-		length = 15,
-		wheel = 1.6,
-		wheelWidth = 1.3,
-		clearance = 1.1,
-		seat = Vector3.new(-1.6, 0.5, -3.6),
-		passengers = { Vector3.new(1.6, 0.5, -3.6), Vector3.new(-2, 6.2, 5), Vector3.new(2, 6.2, 5) },
-		roof = 6.4,
-		head = Vector2.new(1.5, -8.35), -- on the ram plate
-		boxes = {
-			box(Vector3.new(7.4, 2.4, 3), Vector3.new(0, 1.2, -6), "body"),
-			box(Vector3.new(7.4, 4.6, 4), Vector3.new(0, 2.3, -2.6), "glass"),
-			box(Vector3.new(7.4, 0.8, 4), Vector3.new(0, 5, -2.6), "body"),
-			box(Vector3.new(7.4, 6, 7), Vector3.new(0, 3, 3.6), "body"),
-			box(Vector3.new(7.8, 1, 7.4), Vector3.new(0, 1.6, 3.6), "plate"),
-			box(Vector3.new(7.8, 1, 7.4), Vector3.new(0, 4.4, 3.6), "plate"),
-			box(Vector3.new(8, 2.4, 1), Vector3.new(0, 0.9, -7.8), "plate"), -- ram plate
-			box(Vector3.new(7.6, 1.2, 0.4), Vector3.new(0, 6.6, 7), "plate"), -- roof rail for the gunners
-		},
-		cargo = cargo("truck", 15, 7.4, {
-			Vector3.new(-1.8, 0, 2),
-			Vector3.new(1.8, 0, 2),
-			Vector3.new(-1.8, 0, 5.2),
-			Vector3.new(1.8, 0, 5.2),
-			Vector3.new(-1.8, 2.6, 2), -- 3.4: stacked on top (the army's big loads)
-			Vector3.new(1.8, 2.6, 2),
-			Vector3.new(-1.8, 2.6, 5.2),
-			Vector3.new(1.8, 2.6, 5.2),
-		}),
-		back = rearDoors(7.4, DOOR_SILL, 5.8, 7.3, function(_side: number): { Box }
-			return {
-				box(Vector3.new(3.65, 1, 0.08), Vector3.new(0, -1.775, 0.13), "plate"), -- the armour plates go on over the doors
-				box(Vector3.new(3.65, 1, 0.08), Vector3.new(0, 1.025, 0.13), "plate"),
-			}
-		end),
-	},
-	bus = {
-		width = 8,
-		length = 24,
-		wheel = 1.6,
-		wheelWidth = 1.2,
-		clearance = 1.0,
-		seat = Vector3.new(-2.4, 0.5, -9.4),
-		passengers = {
-			Vector3.new(2.4, 0.5, -6),
-			Vector3.new(-2.4, 0.5, -2),
-			Vector3.new(2.4, 0.5, -2),
-			Vector3.new(-2.4, 0.5, 3),
-			Vector3.new(2.4, 0.5, 3),
-		},
-		rideDoor = -9.6, -- the folding door at the front right (where the kids get on: the cargo entry)
-		roof = 7,
-		boxes = {
-			box(Vector3.new(8, 3, 24), Vector3.new(0, 1.5, 0), "body"),
-			box(Vector3.new(8, 3, 23), Vector3.new(0, 4.5, 0.5), "glass"),
-			box(Vector3.new(8.2, 0.8, 24.2), Vector3.new(0, 6.4, 0), "body"),
-			box(Vector3.new(8.1, 0.4, 24.1), Vector3.new(0, 2.6, 0), "dark"), -- black stripe
-			box(Vector3.new(8.4, 0.8, 0.6), Vector3.new(0, 0.4, -12.2), "dark"),
-			box(Vector3.new(0.2, 1.6, 1.6), Vector3.new(-4.2, 3.6, -8.6), "accent"), -- stop sign
-		},
-		cargo = cargo("bus", 24, 8, {
-			-- the kids sit at the windows
-			Vector3.new(-2.6, 2.2, -4.2),
-			Vector3.new(2.6, 2.2, -4.2),
-			Vector3.new(-2.6, 2.2, 0.5),
-			Vector3.new(2.6, 2.2, 0.5),
-			Vector3.new(-2.6, 2.2, 5.5),
-			Vector3.new(2.6, 2.2, 5.5),
-			Vector3.new(-2.6, 2.2, 8.5),
-			Vector3.new(2.6, 2.2, 8.5),
-		}, Vector3.new(5.5, 0, -9.6)),
-	},
-	movingtruck = {
-		width = 7.4,
-		length = 17,
-		wheel = 1.6,
-		wheelWidth = 1.3,
-		clearance = 1.1,
-		seat = Vector3.new(-1.6, 0.5, -4.8),
-		passengers = { Vector3.new(1.6, 0.5, -4.8) },
-		roof = 8.6,
-		boxes = {
-			box(Vector3.new(7.4, 2.4, 2.4), Vector3.new(0, 1.2, -7.3), "body"),
-			box(Vector3.new(7.4, 4.6, 3.6), Vector3.new(0, 2.3, -4.6), "glass"),
-			box(Vector3.new(7.4, 0.8, 3.6), Vector3.new(0, 5, -4.6), "body"),
-			box(Vector3.new(7.6, 8, 10.6), Vector3.new(0, 4, 2.9), "body"), -- the box
-			box(Vector3.new(7.7, 1.4, 9.6), Vector3.new(0, 5, 2.9), "logo"),
-			box(Vector3.new(7.8, 0.8, 0.6), Vector3.new(0, 0.4, -8.6), "dark"),
-		},
-		cargo = cargo("truck", 17, 7.4, {
-			Vector3.new(-1.8, 0, -0.6),
-			Vector3.new(1.8, 0, -0.6),
-			Vector3.new(-1.8, 0, 2.8),
-			Vector3.new(1.8, 0, 2.8),
-			Vector3.new(-1.8, 0, 6.2),
-			Vector3.new(1.8, 0, 6.2),
-			Vector3.new(-1.8, 3.6, -0.6), -- 3.4: a second layer in the tall box
-			Vector3.new(1.8, 3.6, -0.6),
-			Vector3.new(-1.8, 3.6, 2.8),
-			Vector3.new(1.8, 3.6, 2.8),
-		}),
-		back = rearDoors(7.6, DOOR_SILL, 7.8, 8.2, function(_side: number): { Box }
-			return { box(Vector3.new(3.7, 0.25, 0.06), Vector3.new(0, 2.625, 0.12), "dark") } -- the top rail
-		end),
-	},
-	monster = {
-		width = 8,
-		length = 14,
-		wheel = 3,
-		wheelWidth = 2.2,
-		clearance = 2.6,
-		seat = Vector3.new(-1.4, 0.5, -0.8),
-		passengers = { Vector3.new(1.4, 0.5, -0.8), Vector3.new(-1.8, 2.0, 4), Vector3.new(1.8, 2.0, 4) },
-		roof = 5,
-		head = Vector2.new(1.2, -6.65), -- on the hood's face
-		boxes = {
-			box(Vector3.new(7, 2, 4), Vector3.new(0, 1, -4.6), "body"),
-			box(Vector3.new(7, 4, 4), Vector3.new(0, 2, -0.6), "glass"),
-			box(Vector3.new(7, 0.6, 4), Vector3.new(0, 4.3, -0.6), "body"),
-			box(Vector3.new(7, 1.8, 5), Vector3.new(0, 0.9, 4), "body"),
-			box(Vector3.new(8.4, 1.2, 1), Vector3.new(0, 0.2, -7.2), "plate"),
-			box(Vector3.new(1, 1.4, 12), Vector3.new(-3.2, -0.6, 0), "accent"), -- frame rails
-			box(Vector3.new(1, 1.4, 12), Vector3.new(3.2, -0.6, 0), "accent"),
-			box(Vector3.new(0.3, 1.0, 5), Vector3.new(-3.35, 2.3, 4), "body"), -- 3.2: rails round the bed
-			box(Vector3.new(0.3, 1.0, 5), Vector3.new(3.35, 2.3, 4), "body"),
-		},
-		cargo = cargo("truck", 14, 8, {
-			Vector3.new(-2.2, 1.8, 5.6),
-			Vector3.new(0, 1.8, 5.6),
-			Vector3.new(2.2, 1.8, 5.6),
-			Vector3.new(0, 3.8, 5.6),
-			Vector3.new(-2.2, 3.8, 5.6), -- 3.4: piled higher in the bed
-			Vector3.new(2.2, 3.8, 5.6),
-		}),
-		back = tailgate("tailgate", Vector3.new(6.4, 1.0, 0.25), Vector3.new(0, 2.3, 6.375), 92),
-	},
-	livestock = {
-		width = 7.6,
-		length = 20,
-		wheel = 1.6,
-		wheelWidth = 1.3,
-		clearance = 1.1,
-		seat = Vector3.new(-1.6, 0.5, -5.8),
-		passengers = { Vector3.new(1.6, 0.5, -5.8) },
-		roof = 8.4,
-		boxes = stallBoxes(),
-		cargo = cargo("truck", 20, 7.6, { Vector3.new(-1.8, 0.4, 3.2), Vector3.new(1.8, 0.4, 3.2) }),
-		-- The ramp, folded up at the back: lowered it reaches the ground, the cleats on its inside face up.
-		back = tailgate("ramp", Vector3.new(6.8, 6.6, 0.35), Vector3.new(0, 3.5, 9.8), 112, "wood", {
-			box(Vector3.new(6.4, 0.2, 0.12), Vector3.new(0, -2.4, -0.22), "rail"),
-			box(Vector3.new(6.4, 0.2, 0.12), Vector3.new(0, -1.2, -0.22), "rail"),
-			box(Vector3.new(6.4, 0.2, 0.12), Vector3.new(0, 0, -0.22), "rail"),
-			box(Vector3.new(6.4, 0.2, 0.12), Vector3.new(0, 1.2, -0.22), "rail"),
-			box(Vector3.new(6.4, 0.2, 0.12), Vector3.new(0, 2.4, -0.22), "rail"),
-		}),
-	},
-	fueltruck = {
-		width = 7.2,
-		length = 16,
-		wheel = 1.5,
-		wheelWidth = 1.2,
-		clearance = 1.0,
-		seat = Vector3.new(-1.5, 0.5, -1),
-		passengers = { Vector3.new(1.5, 0.5, -1) },
-		roof = 5.2,
-		boxes = flatbedBoxes(),
-		doorTrim = { box(Vector3.new(0.06, 1.6, 1.3), Vector3.new(0.06, 0.05, -0.45), "white") }, -- the hazard plates
-		cargo = cargo("truck", 16, 7.2, {
-			Vector3.new(-1.7, 0.5, 2.6),
-			Vector3.new(1.7, 0.5, 2.6),
-			Vector3.new(-1.7, 0.5, 6),
-			Vector3.new(1.7, 0.5, 6),
-			Vector3.new(-1.7, 3.3, 2.6), -- 3.4: a second row on top, against the headboard
-			Vector3.new(1.7, 3.3, 2.6),
-		}),
-		back = tailgate("tailgate", Vector3.new(6.4, 1.6, 0.25), Vector3.new(0, 1.3, 7.875), 95, "accent", {
-			box(Vector3.new(6.4, 0.3, 0.08), Vector3.new(0, 0.2, 0.15), "rail"),
-		}),
-	},
-	ambulance = {
-		width = 7,
-		length = 15,
-		wheel = 1.4,
-		wheelWidth = 1.1,
-		clearance = 1.0,
-		seat = Vector3.new(-1.5, 0.5, -3.2),
-		passengers = { Vector3.new(1.5, 0.5, -3.2) },
-		roof = 6.4,
-		boxes = ambulanceBoxes(),
-		-- The patient lies on the stretcher in the back; they get in through the rear doors.
-		cargo = cargo("ambulance", 15, 7, { Vector3.new(0, 0.6, 3.6) }, Vector3.new(0, 0, 15 / 2 + 2.5)),
-		back = rearDoors(7.4, DOOR_SILL, 6.1, 7.5, ambulanceDoor),
-	},
-	-- 3.3, the dealer's new vans. A compact courier van: low, a sliding-door line on the right, an amber light bar.
-	courier = {
-		width = 6.2,
-		length = 12,
-		wheel = 1.2,
-		wheelWidth = 0.95,
-		clearance = 0.8,
-		seat = Vector3.new(-1.3, 0.4, -1.8),
-		passengers = { Vector3.new(1.3, 0.4, -1.8) },
-		roof = 4.7,
-		boxes = {
-			box(Vector3.new(6.2, 1.8, 2.4), Vector3.new(0, 0.9, -4.8), "body"), -- hood
-			box(Vector3.new(6.2, 3.8, 3.6), Vector3.new(0, 1.9, -1.8), "glass"), -- cabin
-			box(Vector3.new(6.2, 0.5, 3.6), Vector3.new(0, 4.05, -1.8), "body"), -- cabin roof
-			box(Vector3.new(6.2, 4.3, 6), Vector3.new(0, 2.15, 3), "body"), -- cargo box
-			box(Vector3.new(6.4, 0.7, 0.5), Vector3.new(0, 0.35, -6.15), "dark"), -- bumper
-			box(Vector3.new(0.06, 3.4, 0.12), Vector3.new(3.11, 1.95, 3.2), "dark"), -- the sliding door's seam …
-			box(Vector3.new(0.08, 0.14, 3.6), Vector3.new(3.12, 3.45, 1.6), "dark"), -- … its rail …
-			box(Vector3.new(0.1, 0.25, 0.6), Vector3.new(3.14, 2.0, 0.7), "dark"), -- … and its handle
-			box(Vector3.new(3.2, 0.3, 0.8), Vector3.new(0, 4.45, -2.9), "dark"), -- the light bar
-			box(Vector3.new(1.1, 0.3, 0.6), Vector3.new(-0.95, 4.75, -2.9), "amber"),
-			box(Vector3.new(1.1, 0.3, 0.6), Vector3.new(0.95, 4.75, -2.9), "amber"),
-		},
-		cargo = cargo("van", 12, 6.2, { Vector3.new(-1.4, 0, 4.4), Vector3.new(1.4, 0, 4.4) }),
-		back = rearDoors(6.2, DOOR_SILL, 4.1, 6.0, function(side: number): { Box }
-			return { box(Vector3.new(2.0, 1.0, 0.06), Vector3.new(-side * 0.25, 0.6, 0.12), "glass") } -- rear windows
-		end),
-	},
-	-- A high-roof van: the roof well over your head, windows down the cargo box, a jump seat behind the passenger.
-	highroof = {
-		width = 6.8,
-		length = 14,
-		wheel = 1.35,
-		wheelWidth = 1.05,
-		clearance = 0.95,
-		seat = Vector3.new(-1.4, 0.5, -2.4),
-		passengers = { Vector3.new(1.4, 0.5, -2.4), Vector3.new(1.6, 0.5, 0.4) },
-		roof = 7.0,
-		boxes = {
-			box(Vector3.new(6.8, 2, 2.6), Vector3.new(0, 1, -5.7), "body"), -- hood
-			box(Vector3.new(6.8, 4.4, 4), Vector3.new(0, 2.2, -2.4), "glass"), -- cabin
-			box(Vector3.new(6.8, 2.2, 4), Vector3.new(0, 5.5, -2.4), "body"), -- the high roof over the cabin
-			box(Vector3.new(6.8, 6.6, 7.4), Vector3.new(0, 3.3, 3.3), "body"), -- cargo box
-			box(Vector3.new(6.86, 1.2, 3.6), Vector3.new(0, 4.4, 1.6), "glass"), -- side windows of the box
-			box(Vector3.new(6.86, 0.5, 7.4), Vector3.new(0, 1.6, 3.3), "accent"), -- a stripe
-			box(Vector3.new(1.6, 0.3, 1.6), Vector3.new(0, 6.75, 4.6), "dark"), -- roof vent
-			box(Vector3.new(7, 0.8, 0.6), Vector3.new(0, 0.4, -7.1), "dark"), -- bumper
-		},
-		cargo = cargo("van", 14, 6.8, {
-			Vector3.new(-1.6, 0, 2.6),
-			Vector3.new(1.6, 0, 2.6),
-			Vector3.new(-1.6, 0, 5.4),
-			Vector3.new(1.6, 0, 5.4),
-		}),
-		back = rearDoors(6.8, DOOR_SILL, 6.4, 7.0, function(side: number): { Box }
-			return {
-				box(Vector3.new(2.2, 1.4, 0.06), Vector3.new(-side * 0.25, 1.0, 0.12), "glass"), -- rear windows
-				box(Vector3.new(3.35, 0.5, 0.06), Vector3.new(0, -2.075, 0.12), "accent"), -- the stripe goes round
-			}
-		end),
-	},
-	-- A box truck: a cab, a gap, a big separate box with a wind deflector over the cab and a bottom rail.
-	boxtruck = {
-		width = 7.4,
-		length = 17,
-		wheel = 1.55,
-		wheelWidth = 1.25,
-		clearance = 1.05,
-		seat = Vector3.new(-1.6, 0.5, -4.4),
-		passengers = { Vector3.new(1.6, 0.5, -4.4), Vector3.new(0, 0.5, -4.4) },
-		roof = 8.2,
-		split = 3, -- 4.0: the Freight Hauler's box grows in its middle
-		boxes = {
-			box(Vector3.new(7.2, 2.4, 2.4), Vector3.new(0, 1.2, -7.3), "body"), -- hood
-			box(Vector3.new(7.2, 4.6, 3.4), Vector3.new(0, 2.3, -4.4), "glass"), -- cab
-			box(Vector3.new(7.2, 0.8, 3.4), Vector3.new(0, 5.0, -4.4), "body"), -- cab roof
-			box(Vector3.new(6.6, 1.4, 1.6), Vector3.new(0, 6.1, -3.9), "body", "deflector"), -- wind deflector
-			box(Vector3.new(7.6, 7.6, 10.4), Vector3.new(0, 4.0, 3.0), "body"), -- the box
-			box(Vector3.new(7.7, 0.9, 9.8), Vector3.new(0, 1.6, 3.0), "accent"), -- a stripe down the box
-			box(Vector3.new(7.8, 0.4, 10.4), Vector3.new(0, 0.2, 3.0), "dark"), -- the bottom rail
-			box(Vector3.new(0.3, 7.6, 0.3), Vector3.new(-3.85, 4.0, -2.05), "rail"), -- the box's front corner posts
-			box(Vector3.new(0.3, 7.6, 0.3), Vector3.new(3.85, 4.0, -2.05), "rail"),
-			box(Vector3.new(7.6, 0.8, 0.6), Vector3.new(0, 0.4, -8.8), "dark", "bumper"), -- bumper
-		},
-		cargo = cargo("truck", 17, 7.4, {
-			Vector3.new(-1.8, 0.4, -0.2),
-			Vector3.new(1.8, 0.4, -0.2),
-			Vector3.new(-1.8, 0.4, 3.2),
-			Vector3.new(1.8, 0.4, 3.2),
-			Vector3.new(-1.8, 0.4, 6.4),
-			Vector3.new(1.8, 0.4, 6.4),
-		}),
-		back = rearDoors(7.6, DOOR_SILL, 7.6, 8.2, function(_side: number): { Box }
-			return {
-				box(Vector3.new(3.7, 0.25, 0.06), Vector3.new(0, 0.2, 0.12), "dark"), -- the latch bar
-				box(Vector3.new(3.65, 0.3, 0.06), Vector3.new(0, -3.0, 0.12), "accent"), -- a reflector strip
-			}
-		end),
-	},
-	-- An armored van: steel plates on the box, the hood and the nose, bars over the windows (its own: Style.armored).
-	armorvan = {
-		width = 7.0,
-		length = 14.5,
-		wheel = 1.45,
-		wheelWidth = 1.15,
-		clearance = 1.0,
-		seat = Vector3.new(-1.5, 0.5, -2.45),
-		passengers = { Vector3.new(1.5, 0.5, -2.45), Vector3.new(1.6, 0.5, 0.5) },
-		roof = 5.5,
-		head = Vector2.new(1.75, -7.3), -- above the ram plate
-		armored = true,
-		boxes = {
-			box(Vector3.new(7.0, 2.2, 2.8), Vector3.new(0, 1.1, -5.85), "body"), -- hood
-			box(Vector3.new(7.0, 4.4, 4), Vector3.new(0, 2.2, -2.45), "glass"), -- cabin
-			box(Vector3.new(7.0, 0.7, 4), Vector3.new(0, 4.75, -2.45), "body"), -- cabin roof
-			box(Vector3.new(7.0, 5.1, 7.7), Vector3.new(0, 2.55, 3.4), "body"), -- cargo box
-			box(Vector3.new(7.2, 1.2, 7.4), Vector3.new(0, 1.4, 3.4), "plate"), -- steel plates
-			box(Vector3.new(7.2, 1.2, 7.4), Vector3.new(0, 3.7, 3.4), "plate"),
-			box(Vector3.new(7.1, 0.25, 2.6), Vector3.new(0, 2.3, -5.85), "plate"), -- on the hood
-			box(Vector3.new(7.4, 1.6, 0.6), Vector3.new(0, 0.6, -7.5), "plate"), -- ram plate
-			-- Grilles over the windscreen and the side windows.
-			box(Vector3.new(0.16, 2.0, 0.16), Vector3.new(-1.8, 3.3, -4.53), "rail"),
-			box(Vector3.new(0.16, 2.0, 0.16), Vector3.new(0, 3.3, -4.53), "rail"),
-			box(Vector3.new(0.16, 2.0, 0.16), Vector3.new(1.8, 3.3, -4.53), "rail"),
-			box(Vector3.new(6.6, 0.16, 0.16), Vector3.new(0, 3.3, -4.53), "rail"),
-			box(Vector3.new(0.16, 2.0, 0.16), Vector3.new(-3.58, 3.3, -3.6), "rail"),
-			box(Vector3.new(0.16, 2.0, 0.16), Vector3.new(-3.58, 3.3, -2.45), "rail"),
-			box(Vector3.new(0.16, 2.0, 0.16), Vector3.new(-3.58, 3.3, -1.3), "rail"),
-			box(Vector3.new(0.16, 0.16, 3.4), Vector3.new(-3.58, 3.3, -2.45), "rail"),
-			box(Vector3.new(0.16, 2.0, 0.16), Vector3.new(3.58, 3.3, -3.6), "rail"),
-			box(Vector3.new(0.16, 2.0, 0.16), Vector3.new(3.58, 3.3, -2.45), "rail"),
-			box(Vector3.new(0.16, 2.0, 0.16), Vector3.new(3.58, 3.3, -1.3), "rail"),
-			box(Vector3.new(0.16, 0.16, 3.4), Vector3.new(3.58, 3.3, -2.45), "rail"),
-			box(Vector3.new(7.0, 0.8, 0.6), Vector3.new(0, 0.4, -7.0), "dark"), -- bumper under the plate
-		},
-		cargo = cargo("van", 14.5, 7.0, { Vector3.new(-1.7, 0, 5.2), Vector3.new(1.7, 0, 5.2), Vector3.new(-1.7, 0, 2.2) }),
-		back = rearDoors(7.0, DOOR_SILL, 4.9, 7.25, function(side: number): { Box }
-			return {
-				box(Vector3.new(3.4, 0.9, 0.08), Vector3.new(0, -1.2, 0.13), "plate"), -- a plate over each door
-				box(Vector3.new(1.8, 0.35, 0.06), Vector3.new(-side * 0.3, 1.1, 0.12), "glass"), -- a gun slit
-			}
-		end),
-	},
-	-- A rally van: lowered, big wheels under flares, stripes over the top and down the side, a roof spoiler.
-	rallyvan = {
-		width = 6.6,
-		length = 13.2,
-		wheel = 1.45,
-		wheelWidth = 1.3,
-		clearance = 0.6,
-		seat = Vector3.new(-1.3, 0.3, -2.0),
-		passengers = { Vector3.new(1.3, 0.3, -2.0) },
-		roof = 4.3,
-		boxes = {
-			box(Vector3.new(6.6, 1.6, 2.6), Vector3.new(0, 0.8, -5.3), "body"), -- hood
-			box(Vector3.new(6.6, 3.4, 3.8), Vector3.new(0, 1.7, -2.1), "glass"), -- cabin
-			box(Vector3.new(6.6, 0.5, 3.8), Vector3.new(0, 3.65, -2.1), "body"), -- cabin roof
-			box(Vector3.new(6.6, 3.9, 6.8), Vector3.new(0, 1.95, 3.2), "body"), -- cargo box
-			box(Vector3.new(6.68, 0.45, 12.4), Vector3.new(0, 1.1, 0.1), "accent"), -- side stripe
-			box(Vector3.new(1.2, 0.05, 2.6), Vector3.new(-0.9, 1.63, -5.3), "accent"), -- stripes over the hood …
-			box(Vector3.new(1.2, 0.05, 2.6), Vector3.new(0.9, 1.63, -5.3), "accent"),
-			box(Vector3.new(1.2, 0.05, 10.6), Vector3.new(-0.9, 3.93, 1.3), "accent"), -- … and the roof
-			box(Vector3.new(1.2, 0.05, 10.6), Vector3.new(0.9, 3.93, 1.3), "accent"),
-			box(Vector3.new(6.4, 0.25, 1.2), Vector3.new(0, 4.55, 5.9), "dark"), -- the spoiler on its posts
-			box(Vector3.new(0.3, 0.5, 0.3), Vector3.new(-2.6, 4.15, 5.9), "dark"),
-			box(Vector3.new(0.3, 0.5, 0.3), Vector3.new(2.6, 4.15, 5.9), "dark"),
-			box(Vector3.new(0.5, 0.35, 3.4), Vector3.new(-3.4, 1.3, -4.65), "dark"), -- wheel flares
-			box(Vector3.new(0.5, 0.35, 3.4), Vector3.new(3.4, 1.3, -4.65), "dark"),
-			box(Vector3.new(0.5, 0.35, 3.4), Vector3.new(-3.4, 1.3, 4.65), "dark"),
-			box(Vector3.new(0.5, 0.35, 3.4), Vector3.new(3.4, 1.3, 4.65), "dark"),
-			box(Vector3.new(6.8, 0.7, 0.5), Vector3.new(0, 0.35, -6.75), "dark"), -- bumper
-		},
-		cargo = cargo("van", 13.2, 6.6, { Vector3.new(-1.4, 0, 4.4), Vector3.new(1.4, 0, 4.4) }),
-		back = rearDoors(6.6, DOOR_SILL, 3.7, 6.6, function(side: number): { Box }
-			return {
-				box(Vector3.new(2.1, 0.9, 0.06), Vector3.new(-side * 0.25, 0.6, 0.12), "glass"), -- rear windows
-				box(Vector3.new(3.2, 0.45, 0.06), Vector3.new(0, -1.225, 0.12), "accent"), -- the side stripe goes round
-			}
-		end),
-	},
-	-- 4.0, the Freight Truck: 9 wide, 30 long, 12 high; 12 slots in three 2 x 2 pallet bays (front to back: a pallet
-	-- fills the first free bay, server/Cargo.luau), the floor at dock height, a roll-up door, the pallet jack inside.
-	freighttruck = {
-		width = 9,
-		length = 30,
-		wheel = 1.9,
-		wheelWidth = 1.3,
-		clearance = 1.6,
-		seat = Vector3.new(-2.4, 2.2, -12.4),
-		passengers = { Vector3.new(2.4, 2.2, -12.4) },
-		roof = 9.4,
-		dual = true,
-		jack = Vector3.new(-3.4, 0.6, 12.8), -- (its grip 2.1 behind: inside the shut roll-up door at 15)
-		boxes = freightBoxes(),
-		trim = freightTrim(),
-		cargo = cargo("truck", 30, 9, {
-			Vector3.new(-2.0, 0.6, -6.7),
-			Vector3.new(2.0, 0.6, -6.7),
-			Vector3.new(-2.0, 0.6, -3.3),
-			Vector3.new(2.0, 0.6, -3.3),
-			Vector3.new(-2.0, 0.6, 0.9),
-			Vector3.new(2.0, 0.6, 0.9),
-			Vector3.new(-2.0, 0.6, 4.3),
-			Vector3.new(2.0, 0.6, 4.3),
-			Vector3.new(-2.0, 0.6, 8.5),
-			Vector3.new(2.0, 0.6, 8.5),
-			Vector3.new(-2.0, 0.6, 11.9),
-			Vector3.new(2.0, 0.6, 11.9),
-		}),
-		back = rollUpDoor(8.6, 0.6, 8.8, 15.0),
-	},
-	-- 5.1, the bikes (Style.bike; Codex's art, server/BikeArt/Geometry.luau, over this hidden hull). The chassis top is
-	-- 2.1 over the ground (clearance 0.9 + the chassis' 1.2): the art's points (from the ground) less 2.1. The boxes are
-	-- a hidden hull over the frame; the wheels come from the art (bikeBody), two on the centre line, four hidden
-	-- colliders 1.9 apart. No back: the rear rack's one light slot (the art's Slot1) loads straight away.
-	-- 6.19: the art is built at BikeArt.Scale (smaller, to the classic R15 rider): the saddle, the slots and the Load
-	-- point follow it (bikeArt); the hull, the colliders and every number of the ride stay 5.1's.
-	bike = {
-		width = 2.4,
-		length = 6.5,
-		wheel = 1.3,
-		wheelWidth = 0.5,
-		clearance = 0.9,
-		seat = bikeArt(0, 3.16 - BikeArt.SaddleDrop, 0.55) - Vector3.new(0, 0.2, 0), -- the seat's top on the art's Saddle point
-		passengers = {},
-		roof = 2,
-		bike = true,
-		boxes = {
-			box(Vector3.new(0.8, 1.2, 4.2), Vector3.new(0, 0.6, 0), "dark"), -- the frame, the saddle, the bars
-		},
-		cargo = cargo("rack", 6.5, 2.4, { bikeArt(0, 2.81, 1.8) }, nil, Vector3.new(0, 0.5, 2.3)),
-	},
-	-- The Cargo Bike: a longer, low frame with a box up front: four light slots on the box floor (four of the art's six
-	-- box points, spread 2 x 2), loaded from the box's left side.
-	cargobike = {
-		width = 2.4,
-		length = 6.9,
-		wheel = 1.3,
-		wheelWidth = 0.5,
-		clearance = 0.9,
-		seat = bikeArt(0, 3.16 - BikeArt.SaddleDrop, 0.85) - Vector3.new(0, 0.2, 0),
-		passengers = {},
-		roof = 2,
-		bike = true,
-		boxes = {
-			box(Vector3.new(0.8, 1.2, 2.6), Vector3.new(0, 0.6, 1.0), "dark"), -- the frame behind the box, the saddle
-			box(Vector3.new(1.6, 0.7, 1.6), Vector3.new(0, 0.35, -0.575), "dark"), -- the box
-		},
-		cargo = cargo("cargo box", 6.9, 2.4, {
-			bikeArt(-0.35, 2.21, -0.95),
-			bikeArt(0.35, 2.21, -0.95),
-			bikeArt(-0.35, 2.21, -0.2),
-			bikeArt(0.35, 2.21, -0.2),
-		}, nil, Vector3.new(-1.2, 0.2, -0.45)),
-	},
-	-- 5.1.1, the E-Scooter (server/ScooterArt/Geometry.luau over this hidden hull): small wheels (radius 0.6, axles at
-	-- z -1.95 and 1.45), so a low hull: the chassis top 1.5 over the ground (clearance 0.3 + 1.2); one low hidden box
-	-- under the stem and the deck (its top 2.1, under a standing rider's hips). The rider stands on the deck (its top
-	-- 0.59): the seat's top at 2.45, about a hip's height over it (client/BikeRider.luau straightens the legs). The rear
-	-- rack's light slots (the art's Slot1 at 1.39; 5.7: a second piece stacked on the first), loaded from behind.
-	scooter = {
-		width = 2.0,
-		length = 5.0,
-		wheel = 0.6,
-		wheelWidth = 0.4,
-		clearance = 0.3,
-		seat = Vector3.new(0, 0.75, -0.2),
-		passengers = {},
-		roof = 2,
-		bike = true,
-		stand = true,
-		boxes = {
-			box(Vector3.new(0.6, 0.6, 3.6), Vector3.new(0, 0.3, -0.2), "dark"), -- the deck, the neck and the stem's foot
-		},
-		-- (6.7: a third piece on the deck at the rider's feet, in front of them, behind the stem)
-		cargo = cargo("rack", 5.0, 2.0, { Vector3.new(0, -0.11, 1.45), Vector3.new(0, 0.95, 1.45), Vector3.new(0, -0.91, -1.25) }, nil, Vector3.new(0, 0.1, 2.3)),
-	},
-}
-
-local CHASSIS_HEIGHT = 1.2
-local FRICTIONLESS = PhysicalProperties.new(0.7, 0, 0, 100, 1)
-
--- ── 3.5, the stages' looks ─────────────────────────────────────────────────
--- What a stage (Config.Cars stages look) does to its car's style: `drop` takes off the style's boxes and trim with
--- those tags, `boxes` adds solid body boxes (a "body" box is painted like the body), `trim` adds cosmetic ones,
--- `slots` are the cargo slots at this stage (as many as the stage's capacity, so the loading fits: tests/run_tests.py
--- counts them), `roof` a new height for the roof gun (over a high roof). Every look keeps the style's back.
--- 4.0: `stretch` makes the body that many studs longer at the style's split (Style.split, stretchStyle): the rear
--- axle, the back, the rear lights, the slots, the CargoDoor, the TrolleyMount, the seats and doors behind the split move
--- back, the long boxes across it get longer, the chassis and the wheel colliders follow (the car stays centred on its
--- chassis: everything also moves forward by half the stretch). The look's own boxes, trim and slots are placed on the
--- stretched body. `fresh`: a stage that fixed the Rusty Van's faults (no primer door, no dim headlight, no bald tyres,
--- no smoke).
-
-type Look = {
-	drop: { string }?,
-	boxes: { Box }?,
-	trim: { Box }?,
-	slots: { Vector3 },
-	roof: number?,
-	hoodBusy: boolean?,
-	stretch: number?,
-	fresh: boolean?,
-}
-
--- The lists one after the other in a new list.
-local function join(...: { Box }): { Box }
-	local list: { Box } = {}
-	for _, part in { ... } do
-		for _, b in part do
-			table.insert(list, b)
-		end
-	end
-	return list
-end
-
--- A ladder standing on the side of a body at x (facing out), centred on z, from `foot` up to `top`.
-local function ladder(x: number, z: number, foot: number, top: number): { Box }
-	local height = top - foot
-	local list = {
-		box(Vector3.new(0.14, height, 0.14), Vector3.new(x, foot + height / 2, z - 0.35), "chrome"),
-		box(Vector3.new(0.14, height, 0.14), Vector3.new(x, foot + height / 2, z + 0.35), "chrome"),
 	}
-	for n = 1, math.floor(height / 0.8) do
-		table.insert(list, box(Vector3.new(0.12, 0.12, 0.7), Vector3.new(x, foot + n * 0.8 - 0.3, z), "chrome"))
-	end
-	return list
-end
+end)()
 
--- Shelves behind the rear doors (seen when they open): boards and uprights on the dark opening at the back face z.
-local function shelves(z: number, half: number, rows: { number }): { Box }
-	local list: { Box } = {}
-	for _, side in { -1, 1 } do
-		for _, y in rows do
-			table.insert(list, box(Vector3.new(1.2, 0.1, 0.04), Vector3.new(side * (half - 0.75), y, z), "wood"))
-		end
-		table.insert(list, box(Vector3.new(0.1, rows[#rows] - rows[1] + 0.8, 0.04), Vector3.new(side * (half - 1.4), (rows[1] + rows[#rows]) / 2, z), "wood"))
-	end
-	return list
-end
-
--- Four mud flaps behind the wheels (y = their middle over the chassis top).
-local function mudFlaps(x: number, y: number, front: number, rear: number, kind: string): { Box }
-	local list: { Box } = {}
-	for _, side in { -1, 1 } do
-		for _, z in { front, rear } do
-			table.insert(list, box(Vector3.new(1.0, 1.2, 0.1), Vector3.new(side * x, y, z), kind))
+-- A Config.Cars entry by its id (nil: none such).
+function Vehicles.carDef(id: string): Config.CarDef?
+	for _, def in Config.Cars do
+		if def.id == id then
+			return def
 		end
 	end
-	return list
+	return nil
 end
 
--- 4.0, the Old Van's stages. The Patched Van: the rust ground off and primed grey where it was, a plain straight
--- bumper; the cracked windscreen, the grey door, the bald tyres, the dim lamp and the smoke stay.
-local VAN_PRIMED: { Box } = {
-	box(Vector3.new(0.07, 1.6, 2.6), Vector3.new(-3.325, 1.2, 4.6), "primer"),
-	box(Vector3.new(0.07, 0.55, 5.4), Vector3.new(-3.335, 0.3, 2.9), "primer"),
-	box(Vector3.new(0.07, 0.55, 5.8), Vector3.new(3.335, 0.3, 3.0), "primer"),
-	box(Vector3.new(0.07, 1.2, 1.9), Vector3.new(3.325, 3.6, 2.3), "primer"),
-	box(Vector3.new(0.07, 1.0, 1.4), Vector3.new(3.325, 1.2, 6.0), "primer"),
-	box(Vector3.new(0.07, 1.0, 1.3), Vector3.new(3.325, 1.1, -5.6), "primer"),
-	box(Vector3.new(0.07, 0.8, 1.1), Vector3.new(-3.325, 1.3, -5.0), "primer"),
-	box(Vector3.new(2.4, 0.07, 1.5), Vector3.new(1.5, 2.035, -5.4), "primer"),
-	box(Vector3.new(2.2, 0.07, 2.4), Vector3.new(-1.3, 5.035, 4.4), "primer"),
-}
-
--- The Work Van (1.5 studs longer: the front half 0.75 forward, the back 0.75 back): clean (no rust, no primer, a new
--- windscreen), a chrome bumper, a step at the back, a ladder up the right side, shelves in the back.
-local VAN_WORK_TRIM = join({
-	box(Vector3.new(5.0, 0.3, 0.6), Vector3.new(0, 0.2, 7.5), "dark"), -- the rear step
-}, ladder(3.55, 0.6, 0.7, 5.3), shelves(7.23, 3.05, { 1.9, 2.9, 3.9 }))
-local VAN_CLEAN = { "rust", "primer", "bumper", "crack" }
-local function vanBumper(z: number): Box
-	return box(Vector3.new(6.9, 0.8, 0.6), Vector3.new(0, 0.4, z), "chrome")
+-- The van's own entry (Config.Sandbox.Van in Config.Cars).
+local function vanDef(): Config.CarDef
+	return Vehicles.carDef(Config.Sandbox.Van) or Config.Cars[1]
 end
 
--- The box truck's Liftgate Truck: a chrome bumper, the liftgate folded under the back, marker lights on the box (4.0:
--- on a box `by` studs longer: the Freight Hauler's).
-local function liftTrim(by: number, shelf: boolean): { Box }
-	local front, back = -by / 2, by / 2
-	local list = {
-		box(Vector3.new(7.0, 0.25, 1.1), Vector3.new(0, -0.25, 8.95 + back), "plate"), -- the liftgate's platform
-		box(Vector3.new(0.25, 1.3, 0.25), Vector3.new(-3.3, 0.3, 8.6 + back), "dark"),
-		box(Vector3.new(0.25, 1.3, 0.25), Vector3.new(3.3, 0.3, 8.6 + back), "dark"),
-		box(Vector3.new(0.3, 0.3, 0.3), Vector3.new(-3.75, 7.65, -2.0 + front), "amber"), -- marker lights
-		box(Vector3.new(0.3, 0.3, 0.3), Vector3.new(3.75, 7.65, -2.0 + front), "amber"),
-		box(Vector3.new(0.3, 0.3, 0.3), Vector3.new(-3.75, 7.65, 8.0 + back), "amber"),
-		box(Vector3.new(0.3, 0.3, 0.3), Vector3.new(3.75, 7.65, 8.0 + back), "amber"),
-	}
-	if shelf then
-		table.insert(list, box(Vector3.new(7.0, 0.12, 0.04), Vector3.new(0, 2.7, 8.28 + back), "wood")) -- the stacked row's shelf
-	end
-	return list
-end
-local function truckBumper(z: number): Box
-	return box(Vector3.new(7.8, 0.8, 0.6), Vector3.new(0, 0.4, z), "chrome")
-end
-
-local LOOKS: { [string]: Look } = {
-	-- 4.0: the Patched Van (2 slots, the same body).
-	van_patched = {
-		drop = { "rust", "bumper" },
-		boxes = { box(Vector3.new(6.8, 0.7, 0.5), Vector3.new(0, 0.35, -6.6), "dark") }, -- a plain new bumper, straight
-		trim = VAN_PRIMED,
-		slots = { Vector3.new(-1.5, 0, 4.6), Vector3.new(1.5, 0, 4.6) },
-	},
-	-- The Work Van: 1.5 studs longer (4.0), clean, the third slot.
-	van_work = {
-		drop = VAN_CLEAN,
-		fresh = true,
-		stretch = 1.5,
-		boxes = { vanBumper(-7.4) },
-		trim = VAN_WORK_TRIM,
-		slots = { Vector3.new(-1.5, 0, 5.35), Vector3.new(1.5, 0, 5.35), Vector3.new(-1.5, 0, 2.0) },
-	},
-	-- The Long Cargo Van (4.0; 3.5's Cargo Van): 3.5 studs longer than the Rusty Van, a high roof (a roof rack on it, the
-	-- gun goes up), a light bar, mud flaps.
-	van_cargo = {
-		drop = VAN_CLEAN,
-		fresh = true,
-		stretch = 3.5,
-		boxes = { vanBumper(-8.4), box(Vector3.new(6.4, 1.3, 9.8), Vector3.new(0, 5.65, 3.2), "body") }, -- the high roof
-		trim = join({
-			box(Vector3.new(5.0, 0.3, 0.6), Vector3.new(0, 0.2, 8.5), "dark"), -- the rear step
-			-- The roof rack on the high roof: two rails on four legs, four cross bars.
-			box(Vector3.new(0.2, 0.2, 7.4), Vector3.new(-2.9, 6.75, 3.6), "dark"),
-			box(Vector3.new(0.2, 0.2, 7.4), Vector3.new(2.9, 6.75, 3.6), "dark"),
-			box(Vector3.new(0.2, 0.35, 0.2), Vector3.new(-2.9, 6.45, 0.2), "dark"),
-			box(Vector3.new(0.2, 0.35, 0.2), Vector3.new(2.9, 6.45, 0.2), "dark"),
-			box(Vector3.new(0.2, 0.35, 0.2), Vector3.new(-2.9, 6.45, 7.0), "dark"),
-			box(Vector3.new(0.2, 0.35, 0.2), Vector3.new(2.9, 6.45, 7.0), "dark"),
-			box(Vector3.new(5.8, 0.15, 0.25), Vector3.new(0, 6.75, 0.3), "dark"),
-			box(Vector3.new(5.8, 0.15, 0.25), Vector3.new(0, 6.75, 2.6), "dark"),
-			box(Vector3.new(5.8, 0.15, 0.25), Vector3.new(0, 6.75, 4.9), "dark"),
-			box(Vector3.new(5.8, 0.15, 0.25), Vector3.new(0, 6.75, 7.2), "dark"),
-			-- The light bar on the cabin roof.
-			box(Vector3.new(3.4, 0.3, 0.7), Vector3.new(0, 5.15, -4.55), "dark"),
-			box(Vector3.new(1.2, 0.3, 0.6), Vector3.new(-1.0, 5.45, -4.55), "amber"),
-			box(Vector3.new(1.2, 0.3, 0.6), Vector3.new(1.0, 5.45, -4.55), "amber"),
-		}, ladder(3.55, 0.0, 0.7, 6.3), shelves(8.23, 3.05, { 1.9, 2.9, 3.9 }), mudFlaps(2.75, -1.05, -4.9, 7.9, "tyre")),
-		slots = { Vector3.new(-1.5, 0, 6.3), Vector3.new(1.5, 0, 6.3), Vector3.new(-1.5, 0, 2.6), Vector3.new(1.5, 0, 2.6) },
-		roof = 6.8,
-	},
-	-- The Express Courier: a body-coloured roof pod behind the gun, a checker stripe down both sides.
-	courier_express = {
-		boxes = { box(Vector3.new(4.4, 0.8, 3.4), Vector3.new(0, 4.7, 3.9), "body") },
-		trim = (function(): { Box }
-			local list: { Box } = {}
-			for _, side in { -1, 1 } do
-				for n = 0, 5 do
-					table.insert(list, box(Vector3.new(0.06, 0.5, 0.9), Vector3.new(side * 3.12, 2.75, 0.75 + n * 0.9), if n % 2 == 0 then "dark" else "logo"))
-				end
-			end
-			return list
-		end)(),
-		slots = { Vector3.new(-1.4, 0, 4.4), Vector3.new(1.4, 0, 4.4), Vector3.new(-1.4, 0, 1.6) },
-	},
-	-- The Tall Hauler: a ladder rack on the roof with a spare wheel, side steps, a stacked shelf in the back.
-	highroof_hauler = {
-		trim = {
-			box(Vector3.new(0.2, 0.2, 4.8), Vector3.new(-3.0, 7.15, 4.2), "dark"),
-			box(Vector3.new(0.2, 0.2, 4.8), Vector3.new(3.0, 7.15, 4.2), "dark"),
-			box(Vector3.new(0.2, 0.45, 0.2), Vector3.new(-3.0, 6.82, 2.0), "dark"),
-			box(Vector3.new(0.2, 0.45, 0.2), Vector3.new(3.0, 6.82, 2.0), "dark"),
-			box(Vector3.new(0.2, 0.45, 0.2), Vector3.new(-3.0, 6.82, 6.4), "dark"),
-			box(Vector3.new(0.2, 0.45, 0.2), Vector3.new(3.0, 6.82, 6.4), "dark"),
-			box(Vector3.new(6.0, 0.15, 0.25), Vector3.new(0, 7.15, 2.0), "dark"),
-			box(Vector3.new(6.0, 0.15, 0.25), Vector3.new(0, 7.15, 4.2), "dark"),
-			box(Vector3.new(6.0, 0.15, 0.25), Vector3.new(0, 7.15, 6.4), "dark"),
-			box(Vector3.new(2.2, 0.6, 2.2), Vector3.new(0, 7.55, 4.9), "tyre"), -- the spare wheel
-			box(Vector3.new(1.0, 0.64, 1.0), Vector3.new(0, 7.55, 4.9), "chrome"),
-			box(Vector3.new(0.5, 0.2, 2.8), Vector3.new(-3.6, -0.15, -2.4), "dark"), -- side steps
-			box(Vector3.new(0.5, 0.2, 2.8), Vector3.new(3.6, -0.15, -2.4), "dark"),
-			box(Vector3.new(6.0, 0.12, 0.04), Vector3.new(0, 2.3, 7.08), "wood"), -- the stacked shelf
-		},
-		slots = { Vector3.new(-1.6, 0, 2.6), Vector3.new(1.6, 0, 2.6), Vector3.new(-1.6, 0, 5.4), Vector3.new(1.6, 0, 5.4), Vector3.new(-1.6, 2.3, 5.4) },
-	},
-	-- The Ranch Pickup: a roll bar behind the cab with two spotlights, chrome rails on the bed.
-	pickup_ranch = {
-		trim = {
-			box(Vector3.new(0.25, 4.2, 0.25), Vector3.new(-2.8, 2.1, 1.7), "dark"),
-			box(Vector3.new(0.25, 4.2, 0.25), Vector3.new(2.8, 2.1, 1.7), "dark"),
-			box(Vector3.new(5.85, 0.25, 0.25), Vector3.new(0, 4.2, 1.7), "dark"),
-			box(Vector3.new(0.7, 0.5, 0.35), Vector3.new(-1.6, 4.55, 1.7), "lamp"),
-			box(Vector3.new(0.7, 0.5, 0.35), Vector3.new(1.6, 4.55, 1.7), "lamp"),
-			box(Vector3.new(0.2, 0.2, 5.0), Vector3.new(-3.0, 1.75, 3.9), "chrome"),
-			box(Vector3.new(0.2, 0.2, 5.0), Vector3.new(3.0, 1.75, 3.9), "chrome"),
-		},
-		slots = { Vector3.new(-1.4, 0, 5.1), Vector3.new(1.4, 0, 5.1), Vector3.new(0, 0, 3.6) },
-	},
-	boxtruck_lift = {
-		drop = { "bumper" },
-		boxes = { truckBumper(-8.8) },
-		trim = liftTrim(0, true),
-		slots = {
-			Vector3.new(-1.8, 0.4, -0.2),
-			Vector3.new(1.8, 0.4, -0.2),
-			Vector3.new(-1.8, 0.4, 3.2),
-			Vector3.new(1.8, 0.4, 3.2),
-			Vector3.new(-1.8, 0.4, 6.4),
-			Vector3.new(1.8, 0.4, 6.4),
-			Vector3.new(-1.8, 2.8, 6.4), -- the stacked row
-		},
-	},
-	-- The Freight Hauler: the Liftgate Truck with a box 3 studs longer (4.0: four rows on the floor, the front 2 x 2 takes
-	-- a pallet: StageDef.pallets), a tall wind deflector over the cab and side skirts.
-	boxtruck_freight = {
-		drop = { "bumper", "deflector" },
-		stretch = 3,
-		boxes = { truckBumper(-10.3), box(Vector3.new(6.8, 2.2, 2.0), Vector3.new(0, 6.5, -5.4), "body") },
-		trim = join(liftTrim(3, false), {
-			box(Vector3.new(0.15, 1.1, 9.0), Vector3.new(-3.85, -0.35, 0), "dark"),
-			box(Vector3.new(0.15, 1.1, 9.0), Vector3.new(3.85, -0.35, 0), "dark"),
-		}),
-		slots = {
-			Vector3.new(-1.8, 0.4, -1.6),
-			Vector3.new(1.8, 0.4, -1.6),
-			Vector3.new(-1.8, 0.4, 1.8),
-			Vector3.new(1.8, 0.4, 1.8),
-			Vector3.new(-1.8, 0.4, 5.2),
-			Vector3.new(1.8, 0.4, 5.2),
-			Vector3.new(-1.8, 0.4, 8.4),
-			Vector3.new(1.8, 0.4, 8.4),
-		},
-	},
-	-- The Street Machine: a blower through the hood (no scoop from the Engine upgrade), side pipes, a wider trunk (6.7:
-	-- three pieces across it).
-	muscle_street = {
-		trim = {
-			box(Vector3.new(1.4, 0.7, 1.4), Vector3.new(0, 1.75, -4.6), "rail"),
-			box(Vector3.new(1.6, 0.35, 0.9), Vector3.new(0, 2.27, -4.6), "chrome"),
-			box(Vector3.new(0.3, 0.3, 4.5), Vector3.new(-3.35, 0.15, -0.6), "chrome"),
-			box(Vector3.new(0.3, 0.3, 4.5), Vector3.new(3.35, 0.15, -0.6), "chrome"),
-		},
-		slots = { Vector3.new(-1.85, 0.3, 5), Vector3.new(0, 0.3, 5), Vector3.new(1.85, 0.3, 5) },
-		hoodBusy = true,
-	},
-	-- The Fortress Van: a shield round the roof gun, lockers on the sides, a spare wheel on the roof.
-	armorvan_fortress = {
-		trim = {
-			box(Vector3.new(3.2, 1.1, 0.2), Vector3.new(0, 5.75, -0.9), "plate"),
-			box(Vector3.new(0.2, 0.9, 2.2), Vector3.new(-1.75, 5.65, 0.4), "plate"),
-			box(Vector3.new(0.2, 0.9, 2.2), Vector3.new(1.75, 5.65, 0.4), "plate"),
-			box(Vector3.new(0.25, 1.0, 2.6), Vector3.new(-3.72, 2.55, 4.8), "rail"),
-			box(Vector3.new(0.25, 1.0, 2.6), Vector3.new(3.72, 2.55, 4.8), "rail"),
-			box(Vector3.new(2.2, 0.55, 2.2), Vector3.new(0, 5.38, 5.7), "tyre"),
-			box(Vector3.new(1.0, 0.57, 1.0), Vector3.new(0, 5.38, 5.7), "chrome"),
-		},
-		slots = { Vector3.new(-1.7, 0, 5.2), Vector3.new(1.7, 0, 5.2), Vector3.new(-1.7, 0, 2.2), Vector3.new(1.7, 0, 2.2) },
-	},
-	-- The Works Rally: a light pod over the windscreen, a roof scoop, mud flaps (cosmetic: no more room).
-	rally_works = {
-		trim = join({
-			box(Vector3.new(3.8, 0.35, 0.5), Vector3.new(0, 4.1, -3.6), "dark"),
-			box(Vector3.new(0.7, 0.7, 0.2), Vector3.new(-1.4, 4.15, -3.9), "lamp"),
-			box(Vector3.new(0.7, 0.7, 0.2), Vector3.new(-0.47, 4.15, -3.9), "lamp"),
-			box(Vector3.new(0.7, 0.7, 0.2), Vector3.new(0.47, 4.15, -3.9), "lamp"),
-			box(Vector3.new(0.7, 0.7, 0.2), Vector3.new(1.4, 4.15, -3.9), "lamp"),
-			box(Vector3.new(1.4, 0.45, 1.6), Vector3.new(0, 4.12, -1.4), "dark"),
-		}, mudFlaps(2.6, -0.95, -3.05, 6.2, "accent")),
-		slots = { Vector3.new(-1.4, 0, 4.4), Vector3.new(1.4, 0, 4.4) },
-	},
-}
-
--- 4.0: a style `by` studs longer at its split (Style.split): a z behind the split moves back by `by`, then everything
--- moves forward by by / 2 (the car stays centred on its chassis, both axles move out by by / 2); a box at least 3 long
--- across the split gets longer instead, a shorter one moves with its centre.
-local function stretchStyle(style: Style, by: number): Style
-	local split = style.split or 0
-	local function z(v: number): number
-		return v + (if v > split then by else 0) - by / 2
-	end
-	local function point(p: Vector3): Vector3
-		return Vector3.new(p.X, p.Y, z(p.Z))
-	end
-	local function moved(b: Box): Box
-		local z0, z1 = b.offset.Z - b.size.Z / 2, b.offset.Z + b.size.Z / 2
-		if b.size.Z >= 3 and z0 < split and z1 > split then
-			return box(b.size + Vector3.new(0, 0, by), b.offset, b.kind, b.tag, b.tilt)
-		end
-		return box(b.size, point(b.offset), b.kind, b.tag, b.tilt)
-	end
-	local function boxes(list: { Box }?): { Box }
-		local out: { Box } = {}
-		local from: { Box } = list or {}
-		for _, b in from do
-			table.insert(out, moved(b))
-		end
-		return out
-	end
-	local out = table.clone(style)
-	out.length = style.length + by
-	out.boxes = boxes(style.boxes)
-	out.trim = boxes(style.trim)
-	out.seat = point(style.seat)
-	local passengers: { Vector3 } = {}
-	for _, p in style.passengers do
-		table.insert(passengers, point(p))
-	end
-	out.passengers = passengers
-	local head = style.head
-	if head then
-		out.head = Vector2.new(head.X, z(head.Y))
-	end
-	local rideDoor = style.rideDoor
-	if rideDoor then
-		out.rideDoor = z(rideDoor)
-	end
-	local jack = style.jack
-	if jack then
-		out.jack = point(jack)
-	end
-	local slots: { Vector3 } = {}
-	for _, slot in style.cargo.slots do
-		table.insert(slots, point(slot))
-	end
-	out.cargo = { slots = slots, noun = style.cargo.noun, door = point(style.cargo.door), entry = point(style.cargo.entry) }
-	local back = style.back
-	if back then
-		local leaves: { Leaf } = {}
-		for _, leaf in back.leaves do
-			local copy = table.clone(leaf)
-			copy.center = point(leaf.center)
-			copy.hinge = point(leaf.hinge)
-			table.insert(leaves, copy)
-		end
-		local hole = back.hole
-		out.back = { noun = back.noun, leaves = leaves, hole = if hole then moved(hole) else nil }
-	end
-	return out
-end
-
--- The style of a car at a stage: its STYLES body with the stage's look on it (cached per look, so a stage's doors,
--- doorsOf, are cached per look too), the plain style for stage 0, a car without stages or a look that is missing.
--- 4.0: the look's stretch first (stretchStyle), then its own boxes, trim and slots on the stretched body.
-local lookStyles: { [string]: Style } = {}
-local function styleFor(def: Config.CarDef, stage: number?): Style
-	local base = STYLES[def.style] or STYLES.van
-	local stageDef = Economy.stageDef(def.id, math.clamp(stage or 0, 0, Economy.maxStage(def.id)))
-	local lookId = stageDef and stageDef.look
-	local look = if lookId then LOOKS[lookId] else nil
-	if not lookId or not look then
-		return base
-	end
-	local cached = lookStyles[lookId]
-	if cached then
-		return cached
-	end
-	local dropped: { [string]: boolean } = {}
-	local tags: { string } = look.drop or {}
-	for _, tag in tags do
-		dropped[tag] = true
-	end
-	local function keep(list: { Box }?): { Box }
-		local out: { Box } = {}
-		local from: { Box } = list or {}
-		for _, b in from do
-			if not (b.tag and dropped[b.tag]) then
-				table.insert(out, b)
-			end
-		end
-		return out
-	end
-	local style = table.clone(base)
-	style.boxes = keep(base.boxes)
-	style.trim = keep(base.trim)
-	local stretch = look.stretch
-	if stretch and stretch > 0 then
-		style = stretchStyle(style, stretch)
-	end
-	style.boxes = join(style.boxes, look.boxes or {})
-	style.trim = join(style.trim or {}, look.trim or {})
-	style.cargo = { slots = look.slots, noun = style.cargo.noun, door = style.cargo.door, entry = style.cargo.entry }
-	style.roof = look.roof or base.roof
-	style.hoodBusy = look.hoodBusy or base.hoodBusy
-	if look.fresh then
-		style.primerDoor = nil
-		style.dimHead = nil
-		style.bald = nil
-		style.smoky = nil
-	end
-	lookStyles[lookId] = style
-	return style
-end
-
--- The lights' colours: lit at night (Neon), dim by day.
-local HEAD_LIT, HEAD_DIM = Color3.fromRGB(255, 246, 214), Color3.fromRGB(196, 202, 206)
-local TAIL_LIT, TAIL_DIM = Color3.fromRGB(255, 36, 30), Color3.fromRGB(116, 22, 22)
-Vehicles.SirenTag = "SirenLight" -- the ambulance's light bar (client/Weather.luau flashes it)
-local SIREN_DIM: { [string]: Color3 } = {
-	sirenred = Color3.fromRGB(120, 34, 34),
-	sirenblue = Color3.fromRGB(34, 44, 120),
-}
-
--- 6.13.1: a moving part's shadow is redrawn every frame: only the pieces big enough throw one (shared/RenderBudget.luau;
--- no lamps, handles, mirrors or trims; by its size alone: a car's thin roof and floor plates make its shadow). (A
--- do-block: no new top-level local.)
-local newPart: (model: Model, name: string, size: Vector3, cframe: CFrame, color: Color3, material: Enum.Material) -> Part
-do
-	local RenderBudget = require(Shared.RenderBudget)
-	newPart = function(model: Model, name: string, size: Vector3, cframe: CFrame, color: Color3, material: Enum.Material): Part
-		local p = Instance.new("Part")
-		p.Name = name
-		p.Size = size
-		p.CFrame = cframe
-		p.Color = color
-		p.Material = material
-		p.TopSurface = Enum.SurfaceType.Smooth
-		p.BottomSurface = Enum.SurfaceType.Smooth
-		p.CollisionGroup = "Car"
-		p.CastShadow = RenderBudget.casts(size.X, size.Y, size.Z)
-		p.Parent = model
-		return p
-	end
+local function newPart(model: Instance, name: string, size: Vector3, cframe: CFrame, color: Color3, material: Enum.Material): Part
+	local p = Instance.new("Part")
+	p.Name = name
+	p.Size = size
+	p.CFrame = cframe
+	p.Color = color
+	p.Material = material
+	p.TopSurface = Enum.SurfaceType.Smooth
+	p.BottomSurface = Enum.SurfaceType.Smooth
+	p.CollisionGroup = "Car"
+	p.CastShadow = RenderBudget.casts(size.X, size.Y, size.Z)
+	p.Parent = model
+	return p
 end
 
 local function weld(a: BasePart, b: BasePart)
@@ -1702,21 +186,15 @@ local function weld(a: BasePart, b: BasePart)
 	w.Parent = b
 end
 
--- 6.16: what the body's looks hang on: the hidden BodyRoot that sways (a player's car, build), else the chassis.
-local function lookOf(model: Model, chassis: BasePart): BasePart
-	local root = model:FindFirstChild("BodyRoot")
-	return if root and root:IsA("BasePart") then root else chassis
-end
+-- ── The look (shared/SprinterLooks.luau) ───────────────────────────────────
+-- One table: the module's top level stays small.
+local SprinterBuild = {}
 
-local function rgb(c: { number }): Color3
-	return Color3.fromRGB(c[1], c[2], c[3])
-end
-
--- 8.0 SANDBOX: pieces of the ZDC Sprinter's look (shared/SprinterLooks.luau, the van's frame) as parts under `parent`:
--- no mass, no collisions, not hit by rays, welded to `to` (nil: not welded). A "paint" piece is the car's colour (it
--- joins paintParts); a lamp shows its day look (server/DayNight.luau; the bay's own lamps follow its light, SprinterBuild.wire); a
--- label on its front face. FleetFinish as on the fleet's skin (the audits and tools/vehicle-preview read it);
--- SprinterVisual: only looks (server/SprinterMesh.luau hides these when the owner's Blender model dresses the van).
+-- Pieces of the van's look (SprinterLooks, the van's frame) as parts under `parent`: no mass, no collisions, not hit by
+-- rays, welded to `to` (nil: not welded). A "paint" piece is the van's colour (it joins paintParts); a lamp shows its
+-- day look (server/DayNight.luau; the bay's own lamps follow its light, SprinterBuild.wire); a label on its front
+-- face. FleetFinish as of old (tools/vehicle-preview reads it); SprinterVisual: only looks (server/SprinterMesh.luau
+-- hides these when the owner's Blender model dresses the van).
 function SprinterBuild.emit(parent: Instance, to: BasePart?, top: CFrame, pieces: { Sprinter.Piece }, color: Color3, paintParts: { BasePart }): { BasePart }
 	local made: { BasePart } = {}
 	for _, piece in pieces do
@@ -1779,20 +257,23 @@ function SprinterBuild.emit(parent: Instance, to: BasePart?, top: CFrame, pieces
 	return made
 end
 
--- The ZDC Sprinter's body (build, Style.art): its skin on the body that sways (look); the colliders its doors switch
--- (SprinterLooks.Switched: the shut doors' blocks, the fold-out steps; on the chassis, a new van shut); the sliding
--- door ("SideDoor") on the Motor6D "SlideMotor" (C0 shut; the server moves it: SprinterBuild.wire) with its "SidePrompt" and the
--- bay's ceiling light (working: a player's van; else the door welded shut, no prompt, no light).
-function SprinterBuild.body(model: Model, look: BasePart, chassis: Part, top: CFrame, color: Color3, paintParts: { BasePart }, working: boolean)
+-- The van's body: its skin and its cab doors' (shut for good: nobody gets in) on the chassis; the colliders its doors
+-- switch (SprinterLooks.Switched: the shut doors' blocks, the fold-out steps; a new van shut); the sliding door
+-- ("SideDoor") on the Motor6D "SlideMotor" (C0 shut; the server moves it: SprinterBuild.wire) with its "SidePrompt" and
+-- the bay's ceiling light (working: a player's van; else the door welded shut, no prompt, no light).
+function SprinterBuild.body(model: Model, chassis: Part, top: CFrame, color: Color3, paintParts: { BasePart }, working: boolean)
 	local folder = Instance.new("Folder")
 	folder.Name = "SprinterBody"
 	folder:SetAttribute("SprinterVisual", true)
 	folder.Parent = model
-	SprinterBuild.emit(folder, look, top, Sprinter.body(), color, paintParts)
+	SprinterBuild.emit(folder, chassis, top, Sprinter.body(), color, paintParts)
+	for _, side in { -1, 1 } do
+		SprinterBuild.emit(folder, chassis, top, Sprinter.door(side), color, paintParts)
+	end
 	for _, s in Sprinter.Switched do
 		local finish = if s.finish then Sprinter.Finish[s.finish] else nil
 		local own = finish and finish.color
-		local p = newPart(model, s.name, Vector3.new(s.size[1], s.size[2], s.size[3]), top * CFrame.new(SprinterBuild.point(s.at)), if own then rgb(own) else color,
+		local p = newPart(model, s.name, Vector3.new(s.size[1], s.size[2], s.size[3]), top * CFrame.new(point(s.at)), if own then rgb(own) else color,
 			if finish then (Enum.Material :: any)[finish.material] :: Enum.Material else Enum.Material.SmoothPlastic)
 		p.Massless = true
 		p.CanCollide = s.solid == "closed"
@@ -1807,18 +288,18 @@ function SprinterBuild.body(model: Model, look: BasePart, chassis: Part, top: CF
 	slide:SetAttribute("FleetFinish", nil) -- (on its Motor6D, not welded: the fleet's audit asks a weld of a FleetFinish)
 	SprinterBuild.emit(slide, slide, top, table.move(pieces, 2, #pieces, 1, {}), color, paintParts)
 	if not working then
-		weld(look, slide)
+		weld(chassis, slide)
 		return
 	end
 	local motor = Instance.new("Motor6D")
 	motor.Name = "SlideMotor"
-	motor.Part0 = look
+	motor.Part0 = chassis
 	motor.Part1 = slide
-	motor.C0 = look.CFrame:ToObjectSpace(slide.CFrame)
+	motor.C0 = chassis.CFrame:ToObjectSpace(slide.CFrame)
 	motor.Parent = chassis
 	local at = Instance.new("Attachment")
 	at.Name = "SlidePoint" -- (not "SideDoor": that is the door, SprinterMesh's door group)
-	at.Position = Vector3.new(0, CHASSIS_HEIGHT / 2, 0) + SprinterBuild.point(Sprinter.SidePrompt)
+	at.Position = Vector3.new(0, CHASSIS_HEIGHT / 2, 0) + point(Sprinter.SidePrompt)
 	at.Parent = chassis
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.Name = "SidePrompt"
@@ -1832,9 +313,9 @@ function SprinterBuild.body(model: Model, look: BasePart, chassis: Part, top: CF
 	model:SetAttribute("SlideOpen", false)
 	local spot = Instance.new("Attachment")
 	spot.Name = "BayLight"
-	spot.Position = Vector3.new(0, CHASSIS_HEIGHT / 2, 0) + SprinterBuild.point(Sprinter.Light)
+	spot.Position = Vector3.new(0, CHASSIS_HEIGHT / 2, 0) + point(Sprinter.Light)
 	spot.Parent = chassis
-	local tune = Config.SandboxLight.Van.Bay -- (8.3: the sandbox's light, Config.SandboxLight)
+	local tune = Config.SandboxLight.Van.Bay -- (8.3: the game's light, Config.SandboxLight)
 	local light = Instance.new("PointLight")
 	light.Name = "BayLight"
 	light.Range = tune.Range
@@ -1845,1226 +326,82 @@ function SprinterBuild.body(model: Model, look: BasePart, chassis: Part, top: CF
 	light.Parent = spot
 end
 
--- A cab door's skin, welded to its hinged panel (buildDoors; the panel itself hidden).
-function SprinterBuild.door(panel: BasePart, side: number, top: CFrame, color: Color3, paintParts: { BasePart })
-	panel.Transparency = 1
-	panel:SetAttribute("SprinterVisual", true)
-	SprinterBuild.emit(panel, panel, top, Sprinter.door(side), color, paintParts)
-end
-
--- A back door's skin (the leaf `index` of SprinterLooks.leaves), welded to the leaf (buildBack).
-function SprinterBuild.leaf(leaf: BasePart, index: number, top: CFrame, color: Color3, paintParts: { BasePart })
-	local spec = Sprinter.leaves()[index]
-	leaf:SetAttribute("SprinterVisual", true) -- (the leaf is its door's panel: only looks)
-	if spec then
-		SprinterBuild.emit(leaf, leaf, top, spec.pieces, color, paintParts)
-	end
-end
-
--- The colour of a car: its paint job, or the factory colour.
-local function paintColor(def: Config.CarDef, paintId: string?): Color3
-	local paint = paintId and Economy.findPaint(paintId)
-	if paint and paint.color then
-		return rgb(paint.color)
-	end
-	return rgb(def.color)
-end
-
--- 3.1: a paint job's finish on the painted body panels (PaintDef.material: Neon, Foil, Metal, Glass …), else the
--- body's own SmoothPlastic. Only the panels in paintParts take it (never the windows, the trim or the lights). A
--- neon paint glows by itself, so its colour is toned down to stay a glow and not a floodlight in the dark.
-local BODY_MATERIAL = Enum.Material.SmoothPlastic
-local function applyPaint(parts: { BasePart }, def: Config.CarDef, paintId: string?)
-	local color = paintColor(def, paintId)
-	local paint = paintId and Economy.findPaint(paintId)
-	local material = BODY_MATERIAL
-	if paint and paint.material then
-		local ok, found = pcall(function()
-			return (Enum.Material :: any)[paint.material]
-		end)
-		if ok and typeof(found) == "EnumItem" then
-			material = found :: Enum.Material
+-- 3.2: the back doors (STYLE.leaves) with their skins (SprinterLooks.leaves' pieces). working (a player's van): each
+-- hangs on a Motor6D "BackHinge" that the clients turn (client/CarVisuals.luau), else it is welded shut. The leaves
+-- join paintParts.
+function SprinterBuild.back(model: Model, chassis: Part, top: CFrame, working: boolean, color: Color3, paintParts: { BasePart })
+	local specs = Sprinter.leaves()
+	for index, leaf in STYLE.leaves do
+		local p = newPart(model, "BackDoor", leaf.size, top * CFrame.new(leaf.center), color, Enum.Material.SmoothPlastic)
+		p.CanCollide, p.CanQuery, p.CanTouch, p.Massless = false, false, false, true
+		p:SetAttribute("SprinterVisual", true) -- (the leaf is its door's panel: only looks)
+		table.insert(paintParts, p)
+		local spec = specs[index]
+		if spec then
+			SprinterBuild.emit(p, p, top, spec.pieces, color, paintParts)
 		end
-	end
-	if material == Enum.Material.Neon then
-		color = color:Lerp(Color3.new(0, 0, 0), 0.35)
-	end
-	for _, p in parts do
-		p.Color = color
-		p.Material = material
-		-- Glass: a dark, glossy, still solid shell (the Phantom), never see-through.
-		p.Reflectance = if material == Enum.Material.Glass then 0.25 elseif material == Enum.Material.Foil then 0.1 else 0
-	end
-end
-
-type Built = {
-	model: Model,
-	chassis: Part,
-	seat: VehicleSeat?,
-	passengers: { Seat },
-	turret: Weld?,
-	turretBase: CFrame,
-	muzzle: Attachment?,
-	paintParts: { BasePart },
-	size: Vector3,
-}
-
--- ── The roof guns ──────────────────────────────────────────────────────────
--- Every car gun's look, in "mount space": the centre of the turret's ring at the roof, -Z forward, Y up. The ring
--- (a flat cylinder 1 stud high) turns; every piece is welded to it. The "Barrel" piece holds the muzzle.
-
-local GUNMETAL = Color3.fromRGB(60, 60, 64)
-local OLIVE = Color3.fromRGB(78, 92, 56)
-local BRASS = Color3.fromRGB(196, 156, 64)
-local METAL = Enum.Material.Metal
-
-type GunPiece = {
-	name: string,
-	size: Vector3, -- a cylinder's length is X
-	at: CFrame, -- in mount space
-	color: Color3,
-	material: Enum.Material?,
-	cylinder: boolean?,
-}
-type GunLook = { pieces: { GunPiece }, muzzle: Vector3 }
-
-local ALONG_Z = CFrame.Angles(0, math.rad(90), 0) -- turns a cylinder's axis (X) to lie along the barrel (Z)
-
-local function gunLook(gunId: string): GunLook
-	local pieces: { GunPiece } = {}
-	local function add(name: string, size: Vector3, at: CFrame, color: Color3, cylinder: boolean?, material: Enum.Material?)
-		table.insert(pieces, { name = name, size = size, at = at, color = color, cylinder = cylinder, material = material })
-	end
-	if gunId == "roofminigun" then
-		-- A rotary cluster: six barrels around a spindle, two clamps, the motor behind, an ammo drum on the side.
-		local y = 1
-		add("Housing", Vector3.new(0.95, 0.95, 1.3), CFrame.new(0, y, 0.45), DARK)
-		add("Barrel", Vector3.new(0.25, 0.25, 3.2), CFrame.new(0, y, -1.4), DARK)
-		for n = 0, 5 do
-			local angle = n * math.pi / 3
-			add("RotaryBarrel", Vector3.new(3, 0.2, 0.2), CFrame.new(math.cos(angle) * 0.3, y + math.sin(angle) * 0.3, -1.5) * ALONG_Z, GUNMETAL, true)
-		end
-		add("Clamp", Vector3.new(0.2, 0.95, 0.95), CFrame.new(0, y, -2.75) * ALONG_Z, DARK, true)
-		add("Clamp", Vector3.new(0.2, 0.95, 0.95), CFrame.new(0, y, -0.9) * ALONG_Z, DARK, true)
-		add("AmmoDrum", Vector3.new(0.7, 1.3, 1.3), CFrame.new(1, 0.95, 0.45), OLIVE, true)
-		add("Feed", Vector3.new(0.5, 0.18, 0.35), CFrame.new(0.55, y + 0.15, 0.45), BRASS)
-		return { pieces = pieces, muzzle = Vector3.new(0, y, -3.1) }
-	elseif gunId == "rooflauncher" then
-		-- One fat tube with rings, the breech behind it and a sight.
-		local y = 1.15
-		add("Barrel", Vector3.new(3.4, 1.2, 1.2), CFrame.new(0, y, -1.1) * ALONG_Z, OLIVE, true)
-		add("Ring", Vector3.new(0.3, 1.4, 1.4), CFrame.new(0, y, -2.7) * ALONG_Z, DARK, true)
-		add("Ring", Vector3.new(0.3, 1.4, 1.4), CFrame.new(0, y, 0.4) * ALONG_Z, DARK, true)
-		add("Breech", Vector3.new(1, 1, 0.8), CFrame.new(0, y, 0.95), DARK)
-		add("Sight", Vector3.new(0.15, 0.5, 0.3), CFrame.new(0.55, y + 0.75, -0.6), GUNMETAL)
-		return { pieces = pieces, muzzle = Vector3.new(0, y, -2.9) }
-	end
-	-- roofmg (and the bandits' pickup): a slim barrel in a cooling jacket on a receiver, an ammo box on the side.
-	local y = 0.9
-	add("Receiver", Vector3.new(0.7, 0.6, 1.6), CFrame.new(0, y, 0.1), DARK)
-	add("Barrel", Vector3.new(0.28, 0.28, 3), CFrame.new(0, y, -2.2), GUNMETAL)
-	add("Jacket", Vector3.new(1.4, 0.45, 0.45), CFrame.new(0, y, -1.3) * ALONG_Z, DARK, true)
-	add("AmmoBox", Vector3.new(0.8, 0.75, 1), CFrame.new(0.8, 0.8, 0.2), OLIVE)
-	add("Belt", Vector3.new(0.45, 0.12, 0.35), CFrame.new(0.38, y + 0.2, 0), BRASS)
-	add("Handles", Vector3.new(0.9, 0.15, 0.15), CFrame.new(0, y, 1), GUNMETAL)
-	return { pieces = pieces, muzzle = Vector3.new(0, y, -3.8) }
-end
-
--- Builds a roof gun on the car: the model "CarGun" with the ring on a Weld (the server turns its C0, Vehicles.aim)
--- and the gun's pieces welded to the ring. Returns the joint and the muzzle.
-local function buildTurret(model: Model, chassis: BasePart, turretBase: CFrame, gunId: string): (Weld, Attachment)
-	local holder = Instance.new("Model")
-	holder.Name = "CarGun"
-	holder:SetAttribute("Gun", gunId)
-	holder.Parent = model
-	local mount = chassis.CFrame * turretBase
-	local base = newPart(holder, "Turret", Vector3.new(1, 2.2, 2.2), mount * CFrame.Angles(0, 0, math.rad(90)), DARK, METAL)
-	base.Shape = Enum.PartType.Cylinder
-	base.CanCollide = false
-	base.Massless = true
-	local turret = Instance.new("Weld")
-	turret.Name = "TurretWeld"
-	turret.Part0 = lookOf(model, chassis) -- 6.16: on the roof that sways (the same frame at rest)
-	turret.Part1 = base
-	turret.C0 = turretBase
-	turret.C1 = CFrame.Angles(0, 0, math.rad(90)):Inverse()
-	turret.Parent = base
-	local look = gunLook(gunId)
-	local barrel: BasePart = base
-	for _, piece in look.pieces do
-		local p = newPart(holder, piece.name, piece.size, mount * piece.at, piece.color, piece.material or METAL)
-		if piece.cylinder then
-			p.Shape = Enum.PartType.Cylinder
-		end
-		p.CanCollide = false
-		p.CanQuery = false
-		p.Massless = true
-		weld(base, p)
-		if piece.name == "Barrel" then
-			barrel = p
-		end
-	end
-	local muzzle = Instance.new("Attachment")
-	muzzle.Name = "Muzzle"
-	muzzle.Parent = barrel
-	muzzle.WorldCFrame = mount * CFrame.new(look.muzzle)
-	return turret, muzzle
-end
-
--- The colour and the material of a Box kind on a car painted `color` (its accent colour: `accent`).
-local function boxLook(kind: string, color: Color3, accent: Color3): (Color3, Enum.Material)
-	if kind == "dark" or kind == "lightbar" then
-		return DARK, Enum.Material.Metal
-	elseif kind == "glass" then
-		return GLASS, Enum.Material.Glass
-	elseif kind == "accent" then
-		return accent, Enum.Material.SmoothPlastic
-	elseif kind == "plate" then
-		return color:Lerp(DARK, 0.5), Enum.Material.DiamondPlate
-	elseif kind == "white" then
-		return Color3.fromRGB(220, 180, 120), Enum.Material.SmoothPlastic
-	elseif kind == "ball" then
-		return Color3.fromRGB(255, 150, 200), Enum.Material.SmoothPlastic
-	elseif kind == "logo" then
-		return Color3.fromRGB(240, 240, 240), Enum.Material.SmoothPlastic
-	elseif kind == "wood" then
-		return Color3.fromRGB(128, 92, 58), Enum.Material.WoodPlanks
-	elseif kind == "rail" then
-		return Color3.fromRGB(70, 72, 76), Enum.Material.Metal
-	elseif kind == "cross" then
-		return Color3.fromRGB(205, 30, 34), Enum.Material.SmoothPlastic
-	elseif kind == "hole" then
-		return Color3.fromRGB(16, 16, 18), Enum.Material.SmoothPlastic
-	elseif kind == "amber" then
-		return Color3.fromRGB(255, 168, 36), Enum.Material.Glass
-	elseif kind == "rust" then
-		return Color3.fromRGB(146, 80, 38), Enum.Material.CorrodedMetal -- 4.0: orange-brown, corroded
-	elseif kind == "primer" then
-		return Color3.fromRGB(146, 146, 138), Enum.Material.SmoothPlastic
-	elseif kind == "chrome" then
-		return Color3.fromRGB(196, 198, 204), Enum.Material.Metal
-	elseif kind == "lamp" then
-		return Color3.fromRGB(255, 244, 214), Enum.Material.Glass
-	elseif kind == "tyre" then
-		return Color3.fromRGB(24, 24, 24), Enum.Material.Rubber
-	elseif kind == "crack" then
-		return Color3.fromRGB(46, 50, 54), Enum.Material.SmoothPlastic
-	elseif SIREN_DIM[kind] then
-		return SIREN_DIM[kind], Enum.Material.SmoothPlastic
-	end
-	return color, Enum.Material.SmoothPlastic
-end
-
--- A cosmetic part of the car (no mass, no collisions, not hit by rays), welded to `to` (nil: not welded).
-local function trimPart(model: Model, name: string, b: Box, at: CFrame, to: BasePart?, color: Color3, accent: Color3): Part
-	local c, material = boxLook(b.kind, color, accent)
-	local p = newPart(model, name, b.size, at, c, material)
-	p.CanCollide = false
-	p.CanQuery = false
-	p.CanTouch = false
-	p.Massless = true
-	if b.kind == "glass" then
-		p.Transparency = 0.45
-	end
-	if to then
-		weld(to, p)
-	end
-	return p
-end
-
--- 3.2: the back that opens (Style.back): every leaf with its trim, the dark opening behind. working (a player's car):
--- each leaf hangs on a Motor6D "BackHinge" that the clients turn (client/CarVisuals.luau), else it is welded shut.
--- The body-coloured leaves join paintParts.
-local function buildBack(model: Model, chassis: Part, top: CFrame, back: Back, working: boolean, color: Color3, accent: Color3, paintParts: { BasePart })
-	local on = lookOf(model, chassis) -- 6.16: the body that sways (the hinges stay children of the chassis)
-	if back.hole then
-		local hole = trimPart(model, "BackHole", back.hole, top * CFrame.new(back.hole.offset), on, color, accent)
-		if model:GetAttribute("FleetArt") or model:GetAttribute("MeshArt") then hole.Transparency = 1 end
-	end
-	for index, leaf in back.leaves do
-		local kind = leaf.kind or "body"
-		local p = trimPart(model, "BackDoor", box(leaf.size, leaf.center, kind), top * CFrame.new(leaf.center), if working then nil else chassis, color, accent)
-		if kind == "body" then
-			table.insert(paintParts, p)
-		end
-		if model:GetAttribute("FleetArt") and back.noun == "doors" then
-			VehicleArt.rear(p, color, paintParts, { weld = weld, nightLight = DayNight.nightLight })
-		end
-		local meshed = model:GetAttribute("MeshArt") ~= nil -- 6.25: the model's own back doors on the hidden leaves
-		if meshed then
-			p.Transparency = 1
-			VanMesh.door(model, p, leaf.center.X, true, top, color, paintParts, { weld = weld, nightLight = DayNight.nightLight })
-		elseif model:GetAttribute("SprinterArt") then
-			SprinterBuild.leaf(p, index, top, color, paintParts) -- 8.0: the ZDC Sprinter's back doors' skin
-		end
-		local trim: { Box } = leaf.trim or {}
-		for _, b in trim do
-			local t = trimPart(model, "BackTrim", b, top * CFrame.new(leaf.center + b.offset), p, color, accent)
-			if meshed then
-				t.Transparency = 1
-			elseif b.kind == "body" then
-				table.insert(paintParts, t)
-			end
-		end
-		if working then
-			-- Hinged, not welded: Part1 = chassis * C0 * Transform * C1:Inverse(), closed with no Transform.
-			local hinge = Instance.new("Motor6D")
-			hinge.Name = "BackHinge"
-			hinge.Part0 = on
-			hinge.Part1 = p
-			hinge.C0 = CFrame.new(Vector3.new(0, CHASSIS_HEIGHT / 2, 0) + leaf.hinge)
-			hinge.C1 = CFrame.new(leaf.hinge - leaf.center)
-			hinge:SetAttribute("Axis", leaf.axis)
-			hinge:SetAttribute("Angle", leaf.angle)
-			hinge.Parent = chassis
-		end
-	end
-end
-
--- The Open / Close text of the back's prompt.
-local function backAction(noun: string, open: boolean): string
-	if noun == "ramp" then
-		return if open then "Raise ramp" else "Lower ramp"
-	end
-	return `{if open then "Close" else "Open"} {noun}`
-end
-
--- ── The upgrades you can see (3.3) ─────────────────────────────────────────
--- The "UpgradeKit" folder in a player's car: a bull bar (Ram Plow), side plates and window grilles (Armor), a hood
--- scoop and twin pipes (Engine). Fitted to every style from its boxes: the front end, the hood, the first window.
-
-local KIT_STEEL = Color3.fromRGB(56, 58, 62)
-local KIT_PLATE = Color3.fromRGB(108, 112, 118)
-local KIT_CHROME = Color3.fromRGB(196, 198, 204)
-
-type Hull = {
-	front: number, -- z of the front end (the bumper, the ram plate)
-	hoodTop: number, -- the hood's top (y over the chassis top)
-	hoodZ: number, -- where the scoop goes (z)
-	hoodLen: number,
-	hood: boolean, -- false: no hood to put a scoop on (the bus)
-	glass: Box?, -- the frontmost window box (the windscreen and the front side windows)
-}
-
--- Is the point inside one of the style's glass boxes?
-local function inGlass(style: Style, point: Vector3): boolean
-	for _, b in style.boxes do
-		if b.kind == "glass" then
-			local d = point - b.offset
-			if math.abs(d.X) < b.size.X / 2 and math.abs(d.Y) < b.size.Y / 2 and math.abs(d.Z) < b.size.Z / 2 then
-				return true
-			end
-		end
-	end
-	return false
-end
-
-local function hullOf(style: Style): Hull
-	local front = -style.length / 2
-	local hoodBox: Box? = nil
-	local glass: Box? = nil
-	for _, b in style.boxes do
-		local edge = b.offset.Z - b.size.Z / 2
-		front = math.min(front, edge)
-		if b.kind == "body" and (hoodBox == nil or edge < (hoodBox :: Box).offset.Z - (hoodBox :: Box).size.Z / 2 - 0.01) then
-			hoodBox = b
-		end
-		if b.kind == "glass" and (glass == nil or edge < (glass :: Box).offset.Z - (glass :: Box).size.Z / 2) then
-			glass = b
-		end
-	end
-	local hull: Hull = { front = front, hoodTop = 2, hoodZ = front + 2, hoodLen = 2, hood = false, glass = glass }
-	local h = hoodBox
-	if h then
-		local edge = h.offset.Z - h.size.Z / 2
-		hull.hoodTop = h.offset.Y + h.size.Y / 2
-		hull.hoodLen = math.min(h.size.Z, 4)
-		hull.hoodZ = if h.size.Z <= 6 then h.offset.Z else edge + 2.6 -- a long body (the muscle car): the front part
-		hull.hood = not inGlass(style, Vector3.new(0, hull.hoodTop + 0.3, hull.hoodZ))
-	end
-	return hull
-end
-
--- The levels the kit shows, as a key (rebuilt only when it changes). 4.0: the tyres too; 4.6: the installed gear.
-local function kitKey(levels: Economy.Upgrades, gear: { [string]: boolean }): string
-	local tracks = `{Economy.level(levels, "plow")}/{Economy.level(levels, "armor")}/{Economy.level(levels, "engine")}`
-	local pieces: { string } = {}
-	for _, def in Config.Gear do
-		if gear[def.id] then
-			table.insert(pieces, def.id)
-		end
-	end
-	return `{tracks}/{Economy.level(levels, "handling")}/{table.concat(pieces, "+")}`
-end
-
--- 4.0, Tyres & Suspension 5: the body sits this much lower over its wheels (a new stance builds the car again).
-local STANCE = 0.25
-local function stanceOf(levels: Economy.Upgrades): number
-	return if Economy.level(levels, "handling") >= 5 then STANCE else 0
-end
-
--- 4.0: where the folded Hand Trolley stands (the Attachment TrolleyMount, relative to the chassis top centre): on the
--- cargo floor (the lowest slot), against the right wall, just inside the back.
-local function trolleySpot(style: Style): Vector3
-	local floor = math.huge
-	for _, slot in style.cargo.slots do
-		floor = math.min(floor, slot.Y)
-	end
-	return Vector3.new(style.width / 2 - 0.9, if floor == math.huge then 0 else floor, style.cargo.door.Z - 1.5)
-end
-
-local KIT_TYRE = Color3.fromRGB(22, 22, 24)
-local KIT_TREAD = Color3.fromRGB(64, 64, 66)
-local KIT_ALLOY = Color3.fromRGB(206, 210, 216)
-local KIT_TROLLEY = Color3.fromRGB(196, 46, 38)
-
--- 4.0, Tyres & Suspension on every tyre of the car: from level 1 new black tyres with a tread ring (two grooves round
--- the tread), from 3 alloy rims (a silver disc, silver spokes); before, a Rusty Van's tyres stay bald and grey (build).
--- The new parts are welded to the tyre (they spin with it) and live in the kit's folder.
-local function fitTyres(model: Model, folder: Instance, style: Style, handling: number)
-	if model:GetAttribute("MeshArt") then
-		return -- 6.25: the model's own wheels
-	end
-	if model:GetAttribute("FleetArt") then
-		VehicleArt.fitTyres(model, handling, { weld = weld, nightLight = DayNight.nightLight })
-		return
-	end
-	for _, tyre in model:GetChildren() do
-		if not tyre:IsA("BasePart") or tyre.Name ~= "Tyre" then
+		if not working then
+			weld(chassis, p)
 			continue
 		end
-		local width, diameter = tyre.Size.X, tyre.Size.Y
-		local function piece(name: string, size: Vector3, at: CFrame, color: Color3, material: Enum.Material, cylinder: boolean)
-			local p = newPart(model, name, size, tyre.CFrame * at, color, material)
-			if cylinder then
-				p.Shape = Enum.PartType.Cylinder
-			end
-			p.CanCollide = false
-			p.CanQuery = false
-			p.CanTouch = false
-			p.Massless = true
-			p.Parent = folder
-			weld(tyre :: BasePart, p)
-			return p
-		end
-		tyre.Color = if handling >= 1 then KIT_TYRE elseif style.bald then BALD else Color3.fromRGB(24, 24, 24)
-		if handling >= 1 then
-			for _, side in { -1, 1 } do
-				piece("TreadRing", Vector3.new(0.1, diameter + 0.05, diameter + 0.05), CFrame.new(side * width * 0.22, 0, 0), KIT_TREAD, Enum.Material.Rubber, true)
-			end
-		end
-		local spoke: Instance? = nil
-		for _, d in model:GetChildren() do
-			if d.Name == "Spoke" and d:IsA("BasePart") and (d.Position - tyre.Position).Magnitude < 0.05 then
-				spoke = d
-			end
-		end
-		if spoke and spoke:IsA("BasePart") then
-			spoke.Color = if handling >= 3 then KIT_ALLOY:Lerp(DARK, 0.3) else Color3.fromRGB(90, 90, 90)
-		end
-		if handling >= 3 then
-			local rim = piece("AlloyRim", Vector3.new(width + 0.11, diameter * 0.72, diameter * 0.72), CFrame.identity, KIT_ALLOY, Enum.Material.Metal, true)
-			rim.Reflectance = 0.15
-			piece("AlloySpoke", Vector3.new(width + 0.16, 0.35, diameter * 0.7), CFrame.identity, KIT_ALLOY:Lerp(DARK, 0.3), Enum.Material.Metal, false)
-		end
+		-- Hinged, not welded: Part1 = chassis * C0 * Transform * C1:Inverse(), closed with no Transform.
+		local hinge = Instance.new("Motor6D")
+		hinge.Name = "BackHinge"
+		hinge.Part0 = chassis
+		hinge.Part1 = p
+		hinge.C0 = CFrame.new(Vector3.new(0, CHASSIS_HEIGHT / 2, 0) + leaf.hinge)
+		hinge.C1 = CFrame.new(leaf.hinge - leaf.center)
+		hinge:SetAttribute("Axis", leaf.axis)
+		hinge:SetAttribute("Angle", leaf.angle)
+		hinge.Parent = chassis
 	end
 end
 
--- ── 5.1, the bikes ──────────────────────────────────────────────────────────
--- Codex's art (server/BikeArt/Geometry.luau): forward -Z, up +Y, from the ground under the bike; the roots Frame,
--- FrontWheel, RearWheel and Crank are ours (hidden parts), ModelArt.build welds the skin to them.
+type Built = { model: Model, chassis: Part, paintParts: { BasePart }, size: Vector3 }
 
-local BIKE_LAMP_LIT = Color3.fromRGB(255, 240, 200)
-local BIKE_HIDDEN = Vector3.new(0.2, 0.2, 0.2)
--- The bike gear's art and where it hangs (a Frame point of the bike's art; the trailer at the rear Hitch), how many
--- light slots it has when Config.Gear gives no room of its own (the 5.1 brief: +2, +3, +4).
-local BIKE_GEAR: { { id: string, point: string, room: number } } = {
-	{ id = "basket", point = "BasketMount", room = 2 },
-	{ id = "panniers", point = "PannierMount", room = 3 },
-	{ id = "trailer", point = "Hitch", room = 4 },
-}
-local STACK = 0.6 -- a gear slot past the art's own points rides this much over another one
-
-local bikeSpecs: { [string]: any } = {}
-local function bikeSpec(id: string): any
-	local spec = bikeSpecs[id]
-	if not spec then
-		spec = if table.find(ScooterArt.ids, id) then ScooterArt.spec(id) else BikeArt.spec(id) -- (5.1.1: the E-Scooter)
-		bikeSpecs[id] = spec
-	end
-	return spec
-end
-
--- The art of a bike (its car id; an unknown one: the Courier Bike, the Cargo Bike's on a cargobike body).
-local function bikeArtId(carId: string, styleId: string): string
-	if carId ~= "cargobike_loaded" and (table.find(BikeArt.ids, carId) or table.find(ScooterArt.ids, carId)) then
-		return carId
-	end
-	return if styleId == "cargobike" then "cargobike" elseif styleId == "scooter" then "escooter" else "citybike"
-end
-
--- A point of an art spec (its `at`, relative to its root: the bike's Frame points are from the ground), or nil.
-local function artPoint(spec: any, name: string): Vector3?
-	for _, point in spec.attachments do
-		if point.name == name then
-			return Vector3.new(point.at[1], point.at[2], point.at[3])
-		end
-	end
-	return nil
-end
-
-local function artOrigin(spec: any, name: string): Vector3
-	local o = spec.origins[name]
-	return Vector3.new(o[1], o[2], o[3])
-end
-
--- A hidden root for the art (or a mover's part): massless, not colliding, not hit by rays.
-local function hiddenPart(parent: Instance, name: string, size: Vector3, at: CFrame): Part
-	local p = Instance.new("Part")
-	p.Name = name
-	p.Size = size
-	p.CFrame = at
-	p.CollisionGroup = "Car"
-	p.Transparency = 1
-	p.CanCollide = false
-	p.CanQuery = false
-	p.CanTouch = false
-	p.Massless = true
-	p.Parent = parent
-	return p
-end
-
--- 6.16: the hidden BodyRoot of a player's car on the Motor6D "BodyRoll" (Part0 the chassis; at rest the root sits
--- right on the chassis, C0 = C1 = the pivot on the axle line under the middle, so its Transform turns the body about
--- that line). Its attribute Style picks the springs (shared/Suspension.luau tune; client/CarSway.luau writes it).
-local function bodyRoot(model: Model, chassis: BasePart, axle: number, styleId: string): Part
-	local root = hiddenPart(model, "BodyRoot", Vector3.new(0.4, 0.4, 0.4), chassis.CFrame)
-	local roll = Instance.new("Motor6D")
-	roll.Name = "BodyRoll"
-	roll.Part0 = chassis
-	roll.Part1 = root
-	roll.C0 = CFrame.new(0, axle, 0)
-	roll.C1 = CFrame.new(0, axle, 0)
-	roll:SetAttribute("Style", styleId)
-	roll.Parent = chassis
-	return root
-end
-
--- A hidden wheel root on a WheelMotor (client/CarVisuals.luau spins every WheelMotor by the speed; Front ones steer,
--- not on a bike: its fork is part of the frame).
-local function wheelRoot(model: Instance, parent: Instance, on: BasePart, at: Vector3, radius: number, width: number, front: boolean): Part
-	local tyre = hiddenPart(model, "BikeWheel", Vector3.new(width, radius * 2, radius * 2), on.CFrame * CFrame.new(at))
-	tyre.Shape = Enum.PartType.Cylinder
-	local motor = Instance.new("Motor6D")
-	motor.Name = "WheelMotor"
-	motor.Part0 = on
-	motor.Part1 = tyre
-	motor.C0 = CFrame.new(at)
-	motor:SetAttribute("Front", front)
-	motor:SetAttribute("Radius", radius)
-	motor.Parent = parent
-	return tyre
-end
-
--- The visible bike over the hidden hull (build): the BikeFrame on the BikeLean Motor6D (its pivot on the ground under
--- the bike), the two wheels and the crank on their Motor6Ds, Codex's skin welded to them, the four hidden wheel
--- colliders on the chassis. beam: a player's bike throws a small light at night. Returns the BikeFrame (the saddle
--- goes on it, so the rider leans with the bike).
-local function bikeBody(model: Model, chassis: Part, chassisY: number, style: Style, artId: string, beam: boolean): Part
-	local spec = bikeSpec(artId)
-	local ground = CFrame.new(0, -chassisY, 0)
-	local frame = hiddenPart(model, "BikeFrame", BIKE_HIDDEN, chassis.CFrame * ground)
-	local lean = Instance.new("Motor6D")
-	lean.Name = "BikeLean"
-	lean.Part0 = chassis
-	lean.Part1 = frame
-	lean.C0 = ground
-	lean.Parent = chassis
-	local front, rear = artOrigin(spec, "FrontWheel"), artOrigin(spec, "RearWheel")
-	-- 6.19: a bike's visible wheels spin by their own (scaled) size: the axle's height over the ground
-	local scaled = spec.origins.Crank ~= nil -- (the E-Scooter's art is not scaled)
-	local targets: { [string]: BasePart } = {
-		Frame = frame,
-		FrontWheel = wheelRoot(model, chassis, frame, front, if scaled then front.Y else style.wheel, 0.3, true),
-		RearWheel = wheelRoot(model, chassis, frame, rear, if scaled then rear.Y else style.wheel, 0.3, false),
-	}
-	if spec.origins.Crank then
-		-- (5.1.1: the E-Scooter has no crank: nothing to pedal.)
-		local crankAt = artOrigin(spec, "Crank")
-		local crank = hiddenPart(model, "Crank", BIKE_HIDDEN, frame.CFrame * CFrame.new(crankAt))
-		local crankMotor = Instance.new("Motor6D")
-		crankMotor.Name = "CrankMotor"
-		crankMotor.Part0 = frame
-		crankMotor.Part1 = crank
-		crankMotor.C0 = CFrame.new(crankAt)
-		crankMotor.Parent = chassis
-		targets.Crank = crank
-	end
-	local art = ModelArt.build(model, spec, targets)
-	for _, p in art.parts do
-		if p:GetAttribute("NightLamp") == true then
-			DayNight.nightLight(p, BIKE_LAMP_LIT, p.Color, p.Material.Name)
-		end
-	end
-	-- The hidden wheel colliders: four, a stable stance under the two visible wheels (no balance physics). 6.19: where
-	-- 5.1's full-size art had its axles (the art is smaller now; the ride is not).
-	local x = style.width / 2 - style.wheelWidth / 2
-	local unscale = if scaled then 1 / BikeArt.Scale else 1
-	for _, z in { front.Z * unscale, rear.Z * unscale } do
-		for _, side in { -1, 1 } do
-			local collider = newPart(model, "WheelCollider", Vector3.new(style.wheelWidth, style.wheel * 2, style.wheel * 2), chassis.CFrame * ground * CFrame.new(side * x, style.wheel, z), DARK, Enum.Material.Rubber)
-			collider.Shape = Enum.PartType.Cylinder
-			collider.Transparency = 1
-			collider.CustomPhysicalProperties = FRICTIONLESS
-			weld(chassis, collider)
-		end
-	end
-	if beam then
-		local at = artPoint(spec, "LightMount") or Vector3.new(0, 3, front.Z + 0.8)
-		local lamp = Instance.new("Attachment")
-		lamp.Name = "BikeLamp"
-		lamp.Position = at + Vector3.new(0, 0, -0.2)
-		lamp.Parent = frame
-		local spot = Instance.new("SpotLight")
-		spot.Face = Enum.NormalId.Front
-		spot.Range = if artId == "rustbike" then 26 else 40
-		spot.Angle = 50
-		spot.Brightness = if artId == "rustbike" then 1.4 else 2.6
-		spot.Color = Color3.fromRGB(255, 240, 210)
-		spot.Shadows = false
-		spot.Parent = lamp
-		DayNight.nightLight(spot)
-	end
-	return frame
-end
-
--- Where the bike's ground is in the chassis' space (its BikeLean's pivot), or nil: not a bike.
-local function bikeGround(chassis: BasePart): CFrame?
-	local lean = chassis:FindFirstChild("BikeLean")
-	return if lean and lean:IsA("Motor6D") then lean.C0 else nil
-end
-
--- The light slots of a bike's installed gear (Config.Gear order: the basket, the panniers, the trailer), relative to
--- the chassis' top centre like Style cargo slots: the art's slot points; more room than points stacks over them.
-local function bikeGearSlots(style: Style, artId: string, gear: { [string]: boolean }): { Vector3 }
-	local out: { Vector3 } = {}
-	local spec = bikeSpec(artId)
-	local top = Vector3.new(0, style.clearance + CHASSIS_HEIGHT, 0) -- the chassis top over the bike's ground
-	for _, piece in BIKE_GEAR do
-		if gear[piece.id] ~= true then
-			continue
-		end
-		local mount = artPoint(spec, piece.point)
-		if not mount then
-			continue
-		end
-		local def = Economy.findGear(piece.id)
-		local room = if def and def.room then def.room else piece.room
-		local gearSpec = bikeSpec(piece.id)
-		local origin = mount
-		if piece.id == "trailer" then
-			-- The trailer's own Frame: its forward Hitch on the bike's rear one.
-			origin = mount - (artPoint(gearSpec, "Hitch") or Vector3.zero)
-		end
-		local points: { Vector3 } = {}
-		for n = 1, 8 do
-			local p = artPoint(gearSpec, `Slot{n}`)
-			if not p then
-				break
-			end
-			table.insert(points, p)
-		end
-		if #points == 0 then
-			table.insert(points, Vector3.zero)
-		end
-		for n = 1, room do
-			local layer = (n - 1) // #points
-			table.insert(out, origin + points[(n - 1) % #points + 1] + Vector3.new(0, layer * STACK, 0) - top)
-		end
-	end
-	return out
-end
-
--- The bike gear on a bike's kit (buildKit): Codex's basket, panniers and trailer on hidden Mount roots at the bike's
--- points. The basket and the panniers ride on the BikeFrame (they lean with it); the trailer is welded rigidly to the
--- chassis behind the rear Hitch, its two wheels on WheelMotors (client/CarVisuals.luau spins them; the kit's are
--- found again when the attribute KitBuilt changes).
-local function bikeGear(model: Model, chassis: Part, folder: Folder, carId: string, gear: { [string]: boolean })
-	local frame = model:FindFirstChild("BikeFrame")
-	local ground = bikeGround(chassis)
-	if not frame or not frame:IsA("BasePart") or not ground then
-		return
-	end
-	local def = Economy.findCar(carId)
-	local spec = bikeSpec(bikeArtId(carId, if def then def.style else "bike"))
-	local groundFrame = chassis.CFrame * ground
-	for _, piece in BIKE_GEAR do
-		local mount = artPoint(spec, piece.point)
-		if gear[piece.id] ~= true or not mount then
-			continue
-		end
-		local gearSpec = bikeSpec(piece.id)
-		if piece.id == "trailer" then
-			local origin = mount - (artPoint(gearSpec, "Hitch") or Vector3.zero)
-			local trailer = hiddenPart(folder, "TrailerFrame", BIKE_HIDDEN, groundFrame * CFrame.new(origin))
-			weld(chassis, trailer)
-			local left, right = artOrigin(gearSpec, "LeftWheel"), artOrigin(gearSpec, "RightWheel")
-			ModelArt.build(folder, gearSpec, {
-				Frame = trailer,
-				LeftWheel = wheelRoot(folder, trailer, trailer, left, left.Y, 0.2, false),
-				RightWheel = wheelRoot(folder, trailer, trailer, right, right.Y, 0.2, false),
-			})
-		else
-			local root = hiddenPart(folder, "GearMount", BIKE_HIDDEN, groundFrame * CFrame.new(mount))
-			weld(frame, root)
-			ModelArt.build(folder, gearSpec, { Mount = root })
-		end
-	end
-end
-
--- (Re)builds the kit of a player's car (carId) for these car-track levels; 4.6: and its installed gear (none: nil).
-local function buildKit(model: Model, chassis: Part, style: Style, levels: Economy.Upgrades, carId: string, gear: { [string]: boolean }?)
-	local old = model:FindFirstChild("UpgradeKit")
-	if old then
-		old:Destroy()
-	end
-	for _, name in { "TrolleyMount", "RoofRackSlot" } do
-		local oldMount = chassis:FindFirstChild(name)
-		if oldMount then
-			oldMount:Destroy()
-		end
-	end
-	local installed: { [string]: boolean } = gear or {}
-	local plow = Economy.level(levels, "plow")
-	local armor = Economy.level(levels, "armor")
-	local engine = Economy.level(levels, "engine")
-	-- 4.0: the Rusty Van smokes until the Engine's first level (client/CarVisuals.luau puffs it at the Exhaust).
-	model:SetAttribute("Smoky", style.smoky == true and engine < 1)
-	local folder = Instance.new("Folder")
-	folder.Name = "UpgradeKit"
-	if style.bike then
-		-- 5.1: a bike shows only its bike gear (no plow, armour, engine, tyres or car gear on it). KitBuilt: the clients
-		-- find the kit's moving parts again (a trailer's wheels: client/CarVisuals.luau).
-		bikeGear(model, chassis, folder, carId, installed)
-		folder.Parent = model
-		model:SetAttribute("KitBuilt", ((model:GetAttribute("KitBuilt") or 0) :: number) + 1)
-		return
-	end
-	fitTyres(model, folder, style, Economy.level(levels, "handling"))
-	local top = chassis.CFrame * CFrame.new(0, CHASSIS_HEIGHT / 2, 0)
-	local on = lookOf(model, chassis) -- 6.16: the kit sways with the body (the same frame at rest)
-	local function add(name: string, size: Vector3, at: Vector3, color: Color3, material: Enum.Material, cylinder: boolean?): Part
-		local frame = top * CFrame.new(at)
-		local p = newPart(model, name, size, if cylinder then frame * ALONG_Z else frame, color, material)
-		if cylinder then
-			p.Shape = Enum.PartType.Cylinder
-		end
-		p.CanCollide = false
-		p.CanQuery = false
-		p.CanTouch = false
-		p.Massless = true
-		p.Parent = folder
-		weld(on, p)
-		return p
-	end
-	local hull = hullOf(style)
-
-	if model:GetAttribute("FleetArt") then
-		VehicleArt.upgrades(model, on, style :: any, folder, plow, armor, engine, { weld = weld, nightLight = DayNight.nightLight })
-	elseif not model:GetAttribute("MeshArt") and not model:GetAttribute("SprinterArt") then -- (6.25: the ZDC Van's model has its own bull bar and roof rack; 8.0: the Sprinter takes no upgrades)
-	-- Ram Plow: a bull bar in front of the nose, wider, thicker and lower-reaching with every level.
-	if plow >= 1 then
-		local width = math.min(style.width + 0.2, style.width - 1.6 + 0.36 * plow)
-		local thick = 0.2 + 0.05 * plow
-		local h = math.clamp(hull.hoodTop, 1.5, 2.6)
-		local z = hull.front - 0.35 - 0.05 * plow
-		for _, side in { -1, 1 } do
-			add("BullBarPost", Vector3.new(thick, h + 1.0, thick), Vector3.new(side * (width / 2 - 0.6), (h - 1.0) / 2, z), KIT_STEEL, Enum.Material.Metal)
-		end
-		add("BullBar", Vector3.new(width, thick, thick), Vector3.new(0, h - thick / 2, z), KIT_STEEL, Enum.Material.Metal)
-		add("BullBar", Vector3.new(width, thick, thick), Vector3.new(0, h * 0.35, z), KIT_STEEL, Enum.Material.Metal)
-		if plow >= 3 then
-			add("PlowBlade", Vector3.new(width + 0.2, 0.8, 0.25), Vector3.new(0, -0.6, z - 0.15), KIT_PLATE, Enum.Material.DiamondPlate)
-		end
-		if plow >= 5 then
-			for _, side in { -1, 1 } do
-				add("PlowPad", Vector3.new(1.2, 0.8, 0.3), Vector3.new(side * (width / 2 - 0.6), h * 0.55, z - 0.25), Color3.fromRGB(24, 24, 24), Enum.Material.Rubber)
-			end
-		end
-	end
-
-	-- Armor: plates along both sides between the wheels (taller with the level), grilles over the first windows from 3.
-	if armor >= 1 and not style.armored then
-		local wz = style.length / 2 - style.wheel - 0.5
-		local z0, z1 = -wz + style.wheel + 0.25, wz - style.wheel - 0.25
-		-- Up to the waist of the body (a little over the hood), taller with the level.
-		local y0 = 0.3
-		local y1 = math.min(y0 + 1.4 + 0.15 * armor, math.max(hull.hoodTop + 0.4, 1.8))
-		local height = y1 - y0
-		if z1 - z0 >= 2 then
-			-- Outside everything already on the sides there.
-			local half = style.width / 2
-			for _, b in style.boxes do
-				local by0, by1 = b.offset.Y - b.size.Y / 2, b.offset.Y + b.size.Y / 2
-				local bz0, bz1 = b.offset.Z - b.size.Z / 2, b.offset.Z + b.size.Z / 2
-				if b.kind ~= "hole" and by1 > y0 and by0 < y1 and bz1 > z0 and bz0 < z1 then
-					half = math.max(half, math.abs(b.offset.X) + b.size.X / 2)
-				end
-			end
-			for _, side in { -1, 1 } do
-				add("ArmorPlate", Vector3.new(0.15, height, z1 - z0), Vector3.new(side * (half + 0.08), (y0 + y1) / 2, (z0 + z1) / 2), KIT_PLATE, Enum.Material.DiamondPlate)
-				if armor >= 4 then
-					add("ArmorRim", Vector3.new(0.22, 0.22, z1 - z0), Vector3.new(side * (half + 0.12), y1 - 0.11, (z0 + z1) / 2), KIT_STEEL, Enum.Material.Metal)
-				end
-			end
-		end
-		local g = hull.glass
-		if armor >= 3 and g then
-			local gTop = g.offset.Y + g.size.Y / 2
-			local gFront = g.offset.Z - g.size.Z / 2
-			local yTop = gTop - 0.25
-			local yBottom = math.max(g.offset.Y - g.size.Y / 2 + 0.2, gTop - 2.2, if hull.hood then hull.hoodTop + 0.1 else -math.huge)
-			local band = yTop - yBottom
-			if band >= 0.6 then
-				local y = (yTop + yBottom) / 2
-				-- The windscreen: three bars and a cross bar.
-				for _, f in { -0.25, 0, 0.25 } do
-					add("Grille", Vector3.new(0.14, band, 0.14), Vector3.new(f * g.size.X, y, gFront - 0.08), KIT_STEEL, Enum.Material.Metal)
-				end
-				add("Grille", Vector3.new(g.size.X - 0.4, 0.14, 0.14), Vector3.new(0, y, gFront - 0.08), KIT_STEEL, Enum.Material.Metal)
-				-- The front side windows: two bars and a cross bar on each side.
-				local span = math.min(g.size.Z, 4.4) - 0.6
-				for _, side in { -1, 1 } do
-					local x = side * (g.size.X / 2 + 0.08)
-					for _, f in { 0.3, 0.7 } do
-						add("Grille", Vector3.new(0.14, band, 0.14), Vector3.new(x, y, gFront + 0.3 + span * f), KIT_STEEL, Enum.Material.Metal)
-					end
-					add("Grille", Vector3.new(0.14, 0.14, span), Vector3.new(x, y, gFront + 0.3 + span / 2), KIT_STEEL, Enum.Material.Metal)
-				end
-			end
-		end
-	end
-
-	-- Engine from 3: a scoop on the hood (taller at 5) and two exhaust pipes under the back.
-	if engine >= 3 then
-		if hull.hood and not style.hoodBusy then
-			local tall = 0.45 + 0.1 * (engine - 3)
-			local length = math.min(hull.hoodLen * 0.55, 2.2)
-			add("HoodScoop", Vector3.new(2.2, tall, length), Vector3.new(0, hull.hoodTop + tall / 2, hull.hoodZ), KIT_STEEL, Enum.Material.Metal)
-			add("ScoopIntake", Vector3.new(1.8, tall * 0.6, 0.06), Vector3.new(0, hull.hoodTop + tall / 2, hull.hoodZ - length / 2 - 0.03), Color3.fromRGB(16, 16, 18), Enum.Material.SmoothPlastic)
-		end
-		-- (Not under a horse ramp: it folds down over the back end.)
-		local back = style.back
-		if not (back and back.noun == "ramp") then
-			for _, side in { -1, 1 } do
-				add("Exhaust", Vector3.new(1.0, 0.42, 0.42), Vector3.new(side * (style.width / 2 - 1.3), -0.75, style.length / 2 + 0.3), KIT_CHROME, Enum.Material.Metal, true)
-			end
-		end
-	end
-
-	end -- stock company vehicle kit
-
-	-- 4.0, the Hand Trolley: folded upright against the right wall just inside the back (seen when the back opens), its
-	-- Attachment TrolleyMount on the chassis at its foot (the chassis' axes). server/Cargo.luau builds the trolley you
-	-- push at the mount and may hide this folded one (the model "FoldedTrolley" in the kit) while it is out.
-	-- 4.6: gear installed on the car (Config.Gear "trolley").
-	if installed.trolley == true and Economy.gearFits(carId, "trolley") then
-		local spot = trolleySpot(style)
-		local mount = Instance.new("Attachment")
-		mount.Name = "TrolleyMount"
-		mount.Position = Vector3.new(0, CHASSIS_HEIGHT / 2, 0) + spot
-		mount.Parent = chassis
-		local trolley = Instance.new("Model")
-		trolley.Name = "FoldedTrolley"
-		trolley.Parent = folder
-		local function bar(name: string, size: Vector3, at: Vector3, color: Color3, material: Enum.Material, cylinder: boolean?)
-			add(name, size, spot + at, color, material, cylinder).Parent = trolley
-		end
-		for _, z in { -0.5, 0.5 } do
-			bar("TrolleyRail", Vector3.new(0.12, 3.0, 0.12), Vector3.new(0, 1.6, z), KIT_TROLLEY, Enum.Material.Metal)
-			bar("TrolleyWheel", Vector3.new(0.25, 0.7, 0.7), Vector3.new(0.12, 0.35, z * 1.15), Color3.fromRGB(24, 24, 24), Enum.Material.Rubber, true)
-		end
-		bar("TrolleyHandle", Vector3.new(0.12, 0.12, 1.12), Vector3.new(0, 3.1, 0), KIT_TROLLEY, Enum.Material.Metal)
-		bar("TrolleyBar", Vector3.new(0.1, 0.1, 1.0), Vector3.new(0, 1.7, 0), KIT_TROLLEY, Enum.Material.Metal)
-		bar("TrolleyNose", Vector3.new(0.08, 0.7, 1.1), Vector3.new(-0.14, 0.45, 0), KIT_PLATE, Enum.Material.DiamondPlate)
-	end
-
-	-- 4.6, the other gear (the straps, the cooler, the roof rack) in the FleetArt skin's pieces (VehicleArt.gear), laid
-	-- out over the cargo slots: their floor and the front and back of the load (a slot is Config.Cargo.SlotDepth deep).
-	-- The Roof Rack's light piece rides at the Attachment RoofRackSlot (server/Cargo.luau).
-	local straps = installed.straps == true and Economy.gearFits(carId, "straps")
-	local cooler = installed.cooler == true and Economy.gearFits(carId, "cooler")
-	local rack = installed.roofrack == true and Economy.gearFits(carId, "roofrack")
-	if (straps or cooler or rack) and model:GetAttribute("FleetArt") and #style.cargo.slots > 0 then
-		local floor, front, back = math.huge, math.huge, -math.huge
-		for _, slot in style.cargo.slots do
-			floor = math.min(floor, slot.Y)
-			front = math.min(front, slot.Z - Config.Cargo.SlotDepth / 2)
-			back = math.max(back, slot.Z + Config.Cargo.SlotDepth / 2)
-		end
-		local spot = VehicleArt.gear(model, on, style :: any, folder, { straps = straps, cooler = cooler, roofrack = rack }, { floor = floor, front = front, back = back }, { weld = weld, nightLight = DayNight.nightLight })
-		if spot then
-			local slot = Instance.new("Attachment")
-			slot.Name = "RoofRackSlot"
-			slot.Position = Vector3.new(0, CHASSIS_HEIGHT / 2, 0) + spot
-			slot.Parent = chassis
-		end
-	end
-
-	folder.Parent = model
-end
-
--- ── 3.7, the doors ─────────────────────────────────────────────────────────
--- You get in at a door, not anywhere round the car: the driver's door on the left (every style seats the driver on
--- the left, -X; the front is -Z), the front passenger's on the right, a seat further back (a pickup's or a monster
--- truck's bed, the army truck's roof gunners, a van's jump seat) at its own side, and the bus's passengers all through
--- its folding door at the front right (Style.rideDoor). Seats side by side at one door share it (the box truck's
--- middle seat). A door of the cabin has a panel that swings open (a hinged, massless, non-colliding part painted like
--- the body, over the lower half of the cabin's side glass: the window shows above it); the others only a prompt.
--- Each door has an Attachment "Door{n}" on the chassis just outside it with the prompt in it: the DrivePrompt at the
--- driver's door, a RidePrompt at every passenger door (the attribute Door = n; its seats carry the same attribute).
--- The prompts reach only Config.Cargo.DoorReach, so on the passenger side the driver's E never shows.
-
-export type CarDoor = {
-	side: number, -- -1 left, 1 right
-	z: number, -- the middle of the door along the car (also where you step out)
-	driver: boolean,
-	seats: { number }, -- the passenger seats (Style.passengers / Car.passengers indices) behind it; none at the driver's
-	outside: number, -- the outer face of the body there (|x|, relative to the chassis centre line)
-	promptY: number, -- the prompt's height over the chassis top
-	panel: Box?, -- the door panel (relative to the chassis top centre, closed); nil: no panel, only the prompt
-	hinge: Vector3?, -- the panel's front outer edge, where it turns out
-	trim: { Box }, -- on the panel: offsets from its centre
-}
-
-local DOOR_THICK = 0.1
-local DOOR_FRONT, DOOR_BACK = 1.3, 1.2 -- the panel reaches this far before and behind the seat's middle
-local DOOR_SOLID: { [string]: boolean } = { body = true, glass = true, plate = true } -- the shell a door sits on
-local DOOR_STRIPES: { [string]: boolean } = { accent = true, dark = true, logo = true } -- side stripes go on over it
-
-local doorCache: { [Style]: { CarDoor } } = setmetatable({}, { __mode = "k" }) :: any
-
--- The highest point of the wheels between z0 and z1 (over the chassis top), -inf when no wheel is there.
-local function wheelTop(style: Style, z0: number, z1: number): number
-	local wheelAt = style.wheelAt -- (8.0: the ZDC Sprinter's own)
-	local wz = if wheelAt then wheelAt.Y else style.length / 2 - style.wheel - 0.5
-	local centreY = style.wheel - style.clearance - CHASSIS_HEIGHT
-	local top = -math.huge
-	for _, wheelZ in { -wz, wz } do
-		local d = math.abs(math.clamp(wheelZ, z0, z1) - wheelZ)
-		if d < style.wheel then
-			top = math.max(top, centreY + math.sqrt(style.wheel * style.wheel - d * d))
-		end
-	end
-	return top
-end
-
--- The style's doors (cached per style; a stage's look is a style of its own).
-local function doorsOf(style: Style): { CarDoor }
-	local cached = doorCache[style]
-	if cached then
-		return cached
-	end
-	if style.bike then
-		-- 5.1: a bike has one "door", doorless: the saddle from its left side (client/CarBoarding.luau's climb, a hop).
-		local saddle: { CarDoor } = { {
-			side = -1,
-			z = style.seat.Z,
-			driver = true,
-			seats = {},
-			outside = 0.5,
-			promptY = 0.7,
-			panel = nil,
-			hinge = nil,
-			trim = {},
-		} }
-		doorCache[style] = saddle
-		return saddle
-	end
-	local hull = hullOf(style)
-	local list: { CarDoor } = {}
-	local function add(side: number, z: number, driver: boolean, cabin: boolean): CarDoor
-		local span = style.doorSpan -- (8.0: the ZDC Sprinter's long cab doors, hinged where the Blender model's are)
-		local front, back = z - (if span then span.X else DOOR_FRONT), z + (if span then span.Y else DOOR_BACK)
-		-- Over the wheel arch, up to the waist (the hood's top; the bus's lower body); a monster truck's door sits high
-		-- over its tyres.
-		local bottom = math.max(0.1, wheelTop(style, front, back) + 0.05)
-		local top = math.max(math.min(hull.hoodTop, 3) + 0.05, bottom + 1.2)
-		-- On the outside of the shell there (the cabin, a bed wall, a plate; not the frame of a monster truck).
-		local outside = 0
-		for _, b in style.boxes do
-			local y0, y1 = b.offset.Y - b.size.Y / 2, b.offset.Y + b.size.Y / 2
-			local z0, z1 = b.offset.Z - b.size.Z / 2, b.offset.Z + b.size.Z / 2
-			if DOOR_SOLID[b.kind] and y1 > bottom and y0 < top and z1 > front and z0 < back then
-				outside = math.max(outside, side * b.offset.X + b.size.X / 2)
-			end
-		end
-		outside = if outside > 0 then outside else style.width / 2
-		local door: CarDoor = {
-			side = side,
-			z = z,
-			driver = driver,
-			seats = {},
-			outside = outside,
-			promptY = math.max(0.4, 3 - style.clearance - CHASSIS_HEIGHT),
-			panel = nil,
-			hinge = nil,
-			trim = {},
-		}
-		if cabin then
-			local height, length = top - bottom, back - front
-			local centre = Vector3.new(side * (outside + DOOR_THICK / 2), (bottom + top) / 2, (front + back) / 2)
-			door.panel = box(Vector3.new(DOOR_THICK, height, length), centre, "body")
-			door.hinge = Vector3.new(side * (outside + DOOR_THICK), centre.Y, front)
-			-- The handle near the back edge, under the window.
-			table.insert(door.trim, box(Vector3.new(0.1, 0.16, 0.55), Vector3.new(side * (DOOR_THICK / 2 + 0.05), height / 2 - 0.45, length / 2 - 0.55), "dark"))
-			-- A stripe round the body (as wide as the car) goes on over the door.
-			for _, b in style.boxes do
-				local y0, y1 = math.max(bottom, b.offset.Y - b.size.Y / 2), math.min(top, b.offset.Y + b.size.Y / 2)
-				local z0, z1 = math.max(front, b.offset.Z - b.size.Z / 2), math.min(back, b.offset.Z + b.size.Z / 2)
-				if DOOR_STRIPES[b.kind] and b.size.X >= style.width - 0.5 and y1 - y0 > 0.05 and z1 - z0 > 0.05 then
-					local at = Vector3.new(side * (DOOR_THICK / 2 + 0.02), (y0 + y1) / 2 - centre.Y, (z0 + z1) / 2 - centre.Z)
-					table.insert(door.trim, box(Vector3.new(0.04, y1 - y0, z1 - z0), at, b.kind))
-				end
-			end
-			if driver or #list == 1 then
-				local extra: { Box } = style.doorTrim or {}
-				for _, b in extra do
-					table.insert(door.trim, box(b.size, Vector3.new(side * b.offset.X, b.offset.Y, b.offset.Z), b.kind))
-				end
-			end
-		end
-		table.insert(list, door)
-		return door
-	end
-	add(if style.seat.X > 0 then 1 else -1, style.seat.Z, true, true)
-	for index, position in style.passengers do
-		local side = if style.rideDoor then 1 elseif position.X < -0.3 then -1 else 1
-		local z = style.rideDoor or position.Z
-		local found: CarDoor? = nil
-		for _, door in list do
-			if not door.driver and door.side == side and math.abs(door.z - z) < 1.2 then
-				found = door
-				break
-			end
-		end
-		local door = found or add(side, z, false, style.rideDoor ~= nil or inGlass(style, position + Vector3.new(0, 1.6, 0)))
-		table.insert(door.seats, index)
-	end
-	doorCache[style] = list
-	return list
-end
-
--- The door panels: hinged on a player's car (Motor6D "DoorHinge", the attributes Axis, Angle and Door; the clients
--- swing it open from its attribute DoorOpenAt to DoorCloseAt, server times: client/CarVisuals.luau), else welded shut.
-local function buildDoors(model: Model, chassis: Part, top: CFrame, style: Style, working: boolean, color: Color3, accent: Color3, paintParts: { BasePart })
-	local on = lookOf(model, chassis) -- 6.16: the body that sways (the hinges stay children of the chassis)
-	for index, door in doorsOf(style) do
-		local panel, hingeAt = door.panel, door.hinge
-		if not panel or not hingeAt then
-			continue
-		end
-		-- 4.0: the Rusty Van's door from another van, in grey primer (never painted).
-		local primer = style.primerDoor == index
-		local p = trimPart(model, "CarDoor", if primer then box(panel.size, panel.offset, "primer") else panel, top * CFrame.new(panel.offset), if working then nil else chassis, color, accent)
-		if not primer then
-			table.insert(paintParts, p)
-		end
-		if model:GetAttribute("FleetArt") then
-			VehicleArt.door(model, p, style :: any, door.side, color, paintParts, { weld = weld, nightLight = DayNight.nightLight })
-		end
-		local meshed = model:GetAttribute("MeshArt") ~= nil -- 6.25: the model's own cab door on the hidden panel
-		local sprinter = model:GetAttribute("SprinterArt") ~= nil -- 8.0: the ZDC Sprinter's door on the hidden panel
-		if meshed then
-			p.Transparency = 1
-			VanMesh.door(model, p, door.side, false, top, color, paintParts, { weld = weld, nightLight = DayNight.nightLight })
-		elseif sprinter then
-			SprinterBuild.door(p, door.side, top, color, paintParts)
-		end
-		for _, b in door.trim do
-			local t = trimPart(model, "DoorTrim", b, top * CFrame.new(panel.offset + b.offset), p, color, accent)
-			if meshed or sprinter then
-				t.Transparency = 1
-			elseif b.kind == "body" then
-				table.insert(paintParts, t)
-			end
-		end
-		if working then
-			local hinge = Instance.new("Motor6D")
-			hinge.Name = "DoorHinge"
-			hinge.Part0 = on
-			hinge.Part1 = p
-			hinge.C0 = CFrame.new(Vector3.new(0, CHASSIS_HEIGHT / 2, 0) + hingeAt)
-			hinge.C1 = CFrame.new(hingeAt - panel.offset)
-			hinge:SetAttribute("Axis", "Y")
-			hinge:SetAttribute("Angle", door.side * Config.Cargo.DoorSwing) -- out to its side, the back edge first
-			hinge:SetAttribute("Door", index)
-			hinge.Parent = chassis
-		end
-	end
-end
-
--- Builds the body. display = a showroom model (anchored, no seats, no movers). gunId = the car gun on its roof (nil:
--- none). oneBeam: only one headlight carries a SpotLight (the NPC cars: cheaper). stage (3.5): the car's stage, its
--- look (styleFor; nil: stage 0). lower (4.0, Tyres & Suspension 5): the body sits this much lower over its wheels.
-local function build(def: Config.CarDef, color: Color3, ground: CFrame, display: boolean, gunId: string?, oneBeam: boolean?, stage: number?, lower: number?): Built
-	local style = styleFor(def, stage)
-	local accent = if def.style == "icecream"
-		then Color3.fromRGB(255, 120, 180)
-		elseif def.style == "bus" or def.style == "ambulance" or def.style == "boxtruck" then Color3.fromRGB(205, 30, 34)
-		else color:Lerp(Color3.new(1, 1, 1), 0.45)
-
+-- Builds the van standing on `ground` (the ground under its middle, facing its LookVector), anchored. display: a
+-- showroom model (the tools' previews: no prompts, no hinges, the doors welded shut).
+local function build(def: Config.CarDef, color: Color3, ground: CFrame, display: boolean?): Built
+	local style = STYLE
+	local working = display ~= true
 	local model = Instance.new("Model")
 	model.Name = def.name
 	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
+	model:SetAttribute("SprinterArt", true)
+	model:SetAttribute("Sprinter", true) -- (server/SprinterMesh.luau: a sprinter to dress)
 
-	local chassisY = style.clearance - (lower or 0) + CHASSIS_HEIGHT / 2
+	local chassisY = style.clearance + CHASSIS_HEIGHT / 2
 	local chassisCF = ground * CFrame.new(0, chassisY, 0)
 	local chassis = newPart(model, "Chassis", Vector3.new(style.width - 0.4, CHASSIS_HEIGHT, style.length), chassisCF, DARK, Enum.Material.Metal)
-	chassis.CustomPhysicalProperties = PhysicalProperties.new(2, 0, 0, 100, 1)
+	chassis.Anchored = true
+	chassis:SetAttribute("SprinterVisual", true) -- (only looks under the Blender model's body)
 	model.PrimaryPart = chassis
-	if style.bike then
-		-- 5.1: a bike's chassis and boxes are its hidden hull; Codex's art is the look (bikeBody).
-		chassis.Transparency = 1
-		model:SetAttribute("Bike", true)
-		if style.stand then
-			model:SetAttribute("BikeStand", true) -- 5.1.1: the E-Scooter's rider stands (client/BikeRider.luau)
-		end
-	end
-
-	-- 6.25: the ZDC Van wears the owner's Blender model once ZDCVanArt is imported (server/VanMesh.luau): the hull, the
-	-- chassis, the panels, the lamps' and the tyres' parts stay as they are but hidden; without it, the panelled skin.
-	local meshed = not oneBeam and VanMesh.ready(def.style)
-	local polished = not meshed and not oneBeam and VehicleArt.supports(def.style)
-	-- 8.0 SANDBOX: the ZDC Sprinter wears its parts look (SprinterBuild.body: shared/SprinterLooks.luau); its boxes are
-	-- only its hidden hull (the walk-in bay's walls round the hollow bay)
-	local sprinter = not meshed and style.art == "sprinter"
-	if sprinter then
-		model:SetAttribute("SprinterArt", true)
-		-- (server/SprinterMesh.luau: a sprinter to dress; the chassis is only looks under the Blender model's body)
-		model:SetAttribute("Sprinter", true)
-		chassis:SetAttribute("SprinterVisual", true)
-	end
-	if meshed then
-		chassis.Transparency = 1
-		model:SetAttribute("MeshArt", def.style)
-	end
-	if polished then
-		-- The chassis stays visible (dark metal): the floor of the cab and the cargo bay under the skin.
-		model:SetAttribute("FleetArt", true)
-		model:SetAttribute("FleetStyle", def.style)
-		model:SetAttribute("FleetStage", stage or 0)
-	end
 	local paintParts: { BasePart } = {}
 	local top = chassisCF * CFrame.new(0, CHASSIS_HEIGHT / 2, 0)
+
+	-- The hull: hidden, colliding (the walk-in bay's walls round its hollow bay; its floor the chassis' top).
 	local height = CHASSIS_HEIGHT
-	-- 6.16, the body that sways (client/CarSway.luau): a player's car (not a bike, a showroom model or an NPC car)
-	-- hangs what you see of its body (the skin, the trim, the doors, the back, the lamps, the kit, the roof gun, the
-	-- load: Vehicles.cargoHolder) on the hidden part "BodyRoot", on the Motor6D "BodyRoll" (bodyRoot): every client
-	-- rolls it out of a turn, dips its nose on the brake and squats it as it pulls away. The hull (the physics), the
-	-- wheels and the seats stay on the chassis; a hull box you see (a car without the fleet's skin) leaves a twin that
-	-- sways and hides itself.
-	local look: BasePart = if not display and not oneBeam and not style.bike then bodyRoot(model, chassis, style.wheel - chassisY, def.style) else chassis
 	for _, b in style.boxes do
-		local c, material = boxLook(b.kind, color, accent)
-		local name = if b.kind == "glass" then "Cabin" elseif b.kind == "lightbar" then "LightBar" elseif SIREN_DIM[b.kind] then "SirenLens" else "Body"
-		local p = newPart(model, name, b.size, top * CFrame.new(b.offset) * tilted(b), c, material)
+		local p = newPart(model, if b.kind == "glass" then "Cabin" else "Body", b.size, top * CFrame.new(b.offset), DARK, Enum.Material.SmoothPlastic)
 		p.Massless = true
-		p.CustomPhysicalProperties = FRICTIONLESS
-		if style.bike and not style.stand then
-			-- 6.24: a pedal bike's hidden boxes over its chassis are only hit boxes now (rays still find them; the
-			-- chassis and the wheel colliders are its hull). Since 6.19 the rider sits INSIDE them (the saddle at
-			-- BikeArt.Scale, these boxes at 5.1's size), so a body that was not welded to the bike (the moves on and
-			-- off the saddle as the server sees them) was pushed out of them sideways: the bike rolled over.
-			p.CanCollide = false
-		end
-		if b.kind == "glass" then
-			p.Transparency = 0.45
-		elseif b.kind == "ball" then
-			p.Shape = Enum.PartType.Ball
-		end
-		local shown: BasePart = p -- 6.16: what is seen of it (its twin on the BodyRoot)
-		if look ~= chassis and not polished and not meshed and not sprinter and p.CanCollide and not (SIREN_DIM[b.kind] or b.kind == "lightbar") then
-			shown = p:Clone()
-			shown.CanCollide = false
-			shown.CanQuery = false
-			shown.CanTouch = false
-			shown.Parent = model
-			weld(look, shown)
-			p.Transparency = 1
-		end
-		if b.kind == "body" then
-			table.insert(paintParts, shown)
-		elseif SIREN_DIM[b.kind] or b.kind == "lightbar" then
-			-- The light bar: the lenses flash red / blue, the bar holds the light that throws the colour around.
-			p.CanCollide = false
-			local lens: { [string]: string } = { sirenred = "red", sirenblue = "blue" }
-			p:SetAttribute("Lens", lens[b.kind] or "bar")
-			if b.kind == "lightbar" and not display then
-				local glow = Instance.new("PointLight")
-				glow.Name = "SirenGlow"
-				glow.Range = 24
-				glow.Brightness = 3
-				glow.Shadows = false
-				glow.Enabled = false
-				glow.Parent = p
-			end
-			CollectionService:AddTag(p, Vehicles.SirenTag)
-		end
-		-- Keep the original massless collision/raycast hull; the panelled skin supplies its appearance (5.1: a bike's art).
-		if polished or meshed or style.bike or sprinter then p.Transparency = 1 end
-		-- (6.16: the light bar's lenses, never colliding, sway themselves)
-		weld(if p.CanCollide then chassis else look, p)
+		p.Transparency = 1
+		weld(chassis, p)
 		height = math.max(height, CHASSIS_HEIGHT + b.offset.Y + b.size.Y / 2)
 	end
-	-- 3.5: the cosmetic trim (the Rusty Van's rust, a stage's ladder, racks, lamps …); body-coloured trim is painted.
-	local trim: { Box } = if polished or meshed then {} else style.trim or {}
-	for _, b in trim do
-		local p = trimPart(model, "Trim", b, top * CFrame.new(b.offset) * tilted(b), look, color, accent)
-		if b.kind == "body" then
-			table.insert(paintParts, p)
-		end
-	end
+	SprinterBuild.body(model, chassis, top, color, paintParts, working)
+	SprinterBuild.back(model, chassis, top, working, color, paintParts)
 
-	if polished then
-		local spans = {}
-		for _, door in doorsOf(style) do
-			local panel = door.panel
-			if panel then
-				table.insert(spans, { side = door.side, front = panel.offset.Z - panel.size.Z / 2, back = panel.offset.Z + panel.size.Z / 2 })
-			end
-		end
-		VehicleArt.body(model, look, top, style :: any, color, paintParts, { weld = weld, nightLight = DayNight.nightLight }, spans)
-	elseif meshed then
-		VanMesh.body(model, look, top, color, paintParts, { weld = weld, nightLight = DayNight.nightLight })
-	elseif sprinter then
-		SprinterBuild.body(model, look, chassis, top, color, paintParts, not display and not oneBeam)
-	end
-
-	-- 3.2: the back that opens: hinged on a player's car, welded shut on a showroom model or an NPC car (oneBeam).
-	if style.back then
-		buildBack(model, chassis, top, style.back, not display and not oneBeam, color, accent, paintParts)
-	end
-	-- 3.7: the cabin doors: hinged on a player's car, welded shut on a showroom model or an NPC car.
-	buildDoors(model, chassis, top, style, not display and not oneBeam, color, accent, paintParts)
-
-	-- Wheels: an invisible welded frictionless collider (the car slides on it) and a visible tyre on a Motor6D. 4.0: bald
-	-- grey tyres on the Rusty Van (Style.bald; the UpgradeKit's Tyres & Suspension puts new ones on), a twin tyre inside
-	-- each rear one (Style.dual: no collider of its own).
+	-- The wheels: a hidden collider (the van's solid there) and a tyre on a Motor6D "WheelMotor" (SprinterMesh's wheels go
+	-- on it) with its hub and a spoke.
 	local wheelY = style.wheel - chassisY
-	local wheelAt = style.wheelAt -- (8.0: the ZDC Sprinter's own)
-	local wx = if wheelAt then wheelAt.X else style.width / 2 - style.wheelWidth / 2 + 0.3
-	local wz = if wheelAt then wheelAt.Y else style.length / 2 - style.wheel - 0.5
-	local tyreColor = if style.bald then BALD else Color3.fromRGB(24, 24, 24)
-	local function wheel(offset: Vector3, collides: boolean)
-		if collides then
-			local collider = newPart(model, "WheelCollider", Vector3.new(style.wheelWidth, style.wheel * 2, style.wheel * 2), chassisCF * CFrame.new(offset), DARK, Enum.Material.Rubber)
-			collider.Shape = Enum.PartType.Cylinder
-			collider.Transparency = 1
-			collider.CustomPhysicalProperties = FRICTIONLESS
-			weld(chassis, collider)
-		end
-		local tyre = newPart(model, "Tyre", Vector3.new(style.wheelWidth, style.wheel * 2, style.wheel * 2), chassisCF * CFrame.new(offset), tyreColor, Enum.Material.Rubber)
+	local wx, wz = style.wheelAt.X, style.wheelAt.Y
+	for _, offset in { Vector3.new(-wx, wheelY, -wz), Vector3.new(wx, wheelY, -wz), Vector3.new(-wx, wheelY, wz), Vector3.new(wx, wheelY, wz) } do
+		local size = Vector3.new(style.wheelWidth, style.wheel * 2, style.wheel * 2)
+		local collider = newPart(model, "WheelCollider", size, chassisCF * CFrame.new(offset), DARK, Enum.Material.Rubber)
+		collider.Shape = Enum.PartType.Cylinder
+		collider.Transparency = 1
+		weld(chassis, collider)
+		local tyre = newPart(model, "Tyre", size, chassisCF * CFrame.new(offset), Color3.fromRGB(24, 24, 24), Enum.Material.Rubber)
 		tyre.Shape = Enum.PartType.Cylinder
 		tyre.CanCollide = false
 		tyre.CanQuery = false
@@ -3077,111 +414,21 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 		motor:SetAttribute("Front", offset.Z < 0)
 		motor:SetAttribute("Radius", style.wheel)
 		motor.Parent = chassis
-		if meshed then
-			tyre.Transparency = 1
-			VanMesh.wheel(model, tyre, offset.X, { weld = weld, nightLight = DayNight.nightLight })
-			return
-		end
-		if polished then
-			-- Its outer face (the rim's side); a twin tyre inside another (no collider) shows no rim.
-			tyre:SetAttribute("FleetSide", if offset.X < 0 then -1 else 1)
-			if not collides then
-				tyre:SetAttribute("FleetInner", true)
-			end
-			VehicleArt.wheel(tyre, 0, { weld = weld, nightLight = DayNight.nightLight })
-			return
-		end
 		local hub = newPart(model, "Hub", Vector3.new(style.wheelWidth + 0.1, style.wheel, style.wheel), tyre.CFrame, Color3.fromRGB(170, 170, 170), Enum.Material.Metal)
 		hub.Shape = Enum.PartType.Cylinder
 		hub.CanCollide = false
 		hub.CanQuery = false
 		hub.Massless = true
 		weld(tyre, hub)
-		-- A spoke, so the spin shows.
 		local spoke = newPart(model, "Spoke", Vector3.new(style.wheelWidth + 0.15, style.wheel * 1.6, 0.35), tyre.CFrame, Color3.fromRGB(90, 90, 90), Enum.Material.Metal)
 		spoke.CanCollide = false
 		spoke.CanQuery = false
 		spoke.Massless = true
 		weld(tyre, spoke)
 	end
-	-- 5.1: a bike's wheels, frame and crank are Codex's art on their own roots (bikeBody); the saddle goes on its frame.
-	local bikeFrame: Part? = if style.bike then bikeBody(model, chassis, chassisY, style, bikeArtId(def.id, def.style), not display and not oneBeam) else nil
-	local corners: { Vector3 } = if style.bike then {} else { Vector3.new(-wx, wheelY, -wz), Vector3.new(wx, wheelY, -wz), Vector3.new(-wx, wheelY, wz), Vector3.new(wx, wheelY, wz) }
-	for _, offset in corners do
-		wheel(offset, true)
-	end
-	if style.dual then
-		local inner = wx - style.wheelWidth - 0.12
-		wheel(Vector3.new(-inner, wheelY, wz), false)
-		wheel(Vector3.new(inner, wheelY, wz), false)
-	end
 
-	-- Lights: their day look (server/DayNight.luau); the headlights throw a beam.
-	local front = -style.length / 2
-	local headY = if style.head then style.head.X else 1.2
-	local headZ = if style.head then style.head.Y else front - 0.05
-	-- (5.1: a bike's lamps are in its art.)
-	local lamps: { number } = if style.bike then {} else { -style.width / 2 + 1, style.width / 2 - 1 }
-	for n, x in lamps do
-		-- 4.0: the Rusty Van's right lamp is yellowed and dim (Style.dimHead).
-		local yellowed = style.dimHead == true and n == 2
-		local head = newPart(model, "Headlight", Vector3.new(1.2, 0.6, 0.2), top * CFrame.new(x, headY, headZ), if yellowed then DIM_HEAD_DIM else HEAD_DIM, Enum.Material.Glass)
-		head.CanCollide = false
-		head.CanQuery = false
-		head.Massless = true
-		if meshed or sprinter then
-			head.Transparency = 1 -- (its beam stays; the model's lamps glow; 8.0: the Sprinter's own lamps)
-		end
-		weld(look, head)
-		if not display and (n == 1 or not oneBeam) then
-			local spot = Instance.new("SpotLight")
-			spot.Face = Enum.NormalId.Front
-			spot.Range = if oneBeam then 50 elseif yellowed then 34 else 60
-			spot.Angle = if oneBeam then 70 else 55
-			spot.Brightness = if oneBeam then 3.4 elseif yellowed then 1.4 else 4
-			spot.Color = if yellowed then Color3.fromRGB(255, 214, 140) else Color3.fromRGB(255, 240, 210)
-			spot.Shadows = false
-			spot.Parent = head
-		end
-		if yellowed then
-			DayNight.nightLight(head, DIM_HEAD_LIT, DIM_HEAD_DIM, "Glass")
-		else
-			DayNight.nightLight(head, HEAD_LIT, HEAD_DIM, "Glass")
-		end
-		if sprinter then
-			continue -- (8.0: the Sprinter's tail lamps are in its look)
-		end
-		local tail = newPart(model, "Taillight", Vector3.new(1, 0.5, 0.2), top * CFrame.new(x, 0.6, -front + 0.05), TAIL_DIM, Enum.Material.SmoothPlastic)
-		tail.CanCollide = false
-		tail.CanQuery = false
-		tail.Massless = true
-		if meshed then
-			tail.Transparency = 1
-		end
-		weld(look, tail)
-		DayNight.nightLight(tail, TAIL_LIT, TAIL_DIM, "SmoothPlastic")
-	end
-
-	-- The roof gun, only when one is installed.
-	local turretBase = CFrame.new(0, CHASSIS_HEIGHT / 2 + style.roof, 0.5)
-	local turret: Weld?, muzzle: Attachment? = nil, nil
-	if gunId then
-		turret, muzzle = buildTurret(model, chassis, turretBase, gunId)
-	end
-
-	local built: Built = {
-		model = model,
-		chassis = chassis,
-		seat = nil,
-		passengers = {},
-		turret = turret,
-		turretBase = turretBase,
-		muzzle = muzzle,
-		paintParts = paintParts,
-		size = Vector3.new(style.width, height, style.length),
-	}
-
-	if display then
+	local built: Built = { model = model, chassis = chassis, paintParts = paintParts, size = Vector3.new(style.width, height, style.length) }
+	if not working then
 		for _, d in model:GetDescendants() do
 			if d:IsA("BasePart") then
 				d.Anchored = true
@@ -3191,1056 +438,56 @@ local function build(def: Config.CarDef, color: Color3, ground: CFrame, display:
 		return built
 	end
 
-	-- The driver's seat (only the owner may sit in it, see watchSeats) and the passenger seats. Nobody sits down by
-	-- touching one (CanTouch off): only through a door's prompt (3.7) and Seat:Sit.
-	local seat = Instance.new("VehicleSeat")
-	seat.Name = "DriverSeat"
-	seat.Size = Vector3.new(2, 0.4, 2)
-	seat.CFrame = top * CFrame.new(style.seat)
-	seat.Transparency = 1
-	seat.CanCollide = false
-	seat.CanTouch = false
-	seat.Massless = true
-	seat.MaxSpeed = 0 -- the legacy motor is unused, client/Drive.luau drives the car
-	seat.HeadsUpDisplay = false
-	seat.CollisionGroup = "Car"
-	seat:SetAttribute("Door", 1)
-	seat.Parent = model
-	weld(bikeFrame or chassis, seat)
-	built.seat = seat
-	local doors = doorsOf(style)
-	local doorOf: { [number]: number } = {}
-	for index, door in doors do
-		for _, n in door.seats do
-			doorOf[n] = index
-		end
-	end
-	for n, position in style.passengers do
-		local p = Instance.new("Seat")
-		p.Name = "PassengerSeat"
-		p.Size = Vector3.new(2, 0.4, 2)
-		p.CFrame = top * CFrame.new(position)
-		p.Transparency = 1
-		p.CanCollide = false
-		p.CanTouch = false
-		p.Massless = true
-		p.CollisionGroup = "Car"
-		p:SetAttribute("Index", n)
-		p:SetAttribute("Door", doorOf[n] or 1)
-		p.Parent = model
-		weld(chassis, p)
-		table.insert(built.passengers, p)
-	end
-
-	-- The movers (their values are set by the owner's client).
-	local root = Instance.new("Attachment")
-	root.Name = "Root"
-	root.Parent = chassis
-	local linear = Instance.new("LinearVelocity")
-	linear.Name = "Drive"
-	linear.Attachment0 = root
-	linear.RelativeTo = Enum.ActuatorRelativeTo.World
-	linear.VelocityConstraintMode = Enum.VelocityConstraintMode.Plane
-	linear.PrimaryTangentAxis = Vector3.xAxis
-	linear.SecondaryTangentAxis = Vector3.zAxis
-	linear.PlaneVelocity = Vector2.zero
-	linear.Parent = chassis
-	local angular = Instance.new("AngularVelocity")
-	angular.Name = "Steer"
-	angular.Attachment0 = root
-	angular.RelativeTo = Enum.ActuatorRelativeTo.World
-	angular.AngularVelocity = Vector3.zero
-	angular.Parent = chassis
-	if style.bike then
-		-- 5.1: a bike stays upright: its right side kept level (no roll; it still pitches up and down a hill). The
-		-- strength is set with the movers' (Vehicles.spawnAt).
-		local level = Instance.new("Attachment")
-		level.Name = "Upright"
-		level.Parent = chassis
-		local upright = Instance.new("AlignOrientation")
-		upright.Name = "KeepUpright"
-		upright.Mode = Enum.OrientationAlignmentMode.OneAttachment
-		upright.Attachment0 = level
-		upright.AlignType = Enum.AlignType.PrimaryAxisPerpendicular
-		upright.PrimaryAxis = Vector3.yAxis
-		upright.Responsiveness = 40
-		upright.Parent = chassis
-		-- 6.24: KeepUpright holds a bike that stands, but one lying flat on its side (its right side straight up) gets
-		-- no turn from it at all, and one on its back already counts as level. "Righting" (off until server/
-		-- CarRighting.luau sees a bike down) turns the whole bike back onto its wheels, facing where it pointed. (6.26: a
-		-- car's is made when it is first needed, Vehicles.righting.)
-		local righting = Instance.new("AlignOrientation")
-		righting.Name = "Righting"
-		righting.Mode = Enum.OrientationAlignmentMode.OneAttachment
-		righting.Attachment0 = level
-		righting.Responsiveness = Config.CarUpright.Kinds.bike.Responsiveness
-		righting.MaxAngularVelocity = Config.CarUpright.Kinds.bike.TurnRate
-		righting.Enabled = false
-		righting.Parent = chassis
-	end
-
-	-- The cargo: the back door (server/Cargo.luau puts the Load / Take out prompt there) and the passengers' door.
+	-- The cargo: the back opening (the Load prompts and the BackPrompt sit there).
 	local door = Instance.new("Attachment")
 	door.Name = "CargoDoor"
-	door.Position = Vector3.new(0, CHASSIS_HEIGHT / 2, 0) + style.cargo.door
+	door.Position = Vector3.new(0, CHASSIS_HEIGHT / 2, 0) + style.door
 	door.Parent = chassis
-	local entry = Instance.new("Attachment")
-	entry.Name = "CargoEntry"
-	entry.Position = Vector3.new(0, CHASSIS_HEIGHT / 2, 0) + style.cargo.entry
-	entry.Parent = chassis
-	model:SetAttribute("CargoCount", 0)
-	-- 4.0: where the exhaust smokes (client/CarVisuals.luau, while the car's attribute Smoky is on) and, on the Freight
-	-- Truck, where its pallet jack stands inside the back (server/Cargo.luau builds the jack at JackMount).
-	local exhaust = Instance.new("Attachment")
-	exhaust.Name = "Exhaust"
-	exhaust.Position = Vector3.new(-(style.width / 2 - 1.3), CHASSIS_HEIGHT / 2 - 0.75, style.length / 2 + 0.35)
-	exhaust.Parent = chassis
-	local jack = style.jack
-	if jack then
-		local mount = Instance.new("Attachment")
-		mount.Name = "JackMount"
-		mount.Position = Vector3.new(0, CHASSIS_HEIGHT / 2, 0) + jack
-		mount.Parent = chassis
-	end
-	-- 3.2: the prompt that opens and closes the back (a player's car only: the NPC cars lose every prompt).
-	if style.back and not oneBeam then
-		local backPrompt = Instance.new("ProximityPrompt")
-		backPrompt.Name = "BackPrompt"
-		backPrompt.ActionText = backAction(style.back.noun, false)
-		backPrompt.ObjectText = def.name
-		backPrompt.HoldDuration = Config.Cargo.HoldDuration
-		backPrompt.MaxActivationDistance = 9
-		backPrompt.RequiresLineOfSight = false
-		backPrompt.KeyboardKeyCode = Enum.KeyCode.E
-		backPrompt.Parent = door
-		model:SetAttribute("BackOpen", false)
-	end
-
-	-- Prompts, 3.7 one at every door (doorsOf): the owner drives (the driver's door), everybody else rides along (a
-	-- passenger door with a free seat); the clients show only the ones that fit them (client/CarVisuals.luau).
-	for index, carDoor in doors do
-		local at = Instance.new("Attachment")
-		at.Name = `Door{index}`
-		at.Position = Vector3.new(carDoor.side * (carDoor.outside + Config.Cargo.DoorStandOut), CHASSIS_HEIGHT / 2 + carDoor.promptY, carDoor.z)
-		if style.stand then
-			-- 6.10: the E-Scooter's just left of its deck, a short reach (below): you are right beside it, from any side
-			at.Position = Vector3.new(carDoor.side * Config.Interact.ScooterPromptOut, at.Position.Y, carDoor.z)
-		end
-		at.Parent = chassis
-		local prompt = Instance.new("ProximityPrompt")
-		prompt.Name = if carDoor.driver then "DrivePrompt" else "RidePrompt"
-		prompt.ActionText = if carDoor.driver then "Drive" else "Ride along"
-		prompt.ObjectText = def.name
-		prompt.HoldDuration = 0
-		prompt.MaxActivationDistance = if style.stand then Config.Interact.ScooterReach
-			elseif carDoor.driver then Config.Cargo.DriverDoorReach
-			elseif carDoor.panel == nil then Config.Cargo.SeatReach
-			else Config.Cargo.DoorReach
-		prompt.RequiresLineOfSight = false
-		prompt.KeyboardKeyCode = Enum.KeyCode.E
-		prompt:SetAttribute("Door", index)
-		prompt.Parent = at
-	end
+	local backPrompt = Instance.new("ProximityPrompt")
+	backPrompt.Name = "BackPrompt"
+	backPrompt.ActionText = "Open doors"
+	backPrompt.ObjectText = def.name
+	backPrompt.HoldDuration = Config.Cargo.HoldDuration
+	backPrompt.MaxActivationDistance = 9
+	backPrompt.RequiresLineOfSight = false
+	backPrompt.KeyboardKeyCode = Enum.KeyCode.E
+	backPrompt.Parent = door
+	model:SetAttribute("BackOpen", false)
 	return built
 end
 
--- A showroom model for the dealer (anchored, no seats); 3.5: at a stage (its look). 5.6: `color` paints its body
--- (a ZDC RIDE scooter in its dock); nil: the car's own colour.
-function Vehicles.displayModel(def: Config.CarDef, ground: CFrame, stage: number?, levels: Economy.Upgrades?, gear: { [string]: boolean }?, color: Color3?): Model
-	local built = build(def, color or rgb(def.color), ground, true, nil, nil, stage)
-	if levels then
-		buildKit(built.model, built.chassis, styleFor(def, stage), levels, def.id, gear)
-		for _, p in built.model:GetDescendants() do
-			if p:IsA("BasePart") then p.Anchored = true; p.CollisionGroup = "Default" end
-		end
-	end
-	return built.model
-end
-
-export type NpcCar = {
-	model: Model,
-	chassis: Part,
-	turret: Weld, -- the bandits' pickup always has a roof machine gun
-	turretBase: CFrame,
-	size: Vector3,
-	linear: LinearVelocity,
-	angular: AngularVelocity,
-	guns: { BasePart }, -- the gunners' guns (where the shots come from)
-}
-
--- A bandit figure sitting where a seat was: a body, a head with a bandana, and a gun for the gunners.
-local function dummy(model: Model, chassis: Part, seat: CFrame, gunner: boolean): BasePart?
-	local function piece(name: string, size: Vector3, offset: CFrame, color: Color3, material: Enum.Material): Part
-		local p = newPart(model, name, size, seat * offset, color, material)
-		p.CanCollide = false
-		p.Massless = true
-		weld(chassis, p)
-		return p
-	end
-	piece("BanditBody", Vector3.new(2, 2, 1), CFrame.new(0, 1.4, 0), Color3.fromRGB(30, 30, 34), Enum.Material.Fabric)
-	piece("BanditHead", Vector3.new(1.2, 1.2, 1.2), CFrame.new(0, 3, 0), Color3.fromRGB(205, 160, 120), Enum.Material.SmoothPlastic)
-	piece("Bandana", Vector3.new(1.25, 0.5, 1.25), CFrame.new(0, 2.75, 0), Color3.fromRGB(170, 30, 30), Enum.Material.Fabric)
-	if not gunner then
-		return nil
-	end
-	return piece("BanditGun", Vector3.new(0.35, 0.5, 2.8), CFrame.new(0.9, 2.1, -1.2), Color3.fromRGB(25, 25, 28), Enum.Material.Metal)
-end
-
--- A car for the enemies, driven by the server (server/BanditCars.luau): no seats, no prompts, bandit figures inside.
-function Vehicles.buildNpc(def: Config.CarDef, ground: CFrame): NpcCar
-	if def.bike then
-		def = Config.AmbientCars[1] -- 5.1: the bandits never ride bikes (7.x: the old van's body)
-	end
-	local built = build(def, rgb(def.color), ground, false, "roofmg", true)
-	local model = built.model
-	local spots: { CFrame } = {}
-	local seat = built.seat
-	if seat then
-		table.insert(spots, seat.CFrame)
-		seat:Destroy()
-	end
-	for _, p in built.passengers do
-		table.insert(spots, p.CFrame)
-		p:Destroy()
-	end
-	for _, d in model:GetDescendants() do
-		if d:IsA("ProximityPrompt") then
-			d:Destroy()
-		end
-	end
-	local guns: { BasePart } = {}
-	for n, spot in spots do
-		local gun = dummy(model, built.chassis, spot, n > 1)
-		if gun then
-			table.insert(guns, gun)
-		end
-	end
-	for _, d in model:GetDescendants() do
-		if d:IsA("BasePart") then
-			d.CollisionGroup = "EnemyCar"
-		end
-	end
-	return {
-		model = model,
-		chassis = built.chassis,
-		turret = built.turret :: Weld,
-		turretBase = built.turretBase,
-		size = built.size,
-		linear = built.chassis:FindFirstChild("Drive") :: LinearVelocity,
-		angular = built.chassis:FindFirstChild("Steer") :: AngularVelocity,
-		guns = guns,
-	}
-end
-
-export type TrafficCar = {
-	model: Model,
-	chassis: Part,
-	size: Vector3,
-	linear: LinearVelocity,
-	angular: AngularVelocity,
-	seats: { Seat }, -- 5.5: the passenger seats a city bus keeps (keepSeats); empty for the traffic
-}
-
--- A civilian at the wheel: a body and a head in the driver's seat.
-local DRIVER_SHIRTS = { Color3.fromRGB(70, 110, 160), Color3.fromRGB(160, 60, 60), Color3.fromRGB(90, 130, 90), Color3.fromRGB(200, 180, 140), Color3.fromRGB(60, 60, 66) }
-local DRIVER_SKINS = { Color3.fromRGB(255, 224, 196), Color3.fromRGB(214, 160, 120), Color3.fromRGB(132, 88, 60), Color3.fromRGB(241, 194, 160) }
-
--- A civilian car for the traffic (server/Traffic.luau): an ordinary style in `color` (default: its factory colour),
--- no gun, no seats, no prompts, a driver at the wheel, one headlight beam. It keeps its movers ("Drive", "Steer")
--- like an NPC car; anchor it to step it by CFrame. Its parts are in the "Car" collision group. 3.5: at a stage (its
--- look; the traffic picks one at random). 5.5: keepSeats keeps the passenger seats (a city bus: server/Buses.luau).
-function Vehicles.buildTraffic(def: Config.CarDef, ground: CFrame, color: Color3?, stage: number?, keepSeats: boolean?): TrafficCar
-	if def.bike then
-		def, stage = Config.AmbientCars[1], nil -- 5.1: no bikes in the traffic (7.x: the old van's body)
-	end
-	local built = build(def, color or rgb(def.color), ground, false, nil, true, stage)
-	local model = built.model
-	local seat = built.seat
-	local rng = Random.new()
-	if seat then
-		local at = seat.CFrame
-		local function piece(name: string, size: Vector3, offset: CFrame, c: Color3)
-			local p = newPart(model, name, size, at * offset, c, Enum.Material.SmoothPlastic)
-			p.CanCollide = false
-			p.CanQuery = false
-			p.Massless = true
-			weld(built.chassis, p)
-		end
-		piece("DriverBody", Vector3.new(2, 2, 1), CFrame.new(0, 1.4, 0), DRIVER_SHIRTS[rng:NextInteger(1, #DRIVER_SHIRTS)])
-		piece("DriverHead", Vector3.new(1.2, 1.2, 1.2), CFrame.new(0, 3, 0), DRIVER_SKINS[rng:NextInteger(1, #DRIVER_SKINS)])
-		seat:Destroy()
-	end
-	local seats: { Seat } = {}
-	for _, p in built.passengers do
-		if keepSeats then
-			table.insert(seats, p)
-		else
-			p:Destroy()
-		end
-	end
-	for _, d in model:GetDescendants() do
-		if d:IsA("ProximityPrompt") or d:IsA("Attachment") and (d.Name == "CargoDoor" or d.Name == "CargoEntry") then
-			d:Destroy()
-		end
-	end
-	model:SetAttribute("Traffic", true)
-	return {
-		model = model,
-		chassis = built.chassis,
-		size = built.size,
-		linear = built.chassis:FindFirstChild("Drive") :: LinearVelocity,
-		angular = built.chassis:FindFirstChild("Steer") :: AngularVelocity,
-		seats = seats,
-	}
-end
-
--- 5.5: a city bus (server/Buses.luau): the traffic's bus body in `body` paint with its passenger seats, a stripe of
--- the line's colour round it and an empty board over the windscreen (the caller writes the line on it). Returns the
--- bus and the board.
-function Vehicles.buildBus(def: Config.CarDef, ground: CFrame, body: Color3, stripe: Color3): (TrafficCar, Part)
-	local bus = Vehicles.buildTraffic(def, ground, body, nil, true)
-	local style = styleFor(def)
-	local top = bus.chassis.CFrame * CFrame.new(0, CHASSIS_HEIGHT / 2, 0)
-	local band = newPart(bus.model, "LineStripe", Vector3.new(style.width + 0.16, 0.6, style.length + 0.16), top * CFrame.new(0, 1.9, 0), stripe, Enum.Material.SmoothPlastic)
-	local front = -style.length / 2 + 1 -- (the glass starts a stud behind the bumper)
-	local board = newPart(bus.model, "LineSign", Vector3.new(style.width - 1.6, 1.1, 0.2), top * CFrame.new(0, style.roof - 1.5, front - 0.12), Color3.fromRGB(20, 22, 26), Enum.Material.SmoothPlastic)
-	for _, p in { band, board } do
-		p.CanCollide = false
-		p.CanQuery = false
-		p.CanTouch = false
-		p.Massless = true
-		weld(bus.chassis, p)
-	end
-	return bus, board
-end
-
-local function writeAttributes(car: Car)
-	local model = car.model
-	model:SetAttribute("MaxSpeed", car.stats.maxSpeed)
-	model:SetAttribute("Accel", car.stats.accel)
-	model:SetAttribute("Turn", car.stats.turn)
-	model:SetAttribute("MaxHealth", car.stats.health)
-	model:SetAttribute("Health", math.ceil(car.health))
-end
-
--- What the character holds in its hands (server/Cargo.luau sets it), or nil.
-local function carrying(character: Instance?): string?
-	local value = character and character:GetAttribute("Carrying")
-	return if type(value) == "string" then value else nil
-end
-
--- 6.6, the bike's own bag: getting on your bike loads what your hands carry onto it (server/Cargo.luau stows it as you
--- sit). Cargo sets this hook (Cargo.canStowHands: a foot or bike run's pieces, room for them on the bike or in your
--- bag); true lets you get on with your hands full.
-Vehicles.bikeStows = function(_player: Player): boolean
-	return false
-end
-
--- Nobody gets into a seat with a crate in the hands (or a horse on the rope): load it first. 6.6: onto your bike you
--- may (`car`: the one you get on), when its bag takes them (Vehicles.bikeStows).
-local function handsFull(player: Player, car: Car?): boolean
-	local held = carrying(player.Character)
-	if not held then
-		return false
-	end
-	local pushing = player.Character and player.Character:GetAttribute("Pushing")
-	local def = if car then Economy.findCar(car.id) else nil
-	local bike = def ~= nil and def.bike == true
-	if bike and pushing == nil and held ~= "horse" and Vehicles.bikeStows(player) then
-		return false
-	end
-	local loaded = player.Character ~= nil and player.Character:GetAttribute("CarryCount") ~= nil -- (pieces on the trolley)
-	Net.get("Notice"):FireClient(player, if bike and pushing == nil then "No room for that on your bike or in your bag: hand it over, or put it down (G)."
-		elseif pushing == "trolley" and loaded then "Load them first (E at the back) or set the trolley down (G)."
-		elseif pushing == "trolley" then "Stow the trolley first (G at the open back) or set it down (G)."
-		elseif pushing == "jack" then "Set the pallet jack down first (G)."
-		elseif held == "horse" then "Load the horse first (E at the back of the truck)."
-		else "Load it first (E at the back of the vehicle).")
-	return true
-end
-
-local function eject(seat: Seat | VehicleSeat)
-	local occupant = seat.Occupant
-	local seatWeld = seat:FindFirstChild("SeatWeld")
-	if seatWeld then
-		seatWeld:Destroy()
-	end
-	if occupant then
-		occupant.Sit = false
-		occupant.Jump = true
-	end
-end
-
--- 3.10: a cabin door's opening, in server times (the clients swing it: client/CarVisuals.luau); two people at one door
--- share it (it shuts after the later one). A door without a panel (a bed, the roof) has nothing to swing.
-local function swingDoor(car: Car, index: number, openAt: number, closeAt: number)
-	local now = workspace:GetServerTimeNow()
-	for _, child in car.chassis:GetChildren() do
-		if child.Name == "DoorHinge" and child:GetAttribute("Door") == index then
-			local oldOpen, oldClose = child:GetAttribute("DoorOpenAt"), child:GetAttribute("DoorCloseAt")
-			local a, b = Boarding.mergeDoor(if type(oldOpen) == "number" then oldOpen else nil, if type(oldClose) == "number" then oldClose else nil, openAt, closeAt, now)
-			child:SetAttribute("DoorOpenAt", a)
-			child:SetAttribute("DoorCloseAt", b)
-		end
-	end
-end
-
--- 8.5: a cabin door swung for a body the server moves itself (Danny getting in and out of the van: server/
--- MoveHelper.luau, as a player's own client moves theirs): open from `openAt` to `closeAt` (server times, shared with
--- whoever else uses that door: swingDoor above), or, `openAt` nil, shut from `closeAt` on (his move in called off, as
--- cancelBoarding shuts a player's). Every client swings it (client/CarVisuals.luau), its latch and thunk too.
-function Vehicles.swingDoor(car: Car, index: number, openAt: number?, closeAt: number)
-	if car.wrecked or not car.chassis.Parent then
-		return
-	end
-	if openAt then
-		swingDoor(car, index, openAt, closeAt)
-		return
-	end
-	for _, child in car.chassis:GetChildren() do
-		if child.Name == "DoorHinge" and child:GetAttribute("Door") == index then
-			child:SetAttribute("DoorCloseAt", closeAt)
-		end
-	end
-end
-
--- 3.10, getting in (see the top): who is on the way into which seat. A reserved seat takes nobody else meanwhile.
-type Boarder = { car: Car, seat: Seat | VehicleSeat, door: number, humanoid: Humanoid, character: Model, at: number }
-local boarders: { [Player]: Boarder } = {}
-local reserved: { [Instance]: Player } = {}
-
-local function seatFree(seat: Seat | VehicleSeat): boolean
-	return seat.Occupant == nil and not reserved[seat]
-end
-
-local function endBoarding(player: Player, b: Boarder)
-	if boarders[player] == b then
-		boarders[player] = nil
-	end
-	if reserved[b.seat] == player then
-		reserved[b.seat] = nil
-		b.seat:SetAttribute("Reserved", nil)
-	end
-end
-
-local function clearBoardAttributes(character: Model)
-	character:SetAttribute("Boarding", nil)
-	character:SetAttribute("BoardAt", nil)
-	character:SetAttribute("BoardReach", nil)
-end
-
--- Getting in did not work out (the car left, a death, a wreck…): the seat is free again, the door shuts, the
--- player's client stands them at the door and gives the controls back (the attributes are gone).
-local function cancelBoarding(player: Player, b: Boarder)
-	endBoarding(player, b)
-	clearBoardAttributes(b.character)
-	if b.humanoid.Parent then
-		b.humanoid.PlatformStand = false
-	end
-	if not b.car.wrecked and b.car.chassis.Parent then
-		local now = workspace:GetServerTimeNow()
-		for _, child in b.car.chassis:GetChildren() do
-			if child.Name == "DoorHinge" and child:GetAttribute("Door") == b.door then
-				child:SetAttribute("DoorCloseAt", now)
-			end
-		end
-	end
-end
-
--- The move is over: into the seat (the door shuts from now: its DoorCloseAt). The attributes stay a moment, so the
--- client sees the seat before they go.
-local function finishBoarding(player: Player, b: Boarder)
-	-- 4.0: something in the hands by now (a piece, a trolley taken on the way in): no seat, the move is cancelled
-	-- (handsFull says why; 6.6: onto a bike its bag takes them).
-	if handsFull(player, b.car) then
-		cancelBoarding(player, b)
-		return
-	end
-	endBoarding(player, b)
-	b.humanoid.PlatformStand = false
-	local seat = b.seat
-	if seat:IsA("VehicleSeat") then
-		seat:Sit(b.humanoid)
-	elseif seat:IsA("Seat") then
-		seat:Sit(b.humanoid)
-	end
-	local at = b.at
-	task.delay(1, function()
-		if b.character:GetAttribute("BoardAt") == at then
-			clearBoardAttributes(b.character)
-		end
-	end)
-end
-
--- 5.7: how long the move into a seat takes: a bike's saddle its own (Config.Interact: a step to the side and the leg
--- over, client/CarBoarding.luau), a car's door Config.Cargo's. 6.10: a scooter's deck a quick hop (ScooterHop).
-local function boardSeconds(car: Car): number
-	if car.model:GetAttribute("BikeStand") == true then
-		return Config.Interact.ScooterHop
-	end
-	return if car.model:GetAttribute("Bike") == true then Config.Interact.BikeMount else Config.Cargo.BoardSeconds
-end
-
--- 6.24: a bike and its rider's body never collide (NoCollisionConstraints in the bike's folder "RiderPass", made for
--- the character its owner has now: at the spawn, the E and the seat). The client moves the body onto and off the
--- saddle through the bike in the collision group "Boarding" (client/CarBoarding.luau), but that group is only on its
--- own screen: the server, which runs a bike standing empty (Vehicles.claim), saw the body inside the bike on every
--- move on and off and pushed the light bike away from it, and the body, moved in the bike's own space, followed it:
--- the bike rolled over onto its side. (6.26: a car too, see passBody: on the server the body cannot be moved at all,
--- so a car's mass does not help.)
--- 6.26: the pass itself (a folder of NoCollisionConstraints between the vehicle's colliding parts and the body's).
-local function passFolder(car: Car, character: Model, name: string): Folder
-	local folder = Instance.new("Folder")
-	folder.Name = name
-	for _, mine in car.model:GetChildren() do
-		if not mine:IsA("BasePart") or not mine.CanCollide then
-			continue
-		end
-		for _, body in character:GetChildren() do
-			-- (the torso, the head and the root, and whatever else of the body collides now)
-			if body:IsA("BasePart") and (body.CanCollide or body.Name == "HumanoidRootPart" or body.Name == "Head" or string.find(body.Name, "Torso") ~= nil) then
-				local pass = Instance.new("NoCollisionConstraint")
-				pass.Part0 = mine
-				pass.Part1 = body
-				pass.Parent = folder
-			end
-		end
-	end
-	folder.Parent = car.model
-	return folder
-end
-
-local function passRider(car: Car, character: Instance?)
-	if not character or not character:IsA("Model") or car.model:GetAttribute("Bike") ~= true or car.wrecked then
-		return
-	end
-	local old = car.model:FindFirstChild("RiderPass")
-	if old then
-		local first = old:FindFirstChildWhichIsA("NoCollisionConstraint")
-		local part = first and first.Part1
-		if part and part.Parent == character then
-			return -- (made for this body already)
-		end
-		old:Destroy()
-	end
-	passFolder(car, character, "RiderPass")
-end
-
--- 6.26: a body getting into or out of a car passes through it on the server too, for `seconds` (the move and a little
--- more; a bike: for good, passRider). The client moves the body through the car's shell in the group "Boarding", on
--- its own screen only; the server, which runs a parked car (6.13.1, Vehicles.claim), saw the body inside the cabin and,
--- as a player's body is its own client's and cannot be moved there, shoved the car off it with all the force it took:
--- the car tipped, and the Steer held it tipped (the owner's screenshot). A passenger getting into a driven car too (the
--- driver's client saw the same). The folder "BoardPass_<name>" goes when the last move's time is over.
-local function passBody(car: Car, character: Instance?, seconds: number)
-	if not character or not character:IsA("Model") or car.wrecked or not car.model.Parent then
-		return
-	end
-	if car.model:GetAttribute("Bike") == true then
-		passRider(car, character)
-		return
-	end
-	local name = `BoardPass_{character.Name}`
-	local found = car.model:FindFirstChild(name)
-	if found then
-		local first = found:FindFirstChildWhichIsA("NoCollisionConstraint")
-		local part = first and first.Part1
-		if not part or part.Parent ~= character then
-			found:Destroy() -- (made for another body of that name: a respawn, a namesake)
-			found = nil
-		end
-	end
-	local folder: Instance = if found then found else passFolder(car, character, name)
-	local ends = os.clock() + seconds
-	local was = folder:GetAttribute("Ends")
-	folder:SetAttribute("Ends", if type(was) == "number" then math.max(was, ends) else ends)
-	task.delay(seconds + 0.05, function()
-		local last = folder:GetAttribute("Ends")
-		if folder.Parent and (type(last) ~= "number" or os.clock() >= last) then
-			folder:Destroy()
-		end
-	end)
-end
-
--- The E at a door, checked: the seat is reserved and the move starts (the player's client plays it). 5.7: `lead`
--- seconds later (a rented scooter slides off its dock first: Vehicles.mount); the client walks to the side meanwhile.
-local function startBoarding(player: Player, car: Car, seat: Seat | VehicleSeat, index: number, humanoid: Humanoid, lead: number?)
-	local character = humanoid.Parent
-	if not character or not character:IsA("Model") then
-		return
-	end
-	-- 6.24: onto a bike, the body passes through it on the server too; 6.26: into a car too, for the move
-	passBody(car, character, math.max(0, lead or 0) + boardSeconds(car) + 1)
-	local cfg = Config.Cargo
-	local now = workspace:GetServerTimeNow() + math.max(0, lead or 0)
-	local door = car.doors[index]
-	local panel = door ~= nil and door.panel ~= nil
-	local seatNo = 0
-	if seat ~= car.seat then
-		local n = seat:GetAttribute("Index")
-		seatNo = if type(n) == "number" then n else 1
-	end
-	reserved[seat] = player
-	seat:SetAttribute("Reserved", player.UserId)
-	boarders[player] = { car = car, seat = seat, door = index, humanoid = humanoid, character = character, at = now }
-	character:SetAttribute("BoardAt", now)
-	character:SetAttribute("BoardReach", panel)
-	character:SetAttribute("Boarding", Boarding.encode(car.owner.UserId, index, seatNo))
-	humanoid.PlatformStand = true -- (the client does it at once too; it goes off again at the seat or on a cancel)
-	if panel then
-		-- Open as the hand reaches the handle, shut as they sit.
-		swingDoor(car, index, now + cfg.BoardStepSeconds * 0.7, now + cfg.BoardSeconds)
-	end
-end
-
--- Every frame: a move still fine goes on, and into the seat at its time; anything wrong cancels it.
-local function stepBoarding()
-	if next(boarders) == nil then
-		return
-	end
-	local cfg = Config.Cargo
-	local now = workspace:GetServerTimeNow()
-	for player, b in boarders do
-		local car = b.car
-		local root = b.humanoid.RootPart
-		local fine = player.Parent ~= nil and player.Character == b.character and b.humanoid.Health > 0
-			and b.humanoid.SeatPart == nil and root ~= nil and not car.wrecked and car.chassis.Parent ~= nil
-			and cars[car.owner] == car and not car.chauffeured and b.seat.Parent ~= nil and b.seat.Occupant == nil
-			and Vehicles.speed(car) <= cfg.BoardMaxSpeed and (b.seat == car.seat or not car.repairing)
-		if not fine or not root then
-			cancelBoarding(player, b)
-		elseif now >= b.at + boardSeconds(car) then
-			if (root.Position - b.seat.Position).Magnitude <= cfg.BoardRange then
-				finishBoarding(player, b)
-			else
-				cancelBoarding(player, b)
-			end
-		end
-	end
-end
-
--- Whoever gets out slides out at their own door (3.10: their client plays it, client/CarBoarding.luau; the door opens
--- at once and shuts behind them). Still over the car a moment later (no client move: a lag, a failed start), they are
--- put out next to it at their door, not left inside the cabin.
--- 6.13.1: who simulates a car (its network owner): its driver while somebody sits in its driver's seat (the owner:
--- the seat takes nobody else), the server while it stands empty or a chauffeur drives it. With StreamingEnabled a far
--- owner's client loses the ground under a parked car: owning it, that client would let it fall through (the server
--- then sinks it, "Your car sank!"). Every hand-over of the car goes through here (the seat, the spawn, the chauffeur's
--- hand-over, the lift, a new kit or gun, a decal, the tow).
-function Vehicles.claim(car: Car)
-	if car.wrecked or not car.chassis.Parent or car.chassis.Anchored then
-		return -- (an anchored part has no owner: the lift sets it again when it lets go)
-	end
-	local occupant = car.seat.Occupant
-	local driver = if occupant and not car.chauffeured then Players:GetPlayerFromCharacter(occupant.Parent) else nil
-	pcall(function()
-		car.chassis:SetNetworkOwner(driver)
-	end)
-end
-
-local function watchSeat(car: Car, seat: Seat | VehicleSeat, index: number, driver: boolean)
-	local door = car.doors[index] or car.doors[1]
-	local sitting: Humanoid? = nil
-	seat:GetPropertyChangedSignal("Occupant"):Connect(function()
-		local occupant = seat.Occupant
-		if occupant then
-			if driver and occupant.Parent ~= car.owner.Character then
-				eject(seat) -- somebody else's car
-			elseif driver and handsFull(car.owner, car) then
-				eject(seat)
-			else
-				sitting = occupant
-				if driver then
-					Vehicles.claim(car) -- 6.13.1: its driver's client drives it
-					passRider(car, occupant.Parent) -- 6.24: off a bike again, the body passes through it (any way on)
-				end
-			end
-			return
-		end
-		if driver then
-			Vehicles.claim(car) -- 6.13.1: an empty car is the server's (it cannot fall through ground a far owner lost)
-		end
-		local left = sitting
-		sitting = nil
-		local character = left and left.Parent
-		if not left or not character or not character:IsA("Model") or left.Health <= 0 then
-			return
-		end
-		local cfg = Config.Cargo
-		passBody(car, character, cfg.AlightSeconds + 1) -- 6.26: out through the car's shell without shoving it
-		local now = workspace:GetServerTimeNow()
-		character:SetAttribute("AlightAt", now)
-		character:SetAttribute("AlightReach", door.panel ~= nil)
-		if not car.wrecked and door.panel then
-			swingDoor(car, index, now, now + cfg.AlightSeconds + 0.05)
-		end
-		task.delay(cfg.AlightSeconds + 0.4, function()
-			if character:GetAttribute("AlightAt") == now then
-				character:SetAttribute("AlightAt", nil)
-				character:SetAttribute("AlightReach", nil)
-			end
-			local root = left.RootPart
-			local player = Players:GetPlayerFromCharacter(character)
-			if not root or not character.Parent or not car.chassis.Parent or left.SeatPart or left.Health <= 0 or (player and boarders[player]) then
-				return
-			end
-			local frame = car.chassis.CFrame
-			local rel = frame:PointToObjectSpace(root.Position)
-			if Boarding.inside(rel.X, rel.Z, car.size.X / 2, car.size.Z / 2) and math.abs(rel.Y) < car.size.Y + 2 then
-				character:PivotTo(frame * CFrame.new(door.side * (car.size.X / 2 + 3), 2, door.z))
-			end
-		end)
-	end)
-end
-
--- 3.7: is the player standing at this door (the prompt's reach, and a little slack for the lag)?
-local function atDoor(car: Car, index: number, humanoid: Humanoid): boolean
-	local at = car.chassis:FindFirstChild(`Door{index}`)
-	local root = humanoid.RootPart
-	if not at or not at:IsA("Attachment") or not root then
-		return false
-	end
-	local prompt = at:FindFirstChildOfClass("ProximityPrompt")
-	local reach = if prompt then prompt.MaxActivationDistance else Config.Cargo.DoorReach
-	return (root.Position - at.WorldPosition).Magnitude <= reach + 6
-end
-
--- 3.7: the prompts at the doors: the driver's door seats the owner, a passenger door the next free seat behind it;
--- 3.10: through the move (startBoarding), not at once, and only while the car stands.
-local function watchPrompts(car: Car)
-	local function humanoidOf(player: Player): Humanoid?
-		local character = player.Character
-		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-		return if humanoid and humanoid.Health > 0 then humanoid else nil
-	end
-	for index, door in car.doors do
-		local at = car.chassis:FindFirstChild(`Door{index}`)
-		local prompt = at and at:FindFirstChildOfClass("ProximityPrompt")
-		if not prompt then
-			continue
-		end
-		if door.driver then
-			prompt.Triggered:Connect(function(player)
-				-- 3.2: not with the back open (it must be closed before the car goes anywhere).
-				if player == car.owner and Vehicles.backOpen(car) then
-					Net.get("Notice"):FireClient(player, `Close the back first: {Vehicles.backVerb(car, false)} (E at the back).`)
-					return
-				end
-				local humanoid = humanoidOf(player)
-				if player == car.owner and not car.wrecked and not car.chauffeured and seatFree(car.seat) and humanoid and not humanoid.SeatPart
-					and not boarders[player] and atDoor(car, index, humanoid) and not handsFull(player, car)
-					and Vehicles.speed(car) <= Config.Cargo.BoardMaxSpeed then
-					-- 3.4: back in a car on the lift of a repair bay: the repair is cancelled (server/Repair.luau).
-					if car.repairing then
-						Vehicles.beforeDrive(player, car)
-						Vehicles.setRepairing(car, false) -- (in case nobody was running it)
-					end
-					startBoarding(player, car, car.seat, index, humanoid)
-				end
-			end)
-		else
-			prompt.Triggered:Connect(function(player)
-				local humanoid = humanoidOf(player)
-				if player == car.owner or car.wrecked or car.chauffeured or car.repairing or not humanoid or humanoid.SeatPart or boarders[player] then
-					return
-				end
-				if not atDoor(car, index, humanoid) or handsFull(player) then
-					return
-				end
-				if Vehicles.speed(car) > Config.Cargo.BoardMaxSpeed then
-					Net.get("Notice"):FireClient(player, "Wait for the car to stop.")
-					return
-				end
-				for _, n in door.seats do
-					local seat = car.passengers[n]
-					if seat and seatFree(seat) then
-						startBoarding(player, car, seat, index, humanoid)
-						return
-					end
-				end
-				-- 4.5: an admin's buddy (server/Buddy.luau) in the seat gets out for a player (8.3 review: Danny too, for his
-				-- move's crew: server/MoveHelper.luau, the player who asks passed on).
-				local yield = Vehicles.yieldSeat
-				for _, n in door.seats do
-					local seat = car.passengers[n]
-					local occupant = seat and seat.Occupant
-					if yield and seat and occupant and not reserved[seat] and not Players:GetPlayerFromCharacter(occupant.Parent) and yield(seat, player) then
-						-- (the seat empties as the buddy's SeatWeld goes; a frame later at the latest)
-						task.delay(0.1, function()
-							if seatFree(seat) and humanoid.Parent and humanoid.Health > 0 and not humanoid.SeatPart and not boarders[player] and not car.wrecked then
-								startBoarding(player, car, seat, index, humanoid)
-							end
-						end)
-						return
-					end
-				end
-				Net.get("Notice"):FireClient(player, "No free seat at this door.")
-			end)
-		end
-	end
-end
-
--- 3.10: E in a seat (the CarDoor remote, client/CarBoarding.luau): out of the seat; watchSeat opens the door and the
--- client slides out. Space still does the same through the Humanoid's own jump.
-local lastOut: { [Player]: number } = {}
-local function onCarDoor(player: Player, action: any)
-	if action ~= "out" then
-		return
-	end
-	local now = os.clock()
-	if lastOut[player] and now - lastOut[player] < 0.3 then
-		return
-	end
-	lastOut[player] = now
-	local car, _, seatPart = Vehicles.seatedIn(player)
-	if not car or not seatPart or not (seatPart:IsA("Seat") or seatPart:IsA("VehicleSeat")) then
-		return
-	end
-	local seatWeld = seatPart:FindFirstChild("SeatWeld")
-	if seatWeld then
-		seatWeld:Destroy()
-	end
-	local character = player.Character
-	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-	if humanoid then
-		humanoid.Sit = false
-	end
-end
-
--- 5.7: onto your own bike or scooter through the move (a step to its side, the leg over), not at once: a ZDC RIDE
--- rental (server/Rental.luau). slide: the vehicle first slides this far off its dock (it is moved there now; every
--- client slides a copy over Config.Interact.DockUnclip from where it stood, the model's attributes UnclipAt and
--- UnclipFrom: client/RentalUi.luau) and the move waits for it. Without a saddle's door it seats you at once.
--- 6.10: onto a scooter (yours put out next to you: spawnAt; a rental) the quick hop, at once: the slide plays meanwhile.
-function Vehicles.mount(player: Player, car: Car, slide: Vector3?)
-	local character = player.Character
-	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-	if not humanoid or humanoid.Health <= 0 or humanoid.SeatPart or boarders[player] or car.wrecked or not car.model.Parent then
-		return
-	end
-	local lead = 0
-	if slide and slide.Magnitude > 0 then
-		local from = car.model:GetPivot()
-		car.model:PivotTo(from + slide)
-		car.model:SetAttribute("UnclipFrom", from)
-		car.model:SetAttribute("UnclipAt", workspace:GetServerTimeNow())
-		lead = if car.model:GetAttribute("BikeStand") == true then 0 else Config.Interact.DockUnclip
-	end
-	for index, door in car.doors do
-		if door.driver and seatFree(car.seat) then
-			startBoarding(player, car, car.seat, index, humanoid, lead)
-			return
-		end
-	end
-	car.seat:Sit(humanoid)
-end
-
-function Vehicles.get(player: Player): Car?
-	local car = cars[player]
-	if car and not car.wrecked then
-		return car
-	end
-	return nil
-end
-
--- All live cars (for the zombies).
-function Vehicles.all(): { Car }
-	local list = {}
-	for _, car in cars do
-		if not car.wrecked then
-			table.insert(list, car)
-		end
-	end
-	return list
-end
-
-function Vehicles.isDriving(player: Player): boolean
-	local car = Vehicles.get(player)
-	local occupant = car and car.seat.Occupant
-	return occupant ~= nil and player.Character ~= nil and occupant.Parent == player.Character
-end
-
--- The car the player sits in (any seat) and whether they drive it.
-function Vehicles.seatedIn(player: Player): (Car?, boolean, BasePart?)
-	local character = player.Character
-	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-	local seatPart = humanoid and humanoid.SeatPart
-	if not seatPart then
-		return nil, false, nil
-	end
-	for _, car in cars do
-		if not car.wrecked and seatPart:IsDescendantOf(car.model) then
-			return car, seatPart == car.seat, seatPart
-		end
-	end
-	return nil, false, nil
-end
-
--- The players riding in a car's passenger seats.
-function Vehicles.passengersOf(car: Car): { Player }
-	local list = {}
-	for _, seat in car.passengers do
-		local occupant = seat.Occupant
-		local player = occupant and Players:GetPlayerFromCharacter(occupant.Parent)
-		if player then
-			table.insert(list, player)
-		end
-	end
-	return list
-end
-
--- Speed along the ground (studs / s).
-function Vehicles.speed(car: Car): number
-	local v = car.chassis.AssemblyLinearVelocity
-	return Vector3.new(v.X, 0, v.Z).Magnitude
-end
-
--- 4.2: the speed a ram may count. The driver's client owns the car's physics, so a hacked velocity must not kill
--- everything in one touch: never more than the car's top speed with room for a downhill run.
-function Vehicles.ramSpeed(car: Car): number
-	return math.min(Vehicles.speed(car), car.stats.maxSpeed * 1.7 + 10) -- (nitro is +60%)
-end
-
--- ── Cargo (server/Cargo.luau) ───────────────────────────────────────────────
-
-local function styleOf(car: Car): Style
-	local def = Economy.findCar(car.id)
-	return if def then styleFor(def, car.stage) else STYLES.van
-end
+-- ── Cargo (server/Moving.luau) ──────────────────────────────────────────────
 
 -- Where the loaded pieces ride, relative to the chassis: the bottom centre of a piece, facing the front.
--- 3.5: the slots of the car's stage (its look's: as many as Economy.capacity counts).
--- 5.1: a bike's installed bike gear adds its light slots after the bike's own (bikeGearSlots: the basket's, the
--- panniers', the trailer's).
-function Vehicles.cargoSlots(car: Car): { CFrame }
+function Vehicles.cargoSlots(_car: Car): { CFrame }
 	local list = {}
-	local style = styleOf(car)
-	local slots = style.cargo.slots
-	if style.bike then
-		local def = Economy.findCar(car.id)
-		slots = table.clone(slots)
-		for _, slot in bikeGearSlots(style, bikeArtId(car.id, if def then def.style else "bike"), car.gear) do
-			table.insert(slots, slot)
-		end
-	end
-	for _, slot in slots do
+	for _, slot in STYLE.slots do
 		table.insert(list, CFrame.new(Vector3.new(0, CHASSIS_HEIGHT / 2, 0) + slot))
 	end
 	return list
 end
 
--- 6.16: the part the body's looks hang on: a player's car's BodyRoot (it sways: client/CarSway.luau), else the chassis.
--- At rest (always, on the server) it sits right on the chassis: place things by the chassis, weld them to this.
-function Vehicles.bodyPart(car: Car): BasePart
-	return lookOf(car.model, car.chassis)
-end
-
--- 6.10: the part a loaded piece is welded to (server/Cargo.luau): on a scooter its BikeFrame (the load leans with the
--- deck: client/CarVisuals.luau), else the body (6.16: Vehicles.bodyPart, the load sways with it). The slots stay
--- relative to the chassis.
+-- The part a loaded piece is welded to: the chassis (the slots are relative to it).
 function Vehicles.cargoHolder(car: Car): BasePart
-	if car.model:GetAttribute("BikeStand") == true then
-		local frame = car.model:FindFirstChild("BikeFrame")
-		if frame and frame:IsA("BasePart") then
-			return frame
-		end
-	end
-	return Vehicles.bodyPart(car)
+	return car.chassis
 end
 
--- 5.1: is this car a bike (CarDef.bike)?
-function Vehicles.isBike(car: Car): boolean
-	return styleOf(car).bike == true
-end
-
--- 6.26: the AlignOrientation "Righting" that turns a vehicle that is down back onto its wheels (server/
--- CarRighting.luau sets it and switches it on): a bike's is built with it (build: on its Upright attachment), a car's
--- is made here the first time it is needed (on the movers' Root attachment, the chassis' own axes). Off until then.
-function Vehicles.righting(car: Car): AlignOrientation?
-	local found = car.chassis:FindFirstChild("Righting")
-	if found and found:IsA("AlignOrientation") then
-		return found
-	end
-	local root = car.chassis:FindFirstChild("Root")
-	if not root or not root:IsA("Attachment") or car.wrecked then
-		return nil
-	end
-	local righting = Instance.new("AlignOrientation")
-	righting.Name = "Righting"
-	righting.Mode = Enum.OrientationAlignmentMode.OneAttachment
-	righting.Attachment0 = root
-	righting.Enabled = false
-	righting.Parent = car.chassis
-	return righting
-end
-
--- 6.26: where a vehicle's wheels touch the ground when it stands on them, in its chassis' space: the bottoms of its
--- wheel colliders (a bike's four hidden ones too), front left, front right, back left, back right.
--- server/CarRighting.luau looks under them for a wheel in the air and for the ground's level.
-function Vehicles.wheelContacts(car: Car): { Vector3 }
-	local frame = car.chassis.CFrame
-	local list: { Vector3 } = {}
-	for _, p in car.model:GetChildren() do
-		if p.Name == "WheelCollider" and p:IsA("BasePart") then
-			table.insert(list, frame:PointToObjectSpace(p.Position) - Vector3.new(0, p.Size.Y / 2, 0))
-		end
-	end
-	table.sort(list, function(a: Vector3, b: Vector3): boolean
-		if math.abs(a.Z - b.Z) > 0.01 then
-			return a.Z < b.Z -- (the front is -Z)
-		end
-		return a.X < b.X
-	end)
-	return list
-end
-
--- 3.4: how many pieces the car takes at once (3.5: at its stage). 4.6: with the cargo's look, the Roof Rack's slot
--- for a light piece too (its installed gear, Economy.capacity).
-function Vehicles.capacity(car: Car, look: string?): number
-	local room = Economy.capacity(car.id, { stage = car.stage }, car.gear, look)
-	return if car.rental then math.min(room, Config.Rental.Room) else room -- 5.7: a rental's rack takes one
-end
-
--- 4.6, gear: is this piece (a Config.Gear id) installed on this live car? (A company vehicle has none.)
-function Vehicles.hasGear(car: Car, gearId: string): boolean
-	return car.gear ~= nil and car.gear[gearId] == true
-end
-
--- What the HUD calls the cargo space: "Load it into the back of the {noun}".
-function Vehicles.cargoNoun(car: Car): string
-	return styleOf(car).cargo.noun
-end
-
--- The back of the vehicle, where the Load / Take out prompt sits.
+-- The back of the van, where the Load prompts and the BackPrompt sit.
 function Vehicles.cargoDoor(car: Car): Attachment?
 	local door = car.chassis:FindFirstChild("CargoDoor")
 	return if door and door:IsA("Attachment") then door else nil
 end
 
--- Where passengers get in (the school bus door), on the ground next to the vehicle, in world space.
-function Vehicles.cargoEntry(car: Car): Vector3
-	local entry = car.chassis:FindFirstChild("CargoEntry")
-	local point = if entry and entry:IsA("Attachment") then entry.WorldPosition else car.chassis.Position
-	return Vector3.new(point.X, car.chassis.Position.Y - CHASSIS_HEIGHT / 2 - styleOf(car).clearance, point.Z)
-end
-
 -- ── The back that opens (3.2) ──────────────────────────────────────────────
 
--- Set by server/Cargo.luau: may this player (not the owner) open and close the back of this car (the job's crew)?
-Vehicles.backAllowed = function(_player: Player, _car: Car): boolean
-	return false
-end
--- Set by server/Cargo.luau: the back of this car was opened or closed (the job's prompts and hints follow).
-Vehicles.backChanged = function(_car: Car) end
-
--- The prompt that opens and closes the back; nil: no back (the bus) or wrecked (the prompts burnt).
+-- The prompt that opens and closes the back; nil: gone with the van.
 function Vehicles.backPrompt(car: Car): ProximityPrompt?
 	local door = Vehicles.cargoDoor(car)
 	local prompt = door and door:FindFirstChild("BackPrompt")
 	return if prompt and prompt:IsA("ProximityPrompt") then prompt else nil
 end
 
--- Has this car a back that opens (doors, a tailgate, a trunk, a ramp)?
+-- Has this van a back that opens (it is in the world)?
 function Vehicles.hasBack(car: Car): boolean
 	return not car.wrecked and Vehicles.backPrompt(car) ~= nil
 end
@@ -4249,19 +496,9 @@ function Vehicles.backOpen(car: Car): boolean
 	return car.model:GetAttribute("BackOpen") == true
 end
 
--- What the back is: doors | tailgate | trunk | ramp ("" without one).
-function Vehicles.backNoun(car: Car): string
-	local back = styleOf(car).back
-	return if back then back.noun else ""
-end
-
--- "open the back doors", "close the tailgate", "lower the ramp" … (opening: the way it goes now).
-function Vehicles.backVerb(car: Car, opening: boolean): string
-	local noun = Vehicles.backNoun(car)
-	if noun == "ramp" then
-		return if opening then "lower the ramp" else "raise the ramp"
-	end
-	return `{if opening then "open" else "close"} the {if noun == "doors" then "back doors" else noun}`
+-- "open the back doors" / "close the back doors" (opening: the way it goes now).
+function Vehicles.backVerb(_car: Car, opening: boolean): string
+	return `{if opening then "open" else "close"} the back doors`
 end
 
 -- Opens or closes the back (the clients swing it, client/CarVisuals.luau). Nothing happens without a back.
@@ -4272,62 +509,48 @@ function Vehicles.setBack(car: Car, open: boolean)
 	car.model:SetAttribute("BackOpen", open)
 	local prompt = Vehicles.backPrompt(car)
 	if prompt then
-		prompt.ActionText = backAction(Vehicles.backNoun(car), open)
+		prompt.ActionText = if open then "Close doors" else "Open doors"
 	end
-	Vehicles.backChanged(car)
 end
 
--- The BackPrompt pressed: open or close it. On foot, a hand free (3.7: empty hands, or one light piece in them:
--- the character attribute CarryHands = 1 from server/Cargo.luau), the car standing; the owner or the job's crew.
+-- What the character holds in its hands (server/Moving.luau sets it), or nil.
+local function carrying(character: Instance?): string?
+	local value = character and character:GetAttribute("Carrying")
+	return if type(value) == "string" then value else nil
+end
+
+-- The BackPrompt pressed: open or close it. On foot, a hand free (empty hands, or one light piece in them: the
+-- character attribute CarryHands = 1), the owner or the run's party.
 local function toggleBack(car: Car, player: Player)
 	local character = player.Character
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-	if car.wrecked or car.chauffeured or not character or not humanoid or humanoid.Health <= 0 then
+	if car.wrecked or not character or not humanoid or humanoid.Health <= 0 then
 		return
 	end
 	local notice = Net.get("Notice")
-	if humanoid.SeatPart then
-		notice:FireClient(player, "Get out first.")
-		return
-	end
 	if player ~= car.owner and not Vehicles.backAllowed(player, car) then
-		notice:FireClient(player, "This is not your car.")
+		notice:FireClient(player, "This is not your van.")
 		return
 	end
 	local open = Vehicles.backOpen(car)
-	local held = carrying(character)
-	if held and (held == "horse" or character:GetAttribute("CarryHands") ~= 1) then
+	if carrying(character) and character:GetAttribute("CarryHands") ~= 1 then
 		local verb = Vehicles.backVerb(car, not open)
 		local count = character:GetAttribute("CarryCount")
-		if held == "horse" then
-			notice:FireClient(player, `Your hands are full. Let the horse go (G), then {verb} (E).`)
-		elseif type(count) == "number" and count >= 2 then
+		if type(count) == "number" and count >= 2 then
 			notice:FireClient(player, `Hands full: put a piece down with G, then {verb} (E). Or a crew mate opens it for you.`)
 		else
 			notice:FireClient(player, `Your hands are full. Put it down (G), then {verb} (E).`)
 		end
 		return
 	end
-	if Vehicles.speed(car) > Config.Cargo.MaxCarSpeed then
-		notice:FireClient(player, "Stop the vehicle first.")
-		return
-	end
 	Vehicles.setBack(car, not open)
-	-- Somebody waits at the wheel: they cannot drive until it is closed again.
-	local driver = car.seat.Occupant
-	local other = driver and Players:GetPlayerFromCharacter(driver.Parent)
-	if not open and other and other ~= player then
-		notice:FireClient(other, `{player.DisplayName} opened the back: you can't drive until it is closed.`)
-	end
 end
 
--- 8.0 SANDBOX: a player's ZDC Sprinter (spawnAt) and its walk-in bay. The back (BackOpen: its BackPrompt, setBack):
--- shut, the BackBlock keeps the bay closed; open, the rear step folds out (solid and shown) behind the bumper. The
--- sliding door (its SidePrompt: anybody on foot while the van stands, so nobody is ever shut in; the attribute
--- SlideOpen): it rolls back along the side (the server moves its SlideMotor's C0: every client sees it), its block
--- goes and the side step comes out (both back once it has shut); it shuts itself when somebody takes the wheel. The
--- bay's light is on while either stands open. Somebody standing in the bay while the van drives rides along on its
--- floor (the shut doors' blocks keep them in).
+-- 8.0, the walk-in bay: a player's van's doors (BackOpen, SlideOpen), steps and light. The back (its BackPrompt,
+-- setBack): shut, the BackBlock keeps the bay closed; open, the rear step folds out (solid and shown) behind the bumper.
+-- The sliding door (its SidePrompt: anybody on foot, so nobody is ever shut in; the attribute SlideOpen): it rolls
+-- back along the side (the server moves its SlideMotor's C0: every client sees it), its block goes and the side step
+-- comes out (both back once it has shut). The bay's light is on while either stands open.
 function SprinterBuild.wire(car: Car)
 	local model, chassis = car.model, car.chassis
 	local switched: { BasePart } = {}
@@ -4401,111 +624,26 @@ function SprinterBuild.wire(car: Car)
 		prompt.Triggered:Connect(function(player: Player)
 			local character = player.Character
 			local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-			if car.wrecked or car.chauffeured or not character or not humanoid or humanoid.Health <= 0 then
+			if car.wrecked or not character or not humanoid or humanoid.Health <= 0 then
 				return
 			end
-			local notice = Net.get("Notice")
 			local opening = model:GetAttribute("SlideOpen") ~= true
-			local held = carrying(character)
-			if humanoid.SeatPart then
-				notice:FireClient(player, "Get out first.")
-			elseif held and (held == "horse" or character:GetAttribute("CarryHands") ~= 1) then
-				notice:FireClient(player, `Your hands are full. Put it down (G), then {if opening then "open" else "close"} the side door (E).`)
-			elseif Vehicles.speed(car) > Config.Cargo.MaxCarSpeed then
-				notice:FireClient(player, "Stop the van first.")
+			if carrying(character) and character:GetAttribute("CarryHands") ~= 1 then
+				Net.get("Notice"):FireClient(player, `Your hands are full. Put it down (G), then {if opening then "open" else "close"} the side door (E).`)
 			else
 				model:SetAttribute("SlideOpen", opening)
-			end
-		end)
-		car.seat:GetPropertyChangedSignal("Occupant"):Connect(function()
-			if car.seat.Occupant and model:GetAttribute("SlideOpen") == true then
-				model:SetAttribute("SlideOpen", false) -- (somebody took the wheel: it shuts)
 			end
 		end)
 	end
 	sync()
 end
 
--- The car gun that goes on this car of the player's: the one in their profile, if the car can carry one.
-local function gunFor(player: Player, carId: string): string?
-	local profile = PlayerData.get(player)
-	local gunId = profile and profile.carGuns[carId]
-	if gunId and Economy.canMount(carId) and Economy.findCarGun(gunId) then
-		return gunId
-	end
-	return nil
-end
+-- ── Placing a van ──────────────────────────────────────────────────────────
 
--- 3.4: keeps the car's share of health in the profile (profile.carHealth, saved): it comes back as damaged as it
--- went. Not a lent company vehicle (it goes back to its employer).
-local function remember(car: Car)
-	if car.lent then
-		return
-	end
-	local profile = PlayerData.get(car.owner)
-	if profile then
-		profile.carHealth[car.id] = math.clamp(car.health / math.max(1, car.stats.health), 0, 1)
-	end
-end
-
--- 4.5, set by server/Buddy.luau: a player wants the passenger seat an admin's NPC buddy sits in: the buddy gets out
--- (true when it did; it keeps away from that seat a moment). 8.3 review: `player` is who asks; server/MoveHelper.luau
--- wraps it (Danny gets out for his move's crew).
-Vehicles.yieldSeat = nil :: ((seat: Seat, player: Player?) -> boolean)?
-
--- 3.4, set by server/Repair.luau: the owner gets back into a car on the lift (the repair is cancelled).
-Vehicles.beforeDrive = function(_player: Player, _car: Car) end
-
--- 3.4: a car on the lift of a repair bay: anchored where it stands (nobody pushes or drives it, its passengers step
--- out and nobody rides along until it is done) and marked for the clients (the attribute Repairing); off again, the
--- owner's client drives it as before.
-function Vehicles.setRepairing(car: Car, on: boolean)
-	if car.repairing == on or car.wrecked or not car.chassis.Parent then
-		car.repairing = on
-		return
-	end
-	car.repairing = on
-	car.model:SetAttribute("Repairing", on)
-	car.chassis.AssemblyLinearVelocity = Vector3.zero
-	car.chassis.AssemblyAngularVelocity = Vector3.zero
-	car.chassis.Anchored = on
-	if on then
-		for _, seat in car.passengers do
-			eject(seat) -- the SeatWeld goes too: nobody stays in a car on the lift
-		end
-	else
-		Vehicles.claim(car)
-	end
-end
-
--- The player's car leaves the world (a new one, a garage, leaving the game): parked as it is (its damage kept).
-function Vehicles.remove(player: Player)
-	local car = cars[player]
-	if car then
-		cars[player] = nil
-		if not car.wrecked then
-			remember(car)
-		end
-		car.wrecked = true
-		car.model:Destroy()
-	end
-end
-
--- ── Placing a car ──────────────────────────────────────────────────────────
-
--- Set by server/CarCall.luau: the CAR button (Vehicles.spawn without force) calls the car instead of placing it.
--- Returns an error text, or nil when a chauffeur is on the way.
-Vehicles.callCar = nil :: ((player: Player, carId: string?) -> string?)?
--- Set by server/CarCall.luau: where an instant car (force) goes when the player spawns at home (the home garage's
--- drive-out spot), or nil for the usual spot next to them.
-Vehicles.homeGarage = function(_player: Player): CFrame?
-	return nil
-end
-
--- What a ray looking for the ground must not see: the cars, the people, the enemies, the loot.
+-- What a ray looking for the ground must not see: the vans, the people, the zombies.
 local function groundIgnore(): { Instance }
 	local list: { Instance } = {}
-	for _, name in { "Cars", "Traffic", "BanditCars", "Npcs", "Zombies", "Animals", "Loot", "Showroom" } do
+	for _, name in { "Cars", "Npcs", "Zombies", "Loot" } do
 		local folder = workspace:FindFirstChild(name)
 		if folder then
 			table.insert(list, folder)
@@ -4519,8 +657,8 @@ local function groundIgnore(): { Instance }
 	return list
 end
 
--- The top of the ground at (x, z): a road, a bridge, a hill road, a driveway (looking down from well above refY).
--- Where nothing is found: the road level.
+-- The top of the ground at (x, z): a road, a yard, a floor (looking down from well above refY). Where nothing is
+-- found: the old road level.
 function Vehicles.groundY(x: number, z: number, refY: number?): number
 	local params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Exclude
@@ -4529,7 +667,7 @@ function Vehicles.groundY(x: number, z: number, refY: number?): number
 	params.RespectCanCollide = true
 	local top = math.max(refY or ROAD_TOP, ROAD_TOP) + 90
 	local origin = Vector3.new(x, top, z)
-	-- Look past what nothing drives on: a sign board, a beam, a steep face (a few tries down through them).
+	-- Look past what nothing stands on: a sign board, a beam, a steep face (a few tries down through them).
 	for _ = 1, 5 do
 		local hit = workspace:Raycast(origin, Vector3.new(0, WATER_LEVEL - 6 - origin.Y, 0), params)
 		if not hit then
@@ -4545,18 +683,24 @@ function Vehicles.groundY(x: number, z: number, refY: number?): number
 	return ROAD_TOP
 end
 
--- 6.26, a vehicle never comes out into something (Config.SpawnSpot, shared/SpawnSpot.luau): `ground` (on the ground
--- under its middle, Drop over it, facing its look) is tried first, then the spots near it in a small spiral. A spot is
--- free when the ground under its four wheels (`wheels`, its own space: SpawnSpot.wheels / bikeWheels) is one plane no
--- steeper than Slope (rays; SpawnSpot.plane), nothing stands in the way from the spot asked for at its hull's middle
--- height (a ray: no car through a wall or a fence), and the room its hull needs over that plane (from Lift up, Pad
--- wider) holds nothing it would collide with (a box query in the collision group "Car": the props, the walls, the
--- other cars, a player's body; never a zombie, a person of the city or a corpse, which do not collide with a car).
--- `ignore`: the vehicle itself, its riders, a body that gets in at once. Returns the spot (Drop over its wheels'
--- ground, tilted to its plane, a bike without the plane's roll, facing as asked) and whether it is free; none free:
--- the spot asked for (on its plane when it has one; a warning in Studio).
-local function findRoom(style: Style, lower: number, wheels: { SpawnSpot.Wheel }, ground: CFrame, ignore: { Instance }, what: string): (CFrame, boolean)
+-- The van's four wheels where they touch the ground, in its own space (front left, front right, back left, back right).
+local function wheelsOf(): { SpawnSpot.Wheel }
+	local x, z = STYLE.wheelAt.X, STYLE.wheelAt.Y
+	return { { x = -x, z = -z }, { x = x, z = -z }, { x = -x, z = z }, { x = x, z = z } }
+end
+
+-- 6.26, a van never comes out into something (Config.SpawnSpot, shared/SpawnSpot.luau): `ground` (on the ground under
+-- its middle, Drop over it, facing its look) is tried first, then the spots near it in a small spiral. A spot is free
+-- when the ground under its four wheels is one plane no steeper than Slope (rays; SpawnSpot.plane), nothing stands in
+-- the way from the spot asked for at its hull's middle height (a ray: no van through a wall or a fence), and the room
+-- its hull needs over that plane (from Lift up, Pad wider) holds nothing it would collide with (a box query in the
+-- collision group "Car": the props, the walls, the other vans, a player's body; never a zombie or a corpse, which do
+-- not collide with a car). `ignore`: the van itself. Returns the spot (Drop over its wheels' ground, tilted to its
+-- plane, facing as asked) and whether it is free; none free: the spot asked for (on its plane when it has one; a
+-- warning in Studio).
+local function findRoom(ground: CFrame, ignore: { Instance }, what: string): (CFrame, boolean)
 	local cfg = Config.SpawnSpot
+	local style = STYLE
 	local flat = Vector3.new(ground.LookVector.X, 0, ground.LookVector.Z)
 	local look = if flat.Magnitude > 0.01 then flat.Unit else Vector3.new(0, 0, -1)
 	local right = Vector3.new(-look.Z, 0, look.X)
@@ -4569,14 +713,14 @@ local function findRoom(style: Style, lower: number, wheels: { SpawnSpot.Wheel }
 	rays.FilterDescendantsInstances = skip
 	rays.IgnoreWater = true
 	rays.RespectCanCollide = true
-	local path = RaycastParams.new() -- (the way there: only what stands, not the people and the cars that move)
+	local path = RaycastParams.new() -- (the way there: only what stands, not the people and the vans)
 	path.FilterType = Enum.RaycastFilterType.Exclude
 	path.FilterDescendantsInstances = skip
 	path.RespectCanCollide = true
 	local overlap = OverlapParams.new()
 	overlap.FilterType = Enum.RaycastFilterType.Exclude
 	local pass = table.clone(ignore)
-	for _, where in cfg.Pass do -- (the loot and the animals: pushed along like the zombies; 8.0.1: the sandbox's ground)
+	for _, where in cfg.Pass do -- (the loot: pushed along like the zombies; 8.0.1: the game's ground)
 		local folder: Instance? = workspace
 		for name in string.gmatch(where, "[^%.]+") do
 			folder = if folder then folder:FindFirstChild(name) else nil
@@ -4589,14 +733,14 @@ local function findRoom(style: Style, lower: number, wheels: { SpawnSpot.Wheel }
 	overlap.RespectCanCollide = true
 	overlap.MaxParts = 1
 	pcall(function()
-		overlap.CollisionGroup = "Car" -- (what a car's hull collides with)
+		overlap.CollisionGroup = "Car" -- (what a van's hull collides with)
 		path.CollisionGroup = "Car"
 	end)
 	local top = CHASSIS_HEIGHT
 	for _, b in style.boxes do
 		top = math.max(top, CHASSIS_HEIGHT + b.offset.Y + b.size.Y / 2)
 	end
-	top += style.clearance - lower -- (the hull's top over its wheels' ground)
+	top += style.clearance -- (the hull's top over its wheels' ground)
 	local sx, sy, sz, cy = SpawnSpot.box(style.width, style.length, top, cfg.Lift, cfg.Pad)
 	local along, across = SpawnSpot.steps(style.width, style.length, cfg.Gap)
 	local why = "no ground under a wheel"
@@ -4606,7 +750,7 @@ local function findRoom(style: Style, lower: number, wheels: { SpawnSpot.Wheel }
 		local at = ground.Position + look * step.along + right * step.across
 		local frame = CFrame.lookAt(at, at + look)
 		local points: { { number } } = {}
-		for _, w in wheels do
+		for _, w in wheelsOf() do
 			local spot = frame * Vector3.new(w.x, 0, w.z)
 			local hit = workspace:Raycast(spot + Vector3.new(0, cfg.Probe / 2, 0), Vector3.new(0, -cfg.Probe, 0), rays)
 			if not hit then
@@ -4619,7 +763,7 @@ local function findRoom(style: Style, lower: number, wheels: { SpawnSpot.Wheel }
 			why = if n == 1 then whyNot else why
 			continue
 		end
-		local lookOn, rightOn, upOn = SpawnSpot.frame(up, look.X, look.Z, not style.bike)
+		local lookOn, rightOn, upOn = SpawnSpot.frame(up, look.X, look.Z, true)
 		local origin = Vector3.new(at.X, SpawnSpot.heightAt(up, middle, at.X, at.Z), at.Z)
 		local onPlane = CFrame.fromMatrix(origin, Vector3.new(rightOn[1], rightOn[2], rightOn[3]), Vector3.new(upOn[1], upOn[2], upOn[3]),
 			-Vector3.new(lookOn[1], lookOn[2], lookOn[3]))
@@ -4653,647 +797,104 @@ local function findRoom(style: Style, lower: number, wheels: { SpawnSpot.Wheel }
 	return if asked then asked * CFrame.new(0, cfg.Drop, 0) else ground, false
 end
 
--- 6.26: where a vehicle about to be built touches the ground with its four wheels (findRoom): a car's colliders, or a
--- bike's (and the E-Scooter's) four hidden ones under its art's axles (bikeBody's rule).
-local function wheelsOf(def: Config.CarDef, style: Style): { SpawnSpot.Wheel }
-	local wheelAt = style.wheelAt
-	if wheelAt then
-		-- (8.0: the ZDC Sprinter's own: front left, front right, back left, back right)
-		local x, z = wheelAt.X, wheelAt.Y
-		return { { x = -x, z = -z }, { x = x, z = -z }, { x = -x, z = z }, { x = x, z = z } }
+function Vehicles.get(player: Player): Car?
+	local car = cars[player]
+	if car and not car.wrecked then
+		return car
 	end
-	if not style.bike then
-		return SpawnSpot.wheels(style.width, style.length, style.wheel, style.wheelWidth)
-	end
-	local spec = bikeSpec(bikeArtId(def.id, def.style))
-	local front, rear = artOrigin(spec, "FrontWheel"), artOrigin(spec, "RearWheel")
-	local unscale = if spec.origins.Crank ~= nil then 1 / BikeArt.Scale else 1
-	return SpawnSpot.bikeWheels(style.width, style.wheelWidth, front.Z * unscale, rear.Z * unscale)
-end
-
--- 6.26: a live vehicle put somewhere new (a chauffeur's car put back on a road, one stood up where it lies) by the same
--- check: `ground` (Drop over the ground under its middle, facing its look) or the nearest free spot (findRoom), with
--- its own wheel colliders. Returns the spot, Drop over its wheels' ground, tilted to it.
-function Vehicles.clearFor(car: Car, ground: CFrame): CFrame
-	local ignore: { Instance } = { car.model }
-	local driver = car.seat.Occupant
-	if driver and driver.Parent then
-		table.insert(ignore, driver.Parent)
-	end
-	for _, seat in car.passengers do
-		local occupant = seat.Occupant
-		if occupant and occupant.Parent then
-			table.insert(ignore, occupant.Parent)
-		end
-	end
-	local style = styleOf(car)
-	local wheels: { SpawnSpot.Wheel } = {}
-	for _, contact in Vehicles.wheelContacts(car) do
-		table.insert(wheels, { x = contact.X, z = contact.Z })
-	end
-	if #wheels ~= 4 then
-		wheels = SpawnSpot.wheels(style.width, style.length, style.wheel, style.wheelWidth)
-	end
-	local spot = findRoom(style, car.lower, wheels, ground, ignore, car.model.Name)
-	return spot
-end
-
--- 6.24: a bike that lay over and did not come up by server/BikeRighting.luau's turn (wedged against something) is
--- stood up where it lies: on the ground under it, facing `heading` (flat), Lift over its wheels (it drops onto them),
--- still and with its rider on it. 6.26: any vehicle (server/CarRighting.luau; the kind's Lift, Config.CarUpright), on
--- the ground right under it (no longer a bridge over it), tilted to the plane of the ground under its four wheels,
--- nudged to free room when something is where it lies (Vehicles.clearFor: the spawn's check).
-function Vehicles.standUp(car: Car, heading: Vector3)
-	if car.wrecked or not car.chassis.Parent or car.chassis.Anchored then
-		return
-	end
-	local style = styleOf(car)
-	local kind = if style.bike then Config.CarUpright.Kinds.bike else Config.CarUpright.Kinds.car
-	local at = car.chassis.Position
-	local flat = Vector3.new(heading.X, 0, heading.Z)
-	local look = if flat.Magnitude > 0.01 then flat.Unit else Vector3.new(0, 0, -1)
-	local drop = Config.SpawnSpot.Drop
-	-- (the ground right under it: not a bridge or a roof over where it lies, as Vehicles.groundY's look from high up)
-	local params = RaycastParams.new()
-	params.FilterType = Enum.RaycastFilterType.Exclude
-	params.FilterDescendantsInstances = groundIgnore()
-	params.IgnoreWater = true
-	params.RespectCanCollide = true
-	local under = workspace:Raycast(at + Vector3.new(0, 2, 0), Vector3.new(0, -30, 0), params)
-	local asked = Vector3.new(at.X, (if under then under.Position.Y else Vehicles.groundY(at.X, at.Z, at.Y)) + drop, at.Z)
-	-- (its wheels' ground + drop, tilted to that ground's plane: on a hill road it stands on all four wheels)
-	local spot = Vehicles.clearFor(car, CFrame.lookAt(asked, asked + look))
-	car.chassis.AssemblyLinearVelocity = Vector3.zero
-	car.chassis.AssemblyAngularVelocity = Vector3.zero
-	-- (the whole vehicle follows, its riders with it)
-	car.chassis.CFrame = spot * CFrame.new(0, style.clearance - car.lower + CHASSIS_HEIGHT / 2 + kind.Lift - drop, 0)
-end
-
--- Moves a spot along `direction` until no other car stands there (a few tries).
-local function freeSpot(position: Vector3, direction: Vector3, step: number): Vector3
-	for _ = 1, 6 do
-		local free = true
-		for _, other in cars do
-			if (other.chassis.Position - position).Magnitude < 26 then
-				free = false
-				break
-			end
-		end
-		if free then
-			break
-		end
-		position += direction * step
-	end
-	return position
-end
-
--- The cooldown of the CAR button: an error text while it runs, else nil (and it starts again).
-function Vehicles.cooldown(player: Player): string?
-	local now = os.clock()
-	if lastSpawn[player] and now - lastSpawn[player] < Config.SpawnCarCooldown then
-		return "Wait a moment before calling the car again."
-	end
-	lastSpawn[player] = now
 	return nil
 end
 
--- Builds the player's car (their equipped one, or carId: a company vehicle lent for a job) standing on `ground`
--- (its position on the ground, facing its LookVector) and makes it theirs; the old one goes. seat: the player gets
--- in at once. chauffeured: a chauffeur drives it (server/CarCall.luau): the server owns it and nobody gets in until
--- Vehicles.handOver. Returns nil when the profile is not loaded yet. 6.26: keep: bodies that are in the car's room
--- already and no obstacle (the riders of the car it replaces where it stands: rebuild).
-function Vehicles.spawnAt(player: Player, carId: string?, ground: CFrame, seat: boolean, chauffeured: boolean?, rental: boolean?, keep: { Instance }?): Car?
-	local profile = PlayerData.get(player)
-	if not profile then
+-- The player's van leaves the world (a run's end, a new van, leaving the game).
+function Vehicles.remove(player: Player)
+	local car = cars[player]
+	if car then
+		cars[player] = nil
+		car.wrecked = true
+		car.model:Destroy()
+	end
+end
+
+-- Builds the player's van standing at `ground` (its position on the ground, Drop over it, facing its LookVector: on
+-- free ground near it, findRoom) and makes it theirs; the old one goes. Anchored with its wheels on the ground. Returns
+-- nil while the save is not loaded.
+function Vehicles.spawnAt(player: Player, ground: CFrame): Car?
+	if not PlayerData.get(player) then
 		return nil
 	end
-	local id = carId or profile.car
-	if not id then
-		return nil -- 5.0: no vehicle yet (Vehicles.spawn says so)
-	end
-	local def = Economy.findCar(id) or Config.Cars[1]
-	if def.ambient and not (carId ~= nil and def.company) then
-		def = Config.Cars[1] -- 7.x: a player's own car is never a body of the world: a car that is gone falls back to the van
-	end
+	local def = vanDef()
 	Vehicles.remove(player)
-
-	-- 3.3: this car's own car-track levels (a company vehicle has none; 5.6: nor a rental, whatever you own).
-	local plain = def.company == true or rental == true
-	local levels = Economy.carLevels(if rental then nil else profile.carUpgrades, def.id)
-	local stats = Economy.carStats(def.id, levels)
-	if rental then
-		stats.maxSpeed = math.min(stats.maxSpeed, Config.Rental.MaxSpeed) -- 5.7: a free rental is the slow way round
-		stats.accel = math.min(stats.accel, Config.Rental.Accel) -- 6.0: but quick off the line
-	end
-	-- 3.4: your own car comes as damaged as it was parked (profile.carHealth); a lent company vehicle comes fresh.
-	-- 5.6: so does a rental (lent: its damage is never kept).
-	local lent = rental == true or (carId ~= nil and def.company == true and carId ~= profile.car)
-	local share = if lent then 1 else math.clamp(profile.carHealth[def.id] or 1, 0.05, 1)
-	local gunId = if rental then nil else gunFor(player, def.id)
-	local paintId = if plain then nil else profile.carPaint[def.id]
-	local stage = if plain then 0 else Economy.stageOf(def.id, levels) -- 3.5: its stage's look
-	local lower = if def.bike then 0 else stanceOf(levels) -- 4.0: Tyres & Suspension 5 (5.1: never on a bike)
-	local gear = if plain then {} else Economy.installedGear(profile.carGear, def.id) -- 4.6
-	-- 6.26: never into something (findRoom): the room it needs at `ground`, else the nearest free spot (not a ZDC RIDE
-	-- scooter: it comes out of its dock, its own place). The body of a player who gets in at once (or onto their own
-	-- bike: RiderPass) is in no way; one who stays out is (on the server a body cannot be moved: it would shove the car).
-	if not rental then
-		local character = player.Character
-		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-		local boards = def.bike == true or (seat and not chauffeured and humanoid ~= nil and humanoid.Health > 0 and not carrying(character))
-		local ignore: { Instance } = if keep then table.clone(keep) else {}
-		if boards and character then
-			table.insert(ignore, character)
-		end
-		local style = styleFor(def, stage)
-		ground = findRoom(style, lower, wheelsOf(def, style), ground, ignore, `{player.Name}'s {def.name}`)
-	end
-	local built = build(def, paintColor(def, paintId), ground, false, gunId, nil, stage, lower)
-	applyPaint(built.paintParts, def, paintId)
-	buildKit(built.model, built.chassis, styleFor(def, stage), levels, def.id, gear)
-	local doors = doorsOf(styleFor(def, stage))
-	local driverSeat = built.seat :: VehicleSeat
+	local spot = findRoom(ground, {}, `{player.Name}'s {def.name}`)
+	local stands = spot * CFrame.new(0, -Config.SpawnSpot.Drop, 0) -- (anchored: on its wheels, not dropped onto them)
+	local built = build(def, rgb(def.color), stands)
 	local car: Car = {
 		owner = player,
 		id = def.id,
 		model = built.model,
 		chassis = built.chassis,
-		seat = driverSeat,
-		passengers = built.passengers,
-		turret = built.turret,
-		turretBase = built.turretBase,
-		muzzle = built.muzzle,
-		gunId = gunId,
 		paintParts = built.paintParts,
 		size = built.size,
-		stats = stats,
-		health = math.max(1, stats.health * share),
 		wrecked = false,
-		latched = {},
-		chauffeured = chauffeured == true,
-		born = os.clock(),
-		kit = kitKey(levels, gear),
-		stage = stage,
-		lower = lower,
-		lent = lent,
-		repairing = false,
-		doors = doors,
-		gear = gear,
-		rental = rental == true,
-		ground = ground,
+		ground = stands,
 	}
-	car.model.Name = if rental then `DELIVEROS RIDE · {player.DisplayName}` else `{player.DisplayName}'s {def.name}`
+	car.model.Name = `{player.DisplayName}'s {def.name}`
 	car.model:SetAttribute("OwnerId", player.UserId)
 	car.model:SetAttribute("OwnerName", player.DisplayName)
 	car.model:SetAttribute("CarId", def.id)
-	car.model:SetAttribute("Stage", stage)
-	car.model:SetAttribute("SpeedMult", 1)
-	car.model:SetAttribute("CarGun", gunId)
-	-- A company vehicle lent for a job runs with its lights flashing (the ambulance's light bar).
-	car.model:SetAttribute("Siren", carId ~= nil and def.company == true)
-	car.model:SetAttribute("Chauffeured", car.chauffeured)
-	car.model:SetAttribute("Rental", if rental then true else nil) -- 5.6: a ZDC RIDE rental (server/Rental.luau)
-	writeAttributes(car)
-	Vehicles.onSpawned(car) -- 5.4: its fuel (server/Fuel.luau)
-	Vehicles.onStyle(car) -- 6.12: its STYLE looks (server/StyleWear.luau)
-	watchPrompts(car)
+	Vehicles.onStyle(car) -- 8.3: its paint (server/VanPaint.luau)
 	local backPrompt = Vehicles.backPrompt(car)
 	if backPrompt then
-		backPrompt.HoldDuration = Config.Cargo.HoldDuration
 		backPrompt.Triggered:Connect(function(by: Player)
 			toggleBack(car, by)
 		end)
 	end
-	if car.model:GetAttribute("SprinterArt") then
-		SprinterBuild.wire(car) -- 8.0 SANDBOX: the walk-in bay's doors, steps and light
-	end
+	SprinterBuild.wire(car) -- 8.0: the walk-in bay's doors, steps and light
 	car.model.Parent = workspace:FindFirstChild("Cars") or workspace
 	cars[player] = car
-	watchSeat(car, driverSeat, 1, true)
-	for _, p in car.passengers do
-		local door = p:GetAttribute("Door")
-		watchSeat(car, p, if type(door) == "number" then door else 1, false)
-	end
-
-	-- Heavy enough to plough through, light enough to stop against a wall.
-	local mass = car.chassis.AssemblyMass
-	local linear = car.chassis:FindFirstChild("Drive") :: LinearVelocity
-	local angular = car.chassis:FindFirstChild("Steer") :: AngularVelocity
-	linear.MaxForce = mass * 160
-	angular.MaxTorque = mass * 6000
-	local upright = car.chassis:FindFirstChild("KeepUpright")
-	if upright and upright:IsA("AlignOrientation") then
-		upright.MaxTorque = mass * 12000 -- (5.1: a bike; over the Steer's, which holds every turn still)
-	end
-
-	Vehicles.claim(car) -- 6.13.1: the server's until its driver sits (the seat's watcher hands it over)
-	-- 6.24: a bike put out next to you is never pushed away by your body; 6.26: nor a car you are put into (until the
-	-- seat holds you: passBody)
-	passBody(car, player.Character, 1)
-
-	local character = player.Character
-	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-	if seat and not car.chauffeured and humanoid and humanoid.Health > 0 and not carrying(character) then
-		task.defer(function()
-			if car.wrecked then
-				return
-			end
-			-- 6.10: onto a scooter put out next to you you hop (Vehicles.mount), you are not put into its seat
-			local root = humanoid.RootPart
-			if def.stand and root and humanoid.SeatPart == nil and (root.Position - driverSeat.Position).Magnitude <= Config.Interact.ScooterHopReach then
-				Vehicles.mount(player, car)
-			else
-				driverSeat:Sit(humanoid)
-			end
-		end)
-	end
 	return car
 end
 
--- The chauffeur got out: the car is its owner's now (its doors take you in again, the owner's client drives it).
-function Vehicles.handOver(car: Car)
-	if not car.chauffeured then
-		return
-	end
-	car.chauffeured = false
-	car.model:SetAttribute("Chauffeured", false)
+-- The player's van parked at `spot` (its middle on the ground there, facing the spot's look; the old one goes).
+-- Returns the van, or nil while the save loads.
+function Vehicles.placeAt(player: Player, spot: CFrame): Car?
+	local look = Vector3.new(spot.LookVector.X, 0, spot.LookVector.Z)
+	look = if look.Magnitude > 0.01 then look.Unit else Vector3.new(0, 0, 1)
+	Vehicles.remove(player) -- (the old van is not in the way)
+	local at = spot.Position
+	local position = Vector3.new(at.X, Vehicles.groundY(at.X, at.Z, at.Y) + Config.SpawnSpot.Drop, at.Z)
+	return Vehicles.spawnAt(player, CFrame.lookAt(position, position + look))
+end
+
+-- 6.26: the van stood where it is (the ground right under it: not a bridge or a roof over it), facing `heading` (flat),
+-- tilted to the plane of the ground under its four wheels, nudged to free room when something is where it stands
+-- (findRoom). server/Moving.luau's "Call the van to the door" moves it so.
+function Vehicles.standUp(car: Car, heading: Vector3)
 	if car.wrecked or not car.chassis.Parent then
 		return
 	end
-	Vehicles.setBack(car, false) -- the chauffeur leaves it closed
-	-- 3.7: the chauffeur got out of the driver's door (server/CarCall.luau steps them out there).
-	local now = workspace:GetServerTimeNow()
-	swingDoor(car, 1, now, now + Config.Cargo.AlightSeconds + 0.1)
-	local linear = car.chassis:FindFirstChild("Drive")
-	if linear and linear:IsA("LinearVelocity") then
-		linear.PlaneVelocity = Vector2.zero
-	end
-	local angular = car.chassis:FindFirstChild("Steer")
-	if angular and angular:IsA("AngularVelocity") then
-		angular.AngularVelocity = Vector3.zero
-	end
-	Vehicles.claim(car) -- (6.13.1: the server keeps it parked until the owner sits in the driver's seat)
-end
-
--- The car right next to the player, and they get in: the old instant way (a forced spawn). server/SandboxBoot.luau
--- replaces it with its own (the parking spot nearest you, seated); this is the fallback before it. Returns an error
--- text when it cannot.
-function Vehicles.placeNear(player: Player, carId: string?): string?
-	local profile = PlayerData.get(player)
-	if not profile then
-		return "Still loading..."
-	end
-	if carId == nil and profile.car == nil then
-		return Vehicles.NO_VEHICLE -- 5.0
-	end
-	local character = player.Character
-	local rootPart = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
-	if not rootPart then
-		return "Still loading..."
-	end
-	local from = rootPart.Position
-	local flat = Vector3.new(rootPart.CFrame.LookVector.X, 0, rootPart.CFrame.LookVector.Z)
-	local direction = if flat.Magnitude > 0.01 then flat.Unit else Vector3.new(0, 0, 1)
-	Vehicles.remove(player) -- the old car is not in the way of the new one
-	-- beside you (on your right), stepped along if another car stands there
-	local spot = freeSpot(Vector3.new(from.X, ROAD_TOP, from.Z) + Vector3.new(-direction.Z, 0, direction.X) * 8, direction, 28)
-	local position = Vector3.new(spot.X, Vehicles.groundY(spot.X, spot.Z, from.Y) + 0.5, spot.Z)
-	local car = Vehicles.spawnAt(player, carId, CFrame.lookAt(position, position + direction), true)
-	return if car then nil else "Still loading..."
-end
-
--- Gets the player their car. Without force it is the CAR button: a chauffeur brings it (server/CarCall.luau, which
--- also runs the cooldown), unless they sit in their own car (that one is reset right there, as before). force (PLAY,
--- a respawn, a car just bought or equipped, a job's vehicle) is instant: parked at the home garage when they spawn
--- at home, else next to them and seated. carId = a company vehicle lent for a job. Returns an error text when it
--- cannot.
-function Vehicles.spawn(player: Player, force: boolean?, carId: string?): string?
-	local profile = PlayerData.get(player)
-	if not profile then
-		return "Still loading..."
-	end
-	if carId == nil and profile.car == nil then
-		return Vehicles.NO_VEHICLE -- 5.0: you start on foot
-	end
-	if not force then
-		local inCar = Vehicles.seatedIn(player)
-		local call = Vehicles.callCar
-		-- 5.1: a bike needs no chauffeur: it is by the kerb next to you at once (placeNear).
-		local wanted = Economy.findCar(carId or profile.car or "")
-		if call and not (wanted and wanted.bike) and not (inCar and inCar.owner == player) then
-			return call(player, carId)
-		end
-		local err = Vehicles.cooldown(player)
-		if err then
-			return err
-		end
-		return Vehicles.placeNear(player, carId)
-	end
-	lastSpawn[player] = os.clock()
-	local home = Vehicles.homeGarage(player)
-	if home then
-		local car = Vehicles.placeAt(player, carId, home)
-		if not car then
-			return "Still loading..."
-		end
-		local def = Economy.findCar(car.id)
-		Net.get("Notice"):FireClient(player, `Your {if def then def.name else "car"} is parked in front of your garage.`)
-		return nil
-	end
-	return Vehicles.placeNear(player, carId)
-end
-
--- 4.0: how long the car the player would get is (its style at its stage: a stretched van, the Freight Truck).
-local function lengthFor(player: Player, carId: string?): number
-	local profile = PlayerData.get(player)
-	local def = Economy.findCar(carId or (if profile then profile.car else nil) or Config.CompanyVan.Car) or Config.Cars[1]
-	local levels = if profile then Economy.carLevels(profile.carUpgrades, def.id) else {}
-	return styleFor(def, if def.company then 0 else Economy.stageOf(def.id, levels)).length
-end
-
--- The car parked at a garage's drive-out spot (a home's garage, 3.4: any garage you take a car out of), facing the
--- road, the player not in it (seat: they get in, 3.4: a swap from the driver's seat). Returns the car, or nil while
--- the save loads. 4.0: a car longer than a Box Truck (the Freight Truck, a Freight Hauler) stands further out, its
--- back a stud clear of the garage's front wall (the spot is Map.GarageApron = 8 in front of it).
--- 4.0: how much farther out of a garage door a long car stands (the Freight Truck, the Freight Hauler: their back
--- would reach into the door's lintel), studs along the spot's look; 0 for an ordinary car. Also its length.
-function Vehicles.driveOut(player: Player, carId: string?): (number, number)
-	local length = lengthFor(player, carId)
-	return if length > 17 then length / 2 - (GARAGE_APRON - 1) else 0, length
-end
-
-function Vehicles.placeAt(player: Player, carId: string?, spot: CFrame, seat: boolean?): Car?
-	local look = Vector3.new(spot.LookVector.X, 0, spot.LookVector.Z)
-	look = if look.Magnitude > 0.01 then look.Unit else Vector3.new(0, 0, 1)
-	local out = Vehicles.driveOut(player, carId)
-	Vehicles.remove(player) -- the old car is not in the way; a co-owner's car is (step out to the road)
-	local at = freeSpot(spot.Position + look * out, look, 16)
-	local position = Vector3.new(at.X, Vehicles.groundY(at.X, at.Z, spot.Position.Y) + 0.5, at.Z)
-	return Vehicles.spawnAt(player, carId, CFrame.lookAt(position, position + look), seat == true)
-end
-
--- 3.5: a new stage is a new body: the live car is built again where it stands (its damage kept: Vehicles.remove
--- remembers it), the owner back behind the wheel when they sat there (the passengers step out). Not while a chauffeur
--- drives it or it is on a repair lift (the shop waits for those). Returns whether it was rebuilt.
-local function rebuild(car: Car): boolean
-	if car.chauffeured or car.repairing or car.wrecked or car.lent then
-		return false
-	end
-	local player = car.owner
-	local frame = car.chassis.CFrame
-	local look = Vector3.new(frame.LookVector.X, 0, frame.LookVector.Z)
-	look = if look.Magnitude > 0.01 then look.Unit else Vector3.new(0, 0, 1)
-	local base = STYLES[(Economy.findCar(car.id) or Config.Cars[1]).style] or STYLES.van
-	local position = frame.Position - Vector3.new(0, base.clearance - car.lower + CHASSIS_HEIGHT / 2, 0)
-	local occupant = car.seat.Occupant
-	local seated = occupant ~= nil and Players:GetPlayerFromCharacter(occupant.Parent) == player
-	-- 6.26: its riders are in the new body's room (no obstacle: it is built where it stands) and step out through it
-	local riders: { Instance } = {}
-	local function rider(who: Humanoid?)
-		local body = who and who.Parent
-		if body then
-			table.insert(riders, body)
-		end
-	end
-	rider(occupant)
-	for _, seat in car.passengers do
-		rider(seat.Occupant)
-	end
-	local new = Vehicles.spawnAt(player, car.id, CFrame.lookAt(position, position + look), seated, nil, nil, riders)
-	if new then
-		for _, body in riders do
-			passBody(new, body, Config.Cargo.AlightSeconds + 1)
-		end
-	end
-	return new ~= nil
-end
-
--- New upgrades / a new car equipped: the live car takes the new numbers (health keeps its share), and (3.3) its
--- upgrade kit and its back's hold follow its car-track levels; 3.5: a new stage builds it again (rebuild); 4.0: so
--- does a new stance (Tyres & Suspension 5).
-function Vehicles.refreshStats(player: Player)
-	local car = Vehicles.get(player)
-	local profile = PlayerData.get(player)
-	if not car or not profile or car.rental then
-		return -- (5.6: a rental runs on the plain numbers, whatever you own)
-	end
-	local levels = Economy.carLevels(profile.carUpgrades, car.id)
-	local carDef = Economy.findCar(car.id)
-	local stance = if carDef and carDef.bike then 0 else stanceOf(levels) -- (5.1: a bike never sits lower)
-	local rebuilt = Economy.stageOf(car.id, levels) ~= car.stage or stance ~= car.lower
-	if not car.lent and rebuilt and rebuild(car) then
-		return
-	end
-	local share = car.health / car.stats.health
-	car.stats = Economy.carStats(car.id, levels)
-	car.health = car.stats.health * share
-	writeAttributes(car)
-	local backPrompt = Vehicles.backPrompt(car)
-	if backPrompt then
-		backPrompt.HoldDuration = Config.Cargo.HoldDuration
-	end
-	-- 4.6: the gear installed on it now (Wrench Garage's GEAR tab).
-	local def = Economy.findCar(car.id)
-	car.gear = if car.lent or (def and def.company) then {} else Economy.installedGear(profile.carGear, car.id)
-	local key = kitKey(levels, car.gear)
-	if key ~= car.kit then
-		car.kit = key
-		buildKit(car.model, car.chassis, styleOf(car), levels, car.id, car.gear)
-		Vehicles.onStyle(car) -- 6.12: a decal goes round the new kit
-		-- The new parts joined the car's assembly: the driver's client keeps simulating it (the server while it stands
-		-- empty or a chauffeur drives it).
-		Vehicles.claim(car)
-	end
-end
-
--- A new paint job on the live car.
-function Vehicles.repaint(player: Player)
-	local car = Vehicles.get(player)
-	local profile = PlayerData.get(player)
-	local def = car and Economy.findCar(car.id)
-	if not car or not profile or not def or car.rental then
-		return -- (5.6: a rental keeps the ZDC RIDE colours)
-	end
-	applyPaint(car.paintParts, def, if def.company then nil else profile.carPaint[car.id])
-	Vehicles.onStyle(car) -- 6.12: a STYLE wrap goes over the paint again (and the frame, the decal)
-end
-
--- A car gun bought (or changed): the live car gets the turret that fits it now, or loses the one it should not have.
-function Vehicles.refreshGun(player: Player)
-	local car = Vehicles.get(player)
-	if not car then
-		return
-	end
-	local want = gunFor(player, car.id)
-	if want == car.gunId and (want == nil) == (car.model:FindFirstChild("CarGun") == nil) then
-		return
-	end
-	local old = car.model:FindFirstChild("CarGun")
-	if old then
-		old:Destroy()
-	end
-	car.turret, car.muzzle, car.gunId = nil, nil, nil
-	if want then
-		car.turret, car.muzzle = buildTurret(car.model, car.chassis, car.turretBase, want)
-		car.gunId = want
-		-- The new parts joined the car's assembly: the driver's client keeps simulating it (the server while it
-		-- stands empty or a chauffeur drives it).
-		Vehicles.claim(car)
-	end
-	car.model:SetAttribute("CarGun", want)
-	Vehicles.onStyle(car) -- 6.12: a decal goes round the gun on the roof (or over its place again)
-end
-
--- The light bar on (an ambulance on a job) or off; every client flashes it (client/Weather.luau).
-function Vehicles.setSiren(player: Player, on: boolean)
-	local car = Vehicles.get(player)
-	if car then
-		car.model:SetAttribute("Siren", on)
-	end
-end
-
--- A job modifier (HEAVY LOAD) slows the car down; the owner's client reads the attribute.
-function Vehicles.setSpeedMultiplier(player: Player, multiplier: number)
-	local car = Vehicles.get(player)
-	if car then
-		car.model:SetAttribute("SpeedMult", multiplier)
-	end
-end
-
-local function wreck(car: Car, reason: string)
-	car.wrecked = true
-	eject(car.seat)
-	for _, seat in car.passengers do
-		eject(seat)
-	end
-	local explosion = Instance.new("Explosion")
-	explosion.BlastPressure = 0
-	explosion.DestroyJointRadiusPercent = 0
-	explosion.BlastRadius = 8
-	explosion.Position = car.chassis.Position
-	explosion.Parent = workspace
-	car.model:SetAttribute("Siren", false)
-	for _, d in car.model:GetDescendants() do
-		if d:IsA("BasePart") then
-			-- Burnt out: the lights stay dark through the night.
-			CollectionService:RemoveTag(d, Vehicles.SirenTag)
-			if d.Material == Enum.Material.Neon then
-				d.Material = Enum.Material.SmoothPlastic
-			end
-			d.Color = d.Color:Lerp(Color3.new(0.08, 0.08, 0.08), 0.75)
-		elseif d:IsA("ProximityPrompt") or d:IsA("Light") then
-			d:Destroy()
-		end
-	end
-	local fire = Instance.new("Fire")
-	fire.Size = 9
-	fire.Heat = 12
-	fire.Parent = car.chassis
-	local linear = car.chassis:FindFirstChild("Drive")
-	if linear then
-		linear:Destroy()
-	end
-	-- The turning goes too: client/Drive.luau stops writing it once "Drive" is gone, and the burnt car span on
-	-- at its last steer rate.
-	local angular = car.chassis:FindFirstChild("Steer")
-	if angular then
-		angular:Destroy()
-	end
-	car.model:SetAttribute("Health", 0)
-	-- 3.4: it comes back (CAR) badly damaged: a trip to a repair shop.
-	local profile = PlayerData.get(car.owner)
-	if profile and not car.lent then
-		profile.carHealth[car.id] = Config.Repair.WreckedHealth
-	end
-	car.repairing = false
-	car.chassis.Anchored = false
-	Vehicles.onWrecked(car.owner, car, reason)
-	task.delay(5, function()
-		if cars[car.owner] == car then
-			cars[car.owner] = nil
-		end
-		car.model:Destroy()
-	end)
-end
-
--- `cause` what hit it ("ram": a zombie run over, "crash": a bandit car's ram; nil anything else; 10.6: no skills take
--- a share off any more, the city's server/Skills.luau went). Returns the damage it took.
-function Vehicles.damage(car: Car, amount: number, reason: string?, cause: string?): number
-	if car.wrecked or amount <= 0 then
-		return 0
-	end
-	car.health = math.max(0, car.health - amount)
-	car.model:SetAttribute("Health", math.ceil(car.health))
-	if car.health <= 0 then
-		wreck(car, reason or "Your car was destroyed!")
-	else
-		remember(car)
-	end
-	return amount
-end
-
-function Vehicles.repair(car: Car, share: number)
-	if car.wrecked then
-		return
-	end
-	car.health = math.min(car.stats.health, car.health + car.stats.health * share)
-	car.model:SetAttribute("Health", math.ceil(car.health))
-	remember(car)
-end
-
--- Points the roof gun (if the car has one) at a world position.
-function Vehicles.aim(car: Car, target: Vector3)
-	local turret = car.turret
-	if not turret then
-		return
-	end
-	local localTarget = car.chassis.CFrame:PointToObjectSpace(target)
-	local yaw = math.atan2(-localTarget.X, -localTarget.Z)
-	turret.C0 = car.turretBase * CFrame.Angles(0, yaw, 0)
-end
-
--- Where a shot out of the side window of this seat starts: beside the seat, at head height, just outside the body
--- (client/Shooting.luau draws the tracer from the same point).
-function Vehicles.windowPoint(car: Car, seat: BasePart): Vector3
-	local frame = car.chassis.CFrame
-	local at = frame:PointToObjectSpace(seat.Position)
-	local side = if at.X >= 0 then 1 else -1
-	return (frame * CFrame.new(side * (car.chassis.Size.X / 2 + 0.6), at.Y + 2.6, at.Z)).Position
+	local at = car.chassis.Position
+	local flat = Vector3.new(heading.X, 0, heading.Z)
+	local look = if flat.Magnitude > 0.01 then flat.Unit else Vector3.new(0, 0, -1)
+	local drop = Config.SpawnSpot.Drop
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	local skip = groundIgnore()
+	table.insert(skip, car.model)
+	params.FilterDescendantsInstances = skip
+	params.IgnoreWater = true
+	params.RespectCanCollide = true
+	local under = workspace:Raycast(at + Vector3.new(0, 2, 0), Vector3.new(0, -30, 0), params)
+	local asked = Vector3.new(at.X, (if under then under.Position.Y else Vehicles.groundY(at.X, at.Z, at.Y)) + drop, at.Z)
+	local spot = findRoom(CFrame.lookAt(asked, asked + look), { car.model }, car.model.Name)
+	car.ground = spot * CFrame.new(0, -drop, 0)
+	car.model:PivotTo(car.ground * CFrame.new(0, STYLE.clearance + CHASSIS_HEIGHT / 2, 0))
 end
 
 function Vehicles.start()
-	-- 3.10: getting in and out, the body passes through the car's shell (client/CarBoarding.luau puts the character
-	-- into this group for the move).
-	pcall(function()
-		PhysicsService:RegisterCollisionGroup("Boarding")
-	end)
-	pcall(function()
-		PhysicsService:CollisionGroupSetCollidable("Boarding", "Car", false)
-	end)
-	Net.get("CarDoor").OnServerEvent:Connect(onCarDoor)
 	Players.PlayerRemoving:Connect(function(player)
-		local b = boarders[player]
-		if b then
-			cancelBoarding(player, b)
-		end
 		Vehicles.remove(player)
-		lastSpawn[player] = nil
-		lastOut[player] = nil
-	end)
-	RunService.Heartbeat:Connect(function()
-		stepBoarding()
-		for _, car in cars do
-			if car.wrecked then
-				continue
-			end
-			local position = car.chassis.Position
-			-- (3.4: no free repairs any more: the repair bays, server/Repair.luau.)
-			-- Drove into the water (or off the world).
-			if position.Y < -7 then
-				Vehicles.damage(car, math.huge, "Your car sank!")
-			end
-		end
 	end)
 end
 
+-- (tests/run_tests.py and the tools' previews stage this module with its build, STYLE and wheelsOf exported.)
 return Vehicles

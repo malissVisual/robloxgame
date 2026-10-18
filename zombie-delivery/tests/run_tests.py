@@ -9,7 +9,7 @@ import glob, json, os, re, shutil, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SHARED = os.path.join(os.path.dirname(HERE), "src", "shared")
-PURE = ("Config", "ZombieKinds", "Economy", "Map", "Icons", "SoundSheet", "NpcLooks", "Melee", "Boarding", "KitFit", "Bag", "Gestures", "RunCycle", "BodyMotion", "AvatarLook", "Tasks", "SoundPlan", "StyleLooks", "AnalyticsPlan", "RenderBudget", "OutlinePick", "ZombieStyle", "CardLayout", "KitArt", "CarUpright", "SpawnSpot", "Gait", "MovingRules", "MoveHelperBrain", "MoveRoles", "CarryGrip", "ChaletLooks", "SandboxMap", "SandboxAdmin", "CollectionRules", "SandboxSteps", "WarehouseLayout", "SprinterLooks")
+PURE = ("Config", "ZombieKinds", "Economy", "Map", "Icons", "SoundSheet", "NpcLooks", "Melee", "KitFit", "Bag", "Gestures", "RunCycle", "BodyMotion", "AvatarLook", "Tasks", "SoundPlan", "StyleLooks", "AnalyticsPlan", "RenderBudget", "OutlinePick", "ZombieStyle", "CardLayout", "KitArt", "CarUpright", "SpawnSpot", "Gait", "MovingRules", "MoveHelperBrain", "MoveRoles", "CarryGrip", "ChaletLooks", "SandboxMap", "SandboxAdmin", "CollectionRules", "SandboxSteps", "WarehouseLayout", "SprinterLooks")
 PURE += ("SandboxScenery",)  # 8.0 sandbox, the map (tests/sandboxworld_test.luau)
 PURE += ("PairCarry",)  # 8.1 carrying in two: the leader's steering (tests/paircarry_test.luau)
 PURE += ("UpgradeRules",)  # 8.1 sandbox, the upgrades (tests/upgrades_test.luau)
@@ -63,7 +63,6 @@ with tempfile.TemporaryDirectory() as tmp:
     shutil.copy(os.path.join(os.path.dirname(SHARED), "server", "CharacterArt", "Geometry.luau"), os.path.join(tmp, "CharacterGeometry.luau"))
     # 6.4: the kit art (pure: the bags' pieces, tests/bags_test.luau)
     shutil.copy(os.path.join(SHARED, "KitArt.luau"), os.path.join(tmp, "KitGeometry.luau"))  # (6.22: moved to shared)
-    shutil.copy(os.path.join(os.path.dirname(SHARED), "server", "BikeArt", "Geometry.luau"), os.path.join(tmp, "BikeGeometry.luau"))  # 6.19
     # 6.22: the inventory's looks (tests/itemlooks_test.luau) built by the real builders on a recorder: the vehicle
     # preview's Roblox mock and tools/fixtures/item-mock.luau's few additions, the builders' globals taken from it.
     tools = os.path.join(os.path.dirname(HERE), "tools")
@@ -144,30 +143,22 @@ with tempfile.TemporaryDirectory() as tmp:
         source = re.sub(r"require\(Shared\.(\w+)\)", lambda m: "E.Net" if m[1] == "Net" else f'require("./{m[1]}")', source)
         source = re.sub(r"require\(script\.Parent\.(\w+)\)", lambda m: f'require("./{built_as[m[1]]}")' if m[1] in built_as else f"E.{m[1]}", source)
         open(os.path.join(tmp, built + ".luau"), "w", encoding="utf-8").write(head + source)
-    # 8.5.1 (the owner: "Danny STILL goes through the van"): the REAL vehicle factory, server/Vehicles.luau and its art
-    # builders staged as tools/vehicle-preview/export_fleet.py stages them, on the same recorder (rbxmock: ItemMock's,
-    # so MovingRuntime's), each under a RealVan name: tests/movehelper_realvan_runtime_test.luau builds the Sprinter the
-    # game builds (its hull, its seats and doors, their attachments) into the moves' runtime and rides Danny round it.
-    # Net, World and PlayerData empty (nothing of them is used to build), DayNight the recorder's night light;
-    # RealVanVehicles.__testBuild / __testStyle / __testDoors are its build, styleFor and doorsOf.
-    real_van = {"Vehicles": "src/server/Vehicles.luau", "Builder": "src/server/VehicleArt/Builder.luau", "Geometry": "src/server/VehicleArt/Geometry.luau",
-                "BikeGeometry": "src/server/BikeArt/Geometry.luau", "ScooterGeometry": "src/server/ScooterArt/Geometry.luau",
-                "ModelBuilder": "src/server/ModelArt/Builder.luau", "VanMesh": "src/server/VanMesh.luau"}
+    # 8.5.1 (the owner: "Danny STILL goes through the van"): the REAL vehicle factory, server/Vehicles.luau, staged as
+    # tools/vehicle-preview/export_fleet.py stages it, on the same recorder (rbxmock: ItemMock's, so MovingRuntime's) as
+    # RealVanVehicles.luau: tests/movehelper_realvan_runtime_test.luau builds the Sprinter the game builds (its hull, its
+    # back doors, their attachments) into the moves' runtime and walks Danny round it. Net and PlayerData empty
+    # (nothing of them is used to build), DayNight the recorder's night light; RealVanVehicles.__testBuild /
+    # __testStyle / __testWheels are its build, STYLE and wheelsOf (10.6: the Sprinter's only).
     real_prefix = ('local Mock = require("./rbxmock")\nlocal game, workspace, Instance, Vector3, Vector2, Color3, CFrame, Enum, PhysicalProperties, UDim2, typeof = '
                    'Mock.game, Mock.workspace, Mock.Instance, Mock.Vector3, Mock.Vector2, Mock.Color3, Mock.CFrame, Mock.Enum, Mock.PhysicalProperties, Mock.UDim2, Mock.typeof\n')
-    for name in ("Net", "World", "PlayerData"):
+    for name in ("Net", "PlayerData"):
         open(os.path.join(tmp, "RealVan" + name + ".luau"), "w", encoding="utf-8").write("return {}\n")
     open(os.path.join(tmp, "RealVanDayNight.luau"), "w", encoding="utf-8").write('local Mock = require("./rbxmock")\nreturn { nightLight = Mock.nightLight }\n')
-    for name, path in real_van.items():
-        source = open(os.path.join(os.path.dirname(HERE), path), encoding="utf-8").read()
-        source = source.replace("require(script.Parent.BikeArt.Geometry)", 'require("./RealVanBikeGeometry")')
-        source = source.replace("require(script.Parent.ModelArt.Builder)", 'require("./RealVanModelBuilder")')
-        source = source.replace("require(script.Parent.ScooterArt.Geometry)", 'require("./RealVanScooterGeometry")')
-        source = re.sub(r"require\(Shared\.(\w+)\)", lambda m: f'require("./RealVan{m[1]}")' if m[1] == "Net" else f'require("./{m[1]}")', source)
-        source = re.sub(r"require\(script\.Parent\.(?:VehicleArt\.)?(\w+)\)", r'require("./RealVan\1")', source)
-        if name == "Vehicles":
-            source = re.sub(r"^return Vehicles$", "Vehicles.__testBuild = build\nVehicles.__testStyle = styleFor\nVehicles.__testDoors = doorsOf\nreturn Vehicles", source, flags=re.M)
-        open(os.path.join(tmp, "RealVan" + name + ".luau"), "w", encoding="utf-8").write(real_prefix + source)
+    source = open(os.path.join(os.path.dirname(HERE), "src", "server", "Vehicles.luau"), encoding="utf-8").read()
+    source = re.sub(r"require\(Shared\.(\w+)\)", lambda m: f'require("./RealVan{m[1]}")' if m[1] == "Net" else f'require("./{m[1]}")', source)
+    source = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./RealVan\1")', source)
+    source = re.sub(r"^return Vehicles$", "Vehicles.__testBuild = build\nVehicles.__testStyle = STYLE\nVehicles.__testWheels = wheelsOf\nreturn Vehicles", source, flags=re.M)
+    open(os.path.join(tmp, "RealVanVehicles.luau"), "w", encoding="utf-8").write(real_prefix + source)
     # 8.5.1 (Danny's hand on the van's door; the house's doors opening nicely): the real client/ArmPose.luau and
     # client/WalkDoors.luau as ArmPoseClient.luau and WalkDoorsClient.luau for tests/armpose_npc_test.luau and
     # tests/walkdoors_test.luau, their Roblox globals and their client modules tests/runtime/ClientRuntime.luau's, their
@@ -545,94 +536,32 @@ def finish_check():
     print(f"ok    ItemLooks.Finish agrees with Builder's FINISH ({len(client)} finishes)")
     return True
 
-# 3.3: the car bodies (server/Vehicles.luau STYLES, not loadable outside Roblox) read as text: every Config.Cars style
-# has a body; every dealer car's body takes cargo and has a back that opens (the 3.2 loading).
-# 3.4: every car's capacity (Config.Cars capacity) is exactly its body's cargo slots (the slot list of cargo(...)).
-# 5.1: the bikes (CarDef.bike) are exempt from the back; their body must be a bike's (Style.bike) with slots = capacity.
-# 3.5: every stage of a car (Config.Cars stages) holds exactly its look's slots (Vehicles.luau LOOKS[look].slots; stage
-# 0 / no look: the body's), every look a stage names exists, and a dealer car holds at least 2 at its last stage.
-def slot_count(body, key="cargo = cargo("):
-    start = body.find(key)
-    if start < 0:
-        return 0
-    open_at = body.index("{", start)
-    depth, end = 0, open_at
-    for end in range(open_at, len(body)):
-        if body[end] == "{":
-            depth += 1
-        elif body[end] == "}":
-            depth -= 1
-            if depth == 0:
-                break
-    return len(re.findall(r"Vector3\.new|bikeArt\(", body[open_at:end]))  # (6.19: a bike's slots at its art's scale)
-
-def entries(text):
-    blocks = {}
-    for match in re.finditer(r"^\t(\w+) = \{\n(.*?)^\t\},?$", text, re.S | re.M):
-        blocks[match.group(1)] = match.group(2)
-    return blocks
-
+# 3.3 - 3.5 (10.6: only the Sprinter is built: server/Vehicles.luau's STYLE, read as text): the van every player has
+# (Config.Sandbox.Van) is a Config.Cars entry on the style "sprinter", its capacity exactly the cargo slots STYLE lists,
+# and it has a back that opens (STYLE's leaves).
 def styles_check():
     root = os.path.dirname(HERE)
     config = open(os.path.join(root, "src", "shared", "Config.luau"), encoding="utf-8").read()
     vehicles = open(os.path.join(root, "src", "server", "Vehicles.luau"), encoding="utf-8").read()
-    blocks = entries(vehicles[vehicles.index("local STYLES"):vehicles.index("local CHASSIS_HEIGHT")])
-    looks_at = vehicles.index("local LOOKS")
-    looks = entries(vehicles[looks_at:vehicles.index("\n}\n", looks_at) + 3])
+    van = re.search(r'^Config\.Sandbox = \{.*?\bVan = "(\w+)"', config, re.S | re.M).group(1)
     cars = config[config.index("Config.Cars = {"):config.index("} :: { CarDef }")]
-    # 7.x (one car): the bodies nobody owns any more (Config.AmbientCars: the traffic's vans at every stage, the buses,
-    # the company vehicles) are checked the same way: the world still builds them
-    ambient_at = config.index("Config.AmbientCars = {")
-    cars += config[ambient_at:config.index("} :: { CarDef }", ambient_at)]
+    style = vehicles[vehicles.index("local STYLE = "):]
+    style = style[:style.index("\nend)()")]
+    slots_at = style.index("slots = {")
+    slots = len(re.findall(r"Vector3\.new", style[slots_at:style.index("}", slots_at)]))
     bad = []
-    stages_seen = 0
-    for entry in re.findall(r"^\t\{\n(.*?)^\t\},?$", cars, re.S | re.M):
-        car_id = re.search(r'\bid = "(\w+)"', entry).group(1)
-        style = re.search(r'\bstyle = "(\w+)"', entry).group(1)
-        body = blocks.get(style)
-        if body is None:
-            bad.append(f"{car_id}: no style {style}")
-            continue
-        count = slot_count(body)
+    entry = next((e for e in re.findall(r"^\t\{\n(.*?)^\t\},?$", cars, re.S | re.M) if re.search(rf'\bid = "{van}"', e)), None)
+    if entry is None:
+        bad.append(f"no Config.Cars entry {van} (Config.Sandbox.Van)")
+    else:
         capacity = re.search(r"\bcapacity = (\d+)", entry)
-        if not capacity:
-            bad.append(f"{car_id}: no capacity")
-        elif int(capacity.group(1)) != count:
-            bad.append(f"{car_id}: capacity {capacity.group(1)} but {count} cargo slots in style {style}")
-        most = count
-        for line in re.findall(r"^\t\t\t\{ name = .*$", entry, re.M):
-            stages_seen += 1
-            name = re.search(r'name = "([^"]+)"', line).group(1)
-            held = int(re.search(r"\bcapacity = (\d+)", line).group(1))
-            look = re.search(r'\blook = "(\w+)"', line)
-            if look is None:
-                slots = count
-            elif look.group(1) not in looks:
-                bad.append(f"{car_id} {name}: no look {look.group(1)}")
-                continue
-            else:
-                slots = slot_count(looks[look.group(1)], "slots = {")
-                # 4.0: a look that stretches the body belongs to a style that says where it grows (split = z).
-                if "stretch = " in looks[look.group(1)] and "split = " not in body:
-                    bad.append(f"{car_id} {name}: look {look.group(1)} stretches, style {style} has no split")
-            if slots != held:
-                bad.append(f"{car_id} {name}: capacity {held} but {slots} cargo slots")
-            most = max(most, slots)
-        if "company = true" in entry:
-            continue
-        # 5.1: a bike (bike = true) has no back that opens (you load its rack or box straight away) and may hold one
-        # piece; its slots are its capacity (checked above). Its style says so (bike = true in the body).
-        if re.search(r"\bbike = true", entry):
-            if count < 1:
-                bad.append(f"{car_id}: a bike without cargo slots")
-            if not re.search(r"\bbike = true", body):
-                bad.append(f"{car_id}: a bike on style {style}, which is not a bike body")
-            continue
-        if count < 1 or most < 2:
-            bad.append(f"{car_id}: {count} cargo slots, {most} at its last stage")
-        if "back = " not in body:
-            bad.append(f"{car_id}: no back")
-    print("== styles: " + (f"every car has a body, every dealer car cargo slots and a back, every capacity its slots ({len(blocks)} styles, {len(looks)} stage looks, {stages_seen} stages)" if not bad else "; ".join(bad)))
+        if not re.search(r'\bstyle = "sprinter"', entry):
+            bad.append(f"{van}: not on the style sprinter")
+        if not capacity or int(capacity.group(1)) != slots:
+            bad.append(f"{van}: capacity {capacity and capacity.group(1)} but {slots} cargo slots in STYLE")
+    if slots < 2 or "leaves = leaves" not in style:
+        bad.append(f"the van: {slots} cargo slots, a back {'leaves = leaves' in style}")
+    print("== styles: " + (f"the van {van}: its capacity its {slots} cargo slots, a back that opens" if not bad else "; ".join(bad)))
     return not bad
 
 if not styles_check():

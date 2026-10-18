@@ -11,7 +11,7 @@ Two runs of the real server code on the Luau CLI:
     classic R15) and 8.3's showroom visitors (server/Visitors.luau's bodies: Config.Visitors.Cap of them, every kind's
     look, each with the box of a sale);
   * tools/perf/van-count.luau on tools/vehicle-preview/roblox-mock.luau (export_fleet.py's preparation): the sandbox's
-    van (Config.Sandbox.Van, the ZDC Sprinter's parts model) at every stage, by day (its night lights out).
+    van (Config.Sandbox.Van, the ZDC Sprinter's parts model; 10.6: one build, no stages), by day (its night lights out).
 Each piece's row (tools/perf/census.luau): parts, MeshParts, visible / see-through / invisible parts, shadow casters
 (and the small ones under RenderBudget's size rule), lights (and those with Shadows on), SurfaceGuis and BillboardGuis
 (and those drawn at any distance), ParticleEmitters, Beams, fire / smoke / sparkles, decals, ProximityPrompts;

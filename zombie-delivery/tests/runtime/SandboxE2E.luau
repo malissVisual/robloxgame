@@ -22,8 +22,8 @@
 --     real one, OrderedDataStores (E.ordered: whole numbers), CollectionService's tags, Workspace's rays (the ground, the road, an interior's floor), PhysicsService,
 --     PathfindingService (no path: Danny walks straight, E.mover), RunService (the server, not Studio) …;
 --   * the fakes of the Roblox-heavy server modules: Vehicles (a Sprinter with the real numbers: SprinterLooks' CargoDoor,
---     the chassis' height, the cargo slots, the BackPrompt with Vehicles' rules: owner or crew, on foot, a hand free, the
---     van standing; workspace.Cars and its OwnerId / SpeedMult attributes), Zombies, Npcs (Danny's body), Crew (nobody
+--     the chassis' height, the cargo slots, the BackPrompt with Vehicles' rules: owner or crew, on foot, a hand free;
+--     10.6 parked and anchored, no seat; workspace.Cars and its OwnerId attribute), Zombies, Npcs (Danny's body), Crew (nobody
 --     in a crew), Hand, and the boot's other services' start (no-ops). server/Analytics.luau is the real one: Roblox's
 --     AnalyticsService under it records every call (E.analytics);
 --   * the "physics": a WeldConstraint to a character's root or a van's chassis keeps its piece where it was welded
@@ -32,7 +32,7 @@
 -- The test's hands and feet: E.join / E.spawn / E.leave, E.fire (a client's request on a remote), E.trigger (a prompt:
 -- only enabled and within its reach, as Roblox checks; a hold advances the clock), E.walk (the root in 0.1 s steps at a
 -- walk, the clock moving: the game sees a walk, not a teleport; it stops when the game moves the body, a door's fade),
--- E.seat / E.unseat / E.drive (the van along waypoints at a speed, its driver and its welded load with it), E.waitUntil.
+-- E.waitUntil.
 -- The client: E.clients[player] = fn(remoteName, ...) hears every FireClient to that player (it may answer with
 -- task.delay + E.fire). E.sent keeps every FireClient: E.messages / E.lastNotice / E.heard read it.
 local Mock = require("./ItemMock")
@@ -40,8 +40,6 @@ local Config = require("./Config")
 Config.Rounds.On = false -- (10.5: the portals' runs here, as before the rounds; tests/rounds_runtime_test.luau turns them on)
 local SandboxMapReal = require("./SandboxMap")
 local SprinterLooks = require("./SprinterLooks")
-local Economy = require("./Economy")
-local Map = require("./Map")
 
 local BASE = getfenv(1)
 
@@ -1671,7 +1669,7 @@ local function stub(name: string, fields: { [string]: any }): any
 		error(`SandboxE2E: unmocked {name}.{tostring(key)}`, 2)
 	end })
 end
-for _, name in { "CarRighting", "Admin", "SprinterMesh", "Clipboard" } do -- (8.5: Danny's clipboard, its own test)
+for _, name in { "Admin", "SprinterMesh", "Clipboard" } do -- (8.5: Danny's clipboard, its own test)
 	E.fakes[name] = stub(name, { start = noop })
 end
 E.fakes.CourierAvatar = stub("CourierAvatar", { start = noop, setLook = noop }) -- (10.1: SaveSlots puts the slot's courier on)
@@ -1690,10 +1688,6 @@ E.zombies = {}
 E.fakes.Zombies = stub("Zombies", {
 	ambient = true,
 	start = noop,
-	hunts = function(): boolean
-		return false
-	end,
-	onCarDamaged = noop,
 	findSpot = function(center: any): any
 		return center
 	end,
@@ -1715,14 +1709,12 @@ E.fakes.Zombies = stub("Zombies", {
 	damage = function(): boolean
 		return false
 	end,
-	noise = noop,
 	all = function(): { any }
 		return E.zombies
 	end,
 	extraTargets = function(): { any }
 		return {}
 	end,
-	releaseCar = noop,
 	clearOwner = noop,
 })
 -- Npcs: a body (a root and a humanoid in workspace.Npcs) where it is put; what it says (E.said).
@@ -1822,7 +1814,7 @@ end
 E.humanoidOf = humanoidOf
 
 -- The BackPrompt pressed (server/Vehicles.luau toggleBack's rules): on foot, the owner or the crew (backAllowed), a
--- hand free (nothing carried, or one light piece: CarryHands 1), the van standing.
+-- hand free (nothing carried, or one light piece: CarryHands 1).
 local notice: any = nil
 local function say(player: any, text: string)
 	notice = notice or E.require(shared.Net).get("Notice")
@@ -1834,12 +1826,8 @@ local function toggleBack(car: any, player: any)
 	if car.wrecked or not character or not humanoid or humanoid.Health <= 0 then
 		return
 	end
-	if humanoid.SeatPart then
-		say(player, "Get out first.")
-		return
-	end
 	if player ~= car.owner and not Vehicles.backAllowed(player, car) then
-		say(player, "This is not your car.")
+		say(player, "This is not your van.")
 		return
 	end
 	local open = Vehicles.backOpen(car)
@@ -1847,30 +1835,33 @@ local function toggleBack(car: any, player: any)
 		say(player, `Your hands are full. Put it down (G), then {Vehicles.backVerb(car, not open)} (E).`)
 		return
 	end
-	if Vehicles.speed(car) > Config.Cargo.MaxCarSpeed then
-		say(player, "Stop the vehicle first.")
-		return
-	end
 	Vehicles.setBack(car, not open)
 end
 
--- A player's Sprinter, its chassis' middle at `frame` (CHASSIS_HEIGHT / 2 + the clearance over the ground).
+-- The Config.Cars entry of `id` (Vehicles.carDef's).
+function Vehicles.carDef(id: string): any
+	for _, def in Config.Cars do
+		if def.id == id then
+			return def
+		end
+	end
+	return nil
+end
+
+-- A player's Sprinter, its chassis' middle at `frame` (CHASSIS_HEIGHT / 2 + the clearance over the ground), anchored
+-- (10.6: no seat, never driven).
 local function build(player: any, carId: string, frame: any): any
-	local def = Economy.findCar(carId)
+	local def = Vehicles.carDef(carId)
 	local model = Instance.new("Model")
 	model.Name = `{player.Name}'s {if def then def.name else carId}`
 	local chassis = Instance.new("Part")
 	chassis.Name = "Chassis"
 	chassis.Size = V3(S.Width, CHASSIS_HEIGHT, SprinterLooks.Length)
 	chassis.CFrame = frame
+	chassis.Anchored = true
 	chassis:SetAttribute("E2EMover", true)
 	chassis.Parent = model
 	model.PrimaryPart = chassis
-	local seat = Instance.new("VehicleSeat")
-	seat.Name = "DriveSeat"
-	seat.Size = V3(2, 1, 2)
-	seat.CFrame = frame * Mock.CFrame.new(SprinterLooks.Seat[1], CHASSIS_HEIGHT / 2 + SprinterLooks.Seat[2] - SprinterLooks.Top, SprinterLooks.Seat[3])
-	seat.Parent = model
 	local door = Instance.new("Attachment")
 	door.Name = "CargoDoor"
 	door.Position = V3(0, CHASSIS_HEIGHT / 2 + SprinterLooks.CargoDoor[2] - SprinterLooks.Top, SprinterLooks.CargoDoor[3])
@@ -1886,8 +1877,9 @@ local function build(player: any, carId: string, frame: any): any
 	model:SetAttribute("BackOpen", false)
 	model:SetAttribute("OwnerId", player.UserId)
 	model:SetAttribute("CarId", carId)
-	model:SetAttribute("SpeedMult", 1) -- (Vehicles' spawn: before it is parented; server/Upgrades.luau tunes it)
-	local car = { owner = player, id = carId, model = model, chassis = chassis, seat = seat, wrecked = false, lent = false, rental = false, health = 1, speed = 0, passengers = {} }
+	local car = { owner = player, id = carId, model = model, chassis = chassis, paintParts = {}, size = V3(S.Width, S.Height, SprinterLooks.Length),
+		wrecked = false, ground = frame }
+	Vehicles.onStyle(car) -- (the real one's: its paint, server/VanPaint.luau)
 	back.Triggered:Connect(function(by: any)
 		toggleBack(car, by)
 	end)
@@ -1900,28 +1892,13 @@ function Vehicles.start()
 		Vehicles.remove(player) -- (the real one's: a leaving player's car goes)
 	end)
 end
-Vehicles.onWrecked = function() end
-Vehicles.onSpawned = function() end
+Vehicles.onStyle = function() end
 Vehicles.backAllowed = function(): boolean
 	return false
-end
-Vehicles.backChanged = function() end
-Vehicles.callCar = nil
-Vehicles.homeGarage = function(): any
-	return nil
 end
 function Vehicles.get(player: any): any
 	local car = cars[player]
 	return if car and not car.wrecked then car else nil
-end
-function Vehicles.all(): { any }
-	local list = {}
-	for _, car in cars do
-		if not car.wrecked then
-			table.insert(list, car)
-		end
-	end
-	return list
 end
 function Vehicles.remove(player: any)
 	local old = cars[player]
@@ -1930,73 +1907,30 @@ function Vehicles.remove(player: any)
 		old.model:Destroy()
 	end
 end
-function Vehicles.driveOut(_player: any, _carId: string?): (number, number)
-	local length = SprinterLooks.Length
-	return if length > 17 then length / 2 - (Map.GarageApron - 1) else 0, length
-end
 function Vehicles.groundY(x: number, z: number, _refY: number?): number
 	return E.groundY(x, z)
 end
--- Vehicles.placeAt: the van stands Vehicles.driveOut studs out along the spot's look (a garage's way); its chassis on the
--- ground there (the real one: groundY + its clearance), seated or not.
-function Vehicles.placeAt(player: any, carId: string?, spot: any, seat: boolean?): any
-	table.insert(E.vehicleCalls, { name = "placeAt", player = player, carId = carId, spot = spot, seat = seat })
+-- Vehicles.placeAt: the van's middle at the spot, facing its look; its chassis on the ground there (the real one:
+-- groundY + its clearance).
+function Vehicles.placeAt(player: any, spot: any): any
+	table.insert(E.vehicleCalls, { name = "placeAt", player = player, spot = spot })
 	local look = V3(spot.LookVector.X, 0, spot.LookVector.Z)
 	look = if look.Magnitude > 0.01 then look.Unit else V3(0, 0, 1)
-	local out = Vehicles.driveOut(player, carId)
 	Vehicles.remove(player)
-	local at = spot.Position + look * out
+	local at = spot.Position
 	local y = E.groundY(at.X, at.Z) + S.Clearance + CHASSIS_HEIGHT / 2
 	local position = V3(at.X, y, at.Z)
-	local id = carId or "sprinter"
-	local car = build(player, id, Mock.CFrame.lookAt(position, position + look))
+	local car = build(player, Config.Sandbox.Van, Mock.CFrame.lookAt(position, position + look))
 	cars[player] = car
-	if seat then
-		E.seat(player, car)
-	end
 	return car
 end
-function Vehicles.spawnAt(player: any, carId: string?, ground: any, seat: boolean): any
-	table.insert(E.vehicleCalls, { name = "spawnAt", player = player, carId = carId })
+function Vehicles.spawnAt(player: any, ground: any): any
+	table.insert(E.vehicleCalls, { name = "spawnAt", player = player })
 	Vehicles.remove(player)
 	local position = ground.Position + V3(0, S.Clearance + CHASSIS_HEIGHT / 2, 0)
-	local car = build(player, carId or "sprinter", Mock.CFrame.lookAt(position, position + ground.LookVector))
+	local car = build(player, Config.Sandbox.Van, Mock.CFrame.lookAt(position, position + ground.LookVector))
 	cars[player] = car
-	if seat then
-		E.seat(player, car)
-	end
 	return car
-end
-function Vehicles.placeNear(player: any, carId: string?): string?
-	table.insert(E.vehicleCalls, { name = "placeNear", player = player, carId = carId })
-	local root = rootOf(player)
-	local at = if root then root.CFrame else Mock.CFrame.identity
-	Vehicles.spawnAt(player, carId, at, true)
-	return nil
-end
-function Vehicles.spawn(player: any, force: boolean?, carId: string?): string?
-	table.insert(E.vehicleCalls, { name = "spawn", player = player, carId = carId })
-	local call = Vehicles.callCar
-	if not force and call then
-		return call(player, carId)
-	end
-	return Vehicles.placeNear(player, carId)
-end
-function Vehicles.repair(car: any, share: number)
-	car.health = share
-end
-function Vehicles.damage(car: any, amount: number): number
-	car.health = math.max(0, car.health - amount / 1000)
-	return amount
-end
-function Vehicles.cooldown(): string?
-	return nil
-end
-function Vehicles.clearFor(_car: any, ground: any): any
-	return ground
-end
-function Vehicles.isBike(): boolean
-	return false
 end
 function Vehicles.cargoDoor(car: any): any
 	local door = car.chassis:FindFirstChild("CargoDoor")
@@ -2013,9 +1947,6 @@ end
 function Vehicles.backOpen(car: any): boolean
 	return car.model:GetAttribute("BackOpen") == true
 end
-function Vehicles.backNoun(): string
-	return "doors"
-end
 function Vehicles.backVerb(_car: any, opening: boolean): string
 	return if opening then "open the back doors" else "close the back doors"
 end
@@ -2028,12 +1959,8 @@ function Vehicles.setBack(car: any, open: boolean)
 	if prompt then
 		prompt.ActionText = if open then "Close doors" else "Open doors"
 	end
-	Vehicles.backChanged(car)
 end
-function Vehicles.speed(car: any): number
-	return car.speed or 0
-end
--- The Sprinter's slots (Vehicles' STYLES.sprinter cargo), from the chassis' middle: its floor CHASSIS_HEIGHT / 2 up.
+-- The Sprinter's slots (Vehicles' STYLE.slots), from the chassis' middle: its floor CHASSIS_HEIGHT / 2 up.
 local SLOTS = { { -1.6, -1.2 }, { 1.6, -1.2 }, { -1.6, 2.2 }, { 1.6, 2.2 }, { -1.6, 5.6 }, { 1.6, 5.6 }, { -1.6, 9.0 }, { 1.6, 9.0 } }
 function Vehicles.cargoSlots(_car: any): { any }
 	local list = {}
@@ -2045,30 +1972,7 @@ end
 function Vehicles.cargoHolder(car: any): any
 	return car.chassis
 end
-function Vehicles.bodyPart(car: any): any
-	return car.chassis
-end
-function Vehicles.seatedIn(player: any): (any, boolean, any)
-	local humanoid = humanoidOf(player)
-	local seat = humanoid and humanoid.SeatPart
-	if not seat then
-		return nil, false, nil
-	end
-	for _, car in cars do
-		if not car.wrecked and seat:IsDescendantOf(car.model) then
-			return car, seat == car.seat, seat
-		end
-	end
-	return nil, false, nil
-end
-function Vehicles.isDriving(player: any): boolean
-	local car, driving = Vehicles.seatedIn(player)
-	return car ~= nil and driving
-end
 function Vehicles.standUp() end
-function Vehicles.capacity(): number
-	return #SLOTS
-end
 
 -- ── The players ───────────────────────────────────────────────────────────
 
@@ -2313,61 +2217,6 @@ function E.walkPath(player: any, points: { any }, speed: number?): boolean
 		end
 	end
 	return true
-end
-
--- Into the van's driver's seat (the Drive prompt's end: SeatPart set, its Seated) and out at the driver's door.
-function E.seat(player: any, car: any)
-	local humanoid = humanoidOf(player)
-	humanoid.SeatPart = car.seat
-	car.seat.Occupant = humanoid
-	local root = rootOf(player)
-	root.CFrame = car.seat.CFrame * Mock.CFrame.new(0, 1.5, 0)
-	E.settleWelds()
-end
-function E.unseat(player: any)
-	local humanoid = humanoidOf(player)
-	local seat = humanoid.SeatPart
-	humanoid.SeatPart = nil
-	if seat then
-		seat.Occupant = nil
-		local out = seat.CFrame * V3(-(S.Width / 2 + 2), 0, 0)
-		local y = E.groundY(out.X, out.Z) + 3
-		E.place(player, V3(out.X, y, out.Z), seat.CFrame.LookVector)
-	end
-end
-
--- Drives the van along `points` ({ x, z, yaw }: its pivot's flat place and the way its nose looks, SandboxMap's yaw)
--- at `speed` studs / s in 0.1 s steps, on the ground (the chassis' clearance over the road or the meadow), its driver
--- and its welded load with it; it stands still at the end.
-function E.drive(car: any, points: { any }, speed: number?)
-	local v = speed or 40
-	local dt = 0.1
-	local function frameAt(x: number, z: number, yaw: number): any
-		local y = E.groundY(x, z) + S.Clearance + CHASSIS_HEIGHT / 2
-		return Mock.CFrame.new(x, y, z) * Mock.CFrame.Angles(0, math.rad(yaw), 0)
-	end
-	local driver = car.seat.Occupant
-	for _, point in points do
-		for _ = 1, 100000 do
-			local here = car.chassis.Position
-			local way = V3(point.x - here.X, 0, point.z - here.Z)
-			local length = way.Magnitude
-			local stride = math.min(length, v * dt)
-			local at = if length > 1e-6 then here + way / length * stride else here
-			car.model:PivotTo(frameAt(at.X, at.Z, point.yaw))
-			car.speed = if length > 1e-3 then v else 0
-			if driver and driver.Parent and driver.RootPart then
-				driver.RootPart.CFrame = car.seat.CFrame * Mock.CFrame.new(0, 1.5, 0)
-			end
-			E.settleWelds()
-			E.advance(dt)
-			if length <= stride + 1e-6 then
-				break
-			end
-		end
-	end
-	car.speed = 0
-	E.advance(0.3)
 end
 
 -- ── The environment the staged modules run in ─────────────────────────────

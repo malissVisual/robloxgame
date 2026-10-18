@@ -242,16 +242,17 @@ check("…asked while she carries: refused (\"Put down what you carry first (G)\
 E.Net.get("PutDown").OnServerEvent:Fire(ann)
 ask(ann, true)
 check("…put down: out again", ann.Character:GetAttribute("Carrying") == nil and held(ann))
--- a seat
+-- a seat (a chair, a bench: 10.6 none in a van)
 local humanoid = humanoidOf(ann)
-truck.passengers[1]:Sit(humanoid)
+local chair = M.Instance.new("Seat")
+chair.Parent = workspace
+humanoid.SeatPart, humanoid.Sit = chair, true
 humanoid:GetPropertyChangedSignal("SeatPart"):Fire()
-check("8.5 seat: Ann sits in the van: the clipboard goes", humanoid.SeatPart ~= nil and away(ann))
+check("8.5 seat: Ann sits down: the clipboard goes", humanoid.SeatPart ~= nil and away(ann))
 noticeAt = #E.messages
 ask(ann, true)
 check("…asked while she sits: refused (\"Get out first\")", away(ann) and told(ann, "Get out first", noticeAt), E.lastNotice(ann))
-truck.passengers[1]:FindFirstChild("SeatWeld"):Destroy()
-humanoid.Sit = false
+humanoid.SeatPart, humanoid.Sit = nil, false
 humanoid:GetPropertyChangedSignal("SeatPart"):Fire()
 ask(ann, true)
 check("…out of the seat: out again", humanoid.SeatPart == nil and held(ann))

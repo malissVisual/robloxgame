@@ -6,7 +6,7 @@
 -- teleport with a thing, the horde, the run's end (FINISH, GIVE UP, the clock, the host leaving: what is in the truck
 -- goes home), and the edges: a stranger, the truck lost, the admin's commands.
 -- 7.0 planning: the quick chat on a run (the real server/MoveLobby.luau: the crew hears it, a stranger not).
--- 7.0 review (server): nothing replaces the truck mid-move (Vehicles' spawn / placeNear / placeAt / spawnAt), Moving.busy,
+-- 7.0 review (server): nothing replaces the truck mid-move (Vehicles' placeAt / spawnAt), Moving.busy,
 -- a door trip whose move ends meanwhile, Load's pace check, Unload's full hands, the end's listeners
 -- failing (the cleanup still runs), the plan made once a seed.
 -- 8.8 no roles: anybody of the crew calls the van to the door, once a run (tests/noroles_runtime_test.luau has the rest).
@@ -26,7 +26,6 @@ local E = require("./MovingRuntime")
 local Moving = require("./MovingServer")
 local Config = require("./Config")
 local SandboxMap = require("./SandboxMap")
-local Economy = require("./Economy")
 
 local failures = 0
 local function check(name: string, ok: boolean, detail: any?)
@@ -142,10 +141,6 @@ check("…not from a stranger, nor a line it doesn't have", E.last(bob, "MoveLob
 
 local curb = V3(House.curb.x, 2, House.curb.z)
 truck.chassis.CFrame = M.CFrame.new(curb.X + 60, 2, curb.Z + 40)
-E.seated[bob] = truck
-E.request(ann, "call")
-check("not with somebody in it", string.find(E.lastNotice(ann), "sits in the van", 1, true) ~= nil, E.lastNotice(ann))
-E.seated[bob] = nil
 E.request(bob, "call")
 check("a crew mate calls the van: at the house's curb, stood up, with a fade for the caller", V3(truck.chassis.Position.X - curb.X, 0, truck.chassis.Position.Z - curb.Z).Magnitude < 1
 	and E.stoodUp == 1 and E.last(bob, "Moving", "fade") ~= nil and E.last(ann, "Moving", "fade") == nil, truck.chassis.Position)
@@ -157,13 +152,16 @@ check("…once a run", string.find(E.lastNotice(ann), "once", 1, true) ~= nil, E
 do
 	local calls = E.vehicleCalls or 0
 	local out = "Your van is out"
-	check("CAR (Vehicles.spawn): refused, the truck stays", string.find(E.Vehicles.spawn(ann, false, nil) or "", out, 1, true) ~= nil
-		and string.find(E.Vehicles.spawn(ann, true, "van") or "", out, 1, true) ~= nil and E.cars[ann] == truck)
-	check("…a van next to you (Vehicles.placeNear): refused", string.find(E.Vehicles.placeNear(ann, nil) or "", out, 1, true) ~= nil and E.cars[ann] == truck)
-	check("…a van parked at a spot (placeAt, spawnAt): refused, said", E.Vehicles.placeAt(ann, nil, M.CFrame.new(0, 0, 0)) == nil
-		and E.Vehicles.spawnAt(ann, "sprinter", M.CFrame.new(0, 0, 0), false) == nil and string.find(E.lastNotice(ann), out, 1, true) ~= nil and (E.vehicleCalls or 0) == calls)
-	E.Vehicles.spawn(bob, false, nil)
-	check("…a crew mate's own van is theirs to call", (E.vehicleCalls or 0) == calls + 1)
+	check("a van parked for the host at a spot (placeAt, spawnAt: a park, a round's): refused, said, the truck stays",
+		E.Vehicles.placeAt(ann, M.CFrame.new(0, 0, 0)) == nil and E.Vehicles.spawnAt(ann, M.CFrame.new(0, 0, 0)) == nil
+		and string.find(E.lastNotice(ann), out, 1, true) ~= nil and (E.vehicleCalls or 0) == calls and E.cars[ann] == truck)
+	E.Vehicles.placeAt(bob, M.CFrame.new(0, 0, 0))
+	check("…a crew mate's own van is theirs to park", (E.vehicleCalls or 0) == calls + 1)
+	local bobs = E.cars[bob]
+	if bobs then
+		bobs.model:Destroy()
+		E.cars[bob] = nil
+	end
 	check("the run's people are busy (Moving.busy): its owner and its crew, a stranger free", type(Moving.busy(ann)) == "string" and type(Moving.busy(bob)) == "string"
 		and Moving.busy(cid) == nil)
 end
@@ -259,7 +257,7 @@ E.clock += 0.2
 Moving.step()
 local backPrompt = cargoDoor:FindFirstChild("BackPrompt")
 check("back open, a thing carried: Load shows, the back's own E waits", load.Enabled and not backPrompt.Enabled and string.find(load.ActionText, "Lamp", 1, true) ~= nil, load.ActionText)
-local vanName = (Economy.findCar(truck.id) :: any).name
+local vanName = (E.Vehicles.carDef(truck.id) :: any).name
 check("the prompts say the van's name (the Sprinter's), its walk-in bay its own Load", string.find(load.ObjectText, `{vanName} ·`, 1, true) == 1
 	and truck.chassis:FindFirstChild("MoveLoadBay") ~= nil, load.ObjectText)
 check("the crew may open the back (BackCrew, backAllowed)", truck.model:GetAttribute("BackCrew") == "22")
@@ -512,7 +510,7 @@ load = promptIn(truck.model, "Load")
 Moving.step()
 E.place(ann, outside)
 enter = promptIn(site, "Enter house")
-check("the door open at once: Enter house (off: 8.1 walk-in doors), no Kick door, no noise", enter ~= nil and not enter.Enabled and promptIn(site, "Kick door") == nil and E.noises == 0)
+check("the door open at once: Enter house (off: 8.1 walk-in doors), no Kick door", enter ~= nil and not enter.Enabled and promptIn(site, "Kick door") == nil)
 E.clock += T.Roam.Every + 0.1
 Moving.step() -- (Ann outside by the house: the run's few roamers come round it)
 local z0 = E.zombies[#E.zombies]
@@ -538,14 +536,9 @@ E.clock += 0.2
 Moving.step()
 trigger(load, ann)
 check("the box of memories (★) in the truck", ann.Character:GetAttribute("MoveCarry") == nil and string.find(E.lastNotice(ann), "loaded", 1, true) ~= nil, E.lastNotice(ann))
-check("during the run the truck stays: a car placed for her is refused", string.find(E.Vehicles.placeNear(ann, nil) or "", "van is out", 1, true) ~= nil)
-check("the crew is hunted (no ordinary roamers round them), a stranger not", E.Zombies.hunts(bob) == true and E.Zombies.hunts(ann) == true and E.Zombies.hunts(cid) == false)
+check("during the run the truck stays: a van placed for her is refused", E.Vehicles.placeAt(ann, M.CFrame.new(0, 0, 0)) == nil
+	and string.find(E.lastNotice(ann), "van is out", 1, true) ~= nil and E.cars[ann] == truck)
 check("the crew may open the truck's back, a stranger not", E.Vehicles.backAllowed(bob, truck) == true and E.Vehicles.backAllowed(cid, truck) == false)
-E.Zombies.onCarDamaged(ann, 100)
-E.clock += 0.3
-Moving.step()
-local knocked = stateOf(ann, 5)
-check("the truck's knocks knock its load", knocked ~= nil and math.abs(knocked.condition - (1 - 100 * T.Damage.PerTruckHp)) < 0.01, knocked and knocked.condition)
 local hordeSaid = Moving.admin(ann, "horde")
 E.clock += 1
 Moving.step()
@@ -565,7 +558,8 @@ end
 check("analytics: MoveDone", tracked)
 check("…the van's Load and Take out gone, Take out's own spot too", promptIn(truck.model, "Load") == nil and promptIn(truck.model, "Take out") == nil
 	and truck.chassis:FindFirstChild("MoveTakeOut") == nil and truck.chassis:FindFirstChild("CargoDoor") ~= nil)
-check("the session is gone: the hooks let the truck go again", ann:GetAttribute("MoveWith") == nil and E.destroyed == 2 and E.Zombies.hunts(bob) == false)
+check("the session is gone: the hooks let the truck go again", ann:GetAttribute("MoveWith") == nil and E.destroyed == 2
+	and E.Vehicles.backAllowed(bob, truck) == false)
 check("the horde let go", (function()
 	for _, z in E.zombies do
 		if z.march ~= nil then
@@ -607,17 +601,15 @@ E.clock += 0.3
 Moving.step()
 check("the van gone: what was in it is lost (condition 0), the run goes on", #ends == 2 and heard(ann, "The van is gone")
 	and stateOf(ann, 1).state == "lost" and stateOf(ann, 1).condition == 0)
-check("…another car for her waits VanAgain s", string.find(E.Vehicles.spawn(ann, false, nil) or "", "comes back", 1, true) ~= nil
-	and string.find(E.Vehicles.placeNear(ann, nil) or "", "comes back", 1, true) ~= nil and E.cars[ann] == nil)
 do
 	local calls = E.vehicleCalls or 0
 	local since = #E.messages
-	check("7.2 review: …a van parked at a spot (placeAt, spawnAt) waits too, said", E.Vehicles.placeAt(ann, nil, M.CFrame.new(0, 0, 0)) == nil
-		and E.Vehicles.spawnAt(ann, "sprinter", M.CFrame.new(0, 0, 0), false) == nil and (E.vehicleCalls or 0) == calls and heard(ann, "comes back", since + 1),
-		`{(E.vehicleCalls or 0) - calls} calls`)
+	check("7.2 review: …another van for her (placeAt, spawnAt) waits VanAgain s, said", E.Vehicles.placeAt(ann, M.CFrame.new(0, 0, 0)) == nil
+		and E.Vehicles.spawnAt(ann, M.CFrame.new(0, 0, 0)) == nil and (E.vehicleCalls or 0) == calls and heard(ann, "comes back", since + 1)
+		and E.cars[ann] == nil, `{(E.vehicleCalls or 0) - calls} calls`)
 end
 E.now += T.VanAgain
-E.Vehicles.placeNear(ann, nil)
+E.Vehicles.placeAt(ann, M.CFrame.new(0, 2, 0))
 E.clock += 0.3
 Moving.step()
 check("…then a van placed for her: the run takes it over (its prompts on it)", E.cars[ann] ~= nil and E.cars[ann] ~= truck and promptIn(E.cars[ann].model, "Load") ~= nil
@@ -782,14 +774,12 @@ do
 	wait(0.5)
 	check("a stranger in the zone facing the door: stays out (only the move's crew)", not isIn(kim) and fadesOf(kim, since) == 0)
 	E.place(kim, lobby)
-	E.seated[jo] = E.cars[ivy]
 	E.rootOf(jo).Parent:FindFirstChildOfClass("Humanoid").SeatPart = E.cars[ivy].chassis
 	stand(jo, front, -facing)
 	wait(0.1)
 	wait(0.5)
 	check("…nor a crew mate sitting (in a seat)", not isIn(jo) and fadesOf(jo, since) == 0)
 	E.rootOf(jo).Parent:FindFirstChildOfClass("Humanoid").SeatPart = nil
-	E.seated[jo] = nil
 	E.place(jo, foot + up + facing * 12)
 
 	-- walking past, brushing past: no way in

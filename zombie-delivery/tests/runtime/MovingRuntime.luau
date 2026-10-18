@@ -14,11 +14,9 @@
 -- (Runtime.collected: every Collection.add, its uid back unless Runtime.refuse); server/SandboxBoot.luau's hook
 -- Moving.parkVan is the test's own or Runtime.parkVan (a fake car, Runtime.makeCar, of Runtime.carId: the Sprinter).
 -- 8.3: PlayerData.spend takes from Runtime.wallet (player → money; Runtime.startMoney when not set) and records it
--- (Runtime.spent; 10.1 the crew's discharge, no hire any more), saveSoon records the player (Runtime.savedSoon); a car (not a bike) has its driver's seat and one passenger seat (Seat:Sit puts a humanoid
--- in it: its Occupant, SeatPart, Sit and a SeatWeld), its doors (the driver's on the left, the passenger's on the
--- right) and its size; Vehicles.speed is the car's `speed` (0 unless the test sets it). 8.5 Danny getting in and out
--- like a player: Vehicles.swingDoor records each door swing (Runtime.doorSwings); RunService's Heartbeat (his pose every
--- frame meanwhile) fires only when a test fires it.
+-- (Runtime.spent; 10.1 the crew's discharge, no hire any more), saveSoon records the player (Runtime.savedSoon). A van
+-- (10.6: parked, no seats, no doors of a cab, never moving: server/Vehicles.luau's) has its back (CargoDoor, its
+-- BackPrompt, BackOpen) and its size. RunService's Heartbeat fires only when a test fires it.
 -- 9.2 (you drive Danny's end): his fake body's humanoid has a state (GetState / ChangeState: Npcs.carried puts it in
 -- Physics and back to Running, as the game's does while the server owns him), and Runtime.leadClient(player) is that
 -- player's own client/PairLead.luau (PairLeadClient.luau) on this world's workspace, recorder and clock: a test plays the
@@ -50,10 +48,7 @@ local Runtime: any = {
 	tags = {},
 	floor = 0, -- the floor's height the rays find (the interiors' own: Runtime.interiorFloor near them)
 	-- 7.0 planning
-	seated = {}, -- player → the car they drive (Vehicles.seatedIn)
-	carHits = {}, -- { { car, amount, cause } } what Vehicles.damage took
 	zombieHits = {}, -- { { z, amount, by, info } } what Zombies.damage was asked
-	noises = 0,
 	stoodUp = 0,
 	gameLead = gameLead, -- 8.3 Config.MoveHelper.HoldLead as the game has it
 }
@@ -573,9 +568,7 @@ Runtime.PlayerData = stub("PlayerData", {
 	notify = noop,
 })
 
--- The truck: a chassis at `at`, its back door attachment 9 studs behind it, a BackPrompt. (7.2 review: a bike,
--- Runtime.bikes: no back at all.)
-Runtime.bikes = { rustbike = true, escooter = true }
+-- The truck: a chassis at `at`, its back door attachment 9 studs behind it, a BackPrompt, its size (a 6 × 18 box).
 local function makeCar(owner: any, id: string, at: any): any
 	local model = Mock.Instance.new("Model")
 	model.Name = `{owner.Name}'s {id}`
@@ -584,63 +577,21 @@ local function makeCar(owner: any, id: string, at: any): any
 	chassis.CFrame = Mock.CFrame.new(at.X, at.Y, at.Z)
 	chassis.Parent = model
 	model.PrimaryPart = chassis
-	local bike = Runtime.bikes[id] == true
-	if not bike then
-		local door = Mock.Instance.new("Attachment")
-		door.Name = "CargoDoor"
-		door.Position = Mock.Vector3.new(0, 3, 9)
-		door.CFrame = Mock.CFrame.new(0, 3, 9) -- (10.6: the recorder reads an attachment's Position off its CFrame: the bay's middle from it)
-		door.Parent = chassis
-		local back = Mock.Instance.new("ProximityPrompt")
-		back.Name = "BackPrompt"
-		back.Parent = door
-		model:SetAttribute("BackOpen", false)
-	end
+	local door = Mock.Instance.new("Attachment")
+	door.Name = "CargoDoor"
+	door.Position = Mock.Vector3.new(0, 3, 9)
+	door.CFrame = Mock.CFrame.new(0, 3, 9) -- (10.6: the recorder reads an attachment's Position off its CFrame: the bay's middle from it)
+	door.Parent = chassis
+	local back = Mock.Instance.new("ProximityPrompt")
+	back.Name = "BackPrompt"
+	back.Parent = door
+	model:SetAttribute("BackOpen", false)
 	model.Parent = workspace
-	local car: any = { owner = owner, id = id, model = model, chassis = chassis, wrecked = false, lent = false, rental = false, bike = bike, speed = 0 }
-	if not bike then
-		-- 8.3: its seats (the driver's, one passenger's on the right: Door 2), its doors and its size
-		local function sit(seat: any, humanoid: any)
-			if seat.Occupant ~= nil or humanoid.SeatPart ~= nil then
-				return
-			end
-			seat.Occupant, humanoid.SeatPart, humanoid.Sit = humanoid, seat, true
-			local weld = Mock.Instance.new("Weld")
-			weld.Name = "SeatWeld"
-			weld.Part0, weld.Part1 = seat, humanoid.RootPart or humanoid.Parent.PrimaryPart
-			weld.OnDestroyed = function() -- (Roblox: the seat's occupant gone with its weld)
-				if seat.Occupant == humanoid then
-					seat.Occupant = nil
-				end
-				if humanoid.SeatPart == seat then
-					humanoid.SeatPart = nil
-				end
-			end
-			weld.Parent = seat
-			table.insert(Runtime.sat, { seat = seat, humanoid = humanoid })
-		end
-		local driver = Mock.Instance.new("VehicleSeat")
-		driver.Name = "DriverSeat"
-		driver.CFrame = chassis.CFrame * Mock.CFrame.new(-1.4, 1.5, -3)
-		driver:SetAttribute("Door", 1)
-		driver.Parent = model
-		driver.Sit = sit
-		local passenger = Mock.Instance.new("Seat")
-		passenger.Name = "PassengerSeat"
-		passenger.CFrame = chassis.CFrame * Mock.CFrame.new(1.4, 1.5, -3)
-		passenger:SetAttribute("Index", 1)
-		passenger:SetAttribute("Door", 2)
-		passenger.Parent = model
-		passenger.Sit = sit
-		car.seat, car.passengers = driver, { passenger }
-		car.doors = { { side = -1, z = -3, driver = true, seats = {} }, { side = 1, z = -3, driver = false, seats = { 1 } } }
-		car.size = Mock.Vector3.new(6, 6, 18)
-	end
+	local car: any = { owner = owner, id = id, model = model, chassis = chassis, paintParts = {}, wrecked = false, size = Mock.Vector3.new(6, 6, 18),
+		ground = chassis.CFrame }
 	return car
 end
-Runtime.sat = {} -- 8.3: { { seat, humanoid } } every Seat:Sit
 Runtime.makeCar = makeCar -- (8.0 SANDBOX: the test's own Moving.parkVan parks one)
-Runtime.truckAt = Mock.Vector3.new(0, 2, 0) -- where placeNear puts the truck (the test sets it)
 -- a move goes with its owner's own van (10.6: the Sprinter, Config.Sandbox.Van, its walk-in bay Config.Moving.Beds.sprinter)
 Runtime.carId = Config.Sandbox.Van
 Runtime.profiles = {} -- 7.2 review: player → a profile of the test's own (PlayerData.get returns it)
@@ -648,19 +599,6 @@ Runtime.profiles = {} -- 7.2 review: player → a profile of the test's own (Pla
 Runtime.Vehicles = stub("Vehicles", {
 	get = function(player: any): any
 		return Runtime.cars[player]
-	end,
-	-- (no id: the profile's car, as CAR brings it: a test's own profile's, else Runtime.carId)
-	placeNear = function(player: any, id: string): any
-		local old = Runtime.cars[player]
-		if old then
-			old.model:Destroy()
-		end
-		local own = Runtime.profiles[player]
-		Runtime.cars[player] = makeCar(player, id or (own and own.car) or Runtime.carId, Runtime.truckAt)
-		return nil
-	end,
-	isBike = function(car: any): boolean -- 7.2 review
-		return car.bike == true
 	end,
 	hasBack = function(car: any): boolean -- 7.2 review: Vehicles.hasBack's (not wrecked, a BackPrompt)
 		local door = car.chassis:FindFirstChild("CargoDoor")
@@ -683,50 +621,35 @@ Runtime.Vehicles = stub("Vehicles", {
 	backVerb = function(_car: any, opening: boolean): string
 		return if opening then "open the back doors" else "close the back doors"
 	end,
-	speed = function(car: any): number -- (8.3: the test's `speed` on the car)
-		return if type(car.speed) == "number" then car.speed else 0
-	end,
 	cargoSlots = function(): any
 		return { Mock.CFrame.new(0, 0.6, 0) }
 	end,
 	cargoHolder = function(car: any): any
 		return car.chassis
 	end,
-	all = function(): any -- (7.0 review: the barricades keep clear of every car)
-		local list = {}
-		for _, car in Runtime.cars do
-			table.insert(list, car)
+	carDef = function(id: string): any -- (the van's name on its prompts: Config.Cars')
+		for _, def in Config.Cars do
+			if def.id == id then
+				return def
+			end
 		end
-		return list
-	end,
-	-- (7.0 review: Moving wraps these: nothing replaces the moving truck mid-move; the fakes say what they would do)
-	spawn = function(player: any): any
-		Runtime.vehicleCalls = (Runtime.vehicleCalls or 0) + 1
-		local _ = player
 		return nil
 	end,
-	placeAt = function(player: any, carId: any): any
+	-- (7.0 review: Moving wraps these: nothing replaces the moving truck mid-move; the fakes say what they would do:
+	-- the player's van there, a new one when they have none)
+	placeAt = function(player: any, spot: any): any
 		Runtime.vehicleCalls = (Runtime.vehicleCalls or 0) + 1
-		local _ = carId
-		return Runtime.cars[player]
-	end,
-	spawnAt = function(player: any, carId: any, ground: any): any
-		Runtime.vehicleCalls = (Runtime.vehicleCalls or 0) + 1
-		if Runtime.cars[player] == nil and type(carId) == "string" and ground then -- (8.0 SANDBOX: the van at the plot)
-			Runtime.cars[player] = makeCar(player, carId, ground.Position)
+		if Runtime.cars[player] == nil and spot then
+			Runtime.cars[player] = makeCar(player, Runtime.carId, spot.Position)
 		end
 		return Runtime.cars[player]
 	end,
-	seatedIn = function(player: any): (any, boolean, any)
-		local car = Runtime.seated[player]
-		if car then
-			return car, true, car.chassis
+	spawnAt = function(player: any, ground: any): any
+		Runtime.vehicleCalls = (Runtime.vehicleCalls or 0) + 1
+		if Runtime.cars[player] == nil and ground then
+			Runtime.cars[player] = makeCar(player, Runtime.carId, ground.Position)
 		end
-		return nil, false, nil
-	end,
-	damage = function(car: any, amount: number, _reason: any, cause: any): number
-		table.insert(Runtime.carHits, { car = car, amount = amount, cause = cause })
-		return amount
+		return Runtime.cars[player]
 	end,
 	standUp = function(_car: any, _heading: any)
 		Runtime.stoodUp += 1
@@ -737,32 +660,18 @@ Runtime.Vehicles = stub("Vehicles", {
 	backAllowed = function()
 		return false
 	end,
-	callCar = function()
-		return "called"
-	end,
-	-- 8.3 review: the hook a passenger door's Ride along asks (server/Buddy.luau's: no buddy here; server/MoveHelper.luau
-	-- wraps it: Danny gets out for his crew; a test calls it as the door's prompt would)
-	yieldSeat = function(_seat: any, _player: any): boolean
-		return false
-	end,
-	-- 8.5: a cabin door swung for Danny getting in or out (server/MoveHelper.luau): recorded in Runtime.doorSwings
-	-- (the car, the door, openAt, closeAt: openAt nil shuts it from closeAt; the server time and the clock it came at)
-	swingDoor = function(car: any, index: number, openAt: number?, closeAt: number)
-		table.insert(Runtime.doorSwings, { car = car, door = index, openAt = openAt, closeAt = closeAt, now = Runtime.now, clock = Runtime.clock })
-	end,
 })
-Runtime.doorSwings = {} -- 8.5 { { car, door, openAt, closeAt, now, clock } } every Vehicles.swingDoor
 
--- 10.6: server/SandboxBoot.luau's parkVan as the tests stand it in (Moving.parkVan): the player's van (no carId: their own,
--- Runtime.carId) at the spot, its nose the spot's way, the old one gone; every call kept (Runtime.parked).
-Runtime.parked = {} -- { { player, spot, seat, carId } }
-function Runtime.parkVan(player: any, spot: any, seat: boolean, carId: string?): (string?, any)
-	table.insert(Runtime.parked, { player = player, spot = spot, seat = seat, carId = carId })
+-- 10.6: server/SandboxBoot.luau's parkVan as the tests stand it in (Moving.parkVan): the player's van (Runtime.carId) at
+-- the spot, its nose the spot's way, the old one gone; every call kept (Runtime.parked).
+Runtime.parked = {} -- { { player, spot } }
+function Runtime.parkVan(player: any, spot: any): (string?, any)
+	table.insert(Runtime.parked, { player = player, spot = spot })
 	local old = Runtime.cars[player]
 	if old then
 		old.model:Destroy()
 	end
-	local car = makeCar(player, carId or Runtime.carId, Mock.Vector3.new(spot.x, 2, spot.z))
+	local car = makeCar(player, Runtime.carId, Mock.Vector3.new(spot.x, 2, spot.z))
 	car.chassis.CFrame = Mock.CFrame.new(spot.x, 2, spot.z) * Mock.CFrame.Angles(0, math.rad(spot.yaw or 0), 0)
 	Runtime.cars[player] = car
 	return nil, car
@@ -787,7 +696,7 @@ function Runtime.startRun(owner: any, house: string?, difficulty: string?): stri
 	end
 	local h = SandboxMap.house(house or SandboxMap.House.id) or SandboxMap.House
 	local park = Moving.parkVan or Runtime.parkVan
-	park(owner, h.curb, false)
+	park(owner, h.curb)
 	return Moving.startRun(owner, h.id, difficulty or "normal")
 end
 -- 10.6: the house of `player`'s run (its state's contract; nil: The Old Farmstead), its door's foot, out of it (its
@@ -804,17 +713,13 @@ function Runtime.doorOf(h: any): (any, any, any)
 end
 
 Runtime.Zombies = stub("Zombies", {
-	hunts = function()
-		return false
-	end,
-	onCarDamaged = noop,
 	findSpot = function(center: any): any
 		return center + Mock.Vector3.new(60, 0, 0)
 	end,
 	pickKind = function()
 		return "walker"
 	end,
-	spawn = function(kind: string, at: any, owner: any, guard: any, resident: any, roamer: any): any
+	spawn = function(kind: string, at: any, owner: any, resident: any, roamer: any): any
 		local model = Mock.Instance.new("Model")
 		model.Parent = workspace
 		local root = Mock.Instance.new("Part") -- (7.0 helper: where it stands, for Danny's running away; 7.0 planning: a barricade)
@@ -823,7 +728,7 @@ Runtime.Zombies = stub("Zombies", {
 		root.Parent = model
 		local z = { kind = kind, at = at, owner = owner, roamer = roamer == true, dead = false, model = model, root = root }
 		table.insert(Runtime.zombies, z)
-		local _ = guard and resident
+		local _ = resident
 		return z
 	end,
 	march = function(z: any, at: any)
@@ -832,13 +737,10 @@ Runtime.Zombies = stub("Zombies", {
 			Runtime.marched += 1
 		end
 	end,
-	-- 7.0 planning: the Guard's hits (Zombies.damage wrapped); a noise (nothing on a move makes one now)
+	-- 7.0 planning: the Guard's hits (Zombies.damage wrapped)
 	damage = function(z: any, amount: number, by: any, info: any): boolean
 		table.insert(Runtime.zombieHits, { z = z, amount = amount, by = by, info = info })
 		return false
-	end,
-	noise = function()
-		Runtime.noises += 1
 	end,
 	-- 7.0, the depot's helper (server/MoveHelper.luau): every zombie, and the buddies' targets he adds himself to
 	all = function(): any

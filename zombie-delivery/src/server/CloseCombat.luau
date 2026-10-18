@@ -128,7 +128,7 @@ function CloseCombat.swing(player: Player, kind: string, direction: any, held: b
 	local push = dir * def.push + Vector3.new(0, def.push * 0.4, 0)
 	local damage = def.damage
 	local killed = Zombies.damage(best, damage, player, { push = push, cause = "melee" })
-	if not killed and not best.car and not best.root.Anchored then
+	if not killed and not best.root.Anchored then
 		-- A stagger: a short shove back (a brute barely moves).
 		local scale = math.max(1, best.def.scale)
 		best.root.AssemblyLinearVelocity += dir * (def.push * 0.6 / scale) + Vector3.new(0, 4, 0)

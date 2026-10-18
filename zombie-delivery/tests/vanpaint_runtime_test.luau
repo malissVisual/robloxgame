@@ -325,9 +325,6 @@ check("another player's van: their own look (the factory's), their own prompt", 
 P.Vehicles.onStyle(van2) -- (Vehicles.refreshStats, a repaint: the hook again on the same van)
 check("the hook again on the same van: still one prompt, one set of roof stripes", #all(van2.model, "PaintPrompt") == 1 and #all(van2.model, "VanLivery") == 1
 	and #van2.model:FindFirstChild("VanLivery"):GetChildren() == 2)
-local rented = P.van(B, home, false, true)
-check("a rental (Deliveros RIDE, a lent vehicle): never painted, no prompt", promptOf(rented) == nil and rented.model:GetAttribute("VanPaint") == nil)
-P.cars[B] = vanB
 
 -- ── The admin's UNLOCK PAINTS / RESET PAINTS ──────────────────────────────
 mark = #E.sent
