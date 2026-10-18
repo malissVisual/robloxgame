@@ -25,7 +25,8 @@
 --     state ("queue": ✓ YOU ARE IN THE QUEUE, LEAVE THE QUEUE sends { kind = "round", on = false }, CREATE and JOIN
 --     wait); the bar's IN THE QUICK ROUND QUEUE; the round's banner (client/RoundUi.luau) while queued: hidden while
 --     the panel is open, else on the screen clear of the bar, the chips and the touch controls, its words whole, LEAVE
---     QUEUE a finger's size sending the Runs remote's { kind = "queue", on = false }; the rounds off: the home as 10.4's.
+--     QUEUE a finger's size sending the Runs remote's { kind = "queue", on = false }, 10.6's look (as wide as there is
+--     room for, its words scaled to fit); the rounds off: the home as 10.4's.
 -- `luau play.luau -a dump` prints the preview's scenes as JSON instead (play_preview.py).
 local M = require("./sandbox_mock")
 local Config = require("./Config")
@@ -589,6 +590,11 @@ do
 		if M.touch then
 			check(`{label}: … its LEAVE QUEUE a finger's size`, #smallButtons(banner) == 0, smallButtons(banner)[1])
 		end
+		local title = named(banner, "Title")
+		check(`{label}: … 10.6's look: as wide as there is room for (400 – 560 px at its scale; a big screen 560), its words scaled to fit (TextScaled, a size limit)`,
+			banner.Size.X.Offset >= 400 and banner.Size.X.Offset <= 560 and (M.width < 1920 or banner.Size.X.Offset == 560) and title.TextScaled == true
+				and title:FindFirstChildOfClass("UITextSizeConstraint") ~= nil and box(named(banner, "Leave")).x1 <= box(banner).x1 + 0.5,
+			banner.Size.X.Offset)
 		fire({ kind = "play" })
 		check(`{label}: … away from the circle in the queue (the server's empty view): no PLAY panel, no bar (the banner says it)`, panel() == nil and bar() == nil)
 		runsRemote.OnClientEvent:Fire(BANNER)

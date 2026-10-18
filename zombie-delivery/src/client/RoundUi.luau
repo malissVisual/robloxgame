@@ -9,10 +9,12 @@
 --     one, that the next one is coming. 10.6 both in PLAY: only while you are in the queue (the PLAY panel's QUICK
 --     ROUND: the view's `ready`), never while the PLAY panel is open (it says the same); its LEAVE QUEUE (the Runs
 --     remote's { kind = "queue", on = false }) takes you out. On a phone at Config.Rounds.Banner.TouchScale at least
---     (LEAVE QUEUE a finger's size).
+--     (LEAVE QUEUE a finger's size). 10.6 snatching's look: wider (up to 560 px; a small phone's narrower, so that it
+--     stays high and clear of the HUD), its words scaled to fit, never cut (a long place's name).
 --   * In the round: the table at the screen's left (its first Config.Rounds.Top rows: place, name, pieces, value; your
 --     row lit, and under them when you are further down) and the feed under it (who took what: yours in gold, the
---     latest on top, each for FEED s). The clock is the move's panel's (client/MovingHud.luau).
+--     latest on top, each for FEED s; 10.6 the snatches too: "🤼 Bob snatched … from Ann!", "💪 Ann held on to …"). The
+--     clock is the move's panel's (client/MovingHud.luau).
 --   * Your van: its name tag (the server's RoundVanTag over it) says YOUR VAN for you, in gold and seen through walls.
 --   * The last seconds of the countdown tick; your own Load rings.
 --   RoundUi.start()   the remote, the screen
@@ -39,7 +41,8 @@ local Q = Config.Rounds
 local K = Theme.Contract
 local GOLD = Color3.fromRGB(255, 206, 92)
 local MONEY = Color3.fromRGB(140, 220, 120)
-local BANNER_W, BANNER_H = 400, 64 -- px at scale 1 (10.6: LEAVE QUEUE at its right)
+local BANNER_W, BANNER_H = 560, 64 -- px at scale 1 (10.6: LEAVE QUEUE at its right; wide for a long place's name)
+local BANNER_FITS = { 560, 480, 400 } -- px at scale 1: its widths, the highest spot clear of the HUD wins (a small phone: narrower)
 local LEAVE_W = 64 -- px at scale 1: LEAVE QUEUE (64 × 56: a finger's size at the touch scale)
 local BOARD_W, ROW = 236, 22
 local FEED, FEED_MAX = 6, 4 -- s a feed line shows, lines at most
@@ -118,11 +121,18 @@ local function build(): ScreenGui?
 	Ui.make("UIScale", { Name = "Scale", Scale = bannerScale() }, b)
 	Ui.corner(b, 10)
 	Ui.stroke(b, GOLD, 1.5)
-	local wordsW = BANNER_W - LEAVE_W - 28
-	text(b, "Kicker", { Size = UDim2.fromOffset(wordsW, 14), Position = UDim2.fromOffset(12, 5), Font = Theme.HeadingFont, TextSize = 11, TextColor3 = K.secondary })
-	text(b, "Title", { Size = UDim2.fromOffset(wordsW, 22), Position = UDim2.fromOffset(12, 19), Font = Theme.HeadingFont, TextSize = 16, TextColor3 = GOLD })
-	text(b, "Line", { Size = UDim2.fromOffset(wordsW, 16), Position = UDim2.fromOffset(12, 43), TextSize = 12, TextColor3 = K.secondary })
-	local leave = Ui.make("TextButton", { Name = "Leave", Text = "LEAVE QUEUE", Size = UDim2.fromOffset(LEAVE_W, 56), Position = UDim2.fromOffset(BANNER_W - LEAVE_W - 4, 4),
+	-- (its words scaled to fit, never cut: a long place's name, a phone; they and LEAVE QUEUE follow its width, layout's)
+	local wordsOff = -(LEAVE_W + 28) -- (their width: the banner's less LEAVE QUEUE and the margins)
+	local kicker = text(b, "Kicker", { Size = UDim2.new(1, wordsOff, 0, 14), Position = UDim2.fromOffset(12, 5), Font = Theme.HeadingFont, TextSize = 11, TextColor3 = K.secondary,
+		TextScaled = true, TextTruncate = Enum.TextTruncate.None })
+	Ui.make("UITextSizeConstraint", { MaxTextSize = 11, MinTextSize = 8 }, kicker)
+	local title = text(b, "Title", { Size = UDim2.new(1, wordsOff, 0, 22), Position = UDim2.fromOffset(12, 19), Font = Theme.HeadingFont, TextSize = 16, TextColor3 = GOLD,
+		TextScaled = true, TextTruncate = Enum.TextTruncate.None })
+	Ui.make("UITextSizeConstraint", { MaxTextSize = 16, MinTextSize = 10 }, title)
+	local line = text(b, "Line", { Size = UDim2.new(1, wordsOff, 0, 16), Position = UDim2.fromOffset(12, 43), TextSize = 12, TextColor3 = K.secondary,
+		TextScaled = true, TextTruncate = Enum.TextTruncate.None })
+	Ui.make("UITextSizeConstraint", { MaxTextSize = 12, MinTextSize = 8 }, line)
+	local leave = Ui.make("TextButton", { Name = "Leave", Text = "LEAVE QUEUE", Size = UDim2.fromOffset(LEAVE_W, 56), Position = UDim2.new(1, -LEAVE_W - 4, 0, 4),
 		BackgroundColor3 = K.charcoal, AutoButtonColor = true, Font = Theme.HeadingFont, TextSize = 12, TextColor3 = K.red, TextWrapped = true }, b)
 	Ui.corner(leave, 8)
 	Ui.stroke(leave, K.red, 1)
@@ -375,11 +385,19 @@ local function layout(root: ScreenGui, S: number)
 	local b = banner
 	if b and b.Visible then
 		local BS = bannerScale()
-		local w, h = BANNER_W * BS, BANNER_H * BS
-		local spot = slide(W / 2 - w / 2, GAP, w, h, H, list)
-		if spot then
+		local h = BANNER_H * BS
+		local best: TouchLayout.Box?, bestW = nil, BANNER_W
+		for _, bw in BANNER_FITS do -- (the highest spot wins, the wider on a tie: wide on a big screen, narrower on a small phone)
+			local w = bw * BS
+			local spot = slide(W / 2 - w / 2, GAP, w, h, H, list)
+			if spot and (not best or spot.y0 < best.y0 - 0.5) then
+				best, bestW = spot, bw
+			end
+		end
+		if best then
+			b.Size = UDim2.fromOffset(bestW, BANNER_H)
 			b.AnchorPoint = Vector2.new(0, 0)
-			b.Position = UDim2.fromOffset(math.floor(spot.x0 + 0.5), math.floor(spot.y0 + 0.5))
+			b.Position = UDim2.fromOffset(math.floor(best.x0 + 0.5), math.floor(best.y0 + 0.5))
 		end
 	end
 	local t, f = board, feed
@@ -468,6 +486,15 @@ local function onMessage(message: any)
 		refresh()
 	elseif message.kind == "claim" then
 		onClaim(message)
+		refresh()
+	elseif message.kind == "snatch" then -- 10.6 snatching: who took what from whom (or held on to it)
+		local said = if message.took == true then `🤼 {message.by or "?"} snatched {message.name or ""} from {message.from or "?"}!`
+			else `💪 {message.from or "?"} held on to {message.name or ""} ({message.by or "?"} tried)`
+		table.insert(lines, 1, { text = said, mine = message.mine == true, at = os.clock() })
+		while #lines > FEED_MAX do
+			table.remove(lines)
+		end
+		drawFeed()
 		refresh()
 	end
 end

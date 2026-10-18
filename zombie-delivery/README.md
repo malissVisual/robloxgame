@@ -3,10 +3,11 @@
 > **8.0 SANDBOX (the game the owner tests now).** With `Config.Sandbox.On = true` (the default) the server builds a
 > test world instead of the city (`shared/SandboxMap.luau`, `server/SandboxWorld.luau`). **Since 10.0 a small lobby
 > like Dungeon Quest** (`design/lobby/`, `server/LobbyWorld.luau`: the plaza, the four warehouses, the shops and, since
-> 10.5, one PLAY circle where you make a party lobby) from which a party goes into a house to empty at a chosen
+> 10.7, one PLAY circle where you make a party lobby) from which a party goes into a house to empty at a chosen
 > difficulty (`server/Runs.luau`, see the 10.0 note
-> below; its pieces wear their rarity's outline and stars; **since 10.6 the PLAY circle offers a QUICK ROUND too, one
-> round at a time for everybody in its queue, each loading into their own van: the 10.6 notes**); the houses stand in
+> below; its pieces wear their rarity's outline and stars; **since 10.7 the PLAY circle offers a QUICK ROUND too (10.5's
+> rounds with 10.6's snatching), one round at a time for everybody in its queue, each loading into their own van: the
+> 10.5 – 10.7 notes**); the houses stand in
 > their own fenced run zones of the
 > 9.0 countryside: since 9.0 **open countryside**
 > (`design/countryside/`; 8.9: the village of Jinočany, 8.0 – 8.8: an alpine meadow with one road) with **six places to
@@ -374,7 +375,39 @@
 > off while it plays. **The start's sounds** (`art/audio/sfx6.ogg`, `art/audio/NAHRAT-SFX6.md`): the intro's van and
 > jingle, the start screen's and the character creator's; sfx5.ogg's asset id is in.
 >
-> **10.5** (the owner: "make the map smaller, and on it just one circle where you stand, like PLAY, and you create a
+> **10.5** (the owner: "zombies I don't want in the game at all"; "16 people on one server … a round starts at one place,
+> everybody runs there, everyone has their own car, what you carry off to it quickly is yours … not teams"): **rounds
+> instead of the portals' runs** (`Config.Rounds`; `server/Runs.luau`'s block "10.5 ROUNDS", `shared/RoundRules.luau`,
+> `client/RoundUi.luau`; `Config.Rounds.On = false` brings the portals' pads back). After PLAY you wait in the lobby: a
+> banner counts down to the next round (`Wait`, 45 s), names its place and difficulty (never the same place twice in a
+> row; its portal says NEXT ROUND HERE). Then everybody in the game rides there together (10.4's ride: "ROUND · n
+> MOVERS"), each player's **own van** parked at the house's curb, side by side and in rows behind it (`Config.Rounds.Park`,
+> spots with a tree or a fence in the way last), locked, its back open, its owner's name over it (yours says YOUR VAN, seen
+> through walls). Grab the loot, carry it out and **Load** it at YOUR van (E, only you see its prompt): it is yours at
+> once, straight into your warehouse's stock (`Moving.claim`, `MovingRules.claim`), everybody hears who took what (the
+> feed) and sees **the table** (the top five by value and your place). The move's panel has the clock (`Seconds`, 5:00)
+> and what you loaded; nobody FINISHes or votes (the clock ends it), LEAVE THE ROUND takes you back alone, the host
+> leaving the game hands the round over (`Moving.handOver`), never ends it; no helper comes, CAR is refused. At 0:00 the
+> results card ranks everybody who came ("🥇 YOU: 1ST OF 6", every row's pieces and value), the ride back to the plaza,
+> the vans go and the next countdown starts; whoever pressed PLAY during a round goes in the next one. The admin's
+> `Runs.admin(…, "round")` starts the countdown's round now. **No zombies any more**: none at any difficulty, no bat, no
+> boss (`Config.Runs.Danger`; their code stays, `tests/danger_*` turn them on for themselves); the locks, the vault and
+> the floor's hazards stay. Next (planned): a private warehouse each behind one door in the lobby, for 16 players.
+>
+> **10.6** (the owner: "you can take it out of somebody's hands, but not so that you could just take it … not somebody
+> waiting at your car to take it straight out of your hands"): **snatching in the rounds** (`Config.Rounds.Tug`;
+> `shared/TugRules.luau`, `server/Runs.luau`'s block "10.6 snatching", `Moving.snatch`, `client/TugUi.luau`). Somebody
+> carrying a piece alone wears a **Snatch** prompt (E held a moment; only the others in the round see it). It is off for
+> 3 s after they picked it up, within 12 studs of their own van's back (you can always load in peace) and 8 of the
+> house's door, and for 2 s after a tug at them. With empty hands you start a **tug of war**: both stand still, a panel
+> shows the rope (your side on the left) and every press pulls (E, Space, a click, a gamepad's A or X, the big PULL button
+> on a phone; 10 presses a second count at most). The carrier is favoured: the mark starts on their side and their pulls
+> count 1.35×, so the snatcher needs to be clearly faster; a tie keeps it with the carrier. After 3 s at most the winner
+> keeps it or takes it (into their hands, protected for 3 s), the loser stands stunned 1.5 s, the round's feed tells
+> everybody ("🤼 Bob snatched … from Ann!", "💪 Ann held on to …"). A snatcher tries again only after 4 s; nobody loads
+> while in a tug or stunned; a piece carried in two can't be snatched.
+>
+> **10.7** (the owner: "make the map smaller, and on it just one circle where you stand, like PLAY, and you create a
 > lobby"; "a really huge and nice, well thought-out upgrade tree … and split the warehouse: an exhibition for selling,
 > and something for making money"). **One PLAY circle, party lobbies.** The lobby is smaller (456 × 226 studs: the four
 > warehouses along the north edge, the plaza in front of them) and in its middle one big glowing **PLAY** circle in
@@ -396,33 +429,15 @@
 > (stands, shop window, sales pitch, VIP buyers), RUNS (engine, overtime, spare keys, lucky finds) and the CREW (Danny,
 > pads & helmets, first aid, running shoes, good doctors); each node needs its parents and a warehouse tier; drag,
 > zoom, tap a node for its details and BUY, on a phone too. Old saves keep their levels (`upgradeTreeKept`).
-> **10.6** (the owner: "zombies I don't want in the game at all"; "16 people on one server … a round starts at one place,
-> everybody runs there, everyone has their own car, what you carry off to it quickly is yours … not teams"): **rounds
-> instead of the portals' runs** (`Config.Rounds`; `server/Runs.luau`'s block "10.5 ROUNDS", `shared/RoundRules.luau`,
-> `client/RoundUi.luau`; `Config.Rounds.On = false` brings the portals' pads back). After PLAY you wait in the lobby: a
-> banner counts down to the next round (`Wait`, 45 s), names its place and difficulty (never the same place twice in a
-> row; its portal says NEXT ROUND HERE). Then everybody in the game rides there together (10.4's ride: "ROUND · n
-> MOVERS"), each player's **own van** parked at the house's curb, side by side and in rows behind it (`Config.Rounds.Park`,
-> spots with a tree or a fence in the way last), locked, its back open, its owner's name over it (yours says YOUR VAN, seen
-> through walls). Grab the loot, carry it out and **Load** it at YOUR van (E, only you see its prompt): it is yours at
-> once, straight into your warehouse's stock (`Moving.claim`, `MovingRules.claim`), everybody hears who took what (the
-> feed) and sees **the table** (the top five by value and your place). The move's panel has the clock (`Seconds`, 5:00)
-> and what you loaded; nobody FINISHes or votes (the clock ends it), LEAVE THE ROUND takes you back alone, the host
-> leaving the game hands the round over (`Moving.handOver`), never ends it; no helper comes, CAR is refused. At 0:00 the
-> results card ranks everybody who came ("🥇 YOU: 1ST OF 6", every row's pieces and value), the ride back to the plaza,
-> the vans go and the next countdown starts; whoever pressed PLAY during a round goes in the next one. The admin's
-> `Runs.admin(…, "round")` starts the countdown's round now. **No zombies any more**: none at any difficulty, no bat, no
-> boss (`Config.Runs.Danger`; their code stays, `tests/danger_*` turn them on for themselves); the locks, the vault and
-> the floor's hazards stay. Next (planned): taking a piece out of somebody's hands (a short tug of war, the carrier
-> favoured, safe by your own van) and a private warehouse each behind one door in the lobby, for 16 players.
 >
-> **10.6** (the owner: "Both in the PLAY circle"): **both in PLAY.** Step into the PLAY circle and the PLAY panel offers
-> two choices side by side (`client/PlayUi.luau`, `server/Parties.luau`). **QUICK ROUND** (the rounds of the note
-> above): ⚡ JOIN THE QUEUE. Nobody is queued by the start screen's PLAY any more, and while nobody is queued no round
-> runs. The banner (`client/RoundUi.luau`), the panel, the PLAY circle's sign and the big map's QUICK ROUND line name
-> the next round's place, its difficulty, the countdown and how many are queued (there are no portals); LEAVE QUEUE on
-> the banner or in the panel takes you out, and so does LEAVE THE ROUND; after a round you stay queued for the next one
-> (`Config.Rounds.Stay`). **PRIVATE LOBBY** (the 10.5 party lobbies): CREATE A LOBBY or JOIN one, READY, START, the
+> **10.7** (the owner: "Both in the PLAY circle"): **both in PLAY.** Step into the PLAY circle and the PLAY panel offers
+> two choices side by side (`client/PlayUi.luau`, `server/Parties.luau`). **QUICK ROUND** (the 10.5 rounds, with
+> 10.6's snatching: the Snatch prompts and the tugs work in every quick round): ⚡ JOIN THE QUEUE. Nobody is queued by
+> the start screen's PLAY any more, and while nobody is queued no round runs. The banner (`client/RoundUi.luau`, 10.6's
+> wider look, its words scaled to fit), the panel, the PLAY circle's sign and the big map's QUICK ROUND line name the
+> next round's place, its difficulty, the countdown and how many are queued (there are no portals); LEAVE QUEUE on the
+> banner or in the panel takes you out, and so does LEAVE THE ROUND; after a round you stay queued for the next one
+> (`Config.Rounds.Stay`). **PRIVATE LOBBY** (the party lobbies above): CREATE A LOBBY or JOIN one, READY, START, the
 > co-op run with Danny and the crew, the pieces' results card and the difficulty unlocks, as before. You are in the
 > queue or in a lobby, never both. One shared check keeps them apart (`RunRules.houseBusy`, `Runs.houseBusy`): the quick
 > round's place is busy for the lobbies from its countdown until everybody has ridden back (its house card says QUICK

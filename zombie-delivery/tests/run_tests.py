@@ -37,6 +37,7 @@ PURE += ("CharacterLooks", "SaveSlotRules")  # 10.1 the start: the courier you m
 PURE += ("RunRules",)  # 9.7 runs: the difficulties and their unlocks, the votes, whose stock; 10.6 the house busy (tests/runrules_test.luau)
 PURE += ("PartyRules",)  # 10.4 the party lobbies at the PLAY circle: make, join, leave, kick, READY, START, the map's copy (tests/partyrules_test.luau)
 PURE += ("RoundRules",)  # 10.5 rounds: the place, the table, the vans' spots, the landing; 10.6 the queue's places (tests/roundrules_test.luau)
+PURE += ("TugRules",)  # 10.6 snatching: the tug of war, who may be snatched from (tests/tugrules_test.luau)
 PURE += ("LootRules",)  # 9.x loot: a house's pieces' rarities by the difficulty, the stars, the toasts (tests/loot_test.luau)
 PURE += ("SandboxMapRules",)  # 10.x the map: the plan's code, the frames, the yard, the fog, the words, the layout (tests/sandboxmaprules_test.luau)
 PURE += ("DangerRules",)  # 10.x danger: a run's locks, keys, vault and hazards on the real plans (tests/danger_test.luau; it requires FurnitureLooks, the recorder's copy below)

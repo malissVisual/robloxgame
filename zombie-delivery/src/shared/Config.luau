@@ -6,7 +6,7 @@
 local Config = {}
 
 -- Shown on the start screen: tells which version Studio really runs (bump it with every update).
-Config.Version = "10.5"
+Config.Version = "10.6"
 
 -- 5.0 "From the bottom": everybody starts again on foot (a new store; the v1 saves stay stored and unread, so a
 -- rollback is possible). A new player has no vehicle, $40 and a medkit (server/PlayerData.luau); 6.0: no gun either
@@ -5803,6 +5803,7 @@ Config.Robust = {
 		Slots = 4, -- 10.1: the Slots remote's list / play / new (the start screen's save slots: server/SaveSlots.luau)
 		Runs = 4, -- 9.7: the Runs remote's state / vote / leave (the run: server/Runs.luau; 10.6 the banner's queue)
 		Party = 6, -- 10.4: the Party remote's state / create / join / leave / ready / house / difficulty / kick / start / cancel (server/Parties.luau; 10.6 round)
+		Tug = 16, -- 10.6: the Tug remote's pulls (a tug of war's presses: Config.Rounds.Tug.Rate of them are heard)
 		Crew = 4, -- 10.1: the Crew remote's state / pick / discharge (the CREW window: server/HelperCrew.luau)
 	},
 }
@@ -7810,6 +7811,14 @@ Config.Runs = {
 --   Results       s the results card shows before the ride back
 --   Top           the HUD's live table: its first Top rows (yours under them when you are further down)
 --   Every         s between the loop's looks
+--   Tug           10.6 snatching (the owner: "you can take it out of somebody's hands, but not so that you could just take
+--                 it … not somebody waiting at your car"; shared/TugRules.luau, client/TugUi.luau): On; Reach / Hold: the
+--                 Snatch prompt on a carrier (E held Hold s within Reach studs, the others in the round see it); a tug
+--                 lasts Seconds at most, its mark from Start (the carrier's side), each press Pull (the carrier's Boost
+--                 times as far), Rate presses a second heard at most; both stand still while it goes on and the loser
+--                 Stun s more; nobody is snatched from within Protect s of picking it up (the winner too), within SafeVan
+--                 studs of their own van's back or SafeDoor of the house's door, nor again within Target s; a snatcher
+--                 tries again only after Again s; Every s between the tugs' looks (and the views sent)
 Config.Rounds = {
 	On = true,
 	Wait = 45,
@@ -7823,6 +7832,8 @@ Config.Rounds = {
 	Results = 8,
 	Top = 5,
 	Every = 0.25,
+	Tug = { On = true, Reach = 7, Hold = 0.25, Seconds = 3, Start = -0.2, Pull = 0.1, Boost = 1.35, Rate = 10, Protect = 3, SafeVan = 12, SafeDoor = 8, Stun = 1.5,
+		Again = 4, Target = 2, Every = 0.1 },
 }
 
 -- 9.x LOOT (the owner: "like Dungeon Quest: you go into a house and you get loot there ... outlines with their own colour

@@ -325,7 +325,9 @@ do
 		local gui = M.gui:FindFirstChild("RoundUi")
 		local banner = named(gui, "Banner")
 		check(`{label}: the lobby's banner: on the screen, its words fit, the place, its difficulty and the countdown`, banner ~= nil and banner.Visible and inside(box(banner))
-			and #badTexts(banner) == 0 and string.find(named(banner, "Title").Text, "THE ORCHARD COTTAGE · INSANE", 1, true) ~= nil, banner and (badTexts(banner)[1] or show(box(banner))))
+			and #badTexts(banner) == 0 and string.find(named(banner, "Kicker").Text, "NEXT QUICK ROUND · 0:4", 1, true) ~= nil
+			and string.find(named(banner, "Title").Text, "THE ORCHARD COTTAGE · INSANE", 1, true) ~= nil and string.find(named(banner, "Line").Text, "16 queued", 1, true) ~= nil,
+			banner and (badTexts(banner)[1] or show(box(banner))))
 		for name, other in blocks() do
 			check(`{label}: … clear of {name}`, not overlap(box(banner), other), `{show(box(banner))} on {show(other)}`)
 		end
@@ -350,6 +352,52 @@ do
 		remote.OnClientEvent:Fire(WAIT)
 		M.flush()
 	end
+end
+
+-- ── 10.6 snatching: the tug's panel (client/TugUi.luau) ─────────────────────────────────────────────────────────
+do
+	M.services.ProximityPromptService = M.services.ProximityPromptService or {}
+	M.services.ProximityPromptService.MaxPromptsVisible = 16
+	local TugUi = require("./TugUi")
+	TugUi.start()
+	local tugRemote = M.Net.get("Tug")
+	local id = 0
+	for _, s in { { true, 844, 354, "a phone (844 × 390)" }, { true, 667, 339, "a small phone (667 × 375)" }, { false, 1280, 764, "a computer (1280 × 800)" },
+		{ false, 1920, 1044, "a big screen (1920 × 1080)" } } do
+		screen(s[1], s[2], s[3])
+		local label = s[4]
+		id += 1
+		tugRemote.OnClientEvent:Fire({ kind = "start", id = id, side = "carrier", other = "Bartholomew", name = "Grandfather Clock", icon = "🕰", p = -0.2,
+			endsAt = (M.now or 0) + 3, seconds = 3 })
+		M.flush()
+		local tg = M.gui:FindFirstChild("TugUi")
+		local panel = named(tg, "TugPanel")
+		check(`{label}: 10.6 the tug's panel, whole on the screen, its words fit; the prompts hidden while it goes on`, panel ~= nil and inside(box(panel))
+			and #badTexts(panel) == 0 and M.services.ProximityPromptService.MaxPromptsVisible == 0, panel and (badTexts(panel)[1] or show(box(panel))))
+		check(`{label}: … YOU on the left, the other on the right, the mark on your side (the carrier's head start)`, string.find(named(panel, "Me").Text, "YOU", 1, true) ~= nil
+			and string.find(named(panel, "Them").Text, "BARTHOLOMEW", 1, true) ~= nil and named(named(panel, "Track"), "Mark").Position.X.Scale < 0.5)
+		local before = #sentOn("Tug")
+		if M.touch then
+			local pull = named(panel, "Pull")
+			check(`{label}: … the PULL button a finger's size`, pull ~= nil and #smallButtons(panel) == 0, smallButtons(panel)[1])
+			pull.Activated:Fire()
+		else
+			M.services.UserInputService.InputBegan:Fire({ KeyCode = M.Enum.KeyCode.E, UserInputType = M.Enum.UserInputType.Keyboard }, false)
+		end
+		M.flush()
+		local sent = sentOn("Tug")
+		check(`{label}: … a press: {"{"} kind = "pull", id {"}"} once`, #sent == before + 1 and sent[#sent][1].kind == "pull" and sent[#sent][1].id == id)
+		tugRemote.OnClientEvent:Fire({ kind = "state", id = id, p = 0.6 })
+		M.flush()
+		check(`{label}: … the server's mark: toward them now`, named(named(panel, "Track"), "Mark").Position.X.Scale > 0.5)
+		tugRemote.OnClientEvent:Fire({ kind = "end", id = id, won = true, text = "You held on!" })
+		M.flush()
+		local banner = named(tg, "Banner")
+		check(`{label}: … its end: the panel gone, the prompts back, the big line on the screen and its words fit`, named(tg, "TugPanel") == nil
+			and M.services.ProximityPromptService.MaxPromptsVisible == 16 and banner.Visible and inside(box(banner)) and #badTexts(banner) == 0
+			and string.find(banner.Text, "HELD ON", 1, true) ~= nil, banner and (badTexts(banner)[1] or show(box(banner))))
+	end
+	check("TugUi.active(): none after its end", TugUi.active() == nil)
 end
 
 -- a resize while both are up: their scale follows
