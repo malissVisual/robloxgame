@@ -9,6 +9,9 @@
 --   3. Ann carries a piece out: Bob's van's Load does nothing for her, her own takes it: into her stock at once, the
 --      model gone, the feed to both, the table (Ann first); Bob loads one of his own; an empty-handed Load is off;
 --      CAR, FINISH and GIVE UP do nothing in a round
+--   3b. 10.6 snatching: Ann carries a piece in the house, Bob beside her: her Snatch prompt only after Protect s; his
+--      tug (both still, her Load off), she does nothing: his (the feed, she stunned, then free); she can't take it straight
+--      back; he loads it; another tug where both pull: hers, he stunned, she isn't open again at once
 --   4. Cid presses PLAY mid-round: he waits in the lobby (not in it, his view says so)
 --   5. Ann (the host) leaves the game: the round goes on, Bob's now (its move his, the pieces' prompts his), he loads
 --      another
@@ -155,13 +158,16 @@ function H.free(player: any, spot: number): boolean
 	return true
 end
 function H.choose(player: any): (any, any)
-	for _, item in H.stateOf(player).items do
-		local model = H.pieceOf(player, item.spot)
-		local id = model and model:GetAttribute("FurnitureId")
-		local def = id and FurnitureLooks.Items[id]
-		if item.state == "home" and def and def.class ~= "pair" and H.free(player, item.spot) and not S.taken[item.spot] then
-			S.taken[item.spot] = true
-			return item, model
+	local items = H.stateOf(player).items
+	for pass = 1, 2 do -- (a piece one carries first; none left: a two-person one, dragged alone)
+		for _, item in items do
+			local model = H.pieceOf(player, item.spot)
+			local id = model and model:GetAttribute("FurnitureId")
+			local def = id and FurnitureLooks.Items[id]
+			if item.state == "home" and def and (def.class ~= "pair" or pass == 2) and H.free(player, item.spot) and not S.taken[item.spot] then
+				S.taken[item.spot] = true
+				return item, model
+			end
 		end
 	end
 	return nil, nil
@@ -334,6 +340,113 @@ local bobItem = H.fetch(bob, house)
 local bobOk = bobItem ~= nil and H.loadAt(bob, bobVan)
 E.advance(0.3)
 check("…Bob loads one of his own: into his stock", bobOk and #Collection.stock(bob) == before + 1)
+
+-- ── 3b. 10.6 snatching (inside the house: away from the vans and the door) ─────────────────────────────────────────
+
+local TUG = Config.Rounds.Tug
+function H.grabOf(player: any): any
+	local root = E.rootOf(player)
+	local at = root and root:FindFirstChild("SnatchAt")
+	return at and at:FindFirstChild("SnatchPrompt")
+end
+function H.beside(player: any, other: any)
+	local at = E.rootOf(other).Position
+	E.walk(player, at + V3(2.5, 0, 0))
+end
+function H.mash(player: any, id: number, seconds: number, rate: number)
+	local steps = math.floor(seconds * rate + 0.5)
+	for _ = 1, steps do
+		if next(Runs.tugs()) == nil then
+			return -- (over: no more presses)
+		end
+		E.fire(player, "Tug", { kind = "pull", id = id })
+		E.advance(1 / rate + 0.001)
+	end
+end
+function H.tugMsg(player: any, kind: string, from: number?): any
+	return E.lastKind(player, "Tug", kind, from)
+end
+S.annBefore, S.bobBefore = #Collection.stock(ann), #Collection.stock(bob)
+local inAnn = H.enterHouse(ann, house)
+local annPiece, annModel = H.choose(ann)
+local picked = inAnn and annPiece ~= nil and H.pickUp(ann, annModel)
+local inBob = H.enterHouse(bob, house)
+H.beside(bob, ann)
+E.advance(0.3)
+local grab = H.grabOf(ann)
+check("3b. 10.6 Ann carries a piece in the house, Bob beside her: her Snatch prompt (theirs to see: MoveSkip her, MoveOwner the round's)",
+	picked and inBob and grab ~= nil and grab:GetAttribute("MoveSkip") == ann.UserId and grab:GetAttribute("MoveOwner") == Runs.runOf(ann).host.UserId
+		and string.find(grab.ActionText, "Snatch", 1, true) == 1, annPiece and annPiece.name)
+E.advance(TUG.Protect + 0.5)
+check("…on once she has held it Protect s (never at once after a pick-up)", grab.Enabled == true)
+local tugAt = #E.sent
+local triggered = E.trigger(grab, bob)
+E.advance(0.2)
+local startAnn, startBob = H.tugMsg(ann, "start", tugAt), H.tugMsg(bob, "start", tugAt)
+local id = startBob and startBob.id
+check("…Bob snatches: a tug (both told: their sides, the piece, the clock), both standing still (anchored)", triggered and startAnn ~= nil and startBob ~= nil
+	and startAnn.side == "carrier" and startBob.side == "snatcher" and startBob.other == "Ann" and startAnn.name == annPiece.name
+	and E.rootOf(ann).Anchored == true and E.rootOf(bob).Anchored == true and next(Runs.tugs()) ~= nil)
+E.advance(Q.Every + 0.05)
+check("…her Load and her Snatch prompt off while it goes on", annLoad.Enabled == false and grab.Enabled == false)
+H.mash(bob, id, 2, TUG.Rate)
+E.advance(0.3)
+local endBob, endAnn = H.tugMsg(bob, "end", tugAt), H.tugMsg(ann, "end", tugAt)
+check("…Ann does nothing, Bob pulls: he takes it (in his hands now, hers empty), both told", endBob ~= nil and endBob.won == true and endAnn ~= nil and endAnn.won == false
+	and bob.Character:GetAttribute("MoveCarry") == annPiece.spot and ann.Character:GetAttribute("MoveCarry") == nil and next(Runs.tugs()) == nil)
+local feed = E.lastKind(ann, "Runs", "snatch", tugAt)
+check("…the round's feed: Bob snatched it from Ann", feed ~= nil and feed.took == true and feed.by == "Bob" and feed.from == "Ann" and feed.name == annPiece.name)
+check("…Ann, the loser, stunned (still standing: anchored; told), Bob free", E.rootOf(ann).Anchored == true and E.rootOf(bob).Anchored == false
+	and H.tugMsg(ann, "stun", tugAt) ~= nil)
+local back = #E.sent
+local bobGrab = H.grabOf(bob)
+check("NEG. …she can't snatch it straight back: his is a fresh pick-up (his prompt off)", bobGrab ~= nil and bobGrab.Enabled == false)
+bobGrab.Enabled = true -- (pressed anyway, as a laggy client could: the server says no)
+E.trigger(bobGrab, ann)
+bobGrab.Enabled = false
+check("NEG. …(pressed anyway: nothing, told why)", next(Runs.tugs()) == nil and bob.Character:GetAttribute("MoveCarry") == annPiece.spot
+	and E.heard(ann, "just picked it up", back), E.lastNotice(ann, back))
+E.advance(TUG.Stun + 0.3)
+check("…Stun s later she can move again", E.rootOf(ann).Anchored == false)
+local outBob = H.leaveHouse(bob)
+local loaded = outBob and H.loadAt(bob, bobVan)
+E.advance(0.3)
+check("…he carries it out and loads it at his van: his now (in his stock)", loaded and #Collection.stock(bob) == S.bobBefore + 1 and #Collection.stock(ann) == S.annBefore)
+E.advance(Q.Every + 0.05)
+check("NEG. …by his own van nobody could have snatched it (his prompt off there)", bobGrab.Parent == nil or bobGrab.Enabled == false)
+-- the carrier holds on
+local second, secondModel = H.choose(ann)
+local held = second ~= nil and H.pickUp(ann, secondModel)
+local again = H.enterHouse(bob, house)
+H.beside(bob, ann)
+E.advance(TUG.Again + TUG.Protect + 0.5)
+local holdAt = #E.sent
+local tried = held and again and E.trigger(H.grabOf(ann), bob)
+E.advance(0.2)
+local start2 = H.tugMsg(bob, "start", holdAt)
+for _ = 1, math.floor(TUG.Seconds * TUG.Rate) + 2 do
+	if start2 then
+		E.fire(bob, "Tug", { kind = "pull", id = start2.id })
+		E.fire(ann, "Tug", { kind = "pull", id = start2.id })
+	end
+	E.advance(1 / TUG.Rate + 0.001)
+end
+E.advance(0.3)
+local end2 = H.tugMsg(ann, "end", holdAt)
+check("…another tug, both pulling as fast as is heard: Ann (the carrier) holds on to it, Bob stunned",
+	tried and start2 ~= nil and end2 ~= nil and end2.won == true and ann.Character:GetAttribute("MoveCarry") == second.spot
+		and E.rootOf(bob).Anchored == true and E.rootOf(ann).Anchored == false and E.lastKind(bob, "Runs", "snatch", holdAt).took == false)
+E.advance(Q.Every + 0.05)
+check("NEG. …right after a tug she isn't open again at once (Target s)", H.grabOf(ann).Enabled == false)
+E.advance(TUG.Stun + 0.3)
+H.leaveHouse(ann)
+H.loadAt(ann, annVan)
+E.advance(0.3)
+check("…she carries it out and loads it: hers", #Collection.stock(ann) == S.annBefore + 1 and ann.Character:GetAttribute("MoveCarry") == nil)
+S.annClaims = #Collection.stock(ann)
+if H.isInside(bob) then
+	H.leaveHouse(bob)
+end
 local carAt = #E.sent
 E.fire(ann, "SpawnCar")
 E.advance(0.3)
@@ -362,10 +475,11 @@ E.advance(1)
 local run = Runs.runOf(bob)
 check("…Ann leaves the game: the round goes on, Bob's now (Runs' host, his move's view still there), Ann out of it",
 	run ~= nil and run.host == bob and #run.party == 1 and Runs.round().phase == "play" and H.stateOf(bob) ~= nil and H.stateOf(bob).run.round == true)
+S.bobMid = #Collection.stock(bob)
 local third = H.fetch(bob, house)
 local thirdOk = third ~= nil and H.loadAt(bob, bobVan)
 E.advance(0.3)
-check("…the pieces' prompts his now: he carries another out and loads it", thirdOk and #Collection.stock(bob) == before + 2, third and third.name)
+check("…the pieces' prompts his now: he carries another out and loads it", thirdOk and #Collection.stock(bob) == S.bobMid + 1, third and third.name)
 
 -- ── 6. The clock ─────────────────────────────────────────────────────────
 
@@ -378,9 +492,9 @@ local byName: { [string]: any } = {}
 for _, row in rows do
 	byName[row.name] = row
 end
-check("6. the clock: the results card, a round's: both who came ranked (Bob's 2 pieces, Ann's 1: she left, they are hers), the most value first, Bob's place his row's",
-	result ~= nil and result.round ~= nil and result.round.players == 2 and #rows == 2 and byName.Bob ~= nil and byName.Bob.count == 2 and byName.Ann ~= nil
-		and byName.Ann.count == 1 and rows[1].value >= rows[2].value and result.round.place == byName.Bob.place,
+check("6. the clock: the results card, a round's: both who came ranked (Bob's pieces, the snatched one too; Ann's: she left, they are hers), the most value first, Bob's place his row's",
+	result ~= nil and result.round ~= nil and result.round.players == 2 and #rows == 2 and byName.Bob ~= nil and byName.Bob.count == #Collection.stock(bob) and byName.Ann ~= nil
+		and byName.Ann.count == S.annClaims and rows[1].value >= rows[2].value and result.round.place == byName.Bob.place,
 	result and result.round and `{result.round.place} {#rows}`)
 check("…the round over (its view), Bob out of it", Runs.round().phase == "over" and Runs.runOf(bob) == nil and H.round(bob, endAt).phase == "over")
 local backAt = #E.sent

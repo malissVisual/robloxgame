@@ -389,8 +389,20 @@
 > the vans go and the next countdown starts; whoever pressed PLAY during a round goes in the next one. The admin's
 > `Runs.admin(…, "round")` starts the countdown's round now. **No zombies any more**: none at any difficulty, no bat, no
 > boss (`Config.Runs.Danger`; their code stays, `tests/danger_*` turn them on for themselves); the locks, the vault and
-> the floor's hazards stay. Next (planned): taking a piece out of somebody's hands (a short tug of war, the carrier
-> favoured, safe by your own van) and a private warehouse each behind one door in the lobby, for 16 players.
+> the floor's hazards stay. Next (planned): a private warehouse each behind one door in the lobby, for 16 players.
+>
+> **10.6** (the owner: "you can take it out of somebody's hands, but not so that you could just take it … not somebody
+> waiting at your car to take it straight out of your hands"): **snatching in the rounds** (`Config.Rounds.Tug`;
+> `shared/TugRules.luau`, `server/Runs.luau`'s block "10.6 snatching", `Moving.snatch`, `client/TugUi.luau`). Somebody
+> carrying a piece alone wears a **Snatch** prompt (E held a moment; only the others in the round see it). It is off for
+> 3 s after they picked it up, within 12 studs of their own van's back (you can always load in peace) and 8 of the
+> house's door, and for 2 s after a tug at them. With empty hands you start a **tug of war**: both stand still, a panel
+> shows the rope (your side on the left) and every press pulls (E, Space, a click, a gamepad's A or X, the big PULL button
+> on a phone; 10 presses a second count at most). The carrier is favoured: the mark starts on their side and their pulls
+> count 1.35×, so the snatcher needs to be clearly faster; a tie keeps it with the carrier. After 3 s at most the winner
+> keeps it or takes it (into their hands, protected for 3 s), the loser stands stunned 1.5 s, the round's feed tells
+> everybody ("🤼 Bob snatched … from Ann!", "💪 Ann held on to …"). A snatcher tries again only after 4 s; nobody loads
+> while in a tug or stunned; a piece carried in two can't be snatched.
 
 The active Roblox game in this repository (Merge Blades is preserved in `../archive/merge-blades`). **You run a delivery company** in a world
 gone wrong: take a job, carry the cargo to your vehicle with your own hands (or lead the horses on a rope), drive it

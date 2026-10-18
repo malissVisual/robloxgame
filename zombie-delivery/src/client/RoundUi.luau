@@ -4,12 +4,13 @@
 --   * Where: everything kept clear of the HUD (SandboxHud's money and chips, Hud's groups, the touch controls, the move's
 --     panel and what else holds the top's middle: client/TopBlocks.luau, the corner map, Roblox's player list).
 --   * The lobby's banner (the top's middle, under what holds it there): the countdown to the next
---     round, its place and difficulty ("NEXT ROUND · THE OLD MILL · HARD · 0:42"), how many are in the game and what to
+--     round and its difficulty ("NEXT ROUND IN 0:42 · HARD"), under it the place, how many are in the game and what to
 --     do; while a round is on without you, where and how long ("ROUND ON AT THE OLD MILL · 3:12"); after one, that the
 --     next one is coming. Nothing before you press PLAY.
 --   * In the round: the table at the screen's left (its first Config.Rounds.Top rows: place, name, pieces, value; your
 --     row lit, and under them when you are further down) and the feed under it (who took what: yours in gold, the
---     latest on top, each for FEED s). The clock is the move's panel's (client/MovingHud.luau).
+--     latest on top, each for FEED s; 10.6 the snatches too: "🤼 Bob snatched … from Ann!", "💪 Ann held on to …"). The
+--     clock is the move's panel's (client/MovingHud.luau).
 --   * Your van: its name tag (the server's RoundVanTag over it) says YOUR VAN for you, in gold and seen through walls.
 --   * The last seconds of the countdown tick; your own Load rings.
 --   RoundUi.start()   the remote, the screen
@@ -36,7 +37,7 @@ local Q = Config.Rounds
 local K = Theme.Contract
 local GOLD = Color3.fromRGB(255, 206, 92)
 local MONEY = Color3.fromRGB(140, 220, 120)
-local BANNER_W, BANNER_H = 440, 58 -- px at scale 1
+local BANNER_W, BANNER_H = 560, 58 -- px at scale 1
 local BOARD_W, ROW = 236, 22
 local FEED, FEED_MAX = 6, 4 -- s a feed line shows, lines at most
 local TICK = 5 -- the countdown's last seconds tick
@@ -105,8 +106,13 @@ local function build(): ScreenGui?
 	Ui.make("UIScale", { Name = "Scale", Scale = scaleNow() }, b)
 	Ui.corner(b, 10)
 	Ui.stroke(b, GOLD, 1.5)
-	text(b, "Title", { Size = UDim2.new(1, -20, 0, 26), Position = UDim2.fromOffset(10, 5), Font = Theme.HeadingFont, TextSize = 18, TextColor3 = GOLD, TextXAlignment = Enum.TextXAlignment.Center })
-	text(b, "Line", { Size = UDim2.new(1, -20, 0, 18), Position = UDim2.fromOffset(10, 33), TextSize = 12, TextColor3 = K.secondary, TextXAlignment = Enum.TextXAlignment.Center })
+	-- (its words scaled to fit, never cut: a long place's name, a phone)
+	local title = text(b, "Title", { Size = UDim2.new(1, -20, 0, 24), Position = UDim2.fromOffset(10, 5), Font = Theme.HeadingFont, TextSize = 18, TextColor3 = GOLD,
+		TextXAlignment = Enum.TextXAlignment.Center, TextScaled = true, TextTruncate = Enum.TextTruncate.None })
+	Ui.make("UITextSizeConstraint", { MaxTextSize = 18, MinTextSize = 10 }, title)
+	local line = text(b, "Line", { Size = UDim2.new(1, -20, 0, 16), Position = UDim2.fromOffset(10, 33), TextSize = 12, TextColor3 = K.secondary,
+		TextXAlignment = Enum.TextXAlignment.Center, TextScaled = true, TextTruncate = Enum.TextTruncate.None })
+	Ui.make("UITextSizeConstraint", { MaxTextSize = 12, MinTextSize = 8 }, line)
 	banner = b
 	local t = Ui.make("Frame", {
 		Name = "Board",
@@ -141,15 +147,14 @@ local function difficultyName(id: any): string
 end
 
 local function bannerText(v: { [string]: any }, left: number): (string?, string)
-	local name = string.upper(tostring(v.name or ""))
+	local name = tostring(v.name or "")
 	if v.phase == "wait" then
 		local count = tonumber(v.players) or 0
-		return `NEXT ROUND · {name} · {difficultyName(v.difficulty)} · {RoundRules.clock(left)}`,
-			`{count} in the game · everybody rides there · grab the loot, load it into YOUR van: it is yours`
+		return `NEXT ROUND IN {RoundRules.clock(left)} · {difficultyName(v.difficulty)}`, `{name} · {count} in the game · load the loot into YOUR van: it's yours`
 	elseif v.phase == "play" and v.inRound ~= true then
-		return `ROUND ON AT {name} · {RoundRules.clock(left)}`, "You go in the next one: wait here in the lobby"
+		return `ROUND ON · {RoundRules.clock(left)}`, `{name} · you go in the next one: wait here in the lobby`
 	elseif v.phase == "over" and v.inRound ~= true then
-		return "ROUND OVER · THE NEXT ONE IS COMING", "Stay in the lobby: the countdown starts in a moment"
+		return "ROUND OVER", "The next one is coming: stay in the lobby"
 	end
 	return nil, ""
 end
@@ -433,6 +438,15 @@ local function onMessage(message: any)
 		refresh()
 	elseif message.kind == "claim" then
 		onClaim(message)
+		refresh()
+	elseif message.kind == "snatch" then -- 10.6 snatching: who took what from whom (or held on to it)
+		local said = if message.took == true then `🤼 {message.by or "?"} snatched {message.name or ""} from {message.from or "?"}!`
+			else `💪 {message.from or "?"} held on to {message.name or ""} ({message.by or "?"} tried)`
+		table.insert(lines, 1, { text = said, mine = message.mine == true, at = os.clock() })
+		while #lines > FEED_MAX do
+			table.remove(lines)
+		end
+		drawFeed()
 		refresh()
 	end
 end

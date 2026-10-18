@@ -74,6 +74,17 @@
 --     `round`), Results s later everybody rides back to the lobby, the vans go, the next countdown starts.
 --   Runs.round()                       the round's state now (the tests'): { phase, endsAt, house, difficulty, run?, vans }
 --   Runs.roundStep()                   one look at the round (Runs.step's while Config.Rounds.On)
+-- 10.6 SNATCHING (Config.Rounds.Tug; the owner: "you can take it out of somebody's hands, but not so that you could just
+-- take it … not somebody waiting at your car"; the rules shared/TugRules.luau, the client client/TugUi.luau; the block
+-- "10.6 snatching" below): in a round every carrier wears a Snatch prompt (E held, the others in the round see it: its
+-- MoveSkip theirs), on only while TugRules.open says they may be snatched from (a piece alone, not just picked up, not
+-- by their own van or the house's door, not tugged at a moment ago). A snatcher with empty hands starts a tug of war:
+-- both stand still (their roots anchored), each press (the Tug remote's "pull") moves the rope's mark, the carrier's
+-- further; the winner keeps it or takes it (Moving.snatch: into the snatcher's hands, a fresh pick-up: protected), the
+-- loser stands stunned Stun s more, the round's feed tells everybody ({ kind = "snatch", … }). Nobody loads while
+-- tugging or stunned.
+--   Runs.tugs()                        the tugs now (the tests'): { [id]: { carrier, snatcher, rules } }
+--   Runs.tugStep()                     one look at the tugs (their own loop's, Tug.Every s; the tests')
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -84,6 +95,7 @@ local Config = require(Shared.Config)
 local Net = require(Shared.Net)
 local RunRules = require(Shared.RunRules)
 local RoundRules = require(Shared.RoundRules) -- 10.5 rounds
+local TugRules = require(Shared.TugRules) -- 10.6 snatching
 local SandboxMap = require(Shared.SandboxMap)
 
 local Server = script.Parent
@@ -137,6 +149,17 @@ local Round = {
 	came = {} :: { { id: number, name: string } },
 	pieces = {} :: { { to: number, value: number } },
 	sent = {} :: { [Player]: string },
+	-- 10.6 snatching: the tugs (by id, and each one's by player), the Snatch prompts on the carriers, when each carrier
+	-- picked up what they hold (spot, at), until when somebody is stunned, when somebody last tried to snatch and was last
+	-- tugged at
+	tugs = {} :: { [number]: any },
+	tugOf = {} :: { [Player]: any },
+	grabs = {} :: { [Player]: ProximityPrompt },
+	since = {} :: { [Player]: { spot: number, at: number } },
+	stunned = {} :: { [Player]: number },
+	tried = {} :: { [Player]: number },
+	targeted = {} :: { [Player]: number },
+	nextTug = 0,
 }
 
 local function send(player: Player, message: { [string]: any })
@@ -854,6 +877,9 @@ function Round.claim(player: Player)
 	local car = Round.vans[player]
 	if not run or runOf[player] ~= run or not car then
 		return
+	elseif Round.busy(player, workspace:GetServerTimeNow()) then -- (10.6: not in a tug, not stunned)
+		say(player, "Not now: shake it off first.")
+		return
 	end
 	local piece, why = moving().claim(player, car)
 	if not piece then
@@ -868,6 +894,302 @@ function Round.claim(player: Player)
 		send(p, { kind = "claim", by = player.DisplayName, mine = p == player, name = piece.name, icon = piece.icon, rarity = piece.rarity, value = value })
 	end
 	Round.broadcast()
+end
+
+-- ── 10.6 snatching ─────────────────────────────────────────────────────────
+
+local TUG_WHY: { [string]: string } = {
+	alone = "They have nothing you can snatch.",
+	fresh = "They just picked it up: wait a moment.",
+	van = "They are by their own van: safe there.",
+	door = "Not by the house's door.",
+	busy = "Not now.",
+	again = "Give them a moment.",
+	full = "Your hands are full: put down what you carry first (G).",
+	far = "Get closer.",
+}
+
+-- In a tug, stunned or on a door's trip now?
+function Round.busy(player: Player, now: number): boolean
+	return Round.tugOf[player] ~= nil or (Round.stunned[player] or 0) > now or moving().traveling(player)
+end
+
+local function flatTo(a: Vector3, b: Vector3): number
+	return Vector3.new(a.X - b.X, 0, a.Z - b.Z).Magnitude
+end
+
+-- TugRules' facts of `player` as a carrier now.
+function Round.carrierFacts(player: Player, held: { [string]: any }?, now: number): TugRules.Carrier
+	local root = rootOf(player)
+	local car = Round.vans[player]
+	local door = if car then Vehicles.cargoDoor(car) else nil
+	local run = Round.run
+	local H = if run then SandboxMap.house(run.house) else nil
+	local mark = Round.since[player]
+	return {
+		carrying = held ~= nil,
+		alone = held ~= nil and held.alone == true,
+		since = if mark then mark.at else now,
+		now = now,
+		van = if root and door then flatTo(root.Position, door.WorldPosition) else nil,
+		door = if root and H then flatTo(root.Position, Vector3.new(H.door.x, root.Position.Y, H.door.z)) else nil,
+		busy = Round.busy(player, now),
+		targetAt = Round.targeted[player],
+	}
+end
+
+-- Their root anchored (a tug, a stun) or free again.
+function Round.hold(player: Player, on: boolean)
+	local root = rootOf(player)
+	if root then
+		pcall(function()
+			root.Anchored = on
+		end)
+	end
+end
+
+-- The Snatch prompt on a carrier's root (made once a body; gone with it).
+function Round.grabPrompt(player: Player): ProximityPrompt?
+	local root = rootOf(player)
+	local run = Round.run
+	if not root or not run then
+		return nil
+	end
+	local found = Round.grabs[player]
+	if found and found.Parent and found.Parent.Parent == root then
+		return found
+	elseif found then
+		local old = found.Parent
+		found:Destroy()
+		if old and old:IsA("Attachment") then
+			old:Destroy()
+		end
+	end
+	local at = Instance.new("Attachment")
+	at.Name = "SnatchAt"
+	at.Position = Vector3.new(0, 1, 0)
+	at.Parent = root
+	local p = Instance.new("ProximityPrompt")
+	p.Name = "SnatchPrompt"
+	p.ActionText = "Snatch"
+	p.ObjectText = player.DisplayName
+	p.KeyboardKeyCode = Enum.KeyCode.E
+	p.HoldDuration = Q.Tug.Hold
+	p.MaxActivationDistance = Q.Tug.Reach
+	p.RequiresLineOfSight = false
+	p.Enabled = false
+	p:SetAttribute("MoveOwner", run.host.UserId) -- (the round's: everybody in it sees it but its carrier)
+	p:SetAttribute("MoveSkip", player.UserId)
+	CollectionService:AddTag(p, "MovePrompt")
+	p.Triggered:Connect(function(by: Player)
+		Round.snatch(by, player)
+	end)
+	p.Parent = at
+	Round.grabs[player] = p
+	return p
+end
+
+function Round.dropGrab(player: Player)
+	local p = Round.grabs[player]
+	Round.grabs[player] = nil
+	if p then
+		local at = p.Parent
+		p:Destroy()
+		if at and at:IsA("Attachment") and at.Name == "SnatchAt" then
+			at:Destroy()
+		end
+	end
+end
+
+-- A look at every carrier in the round: when they picked up what they hold, their Snatch prompt on or off.
+function Round.grabStep(run: Run, now: number)
+	for _, p in run.party do
+		local held = moving().held(p)
+		local mark = Round.since[p]
+		if held and (not mark or mark.spot ~= held.spot) then
+			Round.since[p] = { spot = held.spot, at = now }
+		elseif not held then
+			Round.since[p] = nil
+		end
+		local prompt = if held or Round.grabs[p] then Round.grabPrompt(p) else nil
+		if prompt then
+			local open = Q.Tug.On and held ~= nil and (TugRules.open(Round.carrierFacts(p, held, now), Q.Tug))
+			prompt.Enabled = open
+			local text = if held then `Snatch {held.name}` else "Snatch"
+			if prompt.ActionText ~= text then
+				prompt.ActionText = text
+			end
+		end
+	end
+end
+
+local function tugRemote(player: Player, message: { [string]: any })
+	if player.Parent then
+		Net.get("Tug"):FireClient(player, message)
+	end
+end
+
+-- `by` pressed Snatch on `from`: the tug starts (both stand still), or why not.
+function Round.snatch(by: Player, from: Player)
+	local run = Round.run
+	if not Q.Tug.On or not run or runOf[by] ~= run or runOf[from] ~= run or by == from then
+		return
+	end
+	local now = workspace:GetServerTimeNow()
+	local held = moving().held(from)
+	local rootBy, rootFrom = rootOf(by), rootOf(from)
+	if not rootBy or not rootFrom then
+		return
+	end
+	local ok, why = TugRules.open(Round.carrierFacts(from, held, now), Q.Tug)
+	if ok then
+		local character = by.Character
+		local full = moving().held(by) ~= nil or (character ~= nil and (character:GetAttribute("Carrying") ~= nil or character:GetAttribute("MoveCarry") ~= nil))
+		ok, why = TugRules.grab({ full = full, busy = Round.busy(by, now), triedAt = Round.tried[by], now = now, distance = flatTo(rootBy.Position, rootFrom.Position) }, Q.Tug)
+	end
+	if not ok or not held then
+		say(by, TUG_WHY[why or "busy"] or TUG_WHY.busy)
+		return
+	end
+	local name, refused = moving().snatch(from, by, true)
+	if not name then
+		if refused then
+			say(by, refused)
+		end
+		return
+	end
+	Round.nextTug += 1
+	local tug = { id = Round.nextTug, carrier = from, snatcher = by, spot = held.spot, name = held.name, icon = held.icon, rules = TugRules.new(now, Q.Tug), sent = Q.Tug.Start }
+	Round.tugs[tug.id] = tug
+	Round.tugOf[from], Round.tugOf[by] = tug, tug
+	Round.tried[by] = now
+	Round.hold(from, true)
+	Round.hold(by, true)
+	for _, side in { "carrier", "snatcher" } do
+		local p = if side == "carrier" then from else by
+		local other = if side == "carrier" then by else from
+		tugRemote(p, { kind = "start", id = tug.id, side = side, other = other.DisplayName, name = held.name, icon = held.icon, p = tug.rules.p,
+			endsAt = tug.rules.endsAt, seconds = Q.Tug.Seconds })
+	end
+end
+
+-- A tug over: the winner keeps it or takes it, the loser stands stunned; void (somebody gone, the piece let go): both
+-- free, nothing changes hands.
+function Round.endTug(tug: any, winner: string?, now: number)
+	if Round.tugs[tug.id] ~= tug then
+		return
+	end
+	Round.tugs[tug.id] = nil
+	local carrier, snatcher = tug.carrier, tug.snatcher
+	if Round.tugOf[carrier] == tug then
+		Round.tugOf[carrier] = nil
+	end
+	if Round.tugOf[snatcher] == tug then
+		Round.tugOf[snatcher] = nil
+	end
+	Round.targeted[carrier] = now
+	local took = false
+	if winner == "snatcher" then
+		took = moving().snatch(carrier, snatcher) ~= nil
+		winner = if took then winner else nil
+	end
+	local loser = if winner == "snatcher" then carrier elseif winner == "carrier" then snatcher else nil
+	for _, p in { carrier, snatcher } do
+		if p ~= loser then
+			Round.hold(p, false)
+		end
+	end
+	if took then
+		Round.since[snatcher] = { spot = tug.spot, at = now } -- (a fresh pick-up: protected)
+	end
+	if loser then
+		local untilAt = now + Q.Tug.Stun
+		Round.stunned[loser] = untilAt
+		tugRemote(loser, { kind = "stun", untilAt = untilAt })
+		task.delay(Q.Tug.Stun, function()
+			if (Round.stunned[loser] or 0) <= workspace:GetServerTimeNow() + 0.01 and not Round.tugOf[loser] then
+				Round.stunned[loser] = nil
+				Round.hold(loser, false)
+			end
+		end)
+	end
+	for _, p in { carrier, snatcher } do
+		local mine = (p == carrier and winner == "carrier") or (p == snatcher and winner == "snatcher")
+		local text = if winner == nil then "The tug is off."
+			elseif p == snatcher and mine then "You snatched it!"
+			elseif p == snatcher then `{carrier.DisplayName} held on.`
+			elseif mine then "You held on!"
+			else `{snatcher.DisplayName} snatched it!`
+		tugRemote(p, { kind = "end", id = tug.id, won = mine, void = winner == nil, text = text })
+	end
+	local run = Round.run
+	if run and winner then
+		for _, p in run.party do
+			send(p, { kind = "snatch", by = snatcher.DisplayName, from = carrier.DisplayName, name = tug.name, icon = tug.icon, took = took,
+				mine = p == snatcher or p == carrier })
+		end
+	end
+end
+
+-- Every tug: over (an end, its time), void (somebody gone, the piece let go), or its mark to both when it moved.
+function Runs.tugStep()
+	local now = workspace:GetServerTimeNow()
+	for _, tug in Round.tugs do
+		local held = moving().held(tug.carrier)
+		local run = Round.run
+		if not run or runOf[tug.carrier] ~= run or runOf[tug.snatcher] ~= run or not rootOf(tug.carrier) or not rootOf(tug.snatcher) or not held or held.spot ~= tug.spot then
+			Round.endTug(tug, nil, now)
+			continue
+		end
+		local winner = TugRules.result(tug.rules, now)
+		if winner then
+			Round.endTug(tug, winner, now)
+		elseif tug.rules.p ~= tug.sent then
+			tug.sent = tug.rules.p
+			for _, p in { tug.carrier, tug.snatcher } do
+				tugRemote(p, { kind = "state", id = tug.id, p = tug.rules.p })
+			end
+		end
+	end
+end
+
+-- The Tug remote: a press in your tug.
+function Round.pull(player: Player, message: any)
+	if type(message) ~= "table" or message.kind ~= "pull" or not Net.limit(player, "Tug", Config.Robust.Limits.Tug) then
+		return
+	end
+	local tug = Round.tugOf[player]
+	if not tug or tug.id ~= message.id then
+		return
+	end
+	local now = workspace:GetServerTimeNow()
+	TugRules.pull(tug.rules, if player == tug.carrier then "carrier" else "snatcher", now, Q.Tug)
+	local winner = TugRules.result(tug.rules, now)
+	if winner then
+		Round.endTug(tug, winner, now)
+	end
+end
+
+-- Every tug off, every hold and stun let go, the prompts gone (the round's end).
+function Round.clearTugs()
+	local now = workspace:GetServerTimeNow()
+	for _, tug in Round.tugs do
+		Round.endTug(tug, nil, now)
+	end
+	for p in Round.stunned do
+		Round.hold(p, false)
+	end
+	for p in Round.grabs do
+		Round.dropGrab(p)
+	end
+	table.clear(Round.stunned)
+	table.clear(Round.since)
+	table.clear(Round.tried)
+	table.clear(Round.targeted)
+end
+
+function Runs.tugs(): { [number]: any }
+	return Round.tugs
 end
 
 function Round.begin(house: string, players: { Player }, difficulty: string): string?
@@ -959,6 +1281,7 @@ function Round.over(run: Run?)
 	Round.phase = "over"
 	Round.endsAt = workspace:GetServerTimeNow() + Q.Results + R.Fade.Out + 1
 	Round.last = if run then run.house else Round.house
+	Round.clearTugs() -- (10.6: before the run goes: the tugs' ends still know it)
 	Round.run = nil
 	for _, prompt in Round.prompts do
 		prompt:Destroy()
@@ -1062,11 +1385,12 @@ function Runs.roundStep()
 		else
 			for p, prompt in Round.prompts do -- the Load prompts: on while their owner carries something
 				local name = if runOf[p] == run then moving().carrying(p) else nil
-				prompt.Enabled = name ~= nil
+				prompt.Enabled = name ~= nil and not Round.busy(p, now) -- (10.6: not in a tug, not stunned)
 				if name and prompt.ActionText ~= `Load {name}` then
 					prompt.ActionText = `Load {name}`
 				end
 			end
+			Round.grabStep(run, now) -- 10.6 snatching
 		end
 	elseif Round.phase == "over" and now >= Round.endsAt then
 		Round.plan(now)
@@ -1336,6 +1660,18 @@ function Runs.start()
 		warn(`[Runs] the runs' danger did not start: {err}`)
 	end
 	;(remote :: RemoteEvent).OnServerEvent:Connect(onRequest)
+	Net.get("Tug").OnServerEvent:Connect(Round.pull) -- 10.6 snatching
+	task.spawn(function()
+		while true do
+			task.wait(Q.Tug.Every)
+			if next(Round.tugs) ~= nil then
+				local ok, err = pcall(Runs.tugStep :: any)
+				if not ok then
+					warn(`[Runs] the tugs: {err}`)
+				end
+			end
+		end
+	end)
 	-- the dispatch kiosk's prompt: how runs work
 	local world = workspace:FindFirstChild("Sandbox")
 	if world then
@@ -1374,6 +1710,12 @@ function Runs.start()
 		away[player], padKey[player], inUseSaid[player], adminPick[player] = nil, nil, nil, nil
 		Round.dropVan(player) -- (10.5 rounds)
 		Round.sent[player] = nil
+		local tug = Round.tugOf[player] -- (10.6: a tug with them is off)
+		if tug then
+			Round.endTug(tug, nil, workspace:GetServerTimeNow())
+		end
+		Round.dropGrab(player)
+		Round.since[player], Round.stunned[player], Round.tried[player], Round.targeted[player] = nil, nil, nil, nil
 	end)
 	task.spawn(function()
 		while true do
