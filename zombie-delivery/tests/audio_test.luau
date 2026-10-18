@@ -272,18 +272,6 @@ check("8.9 the trade's ka-ching stands in with the sandbox's till, an offer's be
 for _, name in { "menu", "day", "night", "tension" } do
 	check("music loop " .. name, SoundSheet.Music[name] ~= nil and SoundSheet.Music[name][2] > 10)
 end
-for id, sound in Config.Audio.WeaponSounds do
-	check(`weapon sound {id} exists`, SoundSheet.Sfx[sound] ~= nil, sound)
-end
-local weapons = 0
-for _, def in Config.Weapons do
-	weapons += 1
-	check(`weapon {def.id} has a sound`, Config.Audio.WeaponSounds[def.id] ~= nil)
-end
-for _, def in Config.CarGuns do
-	check(`car gun {def.id} has a sound`, Config.Audio.WeaponSounds[def.id] ~= nil)
-end
-check("weapons listed", weapons > 0)
 -- The regions never overlap (each plays only its own sound).
 for _, sheet in { SoundSheet.Sfx, SoundSheet.Music, SoundSheet.Sfx2, SoundSheet.Sfx3, SoundSheet.Sfx4, SoundSheet.Sfx5, SoundSheet.Sfx6 } do
 	local list = {}

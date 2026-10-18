@@ -94,7 +94,7 @@ local function note(text: string)
 		table.insert(notes, text)
 	end
 end
-local swing = math.rad(Config.Jobs.Places.DoorSwing)
+local swing = math.rad(80) -- (the old city's delivery door swing, Config.Jobs.Places.DoorSwing before 10.6)
 for n, lot in houses do
 	local id = `lot {n}`
 	local spec: ChaletLooks.Spec = { w = lot.w, d = lot.d, h = lot.h, lot = lot.size, front = HOUSE_FRONT, seed = lot.seed, render = n % 5 + 1, shade = (n % 7) * 10 - 30 }

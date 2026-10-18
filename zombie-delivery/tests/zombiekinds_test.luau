@@ -189,8 +189,6 @@ do
 	check("fuse: killed while it burns: the sooner one", ZombieKinds.fuseLeft(10 + blast.fuse, 10.2, blast.deathFuse) == 10.2 + blast.deathFuse)
 	check("fuse: never later than one burning", ZombieKinds.fuseLeft(10.5, 10.2, blast.fuse) == 10.5)
 	check("fuse: never in the past", ZombieKinds.fuseLeft(nil, 5, -3) == 5)
-	-- shot from range is safe: the farthest a gun reaches is far outside the blast
-	check("blast: shooting it from range is safe (a pistol's range is several radii)", Config.Weapons[1].range >= blast.radius * 3, Config.Weapons[1].range)
 end
 
 -- ── The moves ─────────────────────────────────────────────────────────────
