@@ -4,6 +4,7 @@ The rules are in `AGENTS.md`. Keep this file short: one line per task, newest on
 
 ## In progress
 <!-- who · task · files · since -->
+- Claude · 10.6 snatching in the rounds (the owner: "you can take it out of somebody's hands, but not too easily … not somebody waiting at your car"): a tug of war (mash, the carrier favoured), safe by your own van and the house's door, a moment's protection after a pick-up, the loser stunned · `server/Runs.luau`, `server/Moving.luau`, a new `shared/TugRules.luau`, `client/TugUi.luau`, `shared/Net.luau`, `shared/Config.luau`, tests · 18. 10. 2026
 
 ## Ready for review
 <!-- Codex: branch · what changed · what to test in Studio -->
