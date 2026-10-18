@@ -10,7 +10,8 @@
 --
 -- What starts, in this order:
 --   * the folders the game puts things in (Cars, Zombies, Effects: World's build made them) and the map
---     (server/SandboxWorld.luau: the ground, the roads, the house's outside, the scenery, the lighting);
+--     (server/SandboxWorld.luau: the ground, the roads, the house's outside, the scenery, the lighting; 10.8 the
+--     floating islands) with its fall catch (IslandFall: whoever falls off an island back on its top);
 --   * 10.1's SaveSlots (the save slots: a join's save loads once the start screen picked one), PlayerData (its own saves,
 --     Config.Sandbox.Store), Analytics, Vehicles, CarRighting, Zombies (Zombies.ambient
 --     off: no camps, no roamers round the players; only what a move spawns), Npcs (Danny, the greeters), Admin, Crew
@@ -21,7 +22,7 @@
 --     daily tasks (SandboxTasks) and SandboxLeaders (the player list's columns, the TOP MOVERS board), 8.3's showroom
 --     visitors (Visitors: their offers, server/VisitorOffers.luau), 8.7's trading between players (PlayerTrade: the
 --     stands' trade prompts go to it, Warehouse.onTrade), the Sprinter's model (SprinterMesh) and last
---     Moving (it wraps the hooks set here: Vehicles.callCar …).
+--     Moving (it wraps the hooks set here: Vehicles.callCar …), then the helpers' crew and the runs.
 --   The modules written alongside this one (SandboxWorld.build, Collection.start, Warehouse.start, SprinterMesh.start)
 --   run only when they are in the place (a FindFirstChild guard); every service through `safely` (one that fails only
 --   warns).
@@ -369,6 +370,7 @@ local function world()
 		end
 	end
 	optional("SandboxWorld", "build")
+	optional("IslandFall", "start") -- 10.8: whoever falls off an island is put back on its top (its loop only)
 end
 
 local function services()

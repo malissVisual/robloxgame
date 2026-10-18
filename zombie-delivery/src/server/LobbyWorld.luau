@@ -7,7 +7,9 @@
 -- always has it, so coming back from a run never shows it streaming in):
 --   Plaza      the paved square in the middle (SandboxMap.Lobby.plaza: its top flush with the meadow, the meadow's hole)
 --              and the fountain on it (a basin, its water, the spout)
---   Hedge      the hedge round the lobby, Lobby.hedge in from its bounds (solid), and the invisible walls on the bounds
+--   Hedge      the hedge round the lobby, Lobby.hedge in from its bounds (solid; 10.8 low: HEDGE_TALL, the other
+--              islands seen over it), and the invisible walls on the bounds (10.8 its island's grass goes on past them
+--              to its edge: server/SandboxWorld.luau, design/islands/plan.py)
 --   Lamps      the plaza's lamps (decoration: a fixed afternoon, their heads dim)
 --   Trees      the lobby's trees (VillageLooks' trees, server/VillageWorld.luau's parts)
 --   Dispatch   the Deliveros dispatch kiosk (server/MoveSites.luau's kiosk art at Lobby.dispatch, its corkboard "Board"
@@ -47,6 +49,7 @@ local STONE = Color3.fromRGB(150, 146, 140)
 local WATER = Color3.fromRGB(76, 140, 190)
 local POLE = Color3.fromRGB(50, 50, 54)
 local HEDGE = Color3.fromRGB(52, 96, 44)
+local HEDGE_TALL = Config.Islands.LobbyHedge -- 10.8: a low hedge (9.7 – 10.5: 4.5): the other islands seen over it
 
 local function rgb(c: { number }): Color3
 	return Color3.fromRGB(c[1], c[2], c[3])
@@ -127,7 +130,7 @@ end
 
 local function hedge(model: Model)
 	local b, h = L.bounds, L.hedge
-	local tall, wide = 4.5, 2.6
+	local tall, wide = HEDGE_TALL, 2.6
 	local x0, x1, z0, z1 = b.x0 + h, b.x1 - h, b.z0 + h, b.z1 - h
 	for _, e in { { x0, x1, z0, z0 }, { x0, x1, z1, z1 }, { x0, x0, z0, z1 }, { x1, x1, z0, z1 } } do
 		local along = e[2] - e[1] + e[4] - e[3] + wide

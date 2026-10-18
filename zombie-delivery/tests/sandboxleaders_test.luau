@@ -288,7 +288,8 @@ do
 	local hit: string? = nil
 	local seen = 0
 	for _, d in world:GetDescendants() do
-		if d:IsA("BasePart") and d.Name ~= "Meadow" and d.Name ~= "Mound" and d.Name ~= "Plaza" then -- (10.4: it stands on the plaza's paving)
+		if d:IsA("BasePart") and d.Name ~= "Meadow" and d.Name ~= "Grass" and d.Name ~= "Mound" and d.Name ~= "Plaza"
+			and not d:IsDescendantOf(world:FindFirstChild("Islands")) then -- (10.4: it stands on the plaza's paving; 10.8 the island's grass and its rock under it)
 			seen += 1
 			local size = d.Size
 			local x, _, z, r00, r01, r02, _, _, _, r20, r21, r22 = d.CFrame:GetComponents()
@@ -299,7 +300,7 @@ do
 			end
 		end
 	end
-	check(`nothing the map builds stands within 1.5 studs of the board's footprint, only meadow or the plaza's paving under it ({seen} parts looked at)`, hit == nil and seen > 300, hit)
+	check(`nothing the map builds stands within 1.5 studs of the board's footprint, only grass or the plaza's paving under it ({seen} parts looked at)`, hit == nil and seen > 300, hit)
 end
 
 if failures == 0 then

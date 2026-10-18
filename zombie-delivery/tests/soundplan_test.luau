@@ -10,7 +10,8 @@
 -- claimed, FILL BEST's few soft clicks, SELL…'s one bigger till), the existing sheets' sounds only, one after the other
 -- (the lane: never two stings over each other, a burst is one). 8.9 in place of the Alps: no cowbell and no alpine meadow
 -- left; 9.4 the countryside (design/countryside/plan.json, no village: no chapel's bell): the D5's far hum from the east
--- (on its motorway), a woodpecker in the forest, a dog and a tractor far off, each with a region or a stand-in that
+-- (on its motorway; 10.8 design/islands/plan.json: the world far below, east of and under every island), a woodpecker
+-- in the forest (10.8 the Forest Lodge's island's), a dog and a tractor far off, each with a region or a stand-in that
 -- plays. 8.9, the newest features' own
 -- sounds (sfx5): every event a quiet sound of sfx5, the clipboard's out and away, a piece's tick and cross-off, an
 -- order's chirp, an answer's nope after its Notice, Danny's whistle only when he needs you, the auction's tick, gavel
@@ -322,8 +323,9 @@ check("… a junk level (0, 9, NaN) is clamped or 4: never an error", SoundPlan.
 check("a plot's yard beside the hall is outdoors", SoundPlan.sandboxPlace(plot.spawn.x, 3, plot.spawn.z, false) == "outdoors")
 check("in the move's house (its state's inside): the house", SoundPlan.sandboxPlace(150, 2, 300, true) == "house")
 check("a move's interior far off the map: the house", SoundPlan.sandboxPlace(9000, 400, 9000, false) == "house")
-check("in the farmstead's own box: the house", SoundPlan.sandboxPlace(h.house.x, 3, h.house.z, false) == "house")
-check("at the farmstead's front door (where you come out): outdoors", SoundPlan.sandboxPlace(h.door.x, 1, h.door.z, false) == "outdoors")
+check("in the farmstead's own box (10.8 on its island: its height its top): the house", SoundPlan.sandboxPlace(h.house.x, h.house.y + 3, h.house.z, false) == "house"
+	and SoundPlan.sandboxPlace(h.house.x, h.house.y + h.house.sy + 5, h.house.z, false) == "outdoors")
+check("at the farmstead's front door (where you come out): outdoors", SoundPlan.sandboxPlace(h.door.x, h.door.y + 1, h.door.z, false) == "outdoors")
 -- 8.9: what the sheets play now. A sound has a region on a sheet (sfx … sfx4, and a newer sheet once there) or a
 -- stand-in that does (SoundSheet.Fallback, as client/Sounds.luau finds it).
 local SHEETS = { SoundSheet.Sfx, SoundSheet.Sfx2, SoundSheet.Sfx3, SoundSheet.Sfx4, (SoundSheet :: any).Sfx5 }
@@ -453,7 +455,8 @@ end)())
 check("nothing on any sheet: silence (no pick)", SoundPlan.sandboxSound("dog_far", function(): boolean
 	return false
 end) == nil)
--- The D5's far hum: on the motorway of design/countryside/plan.json (its landmark "d5"), always from the east.
+-- The D5's far hum: on the motorway of design/countryside/plan.json (its landmark "d5"), always from the east; 10.8
+-- (design/islands/plan.json, no ground: the world far below) east of and under every island.
 local Plan = require("./CountryPlan")
 local function area(name: string): { x0: number, x1: number, z0: number, z1: number }?
 	for _, a in Plan.areas do
@@ -464,20 +467,25 @@ local function area(name: string): { x0: number, x1: number, z0: number, z1: num
 	return nil
 end
 local M = SB.Motorway
--- (9.7 runs: the D5 itself is off the map, nobody in a run zone would see it; its hum stays where it ran, x 330 … 390)
-check("9.7: the D5 off plan.json; its hum where it ran (its middle line x 330 … 390), the map's length end to end", area("d5") == nil and M.X > 330 and M.X < 390
-	and M.Z0 == Plan.bounds.z0 and M.Z1 == Plan.bounds.z1)
+-- (9.7 runs: the D5 itself is off the map; 10.8 no ground at all: its hum the world's far below, east of the Bounds)
+local lowest = math.huge
+for _, island in SandboxMap.Islands do
+	lowest = math.min(lowest, island.top - island.depth)
+end
+check("10.8: no D5 on plan.json; its hum east of the Bounds, under every island's bottom (the world far below), the map's length end to end",
+	area("d5") == nil and M.X > Plan.bounds.x1 and M.Y < lowest and M.Z0 == Plan.bounds.z0 and M.Z1 == Plan.bounds.z1, `{M.Y} vs {lowest}`)
 local eastmost = h.lot.x1
 for _, place in SandboxMap.Houses do
 	eastmost = math.max(eastmost, place.lot.x1)
 end
 check("… east of every place to empty, and no nearer than Near to them (a far hum)", M.X - eastmost > M.Near, `{M.X - eastmost} studs`)
-check("… heard faintly over the whole map (Range past the plan's west edge)", M.Range > M.X - Plan.bounds.x0 and M.Near > 0 and M.Y > 0)
+check("… heard faintly over the whole map (Range past the plan's west edge)", M.Range > math.sqrt((M.X - Plan.bounds.x0) ^ 2 + M.Y ^ 2) and M.Near > 0)
 for _, z in { -9999, -100, 0, 300, 9999 } do
 	local x, at = SoundPlan.motorwaySpot(z)
 	check(`… its spot for z {z}: on the motorway, nearest you`, x == M.X and at == math.clamp(z, M.Z0, M.Z1))
 end
--- The woodpecker: in the forest (plan.json's wood "forest", out of its clearing), heard over the map.
+-- The woodpecker: in the forest (plan.json's wood "forest", out of its clearing; 10.8 up in the crowns over the
+-- Forest Lodge's island), heard over the map.
 local Bl = SB.Woodpecker
 local forest = Plan.woods[1]
 for _, at in { { 0, 0 }, { -900, 500 } } do
@@ -492,7 +500,9 @@ for _, cx in { Plan.bounds.x0, Plan.bounds.x1 } do
 		farthest = math.max(farthest, math.sqrt((cx - Bl.X) ^ 2 + (cz - Bl.Z) ^ 2))
 	end
 end
+local lodge = SandboxMap.islandAt(Bl.X, Bl.Z)
 check("… heard (faintly) over most of the map, the plots among it", Bl.Range > 1200 and Bl.Range < farthest + 600 and Bl.Near > 0 and Bl.Y > 0, `{math.floor(farthest)} studs`)
+check("… on an island (the lodge's), up in the crowns over its top", lodge ~= nil and lodge.id == "lodge" and Bl.Y > lodge.top + 10 and Bl.Y < lodge.top + 40)
 check("… a few drums, apart", Bl.Drums >= 1 and Bl.Drums <= 6 and Bl.Every >= 0.5 and Bl.Every <= 5)
 -- A dog and a tractor far off, a random way round you; the tractor drives across your view.
 for _, kind in { "dog", "tractor" } do

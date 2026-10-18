@@ -451,8 +451,8 @@ local function lobbyChecks(label)
 	local w = box(window)
 	check(`{label}: … on the screen`, inside(w), show(w))
 	check(`{label}: … its map and its side column in it`, within(box(map), w) and side ~= nil and within(box(side), w) and not overlap(box(map), box(side)))
-	check(`{label}: … the lobby drawn: the hedge, the meadow, the plaza, the fountain, 4 plots and warehouses with their desks, PAINT, TOP MOVERS, DISPATCH, the PLAY circle`,
-		named(map, "Hedge") and named(map, "Meadow") and named(map, "Plaza") and named(map, "Fountain") and named(map, "Plot4") and named(map, "Warehouse4") and named(map, "Desk4")
+	check(`{label}: … the lobby drawn: 10.8 its island (its edge, its rim), the hedge, the meadow, the plaza, the fountain, 4 plots and warehouses with their desks, PAINT, TOP MOVERS, DISPATCH, the PLAY circle`,
+		named(map, "Island") and named(map, "Rim") and named(map, "Hedge") and named(map, "Meadow") and named(map, "Plaza") and named(map, "Fountain") and named(map, "Plot4") and named(map, "Warehouse4") and named(map, "Desk4")
 			and named(map, "Paint") and named(map, "Leaders") and named(map, "Dispatch") and named(map, "PlayCircle") and named(map, "Portal_orchard_cottage") == nil and true)
 	check(`{label}: … your plot named in gold (YOUR WAREHOUSE) with its UPGRADES desk, Ann's by her name`, named(map, "PlotName2").Text == "YOUR" and named(map, "PlotName2b").Text == "WAREHOUSE"
 		and sameColor(named(map, "PlotName2").TextColor3, rgb(Config.SandboxMapUi.Colors.Yours)) and named(map, "Upgrades") ~= nil and named(map, "PlotName1").Text == "ANN"

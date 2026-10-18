@@ -4,7 +4,8 @@
 -- steps through the doorway down the aisle to the stage, the desk, the lot's pedestal, the sign and the lot display;
 -- clear of today's map (the roads and their 12 studs, the plots, the vans' ways, the house, the signpost, the lamps, 8.9
 -- the countryside's trees, the board; flat meadow) and of design/countryside/plan.json (CountryPlan.luau: the
--- countryside's roads, landmarks, fields, places and their lots and tree lines); turned with its spot;
+-- countryside's roads, landmarks, fields, places and their lots and tree lines; 10.8 design/islands/plan.json's); turned
+-- with its spot;
 -- and the world SandboxWorld builds: nothing of it while the auction is off; on, the model, its parts as laid out, its
 -- words, the desk's prompt, the lamps, nothing of the map within 1.5 studs of it, the map's budget and rules kept.
 -- Run with tests/run_tests.py.
@@ -219,7 +220,7 @@ do
 	check("clear of the lobby: inside its hedge, off the plots, the portals and their pads, the dispatch, the paint shop, the lamps, the trees and the TOP MOVERS board, on flat meadow", why == nil, why)
 end
 
--- ── Clear of the countryside's plan (design/countryside/plan.json) ─────────
+-- ── Clear of the countryside's plan (10.8 design/islands/plan.json) ────────
 do
 	local site = Layout.site()
 	local b = Plan.bounds
@@ -381,7 +382,8 @@ do
 						out = `{d.Name} on {road.name}`
 					end
 				end
-			elseif d.Name ~= "Meadow" and d.Name ~= "Mound" and d.Name ~= "Plaza" and d.Shape ~= Enum.PartType.Ball then -- (10.4: it stands on the plaza's paving)
+			elseif d.Name ~= "Meadow" and d.Name ~= "Grass" and d.Name ~= "Mound" and d.Name ~= "Plaza" and d.Shape ~= Enum.PartType.Ball
+				and not d:IsDescendantOf(world:FindFirstChild("Islands")) then -- (10.4: it stands on the plaza's paving; 10.8 the island's grass and its rock under it)
 				seen += 1
 				if hits(x - hx, x + hx, z - hz, z + hz) then
 					hit = `{d.Name} at {math.floor(x)}, {math.floor(z)}`
@@ -389,7 +391,7 @@ do
 			end
 		end
 	end
-	check(`nothing else the map builds within 1.5 studs of it, only meadow or the plaza's paving under it ({seen} parts looked at)`, hit == nil and seen > 300, hit)
+	check(`nothing else the map builds within 1.5 studs of it, only grass or the plaza's paving under it ({seen} parts looked at)`, hit == nil and seen > 300, hit)
 	check("its parts inside the Bounds, nothing of it on a road", out == nil, out)
 	check(`the map's part budget holds with it ({total} parts, at most {SandboxScenery.Budget})`, total <= SandboxScenery.Budget, total)
 end

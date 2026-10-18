@@ -4,7 +4,8 @@
 -- it, in the game's contract look (client/Theme.luau: a charcoal ground, small white caps on dark pills, fine lines).
 -- A canvas is drawn once (an open, a run): every piece a plain Frame or TextLabel, siblings ordered by ZIndex (the
 -- ground 1, the buildings and the rooms 2 - 4, the words 6, the markers 8 - 11); the markers are pooled and only moved.
---   * The lobby (SandboxMap.Lobby, north up): the meadow in its hedge, the plaza and the fountain, the trees and the
+--   * The lobby (SandboxMap.Lobby, north up; 10.8 on its island: its rock edge and the rim of grass round the hedge,
+--     SandboxMap.Islands' first): the meadow in its hedge, the plaza and the fountain, the trees and the
 --     lamps, the four plots with their warehouses at their level (WarehouseLayout.site) and their UPGRADES desks (yours
 --     outlined in gold: YOUR WAREHOUSE, the others' their owner's name or FREE), the PAINT shop, the TOP MOVERS board,
 --     the DISPATCH (and the Auction House while Config.Auction.On), 10.4 the PLAY circle (its ring in its state's
@@ -256,6 +257,13 @@ function SandboxMapDraw.lobby(parent: Instance, frame: Rules.Frame, u: number, w
 	local b = L.bounds
 	local label = Rules.textSize(C.Text.Label, u)
 	local small = Rules.textSize(C.Text.Small, u)
+	local island = SandboxMap.Islands[1]
+	if island then -- (10.8: the island's rock edge, its rim of grass round the hedge)
+		local r = island.rect
+		area(canvas, "Island", r.x0, r.z0, r.x1, r.z1, color("Cliff"), 1)
+		local e = C.Edge
+		area(canvas, "Rim", r.x0 + e, r.z0 + e, r.x1 - e, r.z1 - e, color("Rim"), 1)
+	end
 	area(canvas, "Hedge", b.x0, b.z0, b.x1, b.z1, color("Hedge"), 1)
 	local inset = L.hedge + 1.3
 	area(canvas, "Meadow", b.x0 + inset, b.z0 + inset, b.x1 - inset, b.z1 - inset, color("Meadow"), 1)

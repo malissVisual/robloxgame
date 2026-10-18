@@ -41,6 +41,9 @@ function C.stands(player) return stands[player] or 2 end
 function C.incomePerMinute() return 0 end
 function C.boost() return 1 end
 function C.marketIncome() return 1 end
+function C.bonus() return 1 end -- (10.4: the upgrade tree's income bonus, the showroom's stands and their factor)
+function C.showStands() return 2 end
+function C.showFactor() return 1 end
 function C.onChanged() end
 function C.openPicker() end
 function C.undisplay() return true end
