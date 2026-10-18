@@ -7,7 +7,7 @@
 
 local Config = require("./Config")
 local SpawnSpot = require("./SpawnSpot")
-local Map = require("./Map")
+local SandboxMap = require("./SandboxMap")
 local CarUpright = require("./CarUpright")
 
 local failures = 0
@@ -26,9 +26,9 @@ end
 local Cfg = Config.SpawnSpot
 check("the numbers are there", Cfg.Tries >= 6 and Cfg.Tries <= 20 and Cfg.Gap > 0 and Cfg.Pad >= 0 and Cfg.Probe > 2
 	and Cfg.Drop > 0 and Cfg.Drop < 1 and Cfg.Across >= 0 and Cfg.Across <= 2)
--- The curb (Map.WalkTop over Map.RoadTop) and the road's paint stay under the room checked; the lowest hull of any
--- vehicle (a scooter's chassis 0.3 … the cars' 0.6 and more: tools/vehicle-preview/ground-check.luau) is not much below.
-check("the room starts over the curb", Cfg.Lift > Map.WalkTop - Map.RoadTop and Cfg.Lift <= 0.9)
+-- The step from the meadow up onto a yard's asphalt (SandboxMap.RoadTop over GroundTop; the old city's curb was 0.5)
+-- and the road's paint stay under the room checked; the van's hull is not much below (its chassis 1.2 up).
+check("the room starts over the asphalt's step", Cfg.Lift > SandboxMap.RoadTop - SandboxMap.GroundTop and Cfg.Lift <= 0.9)
 check("a crate under one wheel is uneven", Cfg.Spread < 1.5)
 check("the steepest road (14°) is fine, not much more", Cfg.Slope >= 14 and Cfg.Slope <= 20)
 

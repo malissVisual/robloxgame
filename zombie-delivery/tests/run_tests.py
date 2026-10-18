@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Runs the logic tests of the pure shared modules (Config, Economy, Map, Roads, Icons, Levels, TrafficLanes, Crossings, SoundSheet, Missions, Challenges, Melee, Boarding, Tasks, 6.14: Regulars, SpecialOrders, 6.15: LiveEvents, 6.17: JobPick ...) in the
+Runs the logic tests of the pure shared modules (Config, SoundSheet, Melee, 10.6: the sandbox's own ...) in the
 standalone Luau CLI: every tests/*_test.luau file, each must print "ALL CHECKS PASSED".
 
     python3 zombie-delivery/tests/run_tests.py [path to the luau binary]
@@ -9,7 +9,7 @@ import glob, json, os, re, shutil, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SHARED = os.path.join(os.path.dirname(HERE), "src", "shared")
-PURE = ("Config", "ZombieKinds", "Economy", "Map", "Icons", "SoundSheet", "NpcLooks", "Melee", "KitFit", "Bag", "Gestures", "RunCycle", "BodyMotion", "AvatarLook", "Tasks", "SoundPlan", "StyleLooks", "AnalyticsPlan", "RenderBudget", "OutlinePick", "ZombieStyle", "CardLayout", "KitArt", "CarUpright", "SpawnSpot", "Gait", "MovingRules", "MoveHelperBrain", "MoveRoles", "CarryGrip", "ChaletLooks", "SandboxMap", "SandboxAdmin", "CollectionRules", "SandboxSteps", "WarehouseLayout", "SprinterLooks")
+PURE = ("Config", "ZombieKinds", "Map", "Icons", "SoundSheet", "NpcLooks", "Melee", "KitFit", "Bag", "Gestures", "RunCycle", "BodyMotion", "AvatarLook", "Tasks", "SoundPlan", "StyleLooks", "AnalyticsPlan", "RenderBudget", "OutlinePick", "ZombieStyle", "CardLayout", "KitArt", "CarUpright", "SpawnSpot", "Gait", "MovingRules", "MoveHelperBrain", "MoveRoles", "CarryGrip", "ChaletLooks", "SandboxMap", "SandboxAdmin", "CollectionRules", "SandboxSteps", "WarehouseLayout", "SprinterLooks")
 PURE += ("SandboxScenery",)  # 8.0 sandbox, the map (tests/sandboxworld_test.luau)
 PURE += ("PairCarry",)  # 8.1 carrying in two: the leader's steering (tests/paircarry_test.luau)
 PURE += ("UpgradeRules",)  # 8.1 sandbox, the upgrades (tests/upgrades_test.luau)
@@ -108,7 +108,7 @@ with tempfile.TemporaryDirectory() as tmp:
     # 8.0 SANDBOX: the real server/Main.server.luau and server/SandboxBoot.luau as MainServer.luau and
     # SandboxBootServer.luau for tests/boot_runtime_test.luau: each source wrapped in a function (the test runs it once
     # per world: the sandbox's, the city's), its Roblox globals and `require` tests/runtime/BootRuntime.luau's recorders,
-    # bound again at every run; Config, Economy and SandboxMap the real copies above.
+    # bound again at every run; Config and SandboxMap the real copies above.
     shutil.copy(os.path.join(HERE, "runtime", "BootRuntime.luau"), os.path.join(tmp, "BootRuntime.luau"))
     bind = ('local E = require("./BootRuntime")\nreturn function()\n'
             'local game, workspace, script, task, require, warn, print = E.game, E.workspace, E.script, E.task, E.require, E.warn, E.print\n'
@@ -119,7 +119,7 @@ with tempfile.TemporaryDirectory() as tmp:
         open(os.path.join(tmp, built + ".luau"), "w", encoding="utf-8").write(bind + source + "\nend\n")
     # 7.0: the real server/Moving.luau as MovingServer.luau for tests/moving_runtime_test.luau: its server modules, Net,
     # the services and a fake of the house art from tests/runtime/MovingRuntime.luau (on the same recorder), its shared
-    # modules (Config, Economy, Map, MovingRules) the copies above; os.clock and the server time are the test's.
+    # modules (Config, SandboxMap, MovingRules) the copies above; os.clock and the server time are the test's.
     shutil.copy(os.path.join(HERE, "runtime", "MovingRuntime.luau"), os.path.join(tmp, "MovingRuntime.luau"))
     # 7.0, the depot's helper: the real server/MoveHelper.luau as MoveHelperServer.luau on the same fakes (MovingServer
     # requires it; tests/movehelper_runtime_test.luau drives it with its own walk: no physics, no pathfinding here).

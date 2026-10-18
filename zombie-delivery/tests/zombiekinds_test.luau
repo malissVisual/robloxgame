@@ -6,7 +6,7 @@
 -- Run: python3 tests/run_tests.py [path to the luau binary]
 
 local Config = require("./Config")
-local Economy = require("./Economy")
+local DangerRules = require("./DangerRules") -- (its pickKind: server/Zombies.luau's pick of a kind by the weights)
 local ZombieKinds = require("./ZombieKinds")
 local ZombieStyle = require("./ZombieStyle")
 local Geometry = require("./CharacterGeometry")
@@ -120,12 +120,12 @@ do
 		return ZombieKinds.shares(Config.Jobs.Tiers[n].waveKinds).bloater or 0
 	end
 	check("tiers: no bloater in a ★ job's waves, more from ★★ to ★★★★", bloaterShare(1) == 0 and bloaterShare(2) > 0 and bloaterShare(3) > bloaterShare(2) and bloaterShare(4) > bloaterShare(3))
-	-- the pick: the same roll, the same kind (Economy.pickKind sorts the names); the shares come out over many rolls
+	-- the pick: the same roll, the same kind (DangerRules.pickKind sorts the names); the shares come out over many rolls
 	local weights = ZombieKinds.weights(base, moon)
 	local counts: { [string]: number } = {}
 	local rolls = 20000
 	for i = 0, rolls - 1 do
-		local kind = Economy.pickKind(weights, (i + 0.5) / rolls)
+		local kind = DangerRules.pickKind(weights, (i + 0.5) / rolls)
 		counts[kind] = (counts[kind] or 0) + 1
 	end
 	local shares = ZombieKinds.shares(weights)
@@ -136,7 +136,7 @@ do
 		end
 	end
 	check("pick: an even spread of rolls comes out in the weights' shares", #off == 0, table.concat(off, ", "))
-	check("pick: the same roll, the same kind", Economy.pickKind(weights, 0.37) == Economy.pickKind(table.clone(weights), 0.37))
+	check("pick: the same roll, the same kind", DangerRules.pickKind(weights, 0.37) == DangerRules.pickKind(table.clone(weights), 0.37))
 	-- the caps
 	check("caps: the brute and the bloater have one, the walker none", T.MaxAlive.brute ~= nil and T.MaxAlive.bloater ~= nil and T.MaxAlive.walker == nil)
 	check("caps: at its cap a kind is capped, below it not", ZombieKinds.capped("bloater", T.MaxAlive.bloater) and not ZombieKinds.capped("bloater", T.MaxAlive.bloater - 1) and not ZombieKinds.capped("walker", 1000))

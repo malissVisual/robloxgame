@@ -1016,7 +1016,7 @@ function HouseInterior.build(plan: HouseLayout.Plan, origin: CFrame): (Model, { 
 	return model, pieces
 end
 
--- The origin of interior number `index`: far off the map (past Map.Bounds), a slot apart, at the same height.
+-- The origin of interior number `index`: far off the map (past SandboxMap.Bounds), a slot apart, at the same height.
 function HouseInterior.slot(index: number): CFrame
 	local o = T.Slot.Origin
 	return CFrame.new(o[1] + index * T.Slot.Spacing, o[2], o[3])

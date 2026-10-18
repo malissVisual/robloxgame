@@ -7,7 +7,6 @@
 -- contract's house on the map. Run with tests/run_tests.py.
 local Rules = require("./MovingRules")
 local Config = require("./Config")
-local Map = require("./Map")
 local HouseLayout = require("./HouseLayout")
 local FurnitureLooks = require("./FurnitureLooks")
 
@@ -693,35 +692,6 @@ do
 end
 check("the card's estimate: everything whole, ★ with its bonus", Rules.estimate(spots, defs) == math.floor(values + starred * (P.Star - 1) + 0.5))
 
--- The contract's place ---------------------------------------------------------------------------------------------------
-
-check("at least one contract, the prologue Marge's", #T.Contracts >= 1 and T.Contracts[1].id == "marge" and T.Contracts[1].client == "Marge")
-for _, contract in T.Contracts do
-	if contract.kind == "farm" then
-		-- 7.x farm move: a farm stands at a Map.Places place (its site in Config.Moving.Sites), out of the safe zone
-		local place: Map.Place? = nil
-		for _, p in Map.Places do
-			if p.id == contract.place then
-				place = p
-			end
-		end
-		check(`{contract.id}: its place is on the map, out of the safe zone, its site set`, place ~= nil and not Map.isSafe(place.x, place.z) and T.Sites[contract.kind] ~= nil
-			and #T.Sites[contract.kind].Doors == 2, contract.place)
-		continue
-	end
-	local home = Map.home(contract.home or "")
-	check(`{contract.id}: its house is a Suburbs house`, home ~= nil and home.kind == "house" and home.district == "suburbs", contract.home)
-	if home then
-		check(`{contract.id}: the truck parks on a road in front`, Map.onRoad(home.park.x, home.park.z))
-		check(`{contract.id}: out of the safe zone (the zombies come)`, not Map.isSafe(home.door.x, home.door.z))
-		local dist = math.sqrt((home.door.x - Map.Depot.x) ^ 2 + (home.door.z - Map.Depot.z) ^ 2)
-		check(`{contract.id}: a short drive from the depot`, dist < 1400, dist)
-	end
-end
-local dx, dz = Map.Depot.x + T.DropOff[1], Map.Depot.z + T.DropOff[2]
-check("the drop-off (the Wall) is in the safe zone", Map.isSafe(dx, dz))
-check("the board is in the safe zone", Map.isSafe(Map.Depot.x + T.Board[1], Map.Depot.z + T.Board[2]))
-check("the drop-off reaches the road in front of the depot", T.DropRadius >= 15 and T.DropOff[2] + T.DropRadius > Map.BlockSize / 2 + 4)
 check("7.x van moves: a move goes with the owner's Deliveros Van, its bed set", T.Van == "zdcvan" and T.Beds[T.Van] ~= nil and T.Beds[T.Van].Cell > 0 and T.VanAgain > 0)
 check("the numbers", T.Fade > 0 and T.Fade < 1 and T.Slots >= 2 and T.Tether >= 4 and T.Grace > 0 and Config.Robust.Limits.Moving > 0)
 local van = nil

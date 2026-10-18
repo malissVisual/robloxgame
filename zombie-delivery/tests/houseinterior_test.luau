@@ -3,7 +3,7 @@
 -- (Config.Furniture.InteriorMaxParts, its furniture included) and a modest number of lights, everything anchored (a
 -- piece's looks held by welds to its anchored Root), every spot a piece of the right kind at the right place with its
 -- Spot and Star, the house closed (walls, a ceiling, ground under it all, the porch's daylight wall), the EXIT sign
--- over the front door; the slots lie far off the map (Map.Bounds) and never overlap; destroy takes it down. 7.x alpine:
+-- over the front door; the slots lie far off the map (SandboxMap.Bounds: the game's world) and never overlap; destroy takes it down. 7.x alpine:
 -- the chalet's looks built (beams, wainscot, one plank floor, the Kachelofen, the corner bench and its shelf, lace, the
 -- painted front door, antlers, pictures, rag rugs), warm lights, the same plan the same interior, seeds 10-60 in budget.
 -- 8.3 walk-in doors: the front door's leaves shut across the doorway as door leaves (shared/DoorSwing.luau) in the
@@ -12,7 +12,7 @@
 
 local M = require("./ItemMock")
 local Config = require("./Config")
-local Map = require("./Map")
+local SandboxMap = require("./SandboxMap")
 local HouseLayout = require("./HouseLayout")
 local HouseInterior = require("./HouseInterior")
 
@@ -33,7 +33,7 @@ local T = Config.Furniture
 
 -- ── The slots ─────────────────────────────────────────────────────────────────
 do
-	local b = Map.Bounds
+	local b = SandboxMap.Bounds -- (10.6: the game's world)
 	local far, apart = true, true
 	local biggest = 0
 	for seed = 1, 20 do

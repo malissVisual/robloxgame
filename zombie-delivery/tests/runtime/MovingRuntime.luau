@@ -2,7 +2,7 @@
 -- 7.0: the few services and server modules the real server/Moving.luau needs in the Luau CLI (and the real
 -- server/MoveLobby.luau, MoveLobbyServer.luau: the quick chat on a move; the truck's and the zombies' damage)
 -- (tests/moving_runtime_test.luau through tests/run_tests.py, which builds MovingServer.luau from src/server/Moving.luau
--- with these in place of its requires; Config, Economy, SandboxMap and MovingRules are the real ones). The instances are
+-- with these in place of its requires; Config, SandboxMap and MovingRules are the real ones). The instances are
 -- tools/fixtures/item-mock.luau's recorder with signals a test fires (Triggered, Died, HealthChanged …), players and
 -- their bodies, a truck, zombies and the house art (fake FurnitureLooks / HouseLayout / HouseInterior shaped like the
 -- art branch's interface). No physics: a weld is a record, a teleport sets the root's CFrame. os.clock and the server

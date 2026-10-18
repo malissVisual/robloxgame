@@ -11,11 +11,10 @@
 --   * the hull rides over the ground (only the wheels touch it) with 15° at both axles; the skin inside the body's
 --     box and out of the bay's walking room; the livery (the red stripe, the ZDC logo on both sides and the back);
 --     the seats in the cab; the part budget
---   * the car: sandbox-only (no dealer, career or advice lists it; a player's car only in the sandbox), heavier than
---     the ZDC Van, a big tank, one passenger
+--   * the car: sandbox-only (no dealer sells it), heavier than the ZDC Van, a big tank, one passenger (10.6: the one
+--     van of the game, Config.Sandbox.Van)
 -- Run with tests/run_tests.py.
 local Config = require("./Config")
-local Economy = require("./Economy")
 local Looks = require("./SprinterLooks")
 
 local failures = 0
@@ -304,8 +303,16 @@ check("the sliding door: its opening from z -2.85, 0.35 out and 5.0 back (the mo
 	and move[2] == 5.0)
 
 -- ── The car ─────────────────────────────────────────────────────────────────
-local def = Economy.findCar("sprinter") :: Config.CarDef
-local van = Economy.findCar(Config.CompanyVan.Car) :: Config.CarDef
+local function findCar(id: string): Config.CarDef?
+	for _, car in Config.Cars do
+		if car.id == id then
+			return car
+		end
+	end
+	return nil
+end
+local def = findCar("sprinter") :: Config.CarDef
+local van = findCar(Config.CompanyVan.Car) :: Config.CarDef
 check("Config.Cars sprinter: the Deliveros Sprinter, style sprinter, the sandbox's van", def ~= nil and def.name == "Deliveros Sprinter" and def.style == "sprinter"
 	and Config.Sandbox.Van == "sprinter")
 check("… heavier than the Deliveros Van: slower, slower off the line, a wider turn, tougher", def.maxSpeed < van.maxSpeed and def.accel < van.accel
@@ -314,8 +321,6 @@ check("… a big tank (no pumps in the sandbox): 100,000 studs and more", def.ta
 	and (def.tank :: number) * 1000 / (def.burn :: number) * Config.Fuel.Lasts >= 100000)
 check("… sandbox-only: no stages, no roof gun, no gear, never sold", def.sandboxOnly == true and def.stages == nil and not def.mount
 	and (def.gearSlots or 0) == 0 and def.price == 0)
-check("… a player's car only while the sandbox is on", Economy.isPlayerCar("sprinter") == Config.Sandbox.On)
-check("… never a bigger car's advice", string.find(Economy.roomAdvice(Config.CompanyVan.Car, 0, 9), "Sprinter", 1, true) == nil)
 check("the Deliveros Van stays Config.Cars[1]", Config.Cars[1].id == Config.CompanyVan.Car)
 
 print(if failures == 0 then "ALL CHECKS PASSED" else `{failures} CHECK(S) FAILED`)

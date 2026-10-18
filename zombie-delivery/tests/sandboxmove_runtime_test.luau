@@ -48,7 +48,6 @@ local MoveHelper = require("./MoveHelperServer")
 local SandboxMap = require("./SandboxMap")
 local SprinterLooks = require("./SprinterLooks")
 local Brain = require("./MoveHelperBrain")
-local Economy = require("./Economy")
 
 local failures = 0
 local function check(name: string, ok: boolean, detail: any?)
