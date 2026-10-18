@@ -1,13 +1,12 @@
 -- 6.12.2, the spawn's corner and the shoes (Config.GearStall, Map.Shops.bags / supplies, Map.Square,
--- Config.Goal.BoardSpot; Config.RetiredKit's noShoes, shared/Transport.luau retiredRefunds / packRefund,
--- shared/KitFit.luau): the gear stall's two counters (ZDC Bags, Last Stop Supplies) side by side on the depot's block in
+-- Config.Goal.BoardSpot; Config.RetiredKit's noShoes, shared/Transport.luau retiredRefunds / packRefund): the gear
+-- stall's two counters (ZDC Bags, Last Stop Supplies) side by side on the depot's block in
 -- the safe zone, clear of the spawn pad, the scooter rack, the JOBS spot round the job board, the garage terminal and
 -- Marge, their radius the stall's and not the yard's; Last Stop's old block no shop's (7.1: the Hauptplatz); the
 -- Running Shoes gone and paid back once. Run with tests/run_tests.py.
 local Config = require("./Config")
 local Map = require("./Map")
 local Transport = require("./Transport")
-local KitFit = require("./KitFit")
 local Career = require("./Career")
 
 local failures = 0
@@ -123,7 +122,7 @@ check("a false entry, a lock-only record (a new player) or a broken save: nothin
 	and next(Transport.retiredRefunds({ kit = { shoes = true } })) == nil and next(Transport.retiredRefunds({ money = 1, kit = "shoes" })) == nil)
 local words = string.gsub(Config.Courier.ShoeRefund, "{money}", "$250")
 check("Marge's words name the shoes and the money", string.find(words, "Running Shoes", 1, true) ~= nil and string.find(words, "$250", 1, true) ~= nil, words)
-check("an old save's shoes are never worn and make nobody faster", (KitFit.outfit({ shoes = true }) :: any).shoes == nil and Transport.speedMult({ shoes = true }) == 1)
+check("an old save's shoes make nobody faster", Transport.speedMult({ shoes = true }) == 1)
 check("no level reward gives them (level 4: the Thermal Delivery Bag)", (function()
 	for level = 2, 20 do
 		local reward = Career.reward(level)

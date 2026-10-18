@@ -1,17 +1,14 @@
 --!strict
--- Dead End Dispatch: all visual tokens live here. Does not contain gameplay state.
+-- Deliveros: all visual tokens live here. Does not contain gameplay state.
 -- 3.8, the contract UI (Codex's design/ui-contract/, approved by the owner; it replaces 3.6's "Postage & Trouble"):
 -- charcoal rectangles, compact white type, fine grey lines and small precise red accents. Theme.Contract holds the
 -- tokens. The semantic colours (Theme.Colors: panel, text, yellow, red ...) keep their names and meaning, so every
 -- module that used them gets the new look; Theme.soft turns one into the flat dark face a button or a chip of that
--- meaning wears (Ui.button / Ui.chip do it for you). Theme.Postage stays for old references, remapped (see there).
+-- meaning wears (Ui.button does it for you). Theme.Postage stays for old references, remapped (see there).
 -- 5.8, every window in the courier-phone style (design/phone-ui/): Theme.Contract.red as a button's colour is the
 -- PRIMARY action (a red face, white caps, square: Ui.button(..., Theme.Contract.red), HudContract.button "primary");
 -- Theme.Colors.red stays the danger meaning (a dark face with a red hint), one step apart so Theme.soft tells them
 -- apart. The last pastel Postage tokens (violet, sage, hatch) are contract tokens now.
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Icons = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Icons"))
-
 local Theme = {}
 
 -- 3.7+, the contract UI: compact white type over the world, a localized charcoal scrim or window surface, fine grey
@@ -133,13 +130,6 @@ Theme.HeadingFont = Enum.Font.GothamBold
 Theme.DisplayFont = Enum.Font.GothamBold -- 3.8: no Black weight; titles are bold with restraint
 Theme.MonoFont = Enum.Font.GothamMedium -- 3.8: numbers stay in the Gotham family (timers, payouts, "3 / 4 slots")
 
--- Optional Roblox assets. Empty IDs keep the live city flyover and native wordmark.
--- The ids are pasted in shared/Icons.luau (zombie_delivery_logo, menu_background), the one place for every picture.
-Theme.Images = {
-	logo = Icons.get("zombie_delivery_logo") or "",
-	menuBackground = Icons.get("menu_background") or "",
-}
-
 local function linear(v: number): number
 	return if v <= 0.04045 then v / 12.92 else ((v + 0.055) / 1.055) ^ 2.4
 end
@@ -159,8 +149,8 @@ function Theme.textOn(color: Color3): Color3
 	return if Theme.contrast(K.text, color) >= Theme.contrast(K.charcoal, color) then K.text else K.charcoal
 end
 
--- `text` if it reads on `surface` (at least 3:1), else the text that does (textOn). Ui.button and Ui.chip use it so a
--- caller's old dark ink never ends up dark on charcoal.
+-- `text` if it reads on `surface` (at least 3:1), else the text that does (textOn). Ui.button uses it so a caller's
+-- old dark ink never ends up dark on charcoal.
 function Theme.readable(text: Color3, surface: Color3): Color3
 	return if Theme.contrast(text, surface) >= 3 then text else Theme.textOn(surface)
 end
@@ -176,12 +166,10 @@ export type Soft = { face: Color3, lip: Color3, text: Color3, main: boolean, qui
 
 -- The flat faces of the semantic colours: what a button or a chip of that meaning wears.
 local SOFT: { [string]: Soft } = {}
-local FACES: { [string]: boolean } = {}
 local function soft(colors: { Color3 }, face: Color3, lip: Color3, text: Color3, main: boolean, quiet: boolean, primary: boolean?)
 	for _, color in colors do
 		SOFT[key(color)] = { face = face, lip = lip, text = text, main = main, quiet = quiet, primary = primary == true }
 	end
-	FACES[key(face)] = true
 end
 local C = Theme.Colors
 -- The old (3.5 dark, 3.6 pastel) values too: a module that still writes one of them gets the new face.
@@ -212,11 +200,6 @@ function Theme.soft(color: Color3): Soft
 	end
 	local face = color:Lerp(K.charcoal, 0.84)
 	return { face = face, lip = color, text = Theme.textOn(face), main = false, quiet = false, primary = false }
-end
-
--- Is `color` one of the flat faces Theme.soft hands out (so it is not mapped again)?
-function Theme.isFace(color: Color3): boolean
-	return FACES[key(color)] == true
 end
 
 -- The same colour, compared by its 0 – 255 channels (a Color3 read back from a property is rounded to floats).

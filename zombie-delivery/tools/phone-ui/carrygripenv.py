@@ -28,7 +28,6 @@ def carrygrip_env(dest: Path):
     for name in ("CarryGripUi", "MoveSounds", "MovingHud", "MoveHelperHud", "QuickChat", "CardKit", "TouchLayout", "MoveLayout", "TopBlocks", "PadGlyph"):  # (8.3 keys: PadGlyph)
         clock = "local os = mock.os or os\n" if name in ("CarryGripUi", "MoveSounds") else ""
         (dest / f"{name}.luau").write_text(PREFIX + clock + local((ROOT / f"src/client/{name}.luau").read_text()))
-    (dest / "ItemModel.luau").write_text("return { view = function() return nil end, has = function() return false end }")
     for name, field in (("Ui", "MUi"), ("Theme", "MTheme"), ("Net", "Net"), ("Sounds", "Sounds"), ("Fade", "MFade"),
                         ("CameraRig", "MCamera")):
         (dest / f"{name}.luau").write_text(f'return require("./missions_mock").{field}')

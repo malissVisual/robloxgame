@@ -1,47 +1,27 @@
 --!strict
--- 5.0: the worn kit and the phone in hand, the pure part (server/KitWear.luau builds them). Which pieces of Codex's
--- art (shared/KitArt.luau, server/PhoneArt/Geometry.luau) a player wears for their profile.kit, and how the
--- art, authored for a nominal block R15 body, is fitted to the body the character really has.
+-- Art authored for a nominal block R15 body, fitted to the body the character really has (pure Luau,
+-- tests/kitfit_test.luau): the pieces of the courier you make (shared/StyleBuild.luau: hair, a hat, glasses, a beard,
+-- in the character creator's preview and on your character) and Danny's clipboard in your hand (server/Clipboard.luau;
+-- client/ArmPose.luau asks whether a hand holds it in its palm).
 --
---   KitFit.outfit(kit, bag)      slot → art id (6.6: no backpack slot any more, one carrying item; 6.7: no jacket,
---                                6.12.2: no shoes, both retired);
---                                6.0: hand = "bag" (the plastic bag in the left hand; 6.4: `bag`, the active bag's id
---                                when given and owned: "tote", "thermal", "padded", "duffel"), vest = the best vest owned
---                                ("heavy", else "kevlar": stream 2's armour, Config.Kit; 6.0.1: else "hivis", the
---                                Courier Vest, the red reflective vest that is no longer part of the courier's body)
 --   KitFit.factors(bone, size)   the x / y / z scale of a body part against its nominal size (clamped; a hand: one
---                                uniform factor so the phone keeps its shape)
+--                                uniform factor so a rigid thing keeps its shape)
 --   KitFit.fit(pieces, scales)   copies of the pieces with their offsets and sizes scaled per their bone (a turned
 --                                piece's size follows the scaled direction of each of its own axes); 6.7: on a hand
---                                smaller than the block one (the courier's fist) the art is held in the palm
+--                                smaller than the block one (the realistic body's fist) the art is held in the palm
 --                                (KitFit.Palm: scaled by the hand's one factor, turned to face the way the palm does)
--- 6.4.1, the worn bag (server/KitWear.luau; tests/bagfill_test.luau):
---   KitFit.R6                    the R15 part a piece hangs on → its stand-in on an R6 body (the bag under "Left Arm",
---                                the straps and the bag's places on the "Torso"); KitFit.factors scales the art to it
---   KitFit.bagKey(id, place) / KitFit.parseBagKey(key)  the worn bag's slot key "id@place" and back: (id, place) or
---                                nil (6.6: no "+" for a backpack worn any more). Only the id is a KitArt look (6.4 asked KitArt for "bag@hand": the bag never showed)
---   KitFit.bagGrip(id, place, part, size)  where the bag's pivot hangs on that body part (`part` the R15 name it
---                                stands for, `size` the real part's): its offset { x, y, z } and turn (degrees).
---                                "hand": Config.Courier.Bag.Grip under the hand (HandOut[id] further out), else
---                                Config.Courier.BagPlaces[place] scaled to the part
---
--- Pure Luau (tests/kitfit_test.luau).
-
-local Config = require(script.Parent.Config)
+-- 10.6: the city's worn kit (the bags, the vests, the shoes, an R6 body's places) is gone with the city.
 
 local KitFit = {}
 
-KitFit.R6 = { UpperTorso = "Torso", LeftHand = "Left Arm", LeftUpperArm = "Left Arm", RightUpperArm = "Right Arm" } :: { [string]: string }
-
-export type Kit = { [string]: boolean }
 export type Scale = { number } -- x, y, z
 
 -- The block R15 body the art is authored for (design/kit-models/README.md): the torso 2 wide, 1.6 high, 1 deep, the
 -- feet 1 × .3 × 1.2, the upper arms and the hand of the block rig.
 -- 6.7: the courier's realistic body (server/CharacterArt/Geometry.luau) is slimmer than this (the torso 1.24 x 1.58 x
 -- 0.76, the upper arms 0.6 x 1.1 x 0.6, the feet 0.48 x 0.3 x 0.86, the hands 0.22 x 0.36 x 0.4): the art stays
--- authored on the block body and every piece is scaled onto the real one (the vests, the packs, the shoes, the bag
--- places). The pelvis and the left hand are measured too (art hung from them scales the same way).
+-- authored on the block body and every piece is scaled onto the real one. The pelvis and the left hand are measured
+-- too (art hung from them scales the same way).
 KitFit.Nominal = {
 	UpperTorso = { 2, 1.6, 1 },
 	LowerTorso = { 2, 0.4, 1 }, -- 6.7
@@ -53,41 +33,23 @@ KitFit.Nominal = {
 	LeftHand = { 1, 0.3, 1 }, -- 6.7
 } :: { [string]: Scale }
 
--- Bones fitted with one factor for all three axes (the handset is a rigid device, not cloth).
+-- Bones fitted with one factor for all three axes (what a hand holds is rigid, not cloth).
 local UNIFORM: { [string]: boolean } = { RightHand = true, LeftHand = true }
 
 KitFit.Min = 0.5 -- a factor never goes below / above these (an odd mesh body: kept attached, not absurd)
 KitFit.Max = 2
-KitFit.HandMin = 0.45 -- 6.7: 0.7 before; the courier's fist (one factor 0.31) holds the phone at a real size
+KitFit.HandMin = 0.45 -- 6.7: 0.7 before; the realistic body's fist (one factor 0.31) holds the clipboard at a real size
 KitFit.HandMax = 1.3
 
 -- 6.7: a hand smaller than the block one (its factor under SlabHand) holds the art IN ITS PALM: the art (authored on
--- the block hand's front, the phone's screen facing -Z) is scaled about `from` (its middle there), turned so it faces
+-- the block hand's front, the clipboard's paper facing -Z) is scaled about `from` (its middle there), turned so it faces
 -- the way the palm does (the palms face the body: the right one -X, the left +X) and set at `to` on the real hand, just
--- off the palm (KitFit.fit). The phone pose (client/ArmPose.luau) rolls the wrist so the palm and the screen face up.
+-- off the palm (KitFit.fit). The clipboard's pose (client/ArmPose.luau) rolls the wrist so the palm and the paper face up.
 KitFit.SlabHand = 0.8
 KitFit.Palm = {
 	RightHand = { from = { 0, -0.12, -0.3 }, to = { -0.135, -0.2, 0 }, turn = { 0, 90, 0 } },
 	LeftHand = { from = { 0, -0.12, -0.3 }, to = { 0.135, -0.2, 0 }, turn = { 0, -90, 0 } },
 } :: { [string]: { from: Scale, to: Scale, turn: Scale } }
-
--- What to wear: slot → the art id. (6.6: the backpacks and their parcel are gone: one carrying item, the bag.)
-function KitFit.outfit(kit: Kit, bag: string?): { [string]: string }
-	local out: { [string]: string } = {}
-	-- (6.7: no jacket slot: the Thermal Jacket is retired, Config.RetiredKit; its KitArt stays unused. 6.12.2: no shoes
-	-- slot either: the Running Shoes are retired the same way, their KitArt "shoes" stays unused too)
-	if bag ~= nil and kit[bag] == true then
-		out.hand = bag -- 6.4: the active bag (shared/Transport.luau activeBag: server/KitWear.luau names it)
-	elseif bag == nil and kit.bag == true then
-		out.hand = "bag" -- 6.0 (server/KitWear.luau puts it away while the hands carry or push something)
-	end
-	-- 6.0.1: the Courier Vest ("hivis", the red reflective one, no armour) shows only without an armoured vest
-	local vest = if kit.heavy == true then "heavy" elseif kit.kevlar == true then "kevlar" elseif kit.hivis == true then "hivis" else nil
-	if vest then
-		out.vest = vest -- 6.0: only the best one shows
-	end
-	return out
-end
 
 local function finite(n: number): boolean
 	return n == n and n ~= math.huge and n ~= -math.huge
@@ -172,30 +134,6 @@ function KitFit.fit(pieces: { any }, scales: { [string]: Scale }): { any }
 		table.insert(out, copy)
 	end
 	return out
-end
-
--- 6.4.1: the worn bag's slot key and back.
-function KitFit.bagKey(id: string, place: string): string
-	return `{id}@{place}`
-end
-
-function KitFit.parseBagKey(key: string): (string?, string?)
-	local id, place = string.match(key, "^([^@]+)@(%w+)$")
-	if not id or not place then
-		return nil, nil
-	end
-	return id, place
-end
-
--- 6.4.1: the bag's pivot on its body part (see the header). `part` is the R15 name the place is authored for.
-function KitFit.bagGrip(id: string, place: string, part: string, size: Scale): (Scale, Scale)
-	local C = Config.Courier
-	local spot = C.BagPlaces[place]
-	if not spot then
-		return { -(C.HandOut[id] or 0), -(size[2] or 0) / 2 - C.Bag.Grip, 0 }, { 0, 0, 0 }
-	end
-	local f = KitFit.factors(part, size)
-	return { spot.at[1] * f[1], spot.at[2] * f[2], spot.at[3] * f[3] }, { spot.turn[1], spot.turn[2], spot.turn[3] }
 end
 
 return KitFit

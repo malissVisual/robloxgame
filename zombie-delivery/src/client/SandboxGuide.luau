@@ -2,7 +2,7 @@
 -- 8.0 SANDBOX, the guide (design/sandbox/KONTRAKT.md; the owner: "a player new to it must always know what to do next,
 -- without a long tutorial"): a light pointer to the next goal, never a tutorial window.
 --   * The hint line: one thin charcoal line at the top in the middle (a ZDC-orange edge, the words, a small ✕). It sits
---     under what holds the top's middle (client/TopBlocks.luau: the move's panel, Danny's strip, the planning's pill),
+--     under what holds the top's middle (client/TopBlocks.luau: the move's panel, Danny's strip),
 --     keeps clear of the top's sides (the money at the top left, client/SandboxHud.luau's ScreenGui "SandboxHud" when it
 --     is there, Config.SandboxGuide.SideClear at least; on a computer Roblox's player list at the top right while it
 --     reaches down to the line) and is itself a top block ("SandboxGuide"), so the quick chat's
@@ -20,8 +20,8 @@
 --   * The steps come from shared/SandboxSteps.luau (pure, tested) on a state read from what the client sees: the player
 --     attribute Plot (server/SandboxPlots.luau); the Moving remote's "state" (as client/MovingHud.luau reads it: a move
 --     runs, `inside` the house, the van's load counts.out, counts.delivered, your piece in your hands: an item `mine` and
---     "carried"); the MoveLobby remote's "lobby" (the planning: LAUNCH); the Collection remote's "state" (the stock, the
---     pieces on show and their stands); where you stand and whether you sit in a vehicle.
+--     "carried"); the Collection remote's "state" (the stock, the pieces on show and their stands); where you stand and
+--     whether you sit in a vehicle. (10.6: no move's planning lobby: it is gone since 9.7, nobody asks for it.)
 --   * Each step goes quiet once done (per session: SandboxSteps.doneBy). Hold G (not while you carry: G puts a piece down) or the ✕ hides the guide ("Guide off" for a moment); hold G
 --     again, or on a touch screen the 💡 chip left in its place, brings it back. SandboxGuide.setEnabled for a settings row.
 --   * 8.3 keys (shared/SandboxPad.luau, client/PadGlyph.luau): the line's words are the device's used now, a gamepad
@@ -142,8 +142,6 @@ local state: SandboxSteps.State = {
 	delivered = 0,
 	atHouse = false,
 	seated = false,
-	planning = false,
-	planningMine = false,
 	stock = 0,
 	shown = 0,
 	freeStands = nil,
@@ -1089,7 +1087,7 @@ local function look()
 	readHelper()
 	state.heavyNear = root ~= nil and state.helper == "hired" and done.lift ~= true and (state.heavy or 0) > 0 and not state.carrying
 		and not state.seated and not state.waiting and heavyNear(root.Position)
-	local calm = not state.move and not state.planning
+	local calm = not state.move
 	-- 8.9: the sell step's: your signs (the Collection's state) and the players here (only while it may show)
 	state.signs = if world.collectionSeen then summary.signs else nil
 	state.players = if calm and done.sell ~= true and summary.signs == 0 and summary.shown >= G.SellShown then playerCount() else nil
@@ -1282,18 +1280,11 @@ function SandboxGuide.start()
 	if stepped then
 		stepped:Connect(follow)
 	end
-	-- the move (client/MovingHud.luau reads the same remote), its planning, the collection (when it is there)
+	-- the move (client/MovingHud.luau reads the same remote), the collection (when it is there)
 	local moving = Net.get("Moving")
 	moving.OnClientEvent:Connect(function(kind: any, view: any)
 		if kind == "state" then
 			readMove(view)
-		end
-	end)
-	local lobby = Net.get("MoveLobby")
-	lobby.OnClientEvent:Connect(function(kind: any, view: any)
-		if kind == "lobby" then
-			state.planning = type(view) == "table"
-			state.planningMine = type(view) == "table" and view.mine == true
 		end
 	end)
 	task.spawn(function()

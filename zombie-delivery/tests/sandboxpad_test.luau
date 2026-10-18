@@ -78,9 +78,10 @@ check("words without a key or a chip: as they are", SandboxPad.notice("Sold Gran
 
 -- ── 8.3 keys: the sandbox's actions on every device ─────────────────────────
 local A = SandboxPad.Actions
--- The gamepad's map (the owner's): X the prompts and out of a seat, Y held for Sell and the van's Take out, R2 the grip,
--- B Put down and closing (held: the guide), L1 Danny's alone, R2 / L2 and the left stick Roblox's driving.
-check("the prompts on X (Use, out of a seat), the grip on R2", A.use.pad[1] == "ButtonX" and A.getout.pad[1] == "ButtonX" and A.grip.pad[1] == "ButtonR2" and #A.grip.pad == 1)
+-- The gamepad's map (the owner's): X the prompts, Y held for Sell and the van's Take out, R2 the grip, B Put down and
+-- closing (held: the guide), L1 Danny's alone, L2 the map. 10.6: no driving (no seat, no steering, no horn).
+check("the prompts on X (Use), the grip on R2", A.use.pad[1] == "ButtonX" and A.grip.pad[1] == "ButtonR2" and #A.grip.pad == 1)
+check("10.6: nothing to drive (no driving, steering, horn or getting out of a seat)", A.drive == nil and A.steer == nil and A.horn == nil and A.getout == nil)
 check("Y held for Sell and the van's Take out (server/Warehouse.luau's F, server/Moving.luau's Z)", A.sell.pad[1] == "ButtonY" and A.takeout.pad[1] == "ButtonY"
 	and A.sell.hold == true and A.takeout.hold == true and A.sell.key == "F" and A.takeout.key == "Z")
 check("B for Put down and closing; the guide's hold on B as on G", A.putdown.pad[1] == "ButtonB" and A.close.pad[1] == "ButtonB" and A.guide.pad[1] == "ButtonB"
@@ -121,8 +122,7 @@ check("…Q on no other action (E, F, C, J, K, B, G, P, O, T, Z, H are the sandb
 end)())
 check("…its words: \"Press Q\", \"Press R1\", \"Tap 📋\"; away \"Press B\"", SandboxPad.howTo("clipboard", "keys") == "Press Q" and SandboxPad.howTo("clipboard", "pad") == "Press R1"
 	and SandboxPad.howTo("clipboard", "touch") == "Tap 📋" and SandboxPad.howTo("stow", "pad") == "Press B", SandboxPad.howTo("clipboard", "touch"))
-check("driving: R2 on, L2 back, the left stick steers", table.concat(A.drive.pad, ",") == "ButtonR2,ButtonL2" and A.steer.pad[1] == "Thumbstick1")
-check("no button for the horn, the list or the chat", #A.horn.pad == 0 and #A.list.pad == 0 and #A.chat.pad == 0)
+check("no button for the list or the chat", #A.list.pad == 0 and #A.chat.pad == 0)
 local onPad, clashes = {}, {}
 for id, action in A do
 	for _, pad in action.pad do
@@ -134,27 +134,26 @@ for id, action in A do
 end
 check("no action on the D-pad (the chips' ← → ↓, Roblox's ↑)", #clashes == 0, table.concat(clashes, ", "))
 check("… nor on A (jump), L3 (sprint) or the right stick (the camera)", not onPad.ButtonA and not onPad.ButtonL3 and not onPad.Thumbstick2)
-check("the keyboard's keys as the key hints show them", A.use.key == "E" and A.grip.key == "LMB / F" and A.drive.key == "W/S" and A.steer.key == "A/D" and A.horn.key == "H"
-	and A.list.key == "O" and A.chat.key == "T")
+check("the keyboard's keys as the key hints show them", A.use.key == "E" and A.grip.key == "LMB / F" and A.list.key == "O" and A.chat.key == "T")
 
 check("keyFor: the key on a computer, the buttons' names with a gamepad, nothing on a phone",
 	SandboxPad.keyFor("use", "keys") == "E" and SandboxPad.keyFor("use", "pad") == "ButtonX" and SandboxPad.keyFor("use", "touch") == nil)
-check("… two buttons: \"ButtonR2/ButtonL2\"; none: nil; an unknown action: nil", SandboxPad.keyFor("drive", "pad") == "ButtonR2/ButtonL2" and SandboxPad.keyFor("horn", "pad") == nil
-	and SandboxPad.keyFor("horn", "keys") == "H" and SandboxPad.keyFor("nope", "keys") == nil)
+check("… no button: nil; an unknown action: nil", SandboxPad.keyFor("list", "pad") == nil and SandboxPad.keyFor("list", "keys") == "O"
+	and SandboxPad.keyFor("nope", "keys") == nil)
 check("pads: the buttons (empty for none or an unknown action)", SandboxPad.pads("grip")[1] == "ButtonR2" and #SandboxPad.pads("list") == 0 and #SandboxPad.pads("nope") == 0)
 check("a button's word: X, B, Y, R2, L2, L1, the left stick, the D-pad's arrows", SandboxPad.button("ButtonX") == "X" and SandboxPad.button("ButtonB") == "B" and SandboxPad.button("ButtonY") == "Y"
 	and SandboxPad.button("ButtonR2") == "R2" and SandboxPad.button("ButtonL2") == "L2" and SandboxPad.button("ButtonL1") == "L1" and SandboxPad.button("Thumbstick1") == "left stick"
 	and SandboxPad.button("DPadLeft") == "D-pad ←" and SandboxPad.button("Odd") == "Odd")
-check("keyWord: \"E\", \"X\", \"R2/L2\", \"left stick\"; nil on a phone or with no button",
-	SandboxPad.keyWord("use", "keys") == "E" and SandboxPad.keyWord("use", "pad") == "X" and SandboxPad.keyWord("drive", "pad") == "R2/L2"
-	and SandboxPad.keyWord("steer", "pad") == "left stick" and SandboxPad.keyWord("use", "touch") == nil and SandboxPad.keyWord("list", "pad") == nil)
+check("keyWord: \"E\", \"X\", \"R2\", \"L2\"; nil on a phone or with no button",
+	SandboxPad.keyWord("use", "keys") == "E" and SandboxPad.keyWord("use", "pad") == "X" and SandboxPad.keyWord("grip", "pad") == "R2"
+	and SandboxPad.keyWord("map", "pad") == "L2" and SandboxPad.keyWord("use", "touch") == nil and SandboxPad.keyWord("list", "pad") == nil)
 check("withKey: \"try again (E)\", \"try again (X)\", \"try again\" (a phone taps the prompt)", SandboxPad.withKey("try again", "use", "keys") == "try again (E)"
 	and SandboxPad.withKey("try again", "use", "pad") == "try again (X)" and SandboxPad.withKey("try again", "use", "touch") == "try again")
 check("… a key no gamepad button does: no bracket with a gamepad", SandboxPad.withKey("LIST", "list", "pad") == "LIST" and SandboxPad.withKey("LIST", "list", "keys") == "LIST (O)")
 check("howTo the grip: \"Press LMB / F\", \"Press R2\", \"Tap GRIP\"", SandboxPad.howTo("grip", "keys") == "Press LMB / F" and SandboxPad.howTo("grip", "pad") == "Press R2"
 	and SandboxPad.howTo("grip", "touch") == "Tap GRIP")
 check("howTo the guide: \"Hold G\", \"Hold B\", \"Tap 💡\"", SandboxPad.howTo("guide", "keys") == "Hold G" and SandboxPad.howTo("guide", "pad") == "Hold B" and SandboxPad.howTo("guide", "touch") == "Tap 💡")
-check("… a prompt on a phone: no way to name (the prompt itself is tapped); no button: nil", SandboxPad.howTo("use", "touch") == nil and SandboxPad.howTo("horn", "pad") == nil
+check("… a prompt on a phone: no way to name (the prompt itself is tapped); no button: nil", SandboxPad.howTo("use", "touch") == nil and SandboxPad.howTo("list", "pad") == nil
 	and SandboxPad.howTo("nope", "keys") == nil)
 local back = "Load it into the van: walk in or E at the back"
 check("say: a prompt's E standing alone in a computer's words stays", SandboxPad.say(back, "use", "keys") == back)

@@ -238,7 +238,6 @@ M.Juice = {
 		label.Text = M.MUi.money(amount)
 	end,
 }
-M.ItemModel = { view = function() return nil end, has = function() return false end }
 
 -- ── shared/FurnitureLooks.luau: the real catalogue, a recorded build ───────
 local real = require("./FurnitureLooksReal")

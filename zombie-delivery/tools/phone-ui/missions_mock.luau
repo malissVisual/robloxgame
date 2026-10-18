@@ -219,10 +219,7 @@ end
 function Ui.list(parent, vertical, gap)
 	M.make("UIListLayout", { FillDirection = if vertical then M.Enum.FillDirection.Vertical else M.Enum.FillDirection.Horizontal, Padding = M.UDim.new(0, gap) }, parent)
 end
-function Ui.padding(parent)
-	M.make("UIPadding", {}, parent)
-end
--- 6.18: the UI kit's corners (client/CardKit.luau draws the hero, the rows and the chips).
+-- 6.18: the UI kit's corners (client/CardKit.luau's chips and buttons).
 Ui.corner = M.Ui.corner
 function Ui.button(parent, text, size, c, onClick)
 	local made = M.make("TextButton", { Text = text, Size = size, BackgroundColor3 = c }, parent)
@@ -232,31 +229,9 @@ end
 function Ui.ghostButton(parent, text, size, _, onClick)
 	return Ui.button(parent, text, size, Contract.charcoal, onClick)
 end
-function Ui.bar(parent, size, c)
-	local back = M.make("Frame", { Name = "Bar", Size = size }, parent)
-	local fill = M.make("Frame", { Name = "Fill", Size = M.UDim2.fromScale(1, 1), BackgroundColor3 = c }, back)
-	return back, fill
-end
-function Ui.tabs(parent, items, onPick, options)
-	local holder = M.make("Frame", { Name = "Tabs" }, parent)
-	local buttons = {}
-	for _, item in items do
-		local button = M.make("TextButton", { Name = item.id .. "Tab", Text = item.text }, holder)
-		button.Activated:Connect(function()
-			onPick(item.id)
-		end)
-		buttons[item.id] = button
-	end
-	local tabs = { frame = holder, buttons = buttons, selected = options and options.selected }
-	function tabs.select(id)
-		tabs.selected = id
-	end
-	return tabs
-end
 function Ui.selectRow(card, on)
 	card:SetAttribute("Selected", on)
 end
-function Ui.tactile() end
 function Ui.heading(parent, title)
 	local holder = M.make("Frame", { Name = "Heading" }, parent)
 	return { frame = holder, title = Ui.label(holder, string.upper(title), M.UDim2.new(1, 0, 1, 0)), glyph = M.make("Frame", {}, holder) }
@@ -285,20 +260,7 @@ function Ui.window(parent, title, subtitle, _, size)
 	end)
 	return window, content, chrome
 end
-function Ui.icon(parent, _, fallback, size, props)
-	return Ui.label(parent, fallback, size, props)
-end
-function Ui.dashes(parent, _, _, c, size, position)
-	return M.make("Frame", { Size = size, Position = position, BackgroundColor3 = c }, parent)
-end
-function Ui.edge(parent, c)
-	return M.make("Frame", { Name = "Edge", BackgroundColor3 = c }, parent)
-end
 Ui.clear = M.Ui.clear
-function Ui.stars(count)
-	local n = math.clamp(count, 0, 3)
-	return string.rep("★", n) .. string.rep("☆", 3 - n)
-end
 function Ui.money(amount)
 	local text = tostring(math.floor(amount))
 	while true do

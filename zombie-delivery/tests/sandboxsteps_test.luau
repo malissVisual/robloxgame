@@ -27,8 +27,6 @@ local function state(fields: { [string]: any }): SandboxSteps.State
 		delivered = 0,
 		atHouse = false,
 		seated = false,
-		planning = false,
-		planningMine = false,
 		stock = 0,
 		shown = 0,
 		freeStands = nil,
@@ -99,10 +97,7 @@ do
 	check("stock but no free stand and nothing on show: walk to a portal", step.id == "portal", show(step))
 	step = SandboxSteps.decide(state({ stock = 2, move = true }))
 	check("a run wins over the stock", step.id == "door", show(step))
-	step = SandboxSteps.decide(state({ planning = true, planningMine = true }))
-	check("the planning open (yours): press LAUNCH", step.id == "plan" and step.target == nil and string.find(step.hint, "LAUNCH", 1, true) ~= nil, show(step))
-	step = SandboxSteps.decide(state({ planning = true }))
-	check("… a crew's: the owner launches", step.id == "planCrew" and step.target == nil, show(step))
+	check("10.6: no planning steps (no move's planning lobby since 9.7)", SandboxSteps.Steps.plan == nil and SandboxSteps.Steps.planCrew == nil)
 	check("9.7: no contract board, no drive steps (contract, drive, home, back gone)", SandboxSteps.Steps.contract == nil and SandboxSteps.Steps.drive == nil
 		and SandboxSteps.Steps.home == nil and SandboxSteps.Steps.back == nil)
 	local navs = 0
@@ -152,10 +147,6 @@ do
 	check("… its hint and guide quiet", not hint and not guide)
 	check("earn only says something (the client counts it done after a while)", SandboxSteps.Steps.earn.info and done.earn == nil
 		and Config.SandboxGuide.InfoSeconds >= 5 and Config.SandboxGuide.InfoSeconds <= 30)
-	local fresh: { [string]: boolean } = {}
-	local freshLast: SandboxSteps.Last = {}
-	SandboxSteps.doneBy(state({ planning = true }), fresh, freshLast)
-	check("the planning open: the way to a house was found (the portal step done)", fresh.portal == true and fresh.plan == nil)
 	local empty: { [string]: boolean } = {}
 	local emptyLast: SandboxSteps.Last = {}
 	SandboxSteps.doneBy(state({ move = true }), empty, emptyLast)
@@ -189,7 +180,7 @@ do
 	check("… pick up", SandboxSteps.text(Steps.inside, true) == "Carry the loot out to the truck (tap to pick up)", SandboxSteps.text(Steps.inside, true))
 	check("… the truck's back", SandboxSteps.text(Steps.load, true) == "Load the truck: walk in or tap at its back", SandboxSteps.text(Steps.load, true))
 	check("… a computer keeps E (the door: its own words, no key)", SandboxSteps.text(Steps.door, false) == Steps.door.hint and SandboxSteps.text(Steps.load, false) == Steps.load.hint)
-	check("… words without a key unchanged (LAUNCH, FINISH keep their words)", SandboxSteps.text(Steps.plan, true) == Steps.plan.hint and SandboxSteps.text(Steps.finish, true) == Steps.finish.hint
+	check("… words without a key unchanged (FINISH keeps its words)", SandboxSteps.text(Steps.finish, true) == Steps.finish.hint
 		and SandboxSteps.text(Steps.portal, true) == Steps.portal.hint)
 end
 
@@ -360,7 +351,6 @@ do
 	-- the priority: the core loop wins
 	check("a run wins over every soft step", chosen(rich({ move = true })).id == "door" and chosen(rich({ move = true, vanLoad = 3 })).id == "finish"
 		and chosen(rich({ move = true, inside = true })).id == "inside" and chosen(rich({ move = true, carrying = true })).id == "load")
-	check("… the planning too", chosen(rich({ planning = true, planningMine = true })).id == "plan")
 	check("… a core step not done yet (putting the pieces on show)", chosen(rich(), nothing).id == "show")
 	check("… walking to a portal not done yet (nothing in the warehouse)", chosen(rich({ stock = 0, shown = 0 }), nothing).id == "portal")
 	check("… but `earn`, which only says something, gives way", chosen(rich({ stock = 2, shown = 4, freeStands = 0 }), nothing).id == "grow"
@@ -618,8 +608,8 @@ do
 		and chosen(selling({ players = NONE })).id ~= "sell")
 	check("… not with a sign up already, nor before the collection's state came (signs not known)", chosen(selling({ signs = 1 })).id ~= "sell"
 		and chosen(selling({ signs = NONE })).id ~= "sell")
-	check("… never in a move or its planning (it never interrupts a move)", chosen(selling({ move = true })).id == "door"
-		and chosen(selling({ move = true, atHouse = true, inside = true })).id == "inside" and chosen(selling({ planning = true, planningMine = true })).id == "plan")
+	check("… never in a move (it never interrupts a move)", chosen(selling({ move = true })).id == "door"
+		and chosen(selling({ move = true, atHouse = true, inside = true })).id == "inside")
 	check("… never while something covers the screen or something else talks (a first-time hint)", chosen(selling({ covered = true })).id ~= "sell"
 		and chosen(selling({ hush = true })).id ~= "sell")
 	check("… after a core step not done yet (pieces in the stock, a stand free: put them on show first)", chosen(selling({ stock = 2, freeStands = 2 })).id == "show")

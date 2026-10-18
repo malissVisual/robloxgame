@@ -124,7 +124,8 @@ function PairSteer.holding(): boolean
 	return pairOf(player.Character)
 end
 
--- 8.3 the most this body may walk with a move's piece in its hands: the server's CarrySpeed × the boosts (nil: none).
+-- 8.3 the most this body may walk with a move's piece in its hands: the server's CarrySpeed (nil: none). (10.6: no
+-- admin's or kit's boost: nothing sets AdminSpeed or KitSpeed any more.)
 local function capOf(character: Model?): number?
 	if not character or character:GetAttribute("MoveCarry") == nil then
 		return nil
@@ -133,7 +134,7 @@ local function capOf(character: Model?): number?
 	if type(speed) ~= "number" or speed ~= speed or speed < 0 then
 		return nil
 	end
-	return speed * PairCarry.boost(player:GetAttribute("AdminSpeed"), character:GetAttribute("KitSpeed"))
+	return speed
 end
 
 function PairSteer.cap(): number?

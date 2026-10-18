@@ -5,8 +5,6 @@
 -- rectangles, compact white type, fine grey lines, small precise red accents. No tilts, stubs, lifts, bounces or
 -- pastels. The helpers keep their 3.6 signatures, so every module that calls them wears the new look:
 --
---   Ui.panel(parent, size, position, anchor?) -> Frame
---       a charcoal card (the HUD's cards): a scrim (Theme.PanelTransparency), square, a fine line.
 --   Ui.button(parent, text, size, color, onClick) -> TextButton
 --       a flat rectangle with a fine line. `color` says what it means (Theme.soft): yellow / green / money are the
 --       MAIN action (raised charcoal, a thin red rule along its bottom, an arrow when there is room), red / blue /
@@ -19,22 +17,16 @@
 --   Ui.ghostButton(parent, text, size, accent?, onClick) -> TextButton   a plain text action (no surface).
 --   Ui.closeButton(parent, onClick) -> TextButton   a "✕" in a 40 × 40 square outline (44 × 44 to hit on touch);
 --       hover raises it and turns the outline red.
---   Ui.chip(parent, text, color?, textColor?) -> TextLabel   a compact tag: dark face, the meaning's fine outline.
 --   Ui.keyChip(parent, key, size, accent?, props?) -> TextLabel   a key ("M", "ESC") in a square outline.
 --   Ui.caps(parent, text, size, props?) -> TextLabel   a small caps label (12 px, the secondary text).
---   Ui.bar(parent, size, color) -> (back, fill)   a thin square bar on a dark track.
 --
 -- 5.8, the courier phone's marks (design/phone-ui/) for every window:
 --   Ui.brand(parent, size?, props?) -> Frame   the company's mark: the red square and the "DELIVEROS" wordmark (8.9: was ZDC).
---   Ui.glyph(slot, id, size?)   draws the phone's white line glyph `id` (PhoneContract: "board", "missions", "garage",
---       "estate", "bank", "crew", "top", "career", "settings", "shop", "bag", "orders", "map", "messages"; "" clears).
+--   Ui.glyph(slot, id, size?)   draws the white line glyph `id` (PhoneContract: "map", "settings"; "" clears).
 --   Ui.glyphFor(icon?) -> string   the glyph id for a window's emoji icon ("" when none fits).
 --   Ui.heading(parent, title, options?) -> Heading   one header line: [■ ZDC] | [glyph] TITLE in caps.
 --       options: { glyph: string?, brand: boolean?, textSize: number?, height: number? };
 --       Heading: { frame, brand, glyph, title }.
---   Ui.tabs(parent, items, onPick, options?) -> Tabs   square tabs, the open one raised with a red underline.
---       items: { { id: string, text: string } }; onPick(id); options: { selected, vertical, width, height, gap,
---       textSize }; Tabs: { frame, buttons (by id), selected, select(id?) }.
 --
 -- The 3.6 shapes, flattened in 3.8:
 --   Ui.window(parent, title, subtitle, icon?, size?, options?) -> (frame, content, chrome)
@@ -51,22 +43,15 @@
 --       are ignored (kept for the callers); with stubWidth the right column is a plain content area (the stub).
 --       Ui.selectRow(card, on) gives it (or any row) the selected look: raised, a brighter hairline and a narrow red
 --       rule down its left edge, outside the card's padding (keep a layout inside the body, not on the card).
---   Ui.tactile(target, lift?, hoverScale?)   a hover brightens the target's surface (no lift, no tilt, no growth).
---   Ui.tag(parent, text, index, size?, onClick?) -> (tag, parts)
---       a compact square tile (the consumables): a dark face, a fine line, the name over it on hover / gamepad focus.
---       parts: { key (top left), count (bottom right), label, lip (the hover underline) }.
---   Ui.dial(parent, diameter, position?, anchor?) -> Dial
---       the same API as 3.6's speed dial, drawn as compact text (no circle, no ticks; the needle is hidden).
---   Ui.dashes(parent, vertical, count, color, size, position) -> Frame   a fine solid line (count is ignored).
+-- 10.6: the city's pieces nobody draws any more are gone (the HUD's panel, the chip, the bar, the dashes, the edge,
+-- the square tabs, the consumables' tag and its hover, the speed dial, the danger stars, the padding).
 --
--- Touch: on the touch layout a button, a ghost button, a close action or a tag smaller than 44 px gets invisible
+-- Touch: on the touch layout a button, a ghost button or a close action smaller than 44 px gets invisible
 -- margins around it, so its hit area is at least 44 × 44 screen pixels (the drawing stays compact).
 
 local GuiService = game:GetService("GuiService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
-local Icons = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Icons"))
 local Theme = require(script.Parent.Theme)
 local Ui = {}
 Ui.Colors = Theme.Colors
@@ -166,11 +151,6 @@ function Ui.stroke(parent: Instance, color: Color3?, thickness: number?): any
 	return border
 end
 
-function Ui.padding(parent: Instance, pixels: number)
-	local p = UDim.new(0, pixels)
-	Ui.make("UIPadding", { PaddingLeft = p, PaddingRight = p, PaddingTop = p, PaddingBottom = p }, parent)
-end
-
 function Ui.list(parent: Instance, vertical: boolean, gap: number, align: Enum.HorizontalAlignment?)
 	Ui.make("UIListLayout", {
 		FillDirection = if vertical then Enum.FillDirection.Vertical else Enum.FillDirection.Horizontal,
@@ -180,44 +160,7 @@ function Ui.list(parent: Instance, vertical: boolean, gap: number, align: Enum.H
 	}, parent)
 end
 
--- A charcoal card (the HUD's cards; the windows use Ui.window).
-function Ui.panel(parent: Instance, size: UDim2, position: UDim2, anchor: Vector2?): any
-	local frame = Ui.make("Frame", {
-		Size = size,
-		Position = position,
-		AnchorPoint = anchor or Vector2.zero,
-		BackgroundColor3 = K.charcoal,
-		BackgroundTransparency = Theme.PanelTransparency,
-		BorderSizePixel = 0,
-	}, parent)
-	Ui.corner(frame, Theme.PanelRadius)
-	Ui.stroke(frame, Theme.Border, 1)
-	return frame
-end
-
--- 3.8: a fine solid line (3.6 drew it dashed; `count` is ignored) of `size` at `position`.
-function Ui.dashes(parent: Instance, vertical: boolean, count: number, color: Color3, size: UDim2, position: UDim2): any
-	local _ = vertical and count
-	local line = Ui.make("Frame", { Name = "Dashes", Size = size, Position = position, BackgroundTransparency = 1 }, parent)
-	Ui.make("Frame", { Name = "Line", Size = UDim2.fromScale(1, 1), BackgroundColor3 = color, BorderSizePixel = 0 }, line)
-	return line
-end
-
 -- ── The small pieces ──────────────────────────────────────────────────────
-
--- A thin accent rule down the left edge of a card: `inset` px in, a little shorter than the card. It sits outside any
--- layout of the card: give the card's content a frame of its own when it has a UIListLayout.
-function Ui.edge(parent: Instance, color: Color3, inset: number?): any
-	return Ui.make("Frame", {
-		Name = "Edge",
-		Size = UDim2.new(0, 2, 1, -16),
-		Position = UDim2.new(0, inset or 7, 0.5, 0),
-		AnchorPoint = Vector2.new(0, 0.5),
-		BackgroundColor3 = color,
-		BorderSizePixel = 0,
-		ZIndex = 2,
-	}, parent)
-end
 
 -- A small caps label (HeadingFont, upper case, the secondary text): the names of things, the units, the keys.
 function Ui.caps(parent: Instance, text: string, size: UDim2, props: { [string]: any }?): any
@@ -706,84 +649,6 @@ function Ui.closeButton(parent: Instance, onClick: () -> ()): any
 	return close
 end
 
--- A compact tag that grows with its text (cargo counts, rewards): a dark face (Theme.soft of `color`) with a fine
--- outline in the meaning's accent; a `textColor` that would not read on it falls back to the light text.
-function Ui.chip(parent: Instance, text: string, color: Color3?, textColor: Color3?): any
-	local look = Theme.soft(color or Ui.Colors.panelLight)
-	local chip = Ui.make("TextLabel", {
-		Size = UDim2.new(0, 0, 1, 0),
-		AutomaticSize = Enum.AutomaticSize.X,
-		BackgroundColor3 = look.face,
-		BackgroundTransparency = 0,
-		BorderSizePixel = 0,
-		Text = text,
-		TextColor3 = Theme.readable(textColor or look.text, look.face),
-		Font = Theme.HeadingFont,
-		TextSize = 12,
-	}, parent)
-	Ui.corner(chip, Theme.Radius)
-	local outline = Ui.stroke(chip, look.lip, 1)
-	outline.Transparency = if look.quiet or look.lip == K.rule then 0 else 0.4
-	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 7), PaddingRight = UDim.new(0, 7) }, chip)
-	-- A caller's later colours get the same treatment.
-	chip:GetPropertyChangedSignal("BackgroundColor3"):Connect(function()
-		if Theme.isFace(chip.BackgroundColor3) or Theme.same(chip.BackgroundColor3, look.face) then
-			return
-		end
-		look = Theme.soft(chip.BackgroundColor3)
-		chip.BackgroundColor3 = look.face
-		outline.Color = look.lip
-		chip.TextColor3 = Theme.readable(chip.TextColor3, look.face)
-	end)
-	chip:GetPropertyChangedSignal("TextColor3"):Connect(function()
-		local fixed = Theme.readable(chip.TextColor3, chip.BackgroundColor3)
-		if not Theme.same(fixed, chip.TextColor3) then
-			chip.TextColor3 = fixed
-		end
-	end)
-	return chip
-end
-
--- An icon from the icon set (shared/Icons.luau): an ImageLabel when its asset id is filled in, else a label with the
--- emoji / text fallback (what the interface always showed). props go to whichever it is: the Text* and Font ones only
--- to the fallback label, the Image* and ScaleType ones only to the image (ImageColor3 tints the white icon; white
--- when not given), the rest (Position, AnchorPoint, LayoutOrder, ZIndex, ...) to both.
-function Ui.icon(parent: Instance, iconName: string?, fallback: string, size: UDim2, props: { [string]: any }?): GuiObject
-	local id = Icons.get(iconName)
-	local given: { [string]: any } = props or {}
-	if not id then
-		local textProps: { [string]: any } = {}
-		for key, value in given do
-			if string.sub(key, 1, 5) ~= "Image" and key ~= "ScaleType" then
-				textProps[key] = value
-			end
-		end
-		return Ui.label(parent, fallback, size, textProps)
-	end
-	local image = Ui.make("ImageLabel", {
-		Name = iconName,
-		Size = size,
-		BackgroundTransparency = 1,
-		BorderSizePixel = 0,
-		Image = id,
-		ScaleType = Enum.ScaleType.Fit,
-		ImageColor3 = Color3.new(1, 1, 1),
-	}, parent)
-	for key, value in given do
-		if string.sub(key, 1, 4) ~= "Text" and key ~= "Font" and key ~= "RichText" then
-			image[key] = value
-		end
-	end
-	return image
-end
-
--- A thin square bar: `color` on a dark track.
-function Ui.bar(parent: Instance, size: UDim2, color: Color3): (any, any)
-	local back = Ui.make("Frame", { Size = size, BackgroundColor3 = K.track, BorderSizePixel = 0 }, parent)
-	local fill = Ui.make("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = color, BorderSizePixel = 0 }, back)
-	return back, fill
-end
-
 function Ui.clear(parent: Instance)
 	for _, child in parent:GetChildren() do
 		if child:IsA("GuiObject") then
@@ -878,57 +743,6 @@ function Ui.selectRow(card: GuiObject, on: boolean)
 	end
 end
 
--- Hover for a row or a control (or any GuiObject inside one): its surface brightens a little (100 – 140 ms), with no
--- lift, tilt or growth. A transparent holder (Ui.ticket's) brightens its "Card". `lift` and `hoverScale` are ignored
--- (kept for the callers). Touch taps activate at once (no hover step). The tween is cancelled when it is destroyed.
-function Ui.tactile(target: GuiObject, lift: number?, hoverScale: number?)
-	local _ = lift and hoverScale
-	if target:FindFirstChild("PressVeil") then
-		return -- a Ui.button: it has its own hover
-	end
-	local surface: GuiObject = target
-	if target.BackgroundTransparency >= 1 then
-		local card = target:FindFirstChild("Card")
-		if card and card:IsA("GuiObject") then
-			surface = card
-		end
-	end
-	local tweens: { [string]: Tween } = {}
-	local resting: Color3? = nil -- the caller's colour, while we brighten it
-	local lit: Color3? = nil
-	local function hover(on: boolean)
-		if on then
-			if resting == nil then
-				resting = surface.BackgroundColor3
-			end
-			local base = resting :: Color3
-			local goal = base:Lerp(WHITE, 0.05)
-			lit = goal
-			play(tweens, "face", surface, HOVER_INFO, { BackgroundColor3 = goal })
-		else
-			local base = resting
-			resting = nil
-			local mine = lit
-			local running: Tween? = tweens.face
-			if base and mine then
-				-- Only undo our own brightening (a caller that recoloured it meanwhile keeps its colour).
-				local ours = Theme.same(surface.BackgroundColor3, mine)
-					or (if running then running.PlaybackState == Enum.PlaybackState.Playing else false)
-				if ours then
-					play(tweens, "face", surface, HOVER_INFO, { BackgroundColor3 = base })
-				end
-			end
-		end
-	end
-	target.MouseEnter:Connect(function() hover(true) end)
-	target.MouseLeave:Connect(function() hover(false) end)
-	target.SelectionGained:Connect(function() hover(true) end)
-	target.SelectionLost:Connect(function() hover(false) end)
-	target.Destroying:Connect(function()
-		cancelAll(tweens)
-	end)
-end
-
 -- ── The ZDC mark, the line glyphs and the heading (5.8, the phone's look) ─
 
 -- Keeps a label in upper case (the small caps labels a caller may set later).
@@ -977,28 +791,11 @@ function Ui.brand(parent: Instance, size: number?, props: { [string]: any }?): a
 	return frame
 end
 
--- The phone's app glyph (client/PhoneContract's GLYPHS) for the icons the windows pass to Ui.window: "" for none.
+-- The line glyph (client/PhoneContract's GLYPHS) for the icons the windows pass to Ui.window: "" for none.
 local ICON_GLYPHS: { [string]: string } = {
-	["📋"] = "board",
-	["💼"] = "board",
-	["🎯"] = "missions",
-	["🅿"] = "garage",
-	["🚗"] = "garage",
-	["🏠"] = "estate",
-	["🏢"] = "bank",
-	["🏦"] = "bank",
-	["👥"] = "crew",
-	["🏆"] = "top",
-	["🎖"] = "career",
-	["🛠"] = "settings",
+	["🛠"] = "settings", -- the admin panel
 	["⚙"] = "settings",
-	["🏪"] = "shop",
-	["🛒"] = "shop",
-	["🎒"] = "bag",
-	["🛍"] = "bag", -- 6.6: the bag (no backpacks any more)
-	["📦"] = "orders",
 	["🗺"] = "map",
-	["💬"] = "messages",
 }
 
 -- The line glyph id for a window's `icon` (an emoji, with or without its emoji variation selector), "" if none fits.
@@ -1014,7 +811,7 @@ end
 -- is drawn (both have loaded by then), through a plain Instance so the analyzer sees no require cycle.
 local glyphKit: any = nil
 
--- Draws the phone's white line glyph `id` ("board", "missions", "garage", "map" ...; "" clears it) centred in `slot`,
+-- Draws the white line glyph `id` ("map", "settings"; "" clears it) centred in `slot`,
 -- `size` px (default: the slot's width less 4). Replaces what the slot held; the slot's "Glyph" attribute names it.
 function Ui.glyph(slot: GuiObject, id: string, size: number?)
 	for _, child in slot:GetChildren() do
@@ -1115,9 +912,8 @@ Ui.WindowHeader = 78 -- px at scale 1: the header over the content
 Ui.WindowFooter = 40 -- px at scale 1: the footer under it
 
 export type WindowOptions = {
-	-- The header's line glyph (a PhoneContract id: "board", "missions", "garage", "estate", "bank", "crew", "top",
-	-- "career", "settings", "shop", "bag", "orders", "map", "messages"; "" for none). Default: the one that matches
-	-- `icon` (Ui.glyphFor), which also follows a later chrome.icon.Text (the shop, the result).
+	-- The header's line glyph (a PhoneContract id: "map", "settings"; "" for none). Default: the one that matches
+	-- `icon` (Ui.glyphFor), which also follows a later chrome.icon.Text.
 	glyph: string?,
 	brand: boolean?, -- the ZDC mark at the left of the header (default true)
 }
@@ -1164,8 +960,8 @@ local function shown(object: GuiObject): boolean
 	return false
 end
 
--- A charcoal window: see the top of this file. `icon` (an Icons name or an emoji) is kept in a hidden badge for the
--- callers that still reach it (chrome.icon) and picks the header's line glyph (options.glyph overrides it).
+-- A charcoal window: see the top of this file. `icon` (an emoji) is kept in a hidden badge for the callers that still
+-- reach it (chrome.icon) and picks the header's line glyph (options.glyph overrides it).
 function Ui.window(parent: Instance, title: string, subtitle: string, icon: string?, size: UDim2?, options: WindowOptions?): (any, any, WindowChrome)
 	local o: WindowOptions = options or {}
 	local frame = Ui.make("Frame", {
@@ -1197,17 +993,16 @@ function Ui.window(parent: Instance, title: string, subtitle: string, icon: stri
 		BorderSizePixel = 0,
 	}, header)
 	local badge = Ui.make("Frame", { Name = "Badge", Size = UDim2.fromOffset(24, 24), BackgroundTransparency = 1, Visible = false }, header)
-	local iconObject = Ui.icon(badge, icon, icon or "", UDim2.fromOffset(24, 24), {
+	local iconObject = Ui.label(badge, icon or "", UDim2.fromOffset(24, 24), {
 		TextSize = 18,
 		TextXAlignment = Enum.TextXAlignment.Center,
 		TextColor3 = K.secondary,
-		ImageColor3 = K.secondary,
 	})
 	local heading = Ui.heading(header, title, { glyph = o.glyph or Ui.glyphFor(icon), brand = o.brand, textSize = 20, height = 30 })
 	heading.frame.Size = UDim2.new(1, -(24 + 64), 0, 30) -- (the ✕ and a gap on the right)
 	heading.frame.Position = UDim2.fromOffset(24, 11)
 	local titleLabel = heading.title
-	-- The glyph follows the icon a caller sets later (the shop's kind, the result's ⚠), unless options.glyph pinned it.
+	-- The glyph follows the icon a caller sets later (chrome.icon.Text), unless options.glyph pinned it.
 	if o.glyph == nil and iconObject:IsA("TextLabel") then
 		local label = iconObject :: TextLabel
 		label:GetPropertyChangedSignal("Text"):Connect(function()
@@ -1317,407 +1112,6 @@ function Ui.window(parent: Instance, title: string, subtitle: string, icon: stri
 	return frame, content, chrome
 end
 
--- ── Tabs (5.8, the phone's square tabs) ───────────────────────────────────
-
-export type TabItem = { id: string, text: string }
-export type TabOptions = {
-	selected: string?, -- the open tab's id (none when nil)
-	vertical: boolean?, -- a column of full-width tabs (a sidebar of filters) instead of a row
-	width: number?, -- each tab's width (a row: default, at least 72 px and as wide as its text; a column: full width)
-	height: number?, -- each tab's height (default 36; never under 36)
-	gap: number?, -- the space between two tabs (default 4)
-	textSize: number?, -- default 13
-}
-export type Tabs = {
-	frame: Frame, -- the row / column (a UIListLayout inside): the caller places and sizes it, .LayoutOrder included
-	buttons: { [string]: TextButton }, -- the tabs by id (gamepad focus: Ui.gamepadFocus(tabs.buttons[id]))
-	selected: string?, -- the open tab's id
-	select: (id: string?) -> (), -- paints `id` as the open one (no onPick)
-}
-
--- A row (or a column) of square tabs in the phone's look: caps on a hairline outline; the open one raised, white, with
--- a red underline (a column: a red bar down its left edge); hover / gamepad focus brightens a closed one. A click plays
--- the click sound, opens the tab (tabs.select) and calls onPick(id) — also for the open tab, so a caller can refresh.
--- On the touch layout each tab gets hit margins up to 44 px.
-function Ui.tabs(parent: Instance, items: { TabItem }, onPick: (id: string) -> (), options: TabOptions?): Tabs
-	local o: TabOptions = options or {}
-	local vertical = o.vertical == true
-	local height = math.max(36, o.height or 36)
-	local gap = o.gap or 4
-	local frame = Ui.make("Frame", {
-		Name = "Tabs",
-		Size = if vertical then UDim2.new(1, 0, 0, #items * (height + gap)) else UDim2.new(1, 0, 0, height),
-		BackgroundTransparency = 1,
-	}, parent)
-	Ui.list(frame, vertical, gap)
-	local pad = 14
-	local tabs: Tabs
-	local buttons: { [string]: TextButton } = {}
-	local hovered: { [string]: boolean } = {}
-	local function paint(id: string)
-		local button = buttons[id]
-		local on = tabs.selected == id
-		button:SetAttribute("On", on)
-		button.BackgroundTransparency = if on then 0 elseif hovered[id] then 0.5 else 1
-		button.TextColor3 = if on or hovered[id] then K.text else K.secondary
-		local rule = button:FindFirstChild("Rule")
-		if rule and rule:IsA("GuiObject") then
-			rule.Visible = on
-		end
-		local line = button:FindFirstChild("Outline")
-		if line and line:IsA("UIStroke") then
-			line.Transparency = if on then 0.5 else 0.7
-		end
-	end
-	local function select(id: string?)
-		tabs.selected = id
-		for other in buttons do
-			paint(other)
-		end
-	end
-	tabs = { frame = frame, buttons = buttons, selected = o.selected, select = select }
-	for i, item in items do
-		local id = item.id
-		local button = Ui.make("TextButton", {
-			Name = "Tab_" .. id,
-			Size = if vertical then UDim2.new(1, 0, 0, height) else UDim2.fromOffset(o.width or 72, height),
-			AutomaticSize = if vertical or o.width then Enum.AutomaticSize.None else Enum.AutomaticSize.X,
-			BackgroundColor3 = K.raised,
-			BackgroundTransparency = 1,
-			BorderSizePixel = 0,
-			AutoButtonColor = false,
-			Text = string.upper(item.text),
-			Font = Theme.HeadingFont,
-			TextSize = o.textSize or 13,
-			TextColor3 = K.secondary,
-			TextXAlignment = if vertical then Enum.TextXAlignment.Left else Enum.TextXAlignment.Center,
-			TextTruncate = Enum.TextTruncate.AtEnd,
-			LayoutOrder = i,
-		}, frame)
-		Ui.make("UIPadding", { PaddingLeft = UDim.new(0, pad), PaddingRight = UDim.new(0, pad) }, button)
-		Ui.make("UIStroke", { Name = "Outline", ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Color = K.line, Thickness = 1, Transparency = 0.7 }, button)
-		-- The open tab's red mark (placed outside the padding): under a row's tab, down a column's left edge.
-		Ui.make("Frame", {
-			Name = "Rule",
-			Size = if vertical then UDim2.new(0, 2, 1, 0) else UDim2.new(1, pad * 2, 0, 2),
-			Position = if vertical then UDim2.fromOffset(-pad, 0) else UDim2.new(0, -pad, 1, -2),
-			BackgroundColor3 = K.red,
-			BorderSizePixel = 0,
-			Visible = false,
-			ZIndex = button.ZIndex + 1,
-		}, button)
-		buttons[id] = button
-		local function hover(on: boolean)
-			hovered[id] = on
-			paint(id)
-		end
-		button.MouseEnter:Connect(function() hover(true) end)
-		button.MouseLeave:Connect(function() hover(false) end)
-		button.SelectionGained:Connect(function() hover(true) end)
-		button.SelectionLost:Connect(function() hover(false) end)
-		local function fire()
-			click(function()
-				select(id)
-				onPick(id)
-			end)
-		end
-		button.Activated:Connect(fire)
-		touchMargins(button, fire)
-	end
-	select(o.selected)
-	return tabs
-end
-
--- ── The tag (the consumables) ─────────────────────────────────────────────
-
-export type TagParts = { key: TextLabel, count: TextLabel, label: TextLabel, lip: Frame }
-
--- A compact square tile (the consumables): see the top of this file. `text` is its face (an emoji; set it to "" and
--- put an Ui.icon in it for a picture).
-function Ui.tag(parent: Instance, text: string, index: number, size: UDim2?, onClick: (() -> ())?): (any, TagParts)
-	local _ = index -- 3.8: every tile wears the same face (3.6 alternated pastels and tilts by index)
-	local tag = Ui.make("TextButton", {
-		Name = "Tag",
-		Size = size or UDim2.fromOffset(46, 50),
-		BackgroundColor3 = K.charcoal,
-		BackgroundTransparency = 0.15,
-		BorderSizePixel = 0,
-		Text = text,
-		TextColor3 = K.text,
-		Font = Theme.HeadingFont,
-		TextSize = 20,
-		AutoButtonColor = false,
-	}, parent)
-	Ui.stroke(tag, K.rule, 1).Transparency = 0
-	-- The hover / focus underline (the red edge marker).
-	local lip = Ui.make("Frame", {
-		Name = "Lip",
-		AnchorPoint = Vector2.new(0, 1),
-		Position = UDim2.fromScale(0, 1),
-		Size = UDim2.new(1, 0, 0, 2),
-		BackgroundColor3 = K.red,
-		BackgroundTransparency = 1,
-		BorderSizePixel = 0,
-	}, tag)
-	local key = Ui.label(tag, "", UDim2.fromOffset(16, 14), {
-		Name = "KeyNumber",
-		Position = UDim2.fromOffset(4, 2),
-		Font = Theme.MonoFont,
-		TextSize = 11,
-		TextColor3 = K.secondary,
-		TextWrapped = false,
-	})
-	local count = Ui.label(tag, "", UDim2.fromOffset(24, 14), {
-		Name = "Count",
-		AnchorPoint = Vector2.new(1, 1),
-		Position = UDim2.new(1, -4, 1, -4),
-		Font = Theme.MonoFont,
-		TextSize = 11,
-		TextColor3 = K.text,
-		TextXAlignment = Enum.TextXAlignment.Right,
-		TextWrapped = false,
-	})
-	-- The name over it: shows on hover / gamepad focus.
-	local label = Ui.label(tag, "", UDim2.fromOffset(0, 24), {
-		Name = "Label",
-		AutomaticSize = Enum.AutomaticSize.X,
-		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 0, -8),
-		BackgroundTransparency = 0.1,
-		BackgroundColor3 = K.charcoal,
-		Font = Theme.HeadingFont,
-		TextSize = 12,
-		TextColor3 = K.text,
-		TextWrapped = false,
-		Visible = false,
-		ZIndex = 5,
-	})
-	Ui.make("UIPadding", { PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8) }, label)
-	local tweens: { [string]: Tween } = {}
-	local function name(on: boolean)
-		label.Visible = on and label.Text ~= ""
-		play(tweens, "lip", lip, HOVER_INFO, { BackgroundTransparency = if on then 0 else 1 })
-	end
-	tag.MouseEnter:Connect(function() name(true) end)
-	tag.MouseLeave:Connect(function()
-		name(false)
-		tag.TextTransparency = 0
-	end)
-	tag.SelectionGained:Connect(function() name(true) end)
-	tag.SelectionLost:Connect(function() name(false) end)
-	tag.InputBegan:Connect(function(input: InputObject)
-		if isPress(input) then
-			tag.TextTransparency = 0.4
-		end
-	end)
-	tag.InputEnded:Connect(function(input: InputObject)
-		if isPress(input) then
-			tag.TextTransparency = 0
-		end
-	end)
-	tag.Destroying:Connect(function()
-		cancelAll(tweens)
-	end)
-	Ui.tactile(tag)
-	if onClick then
-		local function fire()
-			click(onClick)
-		end
-		tag.Activated:Connect(fire)
-		touchMargins(tag, fire)
-	end
-	return tag, { key = key, count = count, label = label, lip = lip }
-end
-
--- ── The dial (3.6's speed dial, compact text since 3.8) ───────────────────
-
-export type Dial = {
-	frame: Frame,
-	face: CanvasGroup,
-	title: TextLabel,
-	value: TextLabel,
-	unit: TextLabel,
-	caption: TextLabel,
-	percent: TextLabel,
-	barBack: Frame,
-	barFill: Frame,
-	pips: Frame,
-	pipsLabel: TextLabel,
-	needle: Frame,
-	setNeedle: (fraction: number) -> (),
-	setBar: (fraction: number, color: Color3?) -> (),
-	setPips: (filled: number, total: number, text: string?) -> (),
-	setDim: (on: boolean) -> (),
-}
-
--- The 3.6 dial's API as a compact, right-aligned text group in a `diameter` square (the space the old dial took):
--- the title in small caps, the value with its unit, the condition (caption, percent, a thin bar), the slots as small
--- squares and their line. No circle and no ticks; the needle exists but stays hidden. No text under 12 px.
-function Ui.dial(parent: Instance, diameter: number, position: UDim2?, anchor: Vector2?): Dial
-	local d = diameter
-	local s = d / 210
-	local function px(value: number): number
-		return math.max(12, math.floor(value * s + 0.5))
-	end
-	local frame = Ui.make("Frame", {
-		Name = "Dial",
-		Size = UDim2.fromOffset(d, d),
-		Position = position or UDim2.new(),
-		AnchorPoint = anchor or Vector2.zero,
-		BackgroundTransparency = 1,
-	}, parent)
-	local face = Ui.make("CanvasGroup", {
-		Name = "Face",
-		Size = UDim2.fromScale(1, 1),
-		BackgroundTransparency = 1,
-		BorderSizePixel = 0,
-		GroupTransparency = 0,
-	}, frame)
-	local needle = Ui.make("Frame", { Name = "Needle", Size = UDim2.fromOffset(2, 2), BackgroundTransparency = 1, Visible = false }, face)
-	local function setNeedle(fraction: number)
-		needle:SetAttribute("Fraction", math.clamp(fraction, 0, 1))
-	end
-	local right = Enum.TextXAlignment.Right
-	local title = Ui.caps(face, "", UDim2.new(1, 0, 0, px(14)), {
-		Name = "Title",
-		Position = UDim2.fromScale(0, 0.2),
-		TextSize = px(12),
-		TextXAlignment = right,
-	})
-	local speedRow = Ui.make("Frame", {
-		Name = "Speed",
-		Size = UDim2.new(1, 0, 0, math.floor(44 * s)),
-		Position = UDim2.new(0, 0, 0.2, px(16)),
-		BackgroundTransparency = 1,
-	}, face)
-	Ui.make("UIListLayout", {
-		FillDirection = Enum.FillDirection.Horizontal,
-		HorizontalAlignment = Enum.HorizontalAlignment.Right,
-		VerticalAlignment = Enum.VerticalAlignment.Bottom,
-		Padding = UDim.new(0, math.floor(4 * s)),
-		SortOrder = Enum.SortOrder.LayoutOrder,
-	}, speedRow)
-	local value = Ui.label(speedRow, "0", UDim2.fromScale(0, 1), {
-		Name = "Value",
-		AutomaticSize = Enum.AutomaticSize.X,
-		Font = Theme.HeadingFont,
-		TextSize = math.max(18, math.floor(36 * s)),
-		TextColor3 = K.text,
-		TextWrapped = false,
-		TextXAlignment = right,
-		LayoutOrder = 1,
-	})
-	local unit = Ui.label(speedRow, "KM/H", UDim2.fromOffset(0, px(14) + math.floor(6 * s)), {
-		Name = "Unit",
-		AutomaticSize = Enum.AutomaticSize.X,
-		Font = Theme.HeadingFont,
-		TextSize = px(12),
-		TextColor3 = K.secondary,
-		TextWrapped = false,
-		TextYAlignment = Enum.TextYAlignment.Top,
-		LayoutOrder = 2,
-	})
-	local caption = Ui.caps(face, "Vehicle condition", UDim2.new(1, -48, 0, px(14)), {
-		Name = "Caption",
-		Position = UDim2.new(0, 0, 0.58, 0),
-	})
-	caption.TextSize = px(12)
-	local percent = Ui.label(face, "", UDim2.fromOffset(44, px(14)), {
-		Name = "Percent",
-		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.new(1, 0, 0.58, 0),
-		Font = Theme.HeadingFont,
-		TextSize = px(12),
-		TextColor3 = K.text,
-		TextXAlignment = right,
-		TextWrapped = false,
-	})
-	local barBack, barFill = Ui.bar(face, UDim2.new(1, 0, 0, 2), K.text)
-	barBack.Name = "Condition"
-	barBack.Position = UDim2.new(0, 0, 0.58, px(14) + 6)
-	local pips = Ui.make("Frame", {
-		Name = "Pips",
-		Size = UDim2.new(1, 0, 0, math.max(6, math.floor(8 * s))),
-		Position = UDim2.new(0, 0, 0.74, 0),
-		BackgroundTransparency = 1,
-	}, face)
-	Ui.make("UIListLayout", {
-		FillDirection = Enum.FillDirection.Horizontal,
-		HorizontalAlignment = Enum.HorizontalAlignment.Right,
-		Padding = UDim.new(0, 3),
-		SortOrder = Enum.SortOrder.LayoutOrder,
-	}, pips)
-	local pipsLabel = Ui.label(face, "", UDim2.new(1, 0, 0, px(14)), {
-		Name = "PipsLabel",
-		Position = UDim2.new(0, 0, 0.8, 0),
-		Font = Theme.HeadingFont,
-		TextSize = px(12),
-		TextColor3 = K.secondary,
-		TextXAlignment = right,
-		TextWrapped = false,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-	})
-
-	local function setBar(fraction: number, color: Color3?)
-		barFill.Size = UDim2.fromScale(math.clamp(fraction, 0, 1), 1)
-		barFill.BackgroundColor3 = color or K.text
-		percent.Text = `{math.floor(math.clamp(fraction, 0, 1) * 100 + 0.5)}%`
-	end
-	local shownPips = ""
-	local function setPips(filled: number, total: number, text: string?)
-		local signature = `{filled}/{total}`
-		if signature ~= shownPips then
-			shownPips = signature
-			Ui.clear(pips)
-			local width = if total > 8 then math.max(5, math.floor(7 * s)) else math.max(7, math.floor(10 * s))
-			for i = 1, math.max(0, math.floor(total)) do
-				local full = i <= filled
-				local pip = Ui.make("Frame", {
-					Size = UDim2.new(0, width, 1, 0),
-					BackgroundColor3 = K.text,
-					BackgroundTransparency = if full then 0 else 1,
-					BorderSizePixel = 0,
-					LayoutOrder = i,
-				}, pips)
-				Ui.stroke(pip, if full then K.text else K.line, 1).Transparency = 0
-			end
-		end
-		pipsLabel.Text = text or `{filled} / {total} cargo slots`
-	end
-	local dimTween: Tween? = nil
-	local function setDim(on: boolean)
-		if dimTween then
-			dimTween:Cancel()
-		end
-		local tween = TweenService:Create(face, TweenInfo.new(0.2), { GroupTransparency = if on then 0.45 else 0 })
-		dimTween = tween
-		tween:Play()
-	end
-	face.Destroying:Connect(function()
-		if dimTween then
-			dimTween:Cancel()
-		end
-	end)
-	return {
-		frame = frame,
-		face = face,
-		title = title,
-		value = value,
-		unit = unit,
-		caption = caption,
-		percent = percent,
-		barBack = barBack,
-		barFill = barFill,
-		pips = pips,
-		pipsLabel = pipsLabel,
-		needle = needle,
-		setNeedle = setNeedle,
-		setBar = setBar,
-		setPips = setPips,
-		setDim = setDim,
-	}
-end
-
 -- ── Text ──────────────────────────────────────────────────────────────────
 
 function Ui.money(amount: number): string
@@ -1727,10 +1121,6 @@ function Ui.money(amount: number): string
 		formatted = formatted:sub(2)
 	end
 	return "$" .. formatted
-end
-
-function Ui.stars(count: number): string
-	return string.rep("★", count) .. string.rep("☆", 3 - count)
 end
 
 function Ui.clock(seconds: number): string

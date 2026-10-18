@@ -442,7 +442,7 @@ function RoundUi.view(): { [string]: any }?
 end
 
 function RoundUi.start()
-	if started or not Config.Sandbox.On or not Q.On then
+	if started or not Q.On then
 		return
 	end
 	started = true

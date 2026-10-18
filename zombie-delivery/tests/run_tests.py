@@ -9,7 +9,7 @@ import glob, json, os, re, shutil, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SHARED = os.path.join(os.path.dirname(HERE), "src", "shared")
-PURE = ("Config", "ZombieKinds", "Economy", "Map", "Roads", "Icons", "Levels", "SoundSheet", "Cast", "NpcLooks", "Missions", "Melee", "Boarding", "Career", "Transport", "KitFit", "Bag", "Deliveries", "Residents", "Gestures", "RunCycle", "BodyMotion", "AvatarLook", "Tasks", "SoundPlan", "StyleLooks", "AnalyticsPlan", "RenderBudget", "OutlinePick", "ZombieStyle", "CardLayout", "KitArt", "CarUpright", "SpawnSpot", "Gait", "MovingRules", "MoveHelperBrain", "MoveRoles", "CarryGrip", "ChaletLooks", "SandboxMap", "SandboxAdmin", "CollectionRules", "SandboxSteps", "WarehouseLayout", "SprinterLooks")
+PURE = ("Config", "ZombieKinds", "Economy", "Map", "Roads", "Levels", "SoundSheet", "Cast", "NpcLooks", "Missions", "Melee", "Boarding", "Career", "Transport", "KitFit", "Deliveries", "Residents", "Gestures", "RunCycle", "BodyMotion", "AvatarLook", "SoundPlan", "StyleLooks", "AnalyticsPlan", "RenderBudget", "OutlinePick", "ZombieStyle", "CarUpright", "SpawnSpot", "Gait", "MovingRules", "MoveHelperBrain", "MoveRoles", "CarryGrip", "ChaletLooks", "SandboxMap", "SandboxAdmin", "CollectionRules", "SandboxSteps", "WarehouseLayout", "SprinterLooks")
 PURE += ("SandboxScenery",)  # 8.0 sandbox, the map (tests/sandboxworld_test.luau)
 PURE += ("PairCarry",)  # 8.1 carrying in two: the leader's steering (tests/paircarry_test.luau)
 PURE += ("UpgradeRules",)  # 8.1 sandbox, the upgrades (tests/upgrades_test.luau)
@@ -61,18 +61,16 @@ with tempfile.TemporaryDirectory() as tmp:
     open(os.path.join(tmp, "MoveLayout.luau"), "w", encoding="utf-8").write(source)
     shutil.copy(os.path.join(SHARED, "CourierMotion.luau"), os.path.join(tmp, "CourierMotion.luau"))
     shutil.copy(os.path.join(os.path.dirname(SHARED), "server", "CharacterArt", "Geometry.luau"), os.path.join(tmp, "CharacterGeometry.luau"))
-    # 6.4: the kit art (pure: the bags' pieces, tests/bags_test.luau)
-    shutil.copy(os.path.join(SHARED, "KitArt.luau"), os.path.join(tmp, "KitGeometry.luau"))  # (6.22: moved to shared)
     shutil.copy(os.path.join(os.path.dirname(SHARED), "server", "BikeArt", "Geometry.luau"), os.path.join(tmp, "BikeGeometry.luau"))  # 6.19
-    # 6.22: the inventory's looks (tests/itemlooks_test.luau) built by the real builders on a recorder: the vehicle
-    # preview's Roblox mock and tools/fixtures/item-mock.luau's few additions, the builders' globals taken from it.
+    # 6.22: the real builders on a recorder (tests/itemlooks_test.luau frames the furniture): the vehicle preview's
+    # Roblox mock and tools/fixtures/item-mock.luau's few additions, the builders' globals taken from it.
     tools = os.path.join(os.path.dirname(HERE), "tools")
     shutil.copy(os.path.join(tools, "vehicle-preview", "roblox-mock.luau"), os.path.join(tmp, "rbxmock.luau"))
     shutil.copy(os.path.join(tools, "fixtures", "item-mock.luau"), os.path.join(tmp, "ItemMock.luau"))
     prefix = 'local M = require("./ItemMock")\nlocal Instance, Vector3, CFrame, Color3, Enum, UDim2 = M.Instance, M.Vector3, M.CFrame, M.Color3, M.Enum, M.UDim2\n'
     # 7.0 (the moving prototype): the furniture and the house plans are made of Vector3s and CFrames, so they load on
     # the same recorder (tests/furniture_test.luau, tests/houselayout_test.luau).
-    for name in ("GunModels", "CargoLooks", "ItemLooks", "FurnitureLooks", "HouseLayout"):
+    for name in ("GunModels", "ItemLooks", "FurnitureLooks", "HouseLayout"):
         source = open(os.path.join(SHARED, name + ".luau"), encoding="utf-8").read()
         source = re.sub(r"require\(script\.Parent\.Layouts\.(\w+)\)", r'require("./\1")', source)  # (shared/Layouts: the countryside's)
         source = re.sub(r"require\(script\.Parent\.(\w+)\)", r'require("./\1")', source)
@@ -527,24 +525,6 @@ with tempfile.TemporaryDirectory() as tmp:
         sys.stderr.write(result.stderr)
         if result.returncode != 0 or "ALL CHECKS PASSED" not in result.stdout:
             ok = False
-# 6.22: shared/ItemLooks.luau's Finish (the bags' and vests' colours on the client) agrees with
-# server/ModelArt/Builder.luau's FINISH (the server-only builder of the kit worn on the character).
-def finish_check():
-    root = os.path.dirname(HERE)
-    builder = open(os.path.join(root, "src", "server", "ModelArt", "Builder.luau"), encoding="utf-8").read()
-    looks = open(os.path.join(root, "src", "shared", "ItemLooks.luau"), encoding="utf-8").read()
-    pattern = re.compile(r"^\t(\w+) = \{ color = \{ (\d+), (\d+), (\d+) \}, material = (?:Enum\.Material\.(\w+)|\"(\w+)\") \},", re.M)
-    server = {m.group(1): (m.group(2), m.group(3), m.group(4), m.group(5)) for m in pattern.finditer(builder)}
-    block = looks[looks.index("ItemLooks.Finish = {"):]
-    block = block[:block.index("\n}")]
-    client = {m.group(1): (m.group(2), m.group(3), m.group(4), m.group(6)) for m in pattern.finditer(block)}
-    bad = [name for name, value in client.items() if server.get(name) != value]
-    if not client or bad:
-        print("FAIL  ItemLooks.Finish differs from Builder's FINISH: " + ", ".join(bad or ["(none read)"]))
-        return False
-    print(f"ok    ItemLooks.Finish agrees with Builder's FINISH ({len(client)} finishes)")
-    return True
-
 # 3.3: the car bodies (server/Vehicles.luau STYLES, not loadable outside Roblox) read as text: every Config.Cars style
 # has a body; every dealer car's body takes cargo and has a back that opens (the 3.2 loading).
 # 3.4: every car's capacity (Config.Cars capacity) is exactly its body's cargo slots (the slot list of cargo(...)).
@@ -636,8 +616,6 @@ def styles_check():
     return not bad
 
 if not styles_check():
-    ok = False
-if not finish_check():  # 6.22
     ok = False
 
 # 6.13, analytics: every money reason the server passes (PlayerData.addMoney / spend, Analytics.money) is one of

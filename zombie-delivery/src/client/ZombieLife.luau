@@ -1,16 +1,16 @@
 --!strict
 -- 6.16, zombies with a life of their own (the owner: "upgrade the visuals and the feel"), on this client: the zombies'
--- eyes and voices (Config.ZombieLife). Cosmetic only, the server knows nothing of it. The poses are
--- client/ZombieAnimator.luau's; its list of the zombies and its hooks (a hit, an attack, a death, a brute's step) feed
--- this.
---   * Eyes: the Neon eyes (the native body's EyeL / EyeR, the block fallback's Eye) take EyeDay's dull colour by day and
---     the kind's Glow at night, faded through dusk and dawn by the clock (the workspace's ClockHour, Map.nightFactor):
---     a faint glow, no lights. Within EyeRange of the camera, looked at every EyeEvery s; a body is painted again only
---     when the glow has moved on since (or when it comes near). Never a person's style (ZombieStyle's "person").
+-- eyes and voices (Config.ZombieLife), while the danger has zombies in a run (none since 10.5: Config.Runs.Danger).
+-- Cosmetic only, the server knows nothing of it. The poses are client/ZombieAnimator.luau's; its list of the zombies
+-- and its hooks (a hit, an attack, a death, a brute's step) feed this.
+--   * Eyes: the Neon eyes (the native body's EyeL / EyeR, the block fallback's Eye) take EyeDay's dull colour (10.6:
+--     the game's light is a fixed afternoon, so never the city's night glow). Within EyeRange of the camera, looked at
+--     every EyeEvery s; a body is painted once (or again when its eyes were not found yet). Never a person's style
+--     (ZombieStyle's "person").
 --   * Voices: the existing zombie_a / zombie_b cues pitched (client/Sounds.luau Sounds.playAt: 3D, at the zombie):
 --       groans  the nearest within Groan.Range of the camera, each zombie with a pause of its own (Min … Max s,
---               × Night at night, × Hunt while it moves fast), at most Groan.Voices at once and Gap s apart (this took
---               over Sounds' single 5.x groan);
+--               × Hunt while it moves fast), at most Groan.Voices at once and Gap s apart (this took over Sounds'
+--               single 5.x groan);
 --       scream a runner coming at you (within Scream.Range, faster than Speed, heading your way): a shriek, once every
 --               Again s a runner;
 --       grunt   a hit (ZombieAnimator.onHit; a hard one louder), a gurgle on a death, a snarl on a bite or a swipe
@@ -20,13 +20,11 @@
 -- Looked at four times a second; the bodies' humanoids and roots come from client/Bodies.luau's cache; the zombies that
 -- left are forgotten now and then.
 
-local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared:WaitForChild("Config"))
-local Map = require(Shared:WaitForChild("Map"))
 local SoundSheet = require(Shared:WaitForChild("SoundSheet"))
 local ZombieStyle = require(Shared:WaitForChild("ZombieStyle"))
 local Bodies = require(script.Parent.Bodies)
@@ -47,8 +45,7 @@ type Known = {
 	person: boolean,
 	pitch: number,
 	eyes: { BasePart }?, -- looked up when it first comes near
-	glow: Color3,
-	applied: number?, -- the night's glow its eyes were painted for
+	painted: boolean, -- its eyes found and painted
 	nextGroan: number,
 	screamed: number,
 	grunted: number,
@@ -83,8 +80,7 @@ local function knownOf(model: Model, now: number): Known
 		person = gait.style == "person",
 		pitch = gait.pitch,
 		eyes = nil,
-		glow = rgb(Tuning.Glow[name] or Tuning.GlowDefault),
-		applied = nil,
+		painted = false,
 		nextGroan = now + Groan.Min * math.random(),
 		screamed = -math.huge,
 		grunted = -math.huge,
@@ -126,13 +122,7 @@ local function eyesOf(model: Model): { BasePart }
 	return list
 end
 
-local function nightNow(): number
-	local hour = workspace:GetAttribute("ClockHour")
-	return Map.nightFactor(if type(hour) == "number" then hour else Lighting.ClockTime)
-end
-
 local function paintEyes(eye: Vector3, now: number)
-	local night = nightNow()
 	local range = Tuning.EyeRange
 	for _, model in ZombieAnimator.list() do
 		local _, root = Bodies.of(model)
@@ -143,7 +133,7 @@ local function paintEyes(eye: Vector3, now: number)
 		if k.person then
 			continue
 		end
-		if k.applied and math.abs(k.applied - night) < 0.02 then
+		if k.painted then
 			continue
 		end
 		local eyes: { BasePart } = k.eyes or eyesOf(model)
@@ -151,11 +141,10 @@ local function paintEyes(eye: Vector3, now: number)
 			eyes = eyesOf(model) -- (looked for again until found)
 		end
 		k.eyes = eyes
-		local color = DAY:Lerp(k.glow, night)
 		for _, part in eyes do
-			part.Color = color
+			part.Color = DAY
 		end
-		k.applied = night
+		k.painted = #eyes > 0
 	end
 end
 
@@ -201,7 +190,6 @@ local function talk(now: number)
 		local _, root = Bodies.of(character)
 		me = root
 	end
-	local night = workspace:GetAttribute("Night") == true
 	table.clear(candidates)
 	for _, model in ZombieAnimator.list() do
 		local humanoid, root = Bodies.of(model)
@@ -236,9 +224,9 @@ local function talk(now: number)
 			end
 			entry.model, entry.root, entry.distance, entry.known = model, root, distance, k
 			table.insert(candidates, entry)
-			-- (its next pause: shorter at night and while it hunts at a run)
+			-- (its next pause: shorter while it hunts at a run)
 			local pause = Groan.Min + (Groan.Max - Groan.Min) * math.random()
-			k.nextGroan = now + pause * (if night then Groan.Night else 1) * (if flat.Magnitude > 8 then Groan.Hunt else 1)
+			k.nextGroan = now + pause * (if flat.Magnitude > 8 then Groan.Hunt else 1)
 		end
 	end
 	if #candidates == 0 then

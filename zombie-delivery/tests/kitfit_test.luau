@@ -1,6 +1,6 @@
--- 5.0, the worn kit (shared/KitFit.luau, server/KitWear.luau): what a player wears for the kit they own, and how
--- Codex's art, authored for a nominal block R15 body, is fitted to the body parts the character really has.
--- Run with tests/run_tests.py.
+-- Art authored for a nominal block R15 body fitted to the body parts the character really has (shared/KitFit.luau:
+-- the courier you make, shared/StyleBuild.luau; the clipboard in a hand, server/Clipboard.luau). 10.6: the city's worn
+-- kit is gone. Run with tests/run_tests.py.
 local KitFit = require("./KitFit")
 
 local failures = 0
@@ -19,36 +19,6 @@ end
 local function same(a: { number }, b: { number }): boolean
 	return near(a[1], b[1]) and near(a[2], b[2]) and near(a[3], b[3])
 end
-local function count(t: { [string]: string }): number
-	local n = 0
-	for _ in t do
-		n += 1
-	end
-	return n
-end
-
--- The outfit -------------------------------------------------------------------------------------------------------
-
-check("nothing owned: nothing worn", count(KitFit.outfit({})) == 0)
--- 6.6: no backpack slot any more (one carrying item): an old kit's backpack ids wear nothing
-local old = KitFit.outfit({ backpack = true, bigpack = true } :: any)
-check("6.6: an old backpack is never worn", count(old) == 0 and (old :: any).pack == nil and (old :: any).load == nil)
-local all = KitFit.outfit({ backpack = true, shoes = true, jacket = true } :: any)
-check("6.12.2: an old save's retired kit is never worn (6.6: no pack, no parcel; 6.7: no jacket; 6.12.2: no shoes)", (all :: any).shoes == nil and (all :: any).jacket == nil and count(all) == 0)
-check("a false entry is not owned", count(KitFit.outfit({ shoes = false, jacket = false })) == 0)
--- 6.0: the plastic bag in the hand, the best vest over the courier's
-local bagged = KitFit.outfit({ bag = true })
-check("the bag in the hand", bagged.hand == "bag" and count(bagged) == 1)
-check("the Kevlar vest", KitFit.outfit({ kevlar = true }).vest == "kevlar")
-local vests = KitFit.outfit({ kevlar = true, heavy = true, bag = true })
-check("both vests: only the heavy armour", vests.vest == "heavy" and vests.hand == "bag" and count(vests) == 2)
-check("a false bag or vest is not worn", count(KitFit.outfit({ bag = false, kevlar = false, heavy = false, hivis = false })) == 0)
--- 6.0.1: the Courier Vest (the red reflective one) in the same slot; an armoured vest is worn instead of it
-local hivis = KitFit.outfit({ hivis = true, bag = true })
-check("the Courier Vest", hivis.vest == "hivis" and hivis.hand == "bag" and count(hivis) == 2)
-check("the Courier Vest and the Kevlar: the Kevlar shows", KitFit.outfit({ hivis = true, kevlar = true }).vest == "kevlar")
-check("the Courier Vest and the heavy armour: the armour shows", KitFit.outfit({ hivis = true, kevlar = true, heavy = true }).vest == "heavy")
-
 -- The factors ------------------------------------------------------------------------------------------------------
 
 check("the nominal torso: 1, 1, 1", same(KitFit.factors("UpperTorso", { 2, 1.6, 1 }), { 1, 1, 1 }))
@@ -94,25 +64,25 @@ check("the fist: the smallest hand factor", near(fist[1], KitFit.HandMin) and fi
 check("the block hand keeps its factor", near(KitFit.factors("RightHand", { 1, 0.3, 1 })[1], 1))
 check("the left hand and the pelvis are measured too", KitFit.Nominal.LeftHand ~= nil and KitFit.Nominal.LowerTorso ~= nil
 	and near(KitFit.factors("LeftHand", { 0.22, 0.36, 0.4 })[1], KitFit.HandMin))
-local phone = {
-	{ name = "Case", size = { 0.68, 1.18, 0.11 }, at = { 0, -0.12, -0.3 }, attach = "RightHand" },
-	{ name = "Screen", size = { 0.57, 0.9, 0.025 }, at = { 0, -0.11, -0.37 }, attach = "RightHand" },
-	{ name = "Lens", size = { 0.035, 0.12, 0.12 }, at = { -0.22, 0.34, -0.225 }, attach = "RightHand", turn = { 0, 90, 0 } },
+local board = {
+	{ name = "Board", size = { 0.68, 1.18, 0.11 }, at = { 0, -0.12, -0.3 }, attach = "RightHand" },
+	{ name = "Paper", size = { 0.57, 0.9, 0.025 }, at = { 0, -0.11, -0.37 }, attach = "RightHand" },
+	{ name = "Clip", size = { 0.035, 0.12, 0.12 }, at = { -0.22, 0.34, -0.225 }, attach = "RightHand", turn = { 0, 90, 0 } },
 }
-local held = KitFit.fit(phone, { RightHand = fist })
+local held = KitFit.fit(board, { RightHand = fist })
 local palm = KitFit.Palm.RightHand
 check("in the palm: the art's middle on the palm spot", same(held[1].at, palm.to), `{held[1].at[1]} {held[1].at[2]} {held[1].at[3]}`)
 check("in the palm: scaled by the hand's one factor", same(held[1].size, { 0.68 * fist[1], 1.18 * fist[1], 0.11 * fist[1] }))
-check("in the palm: the screen faces the palm's way (-X, the body)", held[2].at[1] < held[1].at[1] and near(held[2].at[3], 0, 1e-9))
+check("in the palm: the paper faces the palm's way (-X, the body)", held[2].at[1] < held[1].at[1] and near(held[2].at[3], 0, 1e-9))
 check("in the palm: turned a quarter about the hand", near(held[1].turn[2], 90, 1e-6) and near(held[1].turn[1], 0, 1e-6))
--- the lens, already turned a quarter, turns on with it: half round about Y (or its mirror) faces the same way
-local lensTurn = held[3].turn
-local cosY = math.cos(math.rad(lensTurn[2])) * math.cos(math.rad(lensTurn[1]))
-check("in the palm: a turned piece turns with it", near(math.abs(cosY), 1, 1e-6), `{lensTurn[1]} {lensTurn[2]} {lensTurn[3]}`)
+-- the clip, already turned a quarter, turns on with it: half round about Y (or its mirror) faces the same way
+local clipTurn = held[3].turn
+local cosY = math.cos(math.rad(clipTurn[2])) * math.cos(math.rad(clipTurn[1]))
+check("in the palm: a turned piece turns with it", near(math.abs(cosY), 1, 1e-6), `{clipTurn[1]} {clipTurn[2]} {clipTurn[3]}`)
 check("in the palm: off the palm, not in it", held[1].at[1] + held[1].size[3] / 2 <= -0.11 + 1e-6)
-local blockHeld = KitFit.fit(phone, { RightHand = { 1, 1, 1 } })
-check("a block hand: the art as authored", same(blockHeld[1].at, phone[1].at) and blockHeld[1].turn == nil)
-local leftHeld = KitFit.fit({ { name = "Case", size = { 0.68, 1.18, 0.11 }, at = { 0, -0.12, -0.3 }, attach = "LeftHand" } }, { LeftHand = fist })
+local blockHeld = KitFit.fit(board, { RightHand = { 1, 1, 1 } })
+check("a block hand: the art as authored", same(blockHeld[1].at, board[1].at) and blockHeld[1].turn == nil)
+local leftHeld = KitFit.fit({ { name = "Board", size = { 0.68, 1.18, 0.11 }, at = { 0, -0.12, -0.3 }, attach = "LeftHand" } }, { LeftHand = fist })
 check("the left palm faces +X", same(leftHeld[1].at, KitFit.Palm.LeftHand.to) and KitFit.Palm.LeftHand.to[1] > 0)
 
 if failures == 0 then

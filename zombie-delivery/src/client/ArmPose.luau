@@ -14,7 +14,7 @@
 --   * A swing (the run's bat: server/CloseCombat.luau's MeleeAt / MeleeKind on the character, shared/Melee.luau swing):
 --     the right arm's wind-up and strike on top of whatever else it does, about Config.Melee.SwingTime long; yours
 --     from your own attributes like everybody's.
---   * 5.7: a short gesture on top of everything (shared/Gestures.luau: wave, give, take, knock), from the Gesture /
+--   * 5.7: a short gesture on top of everything (shared/Gestures.luau: take, knock, lift, setdown), from the Gesture /
 --     GestureAt attributes the server sets on characters and people (server/Npcs.luau Npcs.act); 6.7: a gesture bends
 --     the body too ("pickup", "land": shared/Gestures.luau's waist / neck / crouch): the waist, the head, the Root joint
 --     (the hips down and back) and the legs (bent so the feet stay where they stood: BodyMotion.crouch). Both arms, R15

@@ -316,7 +316,7 @@ local function mount(entry: Card)
 	copy.Parent = view
 	local lo, hi = ItemLooks.bounds(copy)
 	local size = entry.picture.Size
-	local eye, centre = ItemLooks.frame(lo, hi, math.max(0.2, size.X.Offset / math.max(1, size.Y.Offset)), false)
+	local eye, centre = ItemLooks.frame(lo, hi, math.max(0.2, size.X.Offset / math.max(1, size.Y.Offset)))
 	local camera = Ui.make("Camera", { FieldOfView = look.Fov }, view)
 	camera.CFrame = CFrame.lookAt(vec(eye), vec(centre))
 	view.CurrentCamera = camera

@@ -27,10 +27,10 @@
 --                                           (not on a touch screen: the chip is tapped)
 -- 8.3 keys, the sandbox's actions on every device (one place decides how an action is shown: client/KeyHints.luau's
 -- strip, client/CarryGripUi.luau's grip check, client/MovingHud.luau's next step, client/SandboxGuide.luau's line).
--- The gamepad's map: X the prompts (Use, Pick up, Load, Display; out of a seat), Y held for Sell and the van's Take out,
--- R2 the grip, B Put down and closing (held: the guide on and off, as a held G), L1 "Talk to Danny" (reserved for
--- him; 8.3 Danny: R1 his "Give to Danny" at a piece), R2 / L2 and the left stick Roblox's driving. A word names
--- a gamepad button as Roblox does ("X", "R2").
+-- The gamepad's map: X the prompts (Use, Pick up, Load, Display), Y held for Sell and the van's Take out, R2 the grip,
+-- B Put down and closing (held: the guide on and off, as a held G), L1 "Talk to Danny" (reserved for him; 8.3 Danny:
+-- R1 his "Give to Danny" at a piece), L2 the map, the left stick Roblox's walk. A word names a gamepad button as Roblox
+-- does ("X", "R2"). 10.6: nobody drives, so no driving, steering, horn or getting out of a seat.
 -- 8.5 Danny's clipboard (orders mode: client/DannyOrders.luau, server/Clipboard.luau): "clipboard" takes it out, on a
 -- computer Config.MoveHelper.Clipboard.Key (Q: free in the sandbox, where E, F, C, J, K, B, G, P, O, T, Z, H and Tab are
 -- taken and R is the city's clerks'), with a gamepad R1 (Danny's: with it out, R1 by a piece gives it to him, his
@@ -62,10 +62,9 @@ export type Chip = { id: string, icon: string, word: string, key: string, pad: s
 export type Action = { key: string, pad: { string }, tap: string?, hold: boolean? }
 
 -- (each one's own: the prompts' GamepadKeyCode is server/Moving.luau's, server/Warehouse.luau's and Roblox's default X;
--- the seat's way out Roblox's; the grip client/CarryGripUi.luau's; Danny's client/MoveHelperCard.luau's)
+-- the grip client/CarryGripUi.luau's; Danny's client/MoveHelperCard.luau's)
 SandboxPad.Actions = {
 	use = { key = "E", pad = { "ButtonX" } }, -- a prompt: Use, Pick up, Load, Display, the UPGRADES desk
-	getout = { key = "E", pad = { "ButtonX" } }, -- out of a seat
 	putdown = { key = "G", pad = { "ButtonB" } }, -- Put down / Let go what you carry
 	close = { key = "Esc", pad = { "ButtonB" } }, -- a window shut
 	guide = { key = "G", pad = { "ButtonB" }, tap = "💡", hold = true }, -- the guide off and on again
@@ -76,14 +75,10 @@ SandboxPad.Actions = {
 	dannygive = { key = `{Config.MoveHelper.Clipboard.GiveKey} / LMB`, pad = { "ButtonR1" } }, -- 8.3 Danny: a piece onto his list or off it (a click, a tap, R1 at it; 9.0 E by it)
 	clipboard = { key = Config.MoveHelper.Clipboard.Key, pad = { "ButtonR1" }, tap = "📋" }, -- 8.5 Danny's clipboard out (orders mode)
 	stow = { key = Config.MoveHelper.Clipboard.Key, pad = { "ButtonB" }, tap = "📋" }, -- 8.5 … and put away again
-	drive = { key = "W/S", pad = { "ButtonR2", "ButtonL2" } }, -- Roblox's driving: R2 on, L2 back
-	steer = { key = "A/D", pad = { "Thumbstick1" } },
-	horn = { key = "H", pad = {} }, -- (no button: the keyboard's H only)
 	list = { key = "O", pad = {} }, -- the move's list (a phone taps the move's panel)
 	chat = { key = "T", pad = {}, hold = true }, -- the quick chat
-	-- 10.x the map (client/SandboxMapUi.luau, Config.SandboxMapUi): M; with a gamepad L2 on foot (in a seat L2 is the
-	-- brake: not then; no seat is driven in the sandbox since 9.7, and the city's clerks, L2's other user, never stand
-	-- there); a touch screen's 🗺 MAP chip
+	-- 10.x the map (client/SandboxMapUi.luau, Config.SandboxMapUi): M; with a gamepad L2 on foot (nothing else of the
+	-- game's is on L2); a touch screen's 🗺 MAP chip
 	map = { key = Config.SandboxMapUi.Key, pad = { Config.SandboxMapUi.Button }, tap = "🗺 MAP" },
 } :: { [string]: Action }
 

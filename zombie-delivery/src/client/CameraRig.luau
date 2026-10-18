@@ -50,16 +50,6 @@ local WALK_SPEED = Config.Movement.Walk -- 3.7: 14 (3.2.4: 12)
 local SPRINT_SPEED = Config.Movement.Sprint -- 3.7: 28 (3.2.4: 25)
 local CARRY_SPEED = 8 -- a piece in the hands: no sprinting
 
--- 4.5: the admin's walk multiplier (the player attribute AdminSpeed: 1, 2 or 4; only server/Admin.luau sets it).
--- 5.0: × the kit's (the character attribute KitSpeed), on every step on foot: the walk, the sprint, the carry.
-local function adminSpeed(): number
-	local value = player:GetAttribute("AdminSpeed")
-	local character = player.Character
-	local kit = if character then character:GetAttribute("KitSpeed") else nil
-	local kitMult = if type(kit) == "number" and kit >= 1 and kit <= 2 then kit else 1
-	return (if type(value) == "number" and value >= 1 and value <= 4 then value else 1) * kitMult
-end
-
 -- The step with a piece in the hands: 7.0 a move's thing (MoveCarry, server/Moving.luau) walks at its own CarrySpeed (a
 -- lamp near the walk, a sofa dragged alone a crawl).
 local function carrySpeed(character: Model): number
@@ -378,7 +368,7 @@ local function update(dt: number)
 			else WALK_SPEED
 		local rate = if target > speed then SPEED_UP else SLOW_DOWN
 		speed = if target > speed then math.min(target, speed + rate * dt) else math.max(target, speed - rate * dt)
-		humanoid.WalkSpeed = speed * adminSpeed()
+		humanoid.WalkSpeed = speed
 	end
 
 	-- Behind you, a little to the side.
@@ -460,7 +450,7 @@ local function touchSpeed()
 		local target = if handsFull then carrySpeed(character) elseif sprinting then SPRINT_SPEED else WALK_SPEED
 		local rate = if target > speed then SPEED_UP else SLOW_DOWN
 		speed = if target > speed then math.min(target, speed + rate * dt) else math.max(target, speed - rate * dt)
-		local walk = speed * adminSpeed()
+		local walk = speed
 		if walk ~= written or humanoid ~= writtenFor then
 			written = walk
 			writtenFor = humanoid

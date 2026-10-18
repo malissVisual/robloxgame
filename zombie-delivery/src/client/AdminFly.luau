@@ -5,8 +5,7 @@
 --                faster. A LinearVelocity and an AlignOrientation on the HumanoidRootPart, the Humanoid platform-stands;
 --                a car seat ends the flight (it comes back when you get out).
 --   AdminNoclip  the character's parts do not collide (through walls; the Humanoid still stands on the floor).
---   AdminJump    super jump (JumpPower × JUMP_POWER, JumpHeight × JUMP_HEIGHT; back to the character's own values).
--- The walk multiplier (AdminSpeed) is in client/CameraRig.luau.
+-- 10.6: the admin keeps fly and noclip; the city's super jump and walk multiplier are gone.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -18,8 +17,6 @@ local player = Players.LocalPlayer
 
 local FLY_SPEED = 70 -- studs per second
 local FLY_FAST = 3 -- × with Shift
-local JUMP_POWER = 2.5
-local JUMP_HEIGHT = 6.25 -- (the height grows with the square of the power)
 
 type Flight = { humanoid: Humanoid, attachment: Attachment, mover: LinearVelocity, align: AlignOrientation }
 local flight: Flight? = nil
@@ -194,38 +191,9 @@ local function noclip()
 	end
 end
 
--- ── Super jump ─────────────────────────────────────────────────────────────
-
-local jumpBase: { [Humanoid]: { power: number, height: number } } = {}
-
-local function applyJump()
-	local character = player.Character
-	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-	if not humanoid then
-		return
-	end
-	local base = jumpBase[humanoid]
-	if not base then
-		table.clear(jumpBase) -- (only the current character's)
-		base = { power = humanoid.JumpPower, height = humanoid.JumpHeight }
-		jumpBase[humanoid] = base
-	end
-	local on = player:GetAttribute("AdminJump") == true
-	humanoid.JumpPower = base.power * (if on then JUMP_POWER else 1)
-	humanoid.JumpHeight = base.height * (if on then JUMP_HEIGHT else 1)
-end
-
 function AdminFly.start()
 	RunService:BindToRenderStep("ZombieDeliveryAdminFly", Enum.RenderPriority.Camera.Value + 5, fly)
 	RunService.Stepped:Connect(noclip)
-	player:GetAttributeChangedSignal("AdminJump"):Connect(applyJump)
-	player.CharacterAdded:Connect(function(character: Model)
-		character:WaitForChild("Humanoid", 10)
-		applyJump()
-	end)
-	if player.Character then
-		applyJump()
-	end
 end
 
 -- Is the local character flying right now (the attribute on and the flight running)?

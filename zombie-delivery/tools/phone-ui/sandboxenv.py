@@ -1,7 +1,7 @@
 """8.0 SANDBOX: the folder tools/phone-ui/sandbox.luau runs in (check.py runs its checks there, sandbox_preview.py its
 scenes): the real shared modules (shared/FurnitureLooks.luau loaded on the recorder for its catalogue), the real
 client/SandboxHud.luau, client/WarehouseUi.luau, client/CardKit.luau, client/TouchLayout.luau and client/MoveLayout.luau
-on sandbox_mock.luau's recorder (missions_mock.luau's), the Ui, Theme, Hud, Juice and ItemModel stand-ins, and a second
+on sandbox_mock.luau's recorder (missions_mock.luau's), the Ui, Theme, Hud and Juice stand-ins, and a second
 SandboxHud (SandboxHudAlone) that finds no client/Hud.luau (its own column and toasts). 8.1: client/UpgradeUi.luau and
 tools/phone-ui/upgrades.luau (the UPGRADES desk's window) there too. 8.2: client/CollectionBookUi.luau and
 tools/phone-ui/collectionbook.luau (the collection book), client/SandboxTasksUi.luau and tools/phone-ui/sandboxtasks.luau
@@ -55,7 +55,7 @@ def sandbox_env(dest: Path):
     assert 'require("./Hud")' in alone
     (dest / "SandboxHudAlone.luau").write_text(alone.replace('require("./Hud")', 'require("./NoHud")'))
     (dest / "NoHud.luau").write_text("return {}")
-    for name, field in (("Ui", "MUi"), ("Theme", "MTheme"), ("Hud", "Hud"), ("Juice", "Juice"), ("ItemModel", "ItemModel"), ("Sounds", "Sounds")):
+    for name, field in (("Ui", "MUi"), ("Theme", "MTheme"), ("Hud", "Hud"), ("Juice", "Juice"), ("Sounds", "Sounds")):
         (dest / f"{name}.luau").write_text(f'return require("./sandbox_mock").{field}')
     for name in ("mock.luau", "missions_mock.luau", "sandbox_mock.luau", "sandbox.luau", "upgrades.luau", "collectionbook.luau", "sandboxtasks.luau", "sandboxpad.luau", "vanpaint.luau"):
         (dest / name).write_bytes((HERE / name).read_bytes())

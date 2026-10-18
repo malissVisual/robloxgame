@@ -84,7 +84,7 @@ function methods:SetAttribute(key,value) self._attrs[key]=value end
 function methods:GetAttribute(key) return self._attrs[key] end
 function methods:GetPropertyChangedSignal(key) self._signals[key]=self._signals[key] or signal(); return self._signals[key] end
 methods.GetAttributeChangedSignal=methods.GetPropertyChangedSignal
--- 6.22: a ViewportFrame's model (client/ItemModel.luau): its parts, and the copy put in each view.
+-- 6.22: a ViewportFrame's model (the STOCK list's and the book's pictures): its parts, and the copy put in each view.
 function methods:GetDescendants()
 	local out={}
 	for _,child in self._children do table.insert(out,child);for _,d in child:GetDescendants() do table.insert(out,d) end end
@@ -199,35 +199,13 @@ function M.P.button(parent,value,size,kind,fn)
 end
 function M.P.dot(parent,props) return M.Ui.label(parent,"",M.UDim2.fromOffset(14,14),props) end
 function M.P.tag(parent,value) return M.Ui.label(parent,value,M.UDim2.fromOffset(100,20)) end
--- 6.21: an icon (no uploaded ids here: the emoji as a label, like Ui.icon without its picture) and the contract's
--- colours (HudContract).
-function M.Ui.icon(parent,iconName,fallback,size,props)
-	local made=M.make("TextLabel",{Name="Icon",Text=fallback,Size=size,BackgroundTransparency=1},parent)
-	for key,value in props or {} do if string.sub(key,1,5)~="Image" then made[key]=value end end
-	return made
-end
+-- 6.21: the contract's colours (HudContract).
 for key,value in {ink={242,242,240},ink2={196,199,203},line={133,139,147},red={215,74,70},good={126,196,120},warn={228,170,82},surface={20,23,28},raised={32,36,42}} do
 	M.P[key]=M.Color3.fromRGB(unpack(value))
 end
 M.NumberSequence={new=function(points) return {Keypoints=points} end}
--- 6.22: the camera's frame (client/ItemModel.luau looks from the eye at the model's middle), and shared/ItemLooks'
--- stand-in: a model a key (its build counted: once a key), "broken" keys fail (the icon comes back).
+-- 6.22: the camera's frame (a 3D picture looks from the eye at the model's middle).
 M.CFrame={new=function(x,y,z) return {Position=M.Vector3.new(x or 0,y or 0,z or 0)} end,lookAt=function(eye,at) return {Position=eye,LookAt=at} end}
-M.built={}
-M.broken={}
-M.ItemLooks={
-	has=function(key) return not M.broken[key] end,
-	build=function(key)
-		if M.broken[key] then error("no look for "..key) end
-		M.built[key]=(M.built[key] or 0)+1
-		local model=M.make("Model",{Name="ItemLook"})
-		model:SetAttribute("Look",key)
-		M.make("Part",{Name="Body"},model)
-		return model
-	end,
-	bounds=function() return {-1,-1,-1},{1,1,1} end,
-	frame=function() return {3,2,-4},{0,0,0} end,
-}
 M.NumberSequenceKeypoint={new=function(time,value) return {Time=time,Value=value} end}
 M.Sounds={cycle=function() M.soundCycles=(M.soundCycles or 0)+1 end}
 -- the sounds played (recorded) and the keys bound
