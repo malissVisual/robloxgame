@@ -1,7 +1,7 @@
 --!strict
 -- PhoneMotion.reducedMotion(): the player's Reduced Motion setting (Roblox's GuiService.ReducedMotionEnabled), asked
--- by the modules that move things for show (client/Juice.luau, client/GaitPose.luau, client/ItemModel.luau,
--- client/RideUi.luau). (The name is the old courier phone's, whose motion this was.)
+-- by the modules that move things for show (client/Juice.luau, client/GaitPose.luau, client/RideUi.luau). (The name is
+-- the old courier phone's, whose motion this was.)
 
 local GuiService = game:GetService("GuiService")
 
